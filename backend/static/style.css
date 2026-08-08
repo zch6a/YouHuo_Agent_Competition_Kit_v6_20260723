@@ -245,44 +245,6 @@ button, .mic-big, .bottom-nav a { -webkit-user-select: none; user-select: none; 
   padding-right: max(var(--space-4), env(safe-area-inset-right));
 }
 
-@media (max-width: 760px) {
-  /* One column, full-bleed cards, and a header that stays put — the three
-     things that make a browser page read as an app screen. */
-  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); }
-
-  .app-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    padding-top: max(var(--space-2), env(safe-area-inset-top));
-    /* Frosted, so content scrolling underneath stays legible. */
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
-    -webkit-backdrop-filter: saturate(1.4) blur(14px);
-    border-bottom: 1px solid var(--line);
-  }
-
-  /* The rail is a desktop sidebar; on a phone it is simply the rest of the
-     screen, stacked. */
-  .rail { display: grid; gap: var(--space-4); }
-  .panel, .hero, .card { border-radius: var(--r-lg); }
-
-  /* Leave room for the fixed bottom bar plus the home gesture area, or the last
-     card sits under it and cannot be scrolled into view. */
-  main.shell { padding-bottom: calc(var(--space-16) + env(safe-area-inset-bottom) + 44px); }
-
-  /* Thumb reach: the primary control belongs at the bottom of a phone screen,
-     not the middle. */
-  .mic-stage { position: sticky; bottom: var(--space-3); z-index: 15; }
-}
-
-/* Installed to the home screen there is no browser UI to lean on, so the app
-   supplies its own top inset. */
-@media (display-mode: standalone), (display-mode: minimal-ui) {
-  .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
-  /* A back link to a page the user cannot see the URL of is just confusing. */
-  .back-link { display: none; }
-}
 
 /* Soft gradient mesh behind everything; purely decorative. */
 body::before {
@@ -1369,4 +1331,112 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* ==========================================================================
+   Responsive overrides — deliberately LAST in the file.
+   A media query adds no specificity, so anything here written above the
+   component it overrides would silently lose the cascade. That is exactly
+   what happened when this block sat near the top: `.elder-layout` is
+   declared further down with `display: grid`, so the phone app frame never
+   applied to the one screen it mattered most on.
+   ========================================================================== */
+
+@media (max-width: 760px) {
+  /* One column, full-bleed cards, and a header that stays put — the three
+     things that make a browser page read as an app screen. */
+  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); }
+
+  .app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-top: max(var(--space-2), env(safe-area-inset-top));
+    /* Frosted, so content scrolling underneath stays legible. */
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* The rail is a desktop sidebar; on a phone it is simply the rest of the
+     screen, stacked. */
+  .rail { display: grid; gap: var(--space-4); }
+  .panel, .hero, .card { border-radius: var(--r-lg); }
+
+  /* Leave room for the fixed bottom bar plus the home gesture area, or the last
+     card sits under it and cannot be scrolled into view. */
+  main.shell { padding-bottom: calc(var(--space-16) + env(safe-area-inset-bottom) + 44px); }
+
+  /* ----------------------------------------------------------------------
+     The app frame.
+     Before this, the elder screen was one 2500px column on an 844px phone:
+     chat, microphone, composer, four rail cards and the settings, stacked.
+     Scroll down to read an answer and the microphone was gone — the primary
+     action of a voice product left the screen. An app screen does not scroll
+     as a whole; a *region* inside it scrolls while the bar and the composer
+     stay put. That is the difference this block makes, and it is why the
+     layout is fixed to the viewport rather than merely styled.
+     ---------------------------------------------------------------------- */
+     First attempt pinned the *whole page* to the viewport and put the rail
+     inside that frame too. The arithmetic does not work on a phone: role header
+     200 + microphone 217 + composer 157 = 574px, and the rail claimed another
+     354px of an 844px screen, so the conversation — the actual product — was
+     crushed to a 50px sliver showing the tail of one sentence.
+
+     So the frame is the *conversation screen*, not the document. The stage is
+     exactly one viewport tall with the composer at its foot, and the extras sit
+     below it in normal flow, reached by scrolling. First screen is a complete
+     app screen; nothing is crushed; nothing important needs scrolling to reach.
+     ---------------------------------------------------------------------- */
+  .elder-layout > .stage {
+    /* One screen minus the app bar. */
+    min-height: calc(100svh - 104px);
+    min-height: calc(100dvh - 104px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The conversation takes whatever the fixed furniture leaves, and scrolls. */
+  #chat {
+    flex: 1;
+    /* Enough for two long Chinese bubbles; below this the screen is useless and
+       the stage is allowed to grow instead. */
+    min-height: 200px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
+
+  /* Fixed furniture: never shrinks, always at the foot of the screen. */
+  .mic-stage, .composer { flex-shrink: 0; }
+  .composer { padding-bottom: var(--space-2); }
+
+  /* 217px of microphone is a desktop hero, not a phone control. Still far above
+     the 48px touch floor, and still the largest thing on the screen. */
+  .mic-stage { margin: var(--space-4) 0 var(--space-2); gap: var(--space-2); }
+  .mic-big { width: 116px; height: 116px; }
+  .mic-big svg { width: 46px; height: 46px; }
+
+  /* The role header is an identity banner; on a phone it should not cost a
+     quarter of the screen the conversation needs. */
+  .role-header { margin-bottom: var(--space-2); }
+  .role-icon { width: 46px; height: 46px; }
+  #agentTitle { font-size: var(--text-xl); }
+
+  /* The extras follow the conversation screen in normal flow. */
+  .rail { padding-bottom: max(var(--space-6), env(safe-area-inset-bottom)); }
+
+  /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
+     row of prime real estate directly under the microphone. */
+  .quick { display: none; }
+}
+
+/* Installed to the home screen there is no browser UI to lean on, so the app
+   supplies its own top inset. */
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
+  /* A back link to a page the user cannot see the URL of is just confusing. */
+  .back-link { display: none; }
 }
