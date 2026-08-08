@@ -608,15 +608,35 @@ body[data-mode="companion"] {
   opacity: .45;
   transition: box-shadow var(--mode-fade) ease, opacity var(--mode-fade) ease;
 }
-body[data-activity="processing"] .role-halo { animation: halo-breathe 3.4s ease-in-out infinite; }
-body[data-activity="listening"] .role-halo { animation: halo-pulse 1.9s ease-in-out infinite; }
-@keyframes halo-breathe {
-  0%, 100% { box-shadow: inset 0 0 30px 6px color-mix(in srgb, var(--youhuo-blue) 40%, transparent); opacity: .45; }
-  50%      { box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-violet) 66%, transparent); opacity: .95; }
+/* The glow used to animate `box-shadow` blur radius across the whole viewport.
+   Blur radius is not a compositor property: every frame re-rasterised a
+   full-screen shadow, which is precisely the animation an entry-level Android
+   cannot hold at 60fps — and entry-level Android is what this audience owns.
+   The colour layers are now static and only `opacity` animates, which the
+   compositor handles on its own thread. Same look, no per-frame repaint. */
+.role-halo::before,
+.role-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: opacity;
 }
-@keyframes halo-pulse {
-  0%, 100% { box-shadow: inset 0 0 26px 6px color-mix(in srgb, var(--wuyou-orange) 42%, transparent); opacity: .5; }
-  50%      { box-shadow: inset 0 0 60px 16px color-mix(in srgb, var(--wuyou-yellow) 74%, transparent); opacity: .94; }
+.role-halo::before {
+  box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-violet) 66%, transparent);
+}
+.role-halo::after {
+  box-shadow: inset 0 0 60px 16px color-mix(in srgb, var(--wuyou-yellow) 74%, transparent);
+}
+body[data-activity="processing"] .role-halo::before {
+  animation: halo-fade 3.4s var(--ease-in-out) infinite;
+}
+body[data-activity="listening"] .role-halo::after {
+  animation: halo-fade 1.9s var(--ease-in-out) infinite;
+}
+@keyframes halo-fade {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: .8; }
 }
 
 /* Role header: icon + name + opening line carry the mode without relying on colour. */
@@ -1427,6 +1447,15 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
 
   /* The extras follow the conversation screen in normal flow. */
   .rail { padding-bottom: max(var(--space-6), env(safe-area-inset-bottom)); }
+
+  /* A pulsing glow around the entire screen edge is the worst possible motion
+     for someone with vestibular sensitivity: it fills the peripheral field,
+     which is exactly where motion sensitivity lives. On a phone the screen edge
+     is also only a few millimetres from the thumb. The state is already legible
+     from the mic's own rings and the mode badge, so the full-screen layer is
+     reduced to a still tint here and the movement stays local to the control. */
+  .role-halo::before, .role-halo::after { animation: none !important; }
+  body[data-activity="listening"] .role-halo { opacity: .7; }
 
   /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
      row of prime real estate directly under the microphone. */
