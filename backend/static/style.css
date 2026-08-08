@@ -1365,7 +1365,9 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
 @media (max-width: 760px) {
   /* One column, full-bleed cards, and a header that stays put — the three
      things that make a browser page read as an app screen. */
-  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); }
+  /* No bottom padding: the extras are a fixed sheet now, so reserving room for
+     them below the fold just makes the page scroll for nothing. */
+  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); padding-bottom: 0; }
 
   .app-bar {
     position: sticky;
@@ -1417,16 +1419,49 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
     flex-direction: column;
   }
 
+  /* The conversation screen is exactly one viewport tall, with the composer at
+     its foot. Without this the stage is only as tall as its content and the
+     document ends up ~130px past the viewport — a page that scrolls slightly
+     for no reason, which is the tell that it is a web page and not a screen. */
+  /* Block, not grid: the backdrop and the sheet are both position:fixed now, so
+     a grid here still reserves row tracks and gaps for children that are no
+     longer in flow. */
+  .elder-layout { display: block; }
+
+  /* Clamp the document to the screen. Safe only because the stage above is
+     height-fixed rather than min-height: nothing inside needs to grow, so
+     nothing gets clipped. The sheet is unaffected — it is position:fixed and no
+     ancestor here establishes a containing block for it (verified). */
+  main.shell { max-height: 100svh; max-height: 100dvh; overflow: hidden; }
+
+  .elder-layout > .stage {
+    /* `height`, not `min-height`. With a minimum, the furniture's natural size
+       wins and the screen overflows by whatever it needs (measured: 795px of
+       content into 754px of room). With a fixed height the conversation is the
+       thing that gives, which is correct — it is the scrollable region. */
+    height: calc(100svh - 98px);
+    height: calc(100dvh - 98px);
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+
   /* The conversation takes whatever the fixed furniture leaves, and scrolls. */
   #chat {
     flex: 1;
-    /* Enough for two long Chinese bubbles; below this the screen is useless and
-       the stage is allowed to grow instead. */
-    min-height: 200px;
+    /* Must be able to shrink: it is the region that absorbs the difference
+       between the screen and the fixed furniture. A minimum here would push the
+       composer off the bottom on a short phone. */
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     scroll-behavior: smooth;
+    /* A line of Chinese cut through the middle of its glyphs reads as a broken
+       layout. Fading the last few pixels says "there is more below" instead,
+       which is what the clipping actually means. */
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
   }
 
   /* Fixed furniture: never shrinks, always at the foot of the screen. */
@@ -1445,8 +1480,85 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   .role-icon { width: 46px; height: 46px; }
   #agentTitle { font-size: var(--text-xl); }
 
-  /* The extras follow the conversation screen in normal flow. */
-  .rail { padding-bottom: max(var(--space-6), env(safe-area-inset-bottom)); }
+  /* ----------------------------------------------------------------------
+     Bottom sheet. Everything that is not the conversation lives here, so the
+     conversation gets the whole screen instead of a third of it.
+     ---------------------------------------------------------------------- */
+  .sheet-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(9, 14, 28, .42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-sheet) var(--ease-out);
+  }
+  .sheet-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+  .rail.sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* The sidebar version of .rail is sticky with a `top`, and that `top`
+       survives into position:fixed where it beats `bottom` — which left ~100px
+       of the closed sheet visible at the foot of the screen. */
+    top: auto;
+    z-index: 51;
+    max-height: 86svh;
+    max-height: 86dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    background: var(--surface-2);
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    box-shadow: var(--shadow-3);
+    padding: 0 var(--space-4) max(var(--space-6), env(safe-area-inset-bottom));
+    /* Closed by default, moved rather than hidden: the panel stays in the
+       layout so the contrast audit can still measure these controls. */
+    transform: translate3d(0, 100%, 0);
+    /* 250ms overdamped, matching gorhom/bottom-sheet. See the motion tokens. */
+    transition: transform var(--dur-sheet) var(--ease-out);
+    will-change: transform;
+  }
+  .rail.sheet.is-open { transform: translate3d(0, 0, 0); }
+
+  /* Full-width grab area: a 20px hairline is a target only a mouse can hit. */
+  .sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-3) 0 var(--space-2);
+    margin-bottom: var(--space-1);
+    background: var(--surface-2);
+    border: 0;
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    box-shadow: none;
+    cursor: grab;
+    touch-action: none;              /* the drag is ours, not the scroller's */
+  }
+  .sheet-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-strong);
+  }
+
+  /* No scrolling behind an open sheet. */
+  body.sheet-open { overflow: hidden; }
 
   /* A pulsing glow around the entire screen edge is the worst possible motion
      for someone with vestibular sensitivity: it fills the peripheral field,
@@ -1468,4 +1580,11 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
   /* A back link to a page the user cannot see the URL of is just confusing. */
   .back-link { display: none; }
+}
+
+/* On a wide viewport the extras are the sidebar they have always been: none of
+   the sheet chrome applies, and the trigger has nothing to trigger. */
+@media (min-width: 761px) {
+  .sheet-trigger, .sheet-handle, .sheet-backdrop { display: none; }
+  .rail.sheet { position: static; transform: none; max-height: none; overflow: visible; }
 }

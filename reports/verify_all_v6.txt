@@ -11,7 +11,7 @@ START pytest_v6
 ........................................................................ [ 76%]
 ........................................................................ [ 91%]
 .......................................                                  [100%]
-471 passed in 53.06s
+471 passed in 60.43s (0:01:00)
 PASS pytest_v6
 START coverage_v6
 Name                                Stmts   Miss  Cover
@@ -316,10 +316,11 @@ START browser_javascript_v6
   ok identity.js [script]
   ok judge.js [script]
   ok register-sw.js [script]
+  ok sheet.js [script]
   ok speech.js [module]
   ok sw.js [script]
   ok trust.js [script]
-PASS browser_javascript_v6: 9 file(s)
+PASS browser_javascript_v6: 10 file(s)
 PASS speech_text_v6: 29 项朗读文本断言通过
 START accessibility_v6
   ok / [light]

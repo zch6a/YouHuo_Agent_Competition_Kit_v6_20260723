@@ -68,11 +68,25 @@
             <input id="text" aria-label="对优活说" placeholder="也可以打字：帮我挂明天下午的骨科号" />
             <button id="send">发送</button>
           </div>
+          <!-- The sheet is reachable by a real labelled button, not only by a
+               swipe: gesture-only affordances fail this audience first. Hidden
+               on wide screens, where the same content is already the sidebar. -->
+          <button id="openExtras" class="secondary sheet-trigger" data-sheet-open aria-expanded="false" aria-controls="extrasSheet">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16" /><path d="M4 6h16" /><path d="M4 18h16" /></svg>
+            <span>待办、常用和设置</span>
+          </button>
           <div id="status" class="meta status-line"></div>
         </div>
       </section>
 
-      <aside class="rail">
+      <!-- On a phone this whole column lives in a bottom sheet so the
+           conversation owns the screen; on a wide viewport the CSS leaves it as
+           the sidebar it has always been. -->
+      <div id="sheetBackdrop" class="sheet-backdrop" aria-hidden="true"></div>
+      <aside id="extrasSheet" class="rail sheet" aria-label="待办、常用功能与设置">
+        <button class="sheet-handle" data-sheet-close aria-label="收起">
+          <span class="sheet-grip" aria-hidden="true"></span>
+        </button>
         <section class="panel rail-card">
           <div class="rail-head">
             <h2>我的待办</h2>
@@ -169,6 +183,7 @@
     </section>
   </main>
   <script src="/static/identity.js"></script>
+    <script src="/static/sheet.js" defer></script>
     <script type="module" src="/static/elder.js"></script>
 </body>
 </html>
