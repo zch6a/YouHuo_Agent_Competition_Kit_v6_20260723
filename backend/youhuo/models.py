@@ -164,6 +164,25 @@ class DemoLoginResponse(StrictModel):
     expires_at: datetime
 
 
+class VisitorSandboxResponse(StrictModel):
+    """One freshly seeded, isolated demo household for a login-free visitor.
+
+    Both tokens are returned together so the elder and family views of the same
+    sandbox work without a second round trip; they are demo tokens for a
+    generated household, never credentials for a real account.
+    """
+
+    elder_id: str
+    daughter_id: str
+    son_id: str
+    family_id: str
+    elder_token: str
+    family_token: str
+    token_type: str = "bearer"
+    actor: AuthContext
+    expires_at: datetime
+
+
 class SessionCreateRequest(StrictModel):
     session_id: str | None = Field(default=None, max_length=128)
 

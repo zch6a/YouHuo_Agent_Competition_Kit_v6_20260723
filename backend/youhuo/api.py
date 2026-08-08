@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,7 @@ from .models import (
     SessionCreateResponse,
     TaskView,
     TaskType,
+    VisitorSandboxResponse,
 )
 
 
@@ -240,6 +242,34 @@ def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = No
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
         return DemoLoginResponse(access_token=token, actor=actor, expires_at=expires_at)
+
+    @app.post("/v2/auth/visitor", response_model=VisitorSandboxResponse)
+    def visitor_sandbox() -> VisitorSandboxResponse:
+        """Hand a first-time visitor their own isolated demo household.
+
+        A public, login-free deployment otherwise puts every visitor into the same
+        family, so two people looking at once see each other's reminders and can
+        overwrite each other's tasks. Family isolation is already enforced on
+        `family_id` everywhere, so a fresh family is a real sandbox rather than a
+        cosmetic one. The browser keeps the ids and reuses them on reload.
+        """
+        if not resolved_demo_mode:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="演示访客入口已关闭。")
+        suffix = f"v{secrets.token_hex(6)}"
+        ids = db.seed_demo(suffix)
+        v4_store.seed_demo(suffix)
+        elder_token, elder, expires_at = engine.demo_login(ids.elder_id)
+        family_token, _, _ = engine.demo_login(ids.daughter_id)
+        return VisitorSandboxResponse(
+            elder_id=ids.elder_id,
+            daughter_id=ids.daughter_id,
+            son_id=ids.son_id,
+            family_id=ids.family_id,
+            elder_token=elder_token,
+            family_token=family_token,
+            expires_at=expires_at,
+            actor=elder,
+        )
 
     @app.post("/v2/sessions", response_model=SessionCreateResponse)
     def create_session_endpoint(

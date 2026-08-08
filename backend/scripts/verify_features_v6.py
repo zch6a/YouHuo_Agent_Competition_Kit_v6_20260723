@@ -137,6 +137,30 @@ def run(base: str) -> int:
     son_token = audit.check(
         "次家属演示登录", lambda: http("POST", "/v2/auth/demo", {"actor_id": "son-demo"})["access_token"]
     )
+
+    def visitor_sandbox_isolation():
+        """A public login-free URL must not put every visitor in one household."""
+        a = http("POST", "/v2/auth/visitor")
+        b = http("POST", "/v2/auth/visitor")
+        assert a["family_id"] != b["family_id"], "两个访客拿到了同一个家庭"
+        assert a["elder_id"].startswith("elder-v"), a["elder_id"]
+
+        # A creates a reminder; B must not see it.
+        session = http("POST", "/v2/sessions", {}, a["elder_token"])["session_id"]
+        for text in ("提醒我后天上午八点访客隔离检查", "确认办理"):
+            http("POST", "/v2/chat",
+                 {"session_id": session, "text": text, "request_id": None},
+                 a["elder_token"])
+        mine = [r["title"] for r in http("GET", "/v2/reminders", token=a["elder_token"])]
+        theirs = [r["title"] for r in http("GET", "/v2/reminders", token=b["elder_token"])]
+        assert any("访客隔离检查" in t for t in mine), f"A 自己的待办丢失：{mine}"
+        assert theirs == [], f"B 看到了 A 的待办：{theirs}"
+
+        # And cannot reach across families.
+        http("GET", f"/v6/profiles/{a['elder_id']}", token=b["elder_token"], expect=403)
+        return {"a": a["family_id"], "b": b["family_id"]}
+
+    audit.check("免登录访客各自独立沙箱（公网部署前提）", visitor_sandbox_isolation)
     if not elder_token or not family_token:
         audit.report()
         print("\n登录失败，后续检查无法进行。")

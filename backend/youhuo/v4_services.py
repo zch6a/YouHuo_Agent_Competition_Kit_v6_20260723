@@ -343,8 +343,17 @@ class MedicationKnowledgeBase:
     """
 
     def __init__(self, path: str | Path | None = None) -> None:
-        default = Path(__file__).resolve().parents[2] / "data" / "medication_interactions_demo.json"
+        # Ships inside the package, not in data/. This is read-only reference
+        # data, while data/ holds the mutable database and is a mounted volume in
+        # every container deployment — a volume at /app/data shadowed this file,
+        # so the image crash-looped on startup before create_app() finished.
+        default = Path(__file__).resolve().parent / "reference" / "medication_interactions_demo.json"
         self.path = Path(path) if path else default
+        if not self.path.is_file():
+            raise FileNotFoundError(
+                f"用药参考数据缺失：{self.path}。它随包发布，请确认打包时包含 "
+                "backend/youhuo/reference/ 目录。"
+            )
         payload = json.loads(self.path.read_text(encoding="utf-8"))
         self.aliases: dict[str, str] = {k.casefold(): v.casefold() for k, v in payload["aliases"].items()}
         self.rules = payload["rules"]

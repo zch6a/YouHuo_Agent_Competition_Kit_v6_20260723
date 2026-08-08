@@ -64,6 +64,25 @@
         }
       }
     },
+    "/v2/auth/visitor": {
+      "post": {
+        "summary": "Visitor Sandbox",
+        "description": "Hand a first-time visitor their own isolated demo household.\n\nA public, login-free deployment otherwise puts every visitor into the same\nfamily, so two people looking at once see each other's reminders and can\noverwrite each other's tasks. Family isolation is already enforced on\n`family_id` everywhere, so a fresh family is a real sandbox rather than a\ncosmetic one. The browser keeps the ids and reuses them on reload.",
+        "operationId": "visitor_sandbox_v2_auth_visitor_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitorSandboxResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v2/sessions": {
       "post": {
         "summary": "Create Session Endpoint",
@@ -10844,6 +10863,61 @@
           "gentle"
         ],
         "title": "VerbosityMode"
+      },
+      "VisitorSandboxResponse": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "daughter_id": {
+            "type": "string",
+            "title": "Daughter Id"
+          },
+          "son_id": {
+            "type": "string",
+            "title": "Son Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_token": {
+            "type": "string",
+            "title": "Elder Token"
+          },
+          "family_token": {
+            "type": "string",
+            "title": "Family Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuthContext"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "daughter_id",
+          "son_id",
+          "family_id",
+          "elder_token",
+          "family_token",
+          "actor",
+          "expires_at"
+        ],
+        "title": "VisitorSandboxResponse",
+        "description": "One freshly seeded, isolated demo household for a login-free visitor.\n\nBoth tokens are returned together so the elder and family views of the same\nsandbox work without a second round trip; they are demo tokens for a\ngenerated household, never credentials for a real account."
       },
       "VoiceResolutionStatus": {
         "type": "string",

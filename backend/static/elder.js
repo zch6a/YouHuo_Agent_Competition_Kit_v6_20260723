@@ -2,7 +2,11 @@ import {
   configureNeuralVoice, pickVoice, probeNeuralVoice, resetVoiceCache, speakClauses,
 } from '/static/speech.js';
 
-const ELDER_ID = 'elder-demo';
+// Resolved from identity.js: on a public deployment each browser gets its own
+// isolated demo household, so visitors do not share one elder's data. Falls back
+// to the fixed 'elder-demo' when the visitor endpoint is unavailable.
+let ELDER_ID = 'elder-demo';
+let IDENTITY = null;
 
 // Design §4.1 table 1: each role is identified by name, icon, opening line and
 // voice pitch as well as colour, so the mode is never colour-only.
@@ -219,7 +223,24 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function resolveIdentity() {
+  if (IDENTITY) return IDENTITY;
+  IDENTITY = window.YouHuoIdentity
+    ? await window.YouHuoIdentity.ready()
+    : {elderId: 'elder-demo', elderToken: null};
+  ELDER_ID = IDENTITY.elderId;
+  return IDENTITY;
+}
+
 async function login() {
+  const identity = await resolveIdentity();
+  // The visitor endpoint already minted a token for this sandbox; reuse it
+  // rather than logging in again as a household that may not be 'elder-demo'.
+  if (identity.elderToken) {
+    accessToken = identity.elderToken;
+    sessionStorage.setItem('youhuo_elder_token', accessToken);
+    return;
+  }
   const r = await fetch('/v2/auth/demo', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({actor_id: ELDER_ID})

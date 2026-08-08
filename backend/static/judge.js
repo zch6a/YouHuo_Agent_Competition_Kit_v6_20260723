@@ -1,10 +1,25 @@
 let token = sessionStorage.getItem('youhuo_judge_token');
 const statusEl = document.querySelector('#judgeStatus');
 
+// Resolved from identity.js: on a public deployment this browser owns its own
+// demo household, and posting a different family's elder_id would be rejected.
+let IDS = {elderId: 'elder-demo', daughterId: 'daughter-demo', familyToken: null};
+
+async function resolveIdentity() {
+  if (window.YouHuoIdentity) IDS = await window.YouHuoIdentity.ready();
+  return IDS;
+}
+
 async function login() {
+  const ids = await resolveIdentity();
+  if (ids.familyToken) {
+    token = ids.familyToken;
+    sessionStorage.setItem('youhuo_judge_token', token);
+    return;
+  }
   const response = await fetch('/v2/auth/demo', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({actor_id: 'daughter-demo'})
+    body: JSON.stringify({actor_id: ids.daughterId})
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.detail || '演示登录失败');
@@ -34,7 +49,7 @@ async function runVoice() {
   const data = await api('/v5/voice/resolve', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      elder_id: 'elder-demo', side_effect_possible: true,
+      elder_id: IDS.elderId, side_effect_possible: true,
       candidates: [
         {text: '确认办理本月水费', confidence: 0.91, engine: 'core-speech-primary'},
         {text: '取消办理本月水费', confidence: 0.89, engine: 'core-speech-backup'}
@@ -50,7 +65,7 @@ async function runLoad() {
   const data = await api('/v6/interaction/plan', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      elder_id: 'elder-demo',
+      elder_id: IDS.elderId,
       message: '系统将提交本月水费付款请求，请核对账单对象、金额、截止日期和付款家属。',
       options: ['确认办理', '取消办理', '请女儿看看', '稍后再办'],
       risk_level: 4, asr_confidence: 0.93, recent_retries: 1, reversible: false
@@ -65,12 +80,12 @@ async function runPreview() {
   const data = await api('/v6/actions/preview', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      elder_id: 'elder-demo', goal: '缴纳本月水费', action: 'create_payment_request',
-      arguments: {bill_id:'water-2026-07', amount_cents:999999, elder_id:'elder-demo', execute:true},
+      elder_id: IDS.elderId, goal: '缴纳本月水费', action: 'create_payment_request',
+      arguments: {bill_id:'water-2026-07', amount_cents:999999, elder_id:IDS.elderId, execute:true},
       facts: [
         {name:'bill_id', value:'water-2026-07', origin:'trusted_tool', purpose:'bill_payment', trusted_for_control:true},
         {name:'amount_cents', value:999999, origin:'untrusted_document', purpose:'bill_payment', trusted_for_control:false},
-        {name:'elder_id', value:'elder-demo', origin:'system', sensitivity:3, purpose:'bill_payment', trusted_for_control:true}
+        {name:'elder_id', value:IDS.elderId, origin:'system', sensitivity:3, purpose:'bill_payment', trusted_for_control:true}
       ], user_confirmed:true, family_approvals:1, reversible:true
     })
   });
@@ -83,7 +98,7 @@ async function runCard() {
   const data = await api('/v6/reliance/card', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({
-      elder_id:'elder-demo', heard_text:'帮我交水费', goal:'处理本月水费', current_step:'核对账单',
+      elder_id:IDS.elderId, heard_text:'帮我交水费', goal:'处理本月水费', current_step:'核对账单',
       action:'创建付款请求', risk_level:4, reversible:true,
       confirmations:['老人复述金额', '女儿扫码支付'],
       evidence:[

@@ -1,6 +1,8 @@
 'use strict';
 
-const state = { elderToken: '', familyToken: '', systemToken: '', saga: null, sagaRole: 'system' };
+const state = { elderToken: '', familyToken: '', systemToken: '', saga: null, sagaRole: 'system',
+  // Resolved in bootstrap() from identity.js; see the note in that file.
+  elderId: state.elderId, daughterId: state.daughterId, systemId: state.systemId };
 const byId = (id) => document.getElementById(id);
 const pretty = (value) => JSON.stringify(value, null, 2);
 
@@ -23,10 +25,18 @@ async function api(path, options = {}, role = 'elder') {
 
 function output(id, value) { byId(id).textContent = typeof value === 'string' ? value : pretty(value); }
 
+async function resolveIdentity() {
+  if (!window.YouHuoIdentity) return;
+  const identity = await window.YouHuoIdentity.ready();
+  state.elderId = identity.elderId;
+  state.daughterId = identity.daughterId;
+  state.systemId = identity.systemId;
+}
+
 async function bootstrap() {
   try {
     [state.elderToken, state.familyToken, state.systemToken] = await Promise.all([
-      login('elder-demo'), login('daughter-demo'), login('system-demo')
+      login(state.elderId), login(state.daughterId), login(state.systemId)
     ]);
     byId('status').textContent = '演示身份已就绪。高风险动作不会由语言模型直接执行。';
   } catch (error) { byId('status').textContent = error.message; }
@@ -35,7 +45,7 @@ async function bootstrap() {
 byId('voiceSafe').addEventListener('click', async () => {
   try {
     output('voiceOutput', await api('/v5/voice/resolve', { method: 'POST', body: JSON.stringify({
-      elder_id: 'elder-demo', side_effect_possible: true,
+      elder_id: state.elderId, side_effect_possible: true,
       candidates: [
         { text: '帮我交水费', confidence: 0.96, engine: 'HarmonyASR' },
         { text: '帮我缴水费', confidence: 0.93, engine: 'BackupASR' }
@@ -47,7 +57,7 @@ byId('voiceSafe').addEventListener('click', async () => {
 byId('voiceConflict').addEventListener('click', async () => {
   try {
     output('voiceOutput', await api('/v5/voice/resolve', { method: 'POST', body: JSON.stringify({
-      elder_id: 'elder-demo', side_effect_possible: true,
+      elder_id: state.elderId, side_effect_possible: true,
       candidates: [
         { text: '确认办理缴费', confidence: 0.92, engine: 'HarmonyASR' },
         { text: '取消不要缴费', confidence: 0.91, engine: 'BackupASR' }
@@ -58,12 +68,12 @@ byId('voiceConflict').addEventListener('click', async () => {
 
 function paymentPolicyPayload(untrusted) {
   return {
-    elder_id: 'elder-demo', goal: '帮我交本月水费', action: 'create_payment_request',
-    arguments: { bill_id: 'bill-water-2026-07', amount_cents: untrusted ? 999999 : 6840, elder_id: 'elder-demo' },
+    elder_id: state.elderId, goal: '帮我交本月水费', action: 'create_payment_request',
+    arguments: { bill_id: 'bill-water-2026-07', amount_cents: untrusted ? 999999 : 6840, elder_id: state.elderId },
     facts: [
       { name: 'bill_id', value: 'bill-water-2026-07', origin: 'trusted_tool', purpose: 'bill_payment', trusted_for_control: true },
       { name: 'amount_cents', value: untrusted ? 999999 : 6840, origin: untrusted ? 'untrusted_document' : 'trusted_tool', purpose: 'bill_payment', trusted_for_control: !untrusted },
-      { name: 'elder_id', value: 'elder-demo', origin: 'system', sensitivity: 3, purpose: 'bill_payment', trusted_for_control: true }
+      { name: 'elder_id', value: state.elderId, origin: 'system', sensitivity: 3, purpose: 'bill_payment', trusted_for_control: true }
     ],
     user_confirmed: true, family_approvals: 1, reversible: true
   };
@@ -81,7 +91,7 @@ byId('policyAttack').addEventListener('click', async () => {
 byId('sagaCreate').addEventListener('click', async () => {
   try {
     state.saga = await api('/v5/sagas', { method: 'POST', body: JSON.stringify({
-      elder_id: 'elder-demo', kind: 'bill_payment', goal: '交本月水费', context: { bill_type: '水费' },
+      elder_id: state.elderId, kind: 'bill_payment', goal: '交本月水费', context: { bill_type: '水费' },
       request_id: `trust-lab-${Date.now()}`
     }) });
     state.sagaRole = 'system';
@@ -122,15 +132,15 @@ async function register(role, actorId, deviceId) {
 byId('syncDemo').addEventListener('click', async () => {
   try {
     const suffix = String(Date.now());
-    await register('elder', 'elder-demo', `elder-${suffix}`);
-    await register('family', 'daughter-demo', `family-${suffix}`);
+    await register('elder', state.elderId, `elder-${suffix}`);
+    await register('family', state.daughterId, `family-${suffix}`);
     const first = await api('/v5/sync/operations', { method: 'POST', body: JSON.stringify({
-      operation_id: `op-a-${suffix}`, device_id: `elder-${suffix}`, entity_type: 'health_profile', entity_id: 'elder-demo',
+      operation_id: `op-a-${suffix}`, device_id: `elder-${suffix}`, entity_type: 'health_profile', entity_id: state.elderId,
       field_name: 'preferred_hospital', value: '人民医院', base_version: 0, lamport_clock: 1, sensitivity: 'high',
       occurred_at: new Date().toISOString()
     }) });
     const second = await api('/v5/sync/operations', { method: 'POST', body: JSON.stringify({
-      operation_id: `op-b-${suffix}`, device_id: `family-${suffix}`, entity_type: 'health_profile', entity_id: 'elder-demo',
+      operation_id: `op-b-${suffix}`, device_id: `family-${suffix}`, entity_type: 'health_profile', entity_id: state.elderId,
       field_name: 'preferred_hospital', value: '协和医院', base_version: 0, lamport_clock: 2, sensitivity: 'high',
       occurred_at: new Date().toISOString()
     }) }, 'family');
@@ -141,7 +151,7 @@ byId('syncDemo').addEventListener('click', async () => {
 byId('breakGlassDemo').addEventListener('click', async () => {
   try {
     const record = await api('/v5/break-glass', { method: 'POST', body: JSON.stringify({
-      elder_id: 'elder-demo', reason: '老人主动呼救后电话中断，需要确认最近位置',
+      elder_id: state.elderId, reason: '老人主动呼救后电话中断，需要确认最近位置',
       scopes: ['location', 'emergency_contacts', 'active_tasks'], duration_minutes: 10
     }) }, 'family');
     const view = await api(`/v5/break-glass/${record.id}/view`, {}, 'family');

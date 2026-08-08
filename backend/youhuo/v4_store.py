@@ -289,20 +289,25 @@ class V4FeatureStore:
             """
         )
 
-    def seed_demo(self) -> None:
+    def seed_demo(self, suffix: str = "demo") -> None:
+        """Seed v4 safety defaults for one demo household. See Database.seed_demo."""
+        from .database import DemoIdentities
+
+        ids = DemoIdentities.for_suffix(suffix)
         now = utcnow()
         with self.db.transaction() as conn:
             conn.execute(
                 """INSERT OR IGNORE INTO safety_policies_v4(
                     elder_id,family_id,inactivity_minutes,home_lat,home_lon,geofence_radius_m,notify_community,updated_at
                 ) VALUES (?,?,?,?,?,?,?,?)""",
-                ("elder-demo", "fam-demo", 720, 39.9042, 116.3974, 1500, 1, iso(now)),
+                (ids.elder_id, ids.family_id, 720, 39.9042, 116.3974, 1500, 1, iso(now)),
             )
             conn.execute(
                 """INSERT OR IGNORE INTO safety_contacts_v4(
                     id,family_id,elder_id,name,contact_role,channel,address_masked,priority,enabled
                 ) VALUES (?,?,?,?,?,?,?,?,?)""",
-                ("contact-grid-demo", "fam-demo", "elder-demo", "社区网格员", "community", "phone", "***-***-8899", 3, 1),
+                (f"contact-grid-{suffix}", ids.family_id, ids.elder_id, "社区网格员",
+                 "community", "phone", "***-***-8899", 3, 1),
             )
 
     # ----- authorization helpers -----

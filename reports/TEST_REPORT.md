@@ -8,9 +8,9 @@
 
 | 项目 | 结果 |
 |---|---:|
-| pytest自动化测试 | **434 / 434通过** |
-| 逐功能端到端验收 | **122 / 122通过** |
-| OpenAPI 操作覆盖 | **98 / 98** |
+| pytest自动化测试 | **449 / 449通过** |
+| 逐功能端到端验收 | **123 / 123通过** |
+| OpenAPI 操作覆盖 | **99 / 99** |
 | 核心Python语句覆盖率 | **90%** |
 | ElderBench-v3 | **34 / 34通过** |
 | ElderBench-v4 | **120 / 120通过** |
@@ -36,7 +36,7 @@
 
 ## 2. 自动化测试与覆盖率
 
-`backend/tests/` 共434项，覆盖：
+`backend/tests/` 共449项，覆盖：
 
 - 语音候选共识、紧急优先和冲突澄清；
 - 优活/无忧伴路由、任务锁、情绪暂停和恢复；
@@ -230,7 +230,7 @@ v5 审计报告最尖锐的一条是“评委会问：你们的AI模型在哪里
 
 ### 9.4 逐功能验收与两个复验可信度缺陷
 
-新增 `backend/scripts/verify_features_v6.py`（配套 `run_feature_audit.py` 负责起停干净实例），对全部能力逐条做端到端断言，并强制校验 OpenAPI 覆盖率：任何没被实际调用过的操作直接判失败。已接入 `verify_all`；当前为 **122/122 通过，98/98 操作全覆盖**（该节写作时是 105/105 与 97/97）。
+新增 `backend/scripts/verify_features_v6.py`（配套 `run_feature_audit.py` 负责起停干净实例），对全部能力逐条做端到端断言，并强制校验 OpenAPI 覆盖率：任何没被实际调用过的操作直接判失败。已接入 `verify_all`；当前为 **122/122 通过，99/99 操作全覆盖**（该节写作时是 105/105 与 97/97）。
 
 审核过程中发现并修复两个真实缺陷：
 
@@ -559,7 +559,70 @@ app = create_app()
 
 新增 `test_release_hygiene.py` 10 项：检查器能在任意深度发现泄漏产物、跳过 `.venv`、`.gitignore` 按名匹配、git 跟踪清单干净、导入模块不落盘。
 
-### 9.11 本轮复验结果
+### 9.11 公开免登录网页端（第六轮）
+
+目标：给一个任何人打开网址就能用、不需要注册也不需要登录的地址。查下来有两个
+真问题，都在"能部署"这条路上。
+
+#### 一、Docker 镜像从来起不来
+
+Dockerfile 只 `COPY backend` 和 `COPY xiaoyi`，然后 `RUN mkdir -p /app/data`。
+`MedicationKnowledgeBase` 在 `create_app()` 里读 `data/medication_interactions_demo.json`，
+而那个目录是空的：
+
+```
+FileNotFoundError: /app/data/medication_interactions_demo.json
+```
+
+容器启动即 crash-loop。docker-compose 还把一个命名卷挂在 `/app/data` 上，所以
+**就算把文件拷进镜像也会被卷遮住**——只读参考数据和可变数据库放在同一个目录，
+本身就是错的。
+
+Docker 守护进程当时没运行，所以没有靠 `docker build` 证明，而是按 Dockerfile 声明的
+COPY 集合在临时目录里搭出一模一样的文件树再启动应用，同样复现了这个报错，而且更快。
+这个做法留成了 `test_deployment.py`：它**解析 Dockerfile 的 COPY 行**，所以将来
+任何"应用需要但镜像没带"的文件都会让测试失败，而不是让部署失败。
+
+修法：参考数据移到 `backend/youhuo/reference/`（随包发布，卷永远遮不住），缺失时
+给出说清楚的错误而不是裸 `FileNotFoundError`；`CMD` 改成 shell 形式使用
+`${PORT:-8000}`（Render/Railway/Fly/Cloud Run 都注入 `$PORT`，写死 8000 在每一家
+都过不了健康检查），健康检查跟随同一个端口；容器用户改成 uid 1000（Hugging Face
+Spaces 以该 id 运行，数据目录属于别人时应用建不了库）。
+
+#### 二、公网上所有访客共用一个演示家庭
+
+页面写死 `elder-demo`。在本机没问题，放到公网就是：两个评委同时打开，会看到对方
+创建的提醒，也能改掉对方的任务。
+
+新增 `POST /v2/auth/visitor`：每个浏览器首次访问自动播种一个独立家庭
+（`fam-v<随机>`），ids 存在 localStorage 里，刷新沿用。家庭隔离本来就按 `family_id`
+在各层强制执行，所以这是真沙箱：实测两个访客的待办互不可见，跨家庭读档案和写待办
+都返回 403，审计链各自独立。新增 `identity.js` 统一解析身份，五个页面里 30 处写死的
+demo id 全部改为动态；原来的固定 `elder-demo` 账户保留可用，本机演示和既有脚本不受影响。
+
+写这一层时踩到的自己的坑：批量替换字面量时把刚写好的兜底默认值也换掉了，生成出
+`let IDS = {elderId: IDS.elderId}` 这种自引用——加载即 TDZ 报错、白屏。`check_browser_js.py`
+按真实加载方式检查，正好挡住了。
+
+#### 三、又一次 CP936
+
+`prepare_space.ps1` 里写了中文提交信息，Windows PowerShell 5.1 把不带 BOM 的 UTF-8
+`.ps1` 当 ANSI 解码，中文被打乱后引号配对失败，报"字符串缺少终止符"。项目里其他
+`.ps1` 全是纯 ASCII，所以从没遇到过。已把脚本内文案改回 ASCII，中文留在 `.md` 里。
+同一个脚本还暴露两处 PowerShell 陷阱：`$ErrorActionPreference = "Stop"` 下 git 往
+stderr 写的常规提示会被当成终止错误，**静默跳过了 commit**；以及包装函数会把 `-A`、
+`-c` 绑成自己的参数名。都已改为直接调用并显式检查 `$LASTEXITCODE`。
+
+#### 验证
+
+新增 `test_deployment.py` 5 项、`test_visitor_isolation.py` 10 项、`test_release_hygiene.py`
+补充 2 项。逐功能验收新增 1 项并达到 **123/123**；OpenAPI 操作覆盖从 98/98 升到
+**99/99**——新端点没被调用时覆盖率门槛立刻判失败，这条强制校验是有效的。
+
+部署脚本 `deploy/huggingface/prepare_space.ps1|sh` 已实跑验证：组装出 114 个文件的
+提交，Space 用 README 的 YAML 头和 emoji 编码完好，并且从组装出的目录能真的启动应用。
+
+### 9.12 本轮复验结果
 
 `verify_all.ps1` 全部阶段通过：编译、OpenAPI生成、pytest与覆盖率、逐功能验收（含 OpenAPI 覆盖率强制校验）、12个页面/模式无障碍、ElderBench 34/120/300、VoiceBench 800、v6断言500,000、凭据扫描、合约校验、JavaScript语法与交付物检查。具体数字见第 1 节。
 

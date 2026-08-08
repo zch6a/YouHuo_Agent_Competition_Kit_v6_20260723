@@ -1,32 +1,32 @@
 ﻿START compile_v6
 PASS compile_v6
 START openapi_v6
-{"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 94, "version": "6.0.0"}
+{"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 95, "version": "6.0.0"}
 PASS openapi_v6
 START pytest_v6
 ........................................................................ [ 16%]
-........................................................................ [ 33%]
-........................................................................ [ 49%]
-........................................................................ [ 66%]
-........................................................................ [ 82%]
-........................................................................ [ 99%]
-..                                                                       [100%]
-434 passed in 47.96s
+........................................................................ [ 32%]
+........................................................................ [ 48%]
+........................................................................ [ 64%]
+........................................................................ [ 80%]
+........................................................................ [ 96%]
+.................                                                        [100%]
+449 passed in 72.00s (0:01:11)
 PASS pytest_v6
 START coverage_v6
 Name                                Stmts   Miss  Cover
 -------------------------------------------------------
 backend\youhuo\__init__.py              1      0   100%
-backend\youhuo\api.py                 304     66    78%
+backend\youhuo\api.py                 315     58    82%
 backend\youhuo\care_voice.py          159     13    92%
 backend\youhuo\companion.py            63      0   100%
-backend\youhuo\database.py            322     28    91%
+backend\youhuo\database.py            338     27    92%
 backend\youhuo\document_guard.py       86      0   100%
 backend\youhuo\elderbench.py           97      7    93%
-backend\youhuo\engine.py              846     67    92%
+backend\youhuo\engine.py              846     66    92%
 backend\youhuo\llm.py                  38     17    55%
 backend\youhuo\memory_vault.py         92      2    98%
-backend\youhuo\models.py              194      0   100%
+backend\youhuo\models.py              204      0   100%
 backend\youhuo\orchestration.py       157      4    97%
 backend\youhuo\privacy.py              71     17    76%
 backend\youhuo\security.py             86      9    90%
@@ -37,10 +37,10 @@ backend\youhuo\tool_registry.py        85     11    87%
 backend\youhuo\tts.py                  99     50    49%
 backend\youhuo\utils.py               116     16    86%
 backend\youhuo\v3_models.py            14      0   100%
-backend\youhuo\v4_api.py              326     53    84%
+backend\youhuo\v4_api.py              326     51    84%
 backend\youhuo\v4_models.py           475     15    97%
-backend\youhuo\v4_services.py         285     21    93%
-backend\youhuo\v4_store.py            392     34    91%
+backend\youhuo\v4_services.py         287     22    92%
+backend\youhuo\v4_store.py            394     34    91%
 backend\youhuo\v5_api.py              194     35    82%
 backend\youhuo\v5_models.py           319      1    99%
 backend\youhuo\v5_services.py         339     27    92%
@@ -50,7 +50,7 @@ backend\youhuo\v6_models.py           237      0   100%
 backend\youhuo\v6_services.py         321     49    85%
 backend\youhuo\v6_store.py             65      1    98%
 -------------------------------------------------------
-TOTAL                                6589    651    90%
+TOTAL                                6630    640    90%
 PASS coverage_v6
 {
   "total": 34,
@@ -156,6 +156,7 @@ START feature_audit_v6
   [PASS] 老人演示登录
   [PASS] 家属演示登录
   [PASS] 次家属演示登录
+  [PASS] 免登录访客各自独立沙箱（公网部署前提）
   [PASS] 未携带令牌一律401
   [PASS] 伪造令牌一律401
   [PASS] 严格模型拒绝多余字段
@@ -303,19 +304,20 @@ START feature_audit_v6
   [PASS] 每个 OpenAPI 操作都被实际调用
 
 ==============================================================
-功能审核：122/122 通过
+功能审核：123/123 通过
 语义模式：deterministic_only  |  模型可授权：False
-OpenAPI 操作覆盖：98/98
+OpenAPI 操作覆盖：99/99
 全部功能通过。
 PASS feature_audit_v6
 START browser_javascript_v6
   ok care.js [script]
   ok elder.js [module]
   ok family.js [script]
+  ok identity.js [script]
   ok judge.js [script]
   ok speech.js [module]
   ok trust.js [script]
-PASS browser_javascript_v6: 6 file(s)
+PASS browser_javascript_v6: 7 file(s)
 PASS speech_text_v6: 18 项朗读文本断言通过
 START accessibility_v6
   ok / [light]

@@ -1,6 +1,9 @@
 'use strict';
 
-const state = { elderToken: '', familyToken: '' };
+const state = { elderToken: '', familyToken: '',
+  // Resolved in bootstrap() from identity.js: on a public deployment each
+  // browser owns an isolated demo household, so these are not fixed.
+  elderId: state.elderId, daughterId: state.daughterId, systemId: state.systemId };
 const byId = (id) => document.getElementById(id);
 
 function pretty(value) {
@@ -29,9 +32,19 @@ function setOutput(id, value) {
   byId(id).textContent = typeof value === 'string' ? value : pretty(value);
 }
 
+async function resolveIdentity() {
+  if (!window.YouHuoIdentity) return;
+  const identity = await window.YouHuoIdentity.ready();
+  state.elderId = identity.elderId;
+  state.daughterId = identity.daughterId;
+  state.systemId = identity.systemId;
+}
+
 async function bootstrap() {
   try {
-    [state.elderToken, state.familyToken] = await Promise.all([login('elder-demo'), login('daughter-demo')]);
+    await resolveIdentity();
+    [state.elderToken, state.familyToken] = await Promise.all(
+      [login(state.elderId), login(state.daughterId)]);
     byId('status').textContent = '演示账户已就绪：老人本人负责同意，家属负责建议与高风险接力。';
   } catch (error) {
     byId('status').textContent = `初始化失败：${error.message}`;
@@ -43,7 +56,7 @@ byId('routineDemo').addEventListener('click', async () => {
     const suffix = String(Date.now()).slice(-6);
     const routine = await api('/v4/routines', {
       method: 'POST', body: JSON.stringify({
-        elder_id: 'elder-demo', title: `每月交水费-${suffix}`, category: 'payment', frequency: 'monthly',
+        elder_id: state.elderId, title: `每月交水费-${suffix}`, category: 'payment', frequency: 'monthly',
         interval: 1, day_of_month: 25, time_local: '09:00', timezone: 'Asia/Shanghai',
         start_date: '2026-07-25', escalation_after_minutes: 60,
         positive_message: '水费任务完成了，我们做得可真棒！'
@@ -59,7 +72,7 @@ byId('routineDemo').addEventListener('click', async () => {
 byId('monthlyReport').addEventListener('click', async () => {
   try {
     const report = await api('/v4/reports/monthly', {
-      method: 'POST', body: JSON.stringify({ elder_id: 'elder-demo', year: 2026, month: 7 })
+      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, year: 2026, month: 7 })
     }, 'family');
     setOutput('routineOutput', report);
   } catch (error) { setOutput('routineOutput', error.message); }
@@ -68,7 +81,7 @@ byId('monthlyReport').addEventListener('click', async () => {
 byId('emotionDemo').addEventListener('click', async () => {
   try {
     const result = await api('/v4/emotions/analyze', {
-      method: 'POST', body: JSON.stringify({ elder_id: 'elder-demo', text: byId('emotionText').value, store_event: true })
+      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, text: byId('emotionText').value, store_event: true })
     });
     setOutput('emotionOutput', result);
   } catch (error) { setOutput('emotionOutput', error.message); }
@@ -78,7 +91,7 @@ byId('medicalDemo').addEventListener('click', async () => {
   try {
     const result = await api('/v4/medical-reports/analyze', {
       method: 'POST', body: JSON.stringify({
-        elder_id: 'elder-demo', kind: 'checkup_report', text: byId('medicalText').value,
+        elder_id: state.elderId, kind: 'checkup_report', text: byId('medicalText').value,
         source_name: '全景照护中心演示', create_followup_reminder: true
       })
     });
@@ -98,7 +111,7 @@ byId('interactionDemo').addEventListener('click', async () => {
 async function ensurePolicy() {
   return api('/v4/safety/policy', {
     method: 'PUT', body: JSON.stringify({
-      elder_id: 'elder-demo', inactivity_minutes: 720, home_lat: 39.9042, home_lon: 116.3974,
+      elder_id: state.elderId, inactivity_minutes: 720, home_lat: 39.9042, home_lon: 116.3974,
       geofence_radius_m: 1000, notify_community: true
     })
   }, 'family');
@@ -109,7 +122,7 @@ byId('locationInside').addEventListener('click', async () => {
     await ensurePolicy();
     const result = await api('/v4/location/ping', {
       method: 'POST', body: JSON.stringify({
-        elder_id: 'elder-demo', latitude: 39.9042, longitude: 116.3974, accuracy_m: 20,
+        elder_id: state.elderId, latitude: 39.9042, longitude: 116.3974, accuracy_m: 20,
         occurred_at: new Date().toISOString(), source: 'care_hub_demo'
       })
     });
@@ -122,7 +135,7 @@ byId('locationOutside').addEventListener('click', async () => {
     await ensurePolicy();
     const result = await api('/v4/location/ping', {
       method: 'POST', body: JSON.stringify({
-        elder_id: 'elder-demo', latitude: 39.95, longitude: 116.45, accuracy_m: 20,
+        elder_id: state.elderId, latitude: 39.95, longitude: 116.45, accuracy_m: 20,
         occurred_at: new Date().toISOString(), source: 'care_hub_demo'
       })
     });
@@ -134,7 +147,7 @@ byId('sosDemo').addEventListener('click', async () => {
   try {
     await ensurePolicy();
     const result = await api('/v4/safety/sos', {
-      method: 'POST', body: JSON.stringify({ elder_id: 'elder-demo', include_community: true })
+      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, include_community: true })
     });
     setOutput('locationOutput', result);
   } catch (error) { setOutput('locationOutput', error.message); }

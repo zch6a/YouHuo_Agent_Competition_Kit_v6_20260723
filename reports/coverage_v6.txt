@@ -1,16 +1,16 @@
 ﻿Name                                Stmts   Miss  Cover
 -------------------------------------------------------
 backend\youhuo\__init__.py              1      0   100%
-backend\youhuo\api.py                 304     66    78%
+backend\youhuo\api.py                 315     58    82%
 backend\youhuo\care_voice.py          159     13    92%
 backend\youhuo\companion.py            63      0   100%
-backend\youhuo\database.py            322     28    91%
+backend\youhuo\database.py            338     27    92%
 backend\youhuo\document_guard.py       86      0   100%
 backend\youhuo\elderbench.py           97      7    93%
-backend\youhuo\engine.py              846     67    92%
+backend\youhuo\engine.py              846     66    92%
 backend\youhuo\llm.py                  38     17    55%
 backend\youhuo\memory_vault.py         92      2    98%
-backend\youhuo\models.py              194      0   100%
+backend\youhuo\models.py              204      0   100%
 backend\youhuo\orchestration.py       157      4    97%
 backend\youhuo\privacy.py              71     17    76%
 backend\youhuo\security.py             86      9    90%
@@ -21,10 +21,10 @@ backend\youhuo\tool_registry.py        85     11    87%
 backend\youhuo\tts.py                  99     50    49%
 backend\youhuo\utils.py               116     16    86%
 backend\youhuo\v3_models.py            14      0   100%
-backend\youhuo\v4_api.py              326     53    84%
+backend\youhuo\v4_api.py              326     51    84%
 backend\youhuo\v4_models.py           475     15    97%
-backend\youhuo\v4_services.py         285     21    93%
-backend\youhuo\v4_store.py            392     34    91%
+backend\youhuo\v4_services.py         287     22    92%
+backend\youhuo\v4_store.py            394     34    91%
 backend\youhuo\v5_api.py              194     35    82%
 backend\youhuo\v5_models.py           319      1    99%
 backend\youhuo\v5_services.py         339     27    92%
@@ -34,4 +34,4 @@ backend\youhuo\v6_models.py           237      0   100%
 backend\youhuo\v6_services.py         321     49    85%
 backend\youhuo\v6_store.py             65      1    98%
 -------------------------------------------------------
-TOTAL                                6589    651    90%
+TOTAL                                6630    640    90%

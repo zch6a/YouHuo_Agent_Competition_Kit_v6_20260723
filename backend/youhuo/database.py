@@ -4,10 +4,12 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
@@ -30,6 +32,34 @@ from .utils import canonical_json
 
 class IdempotencyConflict(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class DemoIdentities:
+    """The four actor ids and the family id of one seeded demo household."""
+
+    suffix: str
+    family_id: str
+    elder_id: str
+    daughter_id: str
+    son_id: str
+    system_id: str
+
+    #: Visitor suffixes are generated, so constrain them: they become primary keys.
+    _SAFE = re.compile(r"^[a-z0-9][a-z0-9-]{0,30}$")
+
+    @classmethod
+    def for_suffix(cls, suffix: str) -> DemoIdentities:
+        if not cls._SAFE.match(suffix):
+            raise ValueError("演示家庭标识只能包含小写字母、数字和连字符。")
+        return cls(
+            suffix=suffix,
+            family_id=f"fam-{suffix}",
+            elder_id=f"elder-{suffix}",
+            daughter_id=f"daughter-{suffix}",
+            son_id=f"son-{suffix}",
+            system_id=f"system-{suffix}",
+        )
 
 
 def utcnow() -> datetime:
@@ -287,37 +317,45 @@ class Database:
             """
         )
 
-    def seed_demo(self) -> None:
+    def seed_demo(self, suffix: str = "demo") -> DemoIdentities:
+        """Seed one self-contained demo family.
+
+        Parameterised by suffix so a public deployment can give every visitor
+        their own sandbox: family isolation is enforced on `family_id` throughout,
+        so separate families cannot see each other's tasks, bills or audit trail.
+        The default "demo" reproduces the original fixed ids exactly.
+        """
+        ids = DemoIdentities.for_suffix(suffix)
         now = utcnow()
         with self.transaction() as conn:
-            conn.execute("INSERT OR IGNORE INTO families(id,display_name) VALUES (?,?)", ("fam-demo", "优活示范家庭"))
             conn.execute(
-                "INSERT OR IGNORE INTO actors(id,family_id,role,display_name) VALUES (?,?,?,?)",
-                ("elder-demo", "fam-demo", "elder", "王奶奶"),
+                "INSERT OR IGNORE INTO families(id,display_name) VALUES (?,?)",
+                (ids.family_id, "优活示范家庭"),
             )
-            conn.execute(
-                "INSERT OR IGNORE INTO actors(id,family_id,role,display_name) VALUES (?,?,?,?)",
-                ("daughter-demo", "fam-demo", "family", "女儿"),
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO actors(id,family_id,role,display_name) VALUES (?,?,?,?)",
-                ("son-demo", "fam-demo", "family", "儿子"),
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO actors(id,family_id,role,display_name) VALUES (?,?,?,?)",
-                ("system-demo", "fam-demo", "system", "优活系统"),
-            )
-            for row in [
+            for actor_id, role, name in (
+                (ids.elder_id, "elder", "王奶奶"),
+                (ids.daughter_id, "family", "女儿"),
+                (ids.son_id, "family", "儿子"),
+                (ids.system_id, "system", "优活系统"),
+            ):
+                conn.execute(
+                    "INSERT OR IGNORE INTO actors(id,family_id,role,display_name) VALUES (?,?,?,?)",
+                    (actor_id, ids.family_id, role, name),
+                )
+            for bill_id, bill_type, period, cents, due in [
                 ("bill-water-2026-07", "水费", "2026-07", 6840, "2026-07-28"),
                 ("bill-electric-2026-07", "电费", "2026-07", 12650, "2026-07-30"),
                 ("bill-gas-2026-07", "燃气费", "2026-07", 5230, "2026-07-31"),
             ]:
                 conn.execute(
                     "INSERT OR IGNORE INTO bills(id,family_id,bill_type,period,amount_cents,due_date,paid) VALUES (?,?,?,?,?,?,0)",
-                    (row[0], "fam-demo", row[1], row[2], row[3], row[4]),
+                    (f"{bill_id}-{suffix}", ids.family_id, bill_type, period, cents, due),
                 )
-        if self.count_audit("fam-demo") == 0:
-            self.append_audit("fam-demo", "system-demo", "DEMO_SEEDED", None, {"at": iso(now), "schema": 3})
+        if self.count_audit(ids.family_id) == 0:
+            self.append_audit(
+                ids.family_id, ids.system_id, "DEMO_SEEDED", None, {"at": iso(now), "schema": 3}
+            )
+        return ids
 
     # --- actors/auth ---
     def actor(self, actor_id: str) -> sqlite3.Row | None:

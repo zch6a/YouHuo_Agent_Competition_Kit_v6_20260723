@@ -1,4 +1,6 @@
-const ELDER_ID = 'elder-demo';
+// Resolved from identity.js; see the note there about per-visitor sandboxes.
+let ELDER_ID = 'elder-demo';
+let IDENTITY = null;
 
 // Design §4.5: the family view shows "which step is this task on" in plain words,
 // not raw backend enum values.
@@ -75,10 +77,25 @@ const calendarEl = document.querySelector('#calendar');
 const noticesEl = document.querySelector('#notices');
 const weeklyEl = document.querySelector('#weekly');
 
+async function resolveIdentity() {
+  if (IDENTITY) return IDENTITY;
+  IDENTITY = window.YouHuoIdentity
+    ? await window.YouHuoIdentity.ready()
+    : {elderId: 'elder-demo', daughterId: 'daughter-demo', familyToken: null};
+  ELDER_ID = IDENTITY.elderId;
+  return IDENTITY;
+}
+
 async function login() {
+  const identity = await resolveIdentity();
+  if (identity.familyToken) {
+    accessToken = identity.familyToken;
+    sessionStorage.setItem('youhuo_family_token', accessToken);
+    return;
+  }
   const r = await fetch('/v2/auth/demo', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({actor_id: 'daughter-demo'})
+    body: JSON.stringify({actor_id: identity.daughterId})
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.detail || '家属端演示登录失败');
