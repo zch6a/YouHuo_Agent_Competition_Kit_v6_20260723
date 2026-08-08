@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    优活 Agent v6 — design system
    All styling lives in this file: the app ships a strict CSP (style-src 'self'),
    so no inline <style> blocks and no style="" attributes are allowed.
@@ -48,14 +48,40 @@
   --danger-bg: #fdeaec;
 
   /* --- shape and depth ---------------------------------------------------- */
-  --r-sm: 12px;
-  --r-md: 16px;
-  --r-lg: 22px;
-  --r-xl: 28px;
-  --r-2xl: 34px;
-  --shadow-1: 0 1px 2px rgba(16, 24, 44, .05), 0 2px 8px rgba(16, 24, 44, .04);
-  --shadow-2: 0 2px 4px rgba(16, 24, 44, .05), 0 12px 30px rgba(16, 24, 44, .07);
-  --shadow-3: 0 4px 8px rgba(16, 24, 44, .06), 0 26px 60px rgba(16, 24, 44, .11);
+  /* Tightened from 12/16/22/28/34. Magic UI, shadcn and COSS all sit on a ~10px
+     base with ±4px steps; 28px cards read as a consumer toy, and next to 17px
+     body text the curve visibly eats the corner of the content. Kept a little
+     looser than 10px because this product is warm rather than technical, and
+     because large touch targets carry bigger corners better. */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 20px;
+  --r-2xl: 26px;
+  /* Four-stop ladders instead of two. A real object casts a tight contact
+     shadow AND a wide ambient one; two stops always reads as either a hard
+     drop-shadow or a grey smudge. The near stops are almost opaque and tiny,
+     the far stops wide and very faint — that ratio is what makes a card look
+     like it is sitting on the page rather than pasted onto it. */
+  --shadow-1:
+    0 1px 1px rgba(16, 24, 44, .04),
+    0 2px 4px rgba(16, 24, 44, .04),
+    0 4px 10px rgba(16, 24, 44, .03);
+  --shadow-2:
+    0 1px 1px rgba(16, 24, 44, .05),
+    0 3px 6px rgba(16, 24, 44, .05),
+    0 8px 18px rgba(16, 24, 44, .05),
+    0 20px 44px rgba(16, 24, 44, .05);
+  --shadow-3:
+    0 1px 2px rgba(16, 24, 44, .06),
+    0 4px 10px rgba(16, 24, 44, .06),
+    0 14px 32px rgba(16, 24, 44, .07),
+    0 34px 76px rgba(16, 24, 44, .08);
+  /* A hairline that is darker at the bottom than the top, the way a lit surface
+     actually is. Applied as an inset ring so it never affects layout. */
+  --ring-hairline:
+    inset 0 1px 0 rgba(255, 255, 255, .7),
+    inset 0 -1px 0 rgba(16, 24, 44, .05);
   --ring: 0 0 0 4px color-mix(in srgb, var(--role-accent) 22%, transparent);
 
   /* --- spacing: 4px base, so margins and padding share one rhythm ---------
@@ -117,6 +143,14 @@
   --dur-slow: 320ms;
   --ease-out: cubic-bezier(.22, 1, .36, 1);
   --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+
+  /* Bottom tab bar height, excluding the safe-area inset. Declared here because
+     two rules must agree on it — the bar's own min-height and the page padding
+     that keeps the last card out from under it. When those two drifted apart
+     before (for a bar that did not even exist) the result was 100px of content
+     clipped off the bottom of a screen. 56px keeps a 24px glyph, a 13px label
+     and the gap between them above the 48px touch floor. */
+  --tabbar-h: 56px;
 
   --mode-fade: 1s;
   --elder-font-scale: 1.25;
@@ -306,7 +340,30 @@ a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underlin
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-2);
+  /* Ambient shadow plus the lit hairline. The 1px white inset along the top is
+     the single cheapest trick that makes a surface read as raised rather than
+     drawn, and it is why product UIs look "solid" while flat cards look printed. */
+  box-shadow: var(--shadow-2), var(--ring-hairline);
+}
+
+/* Tinted surfaces are derived in OKLCH rather than sRGB. Mixing a colour toward
+   white in sRGB drags it through a grey mid-point, which is exactly why pale
+   blue panels look dusty; OKLCH is perceptually uniform, so a 96%-light tint of
+   the brand blue stays recognisably blue and stays clean. Magic UI derives its
+   colours the same way. */
+@supports (color: oklch(from #fff l c h)) {
+  :root {
+    --role-tint: oklch(from var(--role-accent) 0.965 calc(c * 0.42) h);
+    --surface-2: oklch(from var(--role-accent) 0.985 calc(c * 0.14) h);
+    --surface-3: oklch(from var(--role-accent) 0.962 calc(c * 0.20) h);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --role-tint: oklch(from var(--role-accent) 0.30 calc(c * 0.55) h);
+      --surface-2: oklch(from var(--role-accent) 0.235 calc(c * 0.22) h);
+      --surface-3: oklch(from var(--role-accent) 0.275 calc(c * 0.26) h);
+    }
+  }
 }
 .panel { padding: clamp(18px, 2.4vw, 28px); }
 
@@ -555,6 +612,43 @@ pre {
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; align-items: start; }
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-top: 22px; align-items: start; }
 .feature-panel { display: flex; flex-direction: column; gap: 11px; }
+
+/* ------------------------------------------------------------------------
+   Card heading icon chip.
+   A stack of six bare <h2>s on white is a document outline: to find
+   "用药与库存安全" you read four headings first. A chip gives each card a
+   silhouette and a colour, so the eye lands on the right card before any word
+   is read. The heading becomes a flex row rather than the chip being floated,
+   because a Chinese heading that wraps to two lines must align its second line
+   to the text, not tuck under the icon.
+   ------------------------------------------------------------------------ */
+/* NOT `.card-icon` — that name is index.html's 50x50 card component chip,
+   declared further down this file. At equal specificity the later rule wins, so
+   every declaration here was silently overridden (chips came out 50px with a
+   15px radius) and the mobile override was shrinking index's real cards too. */
+h2:has(> .head-icon) {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.head-icon {
+  /* inline-grid, not grid: the flex row above depends on :has(), and where that
+     is unsupported a block-level chip would knock the heading text onto its own
+     line. Inline it simply sits before the text, which is the correct fallback
+     rather than a broken one. */
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -0.28em;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  /* Tinted from the page's own role accent, so the chips re-colour with the
+     mode instead of hard-coding a palette that then drifts. */
+  background: var(--role-tint);
+  color: var(--role-accent-deep);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--role-accent) 16%, transparent);
+}
 .feature-panel button { align-self: flex-start; }
 .feature-panel pre { max-height: 320px; overflow: auto; }
 .capability-card { background: var(--surface-2); }
@@ -1386,9 +1480,26 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   .rail { display: grid; gap: var(--space-4); }
   .panel, .hero, .card { border-radius: var(--r-lg); }
 
-  /* Leave room for the fixed bottom bar plus the home gesture area, or the last
-     card sits under it and cannot be scrolled into view. */
-  main.shell { padding-bottom: calc(var(--space-16) + env(safe-area-inset-bottom) + 44px); }
+  /* Clear the home gesture area so the last card is not sitting under the
+     thumb bar. This used to reserve `--space-16 + 44px` for a fixed bottom bar;
+     there is no fixed bottom bar (grep: nothing is position:fixed here but the
+     halo, the sheet and its backdrop), and on the elder screen those 100px of
+     phantom furniture were the entire overflow the frame then had to clip. */
+  /* Clear the tab bar and the home gesture area, or the last card sits under
+     them and can never be scrolled into view. `--tabbar-h` is declared once
+     below and used here so the two cannot drift apart.
+
+     Note this padding used to exist for a bottom bar that did not exist yet:
+     it reserved `--space-16 + 44px` against nothing (grep found no fixed bottom
+     furniture at all), and on the elder screen those phantom pixels were the
+     whole overflow the frame then had to clip. Now there is a real bar. */
+  main.shell:not(.app-frame) {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-5));
+  }
+  /* The frame cannot take that as page padding — it would push itself past its
+     own clamp and get clipped. It reserves the inset inside the frame instead,
+     in the stage height below, so the composer clears the home indicator. */
+  main.shell.app-frame { padding-bottom: 0; }
 
   /* ----------------------------------------------------------------------
      The app frame.
@@ -1399,7 +1510,7 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
      as a whole; a *region* inside it scrolls while the bar and the composer
      stay put. That is the difference this block makes, and it is why the
      layout is fixed to the viewport rather than merely styled.
-     ---------------------------------------------------------------------- */
+
      First attempt pinned the *whole page* to the viewport and put the rail
      inside that frame too. The arithmetic does not work on a phone: role header
      200 + microphone 217 + composer 157 = 574px, and the rail claimed another
@@ -1408,39 +1519,41 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
 
      So the frame is the *conversation screen*, not the document. The stage is
      exactly one viewport tall with the composer at its foot, and the extras sit
-     below it in normal flow, reached by scrolling. First screen is a complete
-     app screen; nothing is crushed; nothing important needs scrolling to reach.
+     in a sheet over it. First screen is a complete app screen; nothing is
+     crushed; nothing important needs scrolling to reach.
      ---------------------------------------------------------------------- */
-  .elder-layout > .stage {
-    /* One screen minus the app bar. */
-    min-height: calc(100svh - 104px);
-    min-height: calc(100dvh - 104px);
-    display: flex;
-    flex-direction: column;
-  }
 
-  /* The conversation screen is exactly one viewport tall, with the composer at
-     its foot. Without this the stage is only as tall as its content and the
-     document ends up ~130px past the viewport — a page that scrolls slightly
-     for no reason, which is the tell that it is a web page and not a screen. */
   /* Block, not grid: the backdrop and the sheet are both position:fixed now, so
      a grid here still reserves row tracks and gaps for children that are no
      longer in flow. */
   .elder-layout { display: block; }
 
-  /* Clamp the document to the screen. Safe only because the stage above is
-     height-fixed rather than min-height: nothing inside needs to grow, so
-     nothing gets clipped. The sheet is unaffected — it is position:fixed and no
-     ancestor here establishes a containing block for it (verified). */
-  main.shell { max-height: 100svh; max-height: 100dvh; overflow: hidden; }
+  /* Clamp the document to the screen — for the conversation screen ONLY, hence
+     the explicit `.app-frame` opt-in that only elder.html carries.
+
+     This rule used to read `main.shell { ... }`. Every page shares that class,
+     so the clamp landed on index/family/care/trust/judge too — long scrolling
+     documents with nothing height-fixed inside them. Measured at 390x844:
+     index lost 2157px, family 2016, judge 1964, care 1444, trust 1223. On a
+     phone the entire page below the first screen simply did not exist.
+
+     It survived every gate I had. Full-page screenshots grow the emulated
+     viewport, and 100dvh grows with it, so the clip never appeared in an image;
+     the contrast audit reads computed colours, which are unaffected by being
+     clipped out of view. test_mobile_reachability.py now measures it directly. */
+  main.shell.app-frame { max-height: 100svh; max-height: 100dvh; overflow: hidden; }
 
   .elder-layout > .stage {
     /* `height`, not `min-height`. With a minimum, the furniture's natural size
        wins and the screen overflows by whatever it needs (measured: 795px of
        content into 754px of room). With a fixed height the conversation is the
        thing that gives, which is correct — it is the scrollable region. */
-    height: calc(100svh - 98px);
-    height: calc(100dvh - 98px);
+    /* Installed to the home screen there is no browser chrome under the
+       composer, so the home indicator would sit on top of the send button.
+       Reserved here rather than as page padding: see .app-frame above. In a
+       browser tab the inset resolves to 0 and nothing changes. */
+    height: calc(100svh - 98px - env(safe-area-inset-bottom));
+    height: calc(100dvh - 98px - env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
@@ -1572,6 +1685,123 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
      row of prime real estate directly under the microphone. */
   .quick { display: none; }
+
+  /* ----------------------------------------------------------------------
+     Page headers, compacted.
+
+     Measured on /care at 390x844: eyebrow + title + a two-line lead cost 380px
+     before a single piece of content — 45% of the screen spent telling someone
+     which page they are already looking at. The desktop `clamp(28px, 5vw, 48px)`
+     bottoms out at 28px, but 5vw of a phone is 19.5px, so the clamp never
+     engages and the title lands at its 28px floor next to 17px body text.
+
+     Nothing is hidden. The eyebrow is a version stamp for a judge and drops to
+     11px; the title takes a size that still leads the page at 26px; the lead
+     keeps every word at a tighter measure. Roughly 150px comes back, which on
+     this page is the difference between seeing one card and seeing two.
+     ---------------------------------------------------------------------- */
+  .eyebrow { font-size: 11px; letter-spacing: .12em; margin-bottom: 6px; }
+  .care-title, .topbar h1 { font-size: 26px; line-height: 1.2; margin-bottom: 6px; }
+  .lead { font-size: 16px; line-height: 1.62; }
+  .topbar { margin-bottom: var(--space-4); }
+
+  /* space-between on a wrapped flex row leaves the action buttons stranded on
+     their own line with a gap above them; stacked is what it already looked
+     like, minus the accident. */
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  /* 38px chips beside a 26px heading crowd the title on a narrow column. */
+  .head-icon { width: 34px; height: 34px; }
+  .head-icon svg { width: 18px; height: 18px; }
+
+  /* ----------------------------------------------------------------------
+     Bottom tab bar.
+
+     Every console page navigated with a top-left "← 返回首页" link. That is a
+     web page's model of location — "you arrived from somewhere, here is the way
+     back". An app's model is "these are the places you can be, and this is the
+     one you are in": persistent, at the bottom where the thumb already rests,
+     with the current section marked. Of everything on these screens this is the
+     change that decides whether they read as an application or as documentation
+     with a stylesheet, so it comes before any amount of shadow work.
+
+     Five destinations, which is also the practical ceiling — past five the
+     labels stop fitting at 390px and the targets fall under the touch floor.
+     The current tab is marked in the markup with aria-current, not by script:
+     a nav that needs JS to say where you are shows the wrong tab on first paint
+     and lies outright if the script fails.
+     ---------------------------------------------------------------------- */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    /* The bar itself sits above the home indicator; the inset is padding so the
+       frosted background still bleeds to the physical edge of the screen. */
+    padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: saturate(1.5) blur(18px);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    border-top: 1px solid var(--line);
+  }
+
+  .tab {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    min-height: var(--tabbar-h);
+    /* 13px, and only just enough — a tab label is the one place where a shorter
+       word beats a smaller size, which is why these are all two characters. */
+    font-size: var(--text-xs);
+    font-weight: 650;
+    line-height: 1;
+    letter-spacing: .01em;
+    color: var(--ink-2);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-base) var(--ease-out);
+  }
+
+  /* The whole tab is the target, not the glyph: 78x56 at 390px wide, against a
+     48px floor. Icon-only tabs would be smaller *and* unlabelled. */
+  .tab svg {
+    width: 24px;
+    height: 24px;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  .tab.is-current { color: var(--role-accent-deep); }
+
+  /* A 3px cap above the current tab. Colour alone is never the only channel —
+     the icon changes weight and the indicator appears, so the state survives
+     both a monochrome screen and the most common colour deficiencies. */
+  .tab.is-current::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 22px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: currentColor;
+  }
+  .tab.is-current svg { stroke-width: 2.3; }
+
+  /* Press feedback on the glyph only. Moving the label would shift text under
+     the thumb mid-tap, which reads as a misfire. */
+  .tab:active svg { transform: scale(.88); }
+
+  /* The 首页 tab does what this link did, from a better place. */
+  .back-link { display: none; }
 }
 
 /* Installed to the home screen there is no browser UI to lean on, so the app
@@ -1587,4 +1817,10 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
 @media (min-width: 761px) {
   .sheet-trigger, .sheet-handle, .sheet-backdrop { display: none; }
   .rail.sheet { position: static; transform: none; max-height: none; overflow: visible; }
+
+  /* A thumb bar pinned to the bottom of a 1440px window is a phone affordance
+     stranded on a desktop; with a mouse and a visible URL the back link is the
+     right model. Hidden rather than removed from the markup so the two layouts
+     stay one document — and so the tab order is identical in both. */
+  .tabbar { display: none; }
 }

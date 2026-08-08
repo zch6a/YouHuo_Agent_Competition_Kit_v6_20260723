@@ -98,6 +98,11 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 
 - 安全区与动态视口：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，不压刘海、不被手势条盖住；
 - 触控：去掉灰色高亮与 300ms 延迟，主控件吸底到拇指可达区，≤760px 单列；
+- **常驻底部标签栏**（首页/家人/照护/可信/评委）：当前项由 HTML 里的 `aria-current`
+  标出，不由脚本赋值——CSP 禁内联脚本，而脚本赋值的高亮会在首帧闪错、脚本挂了就
+  一直错。状态同时由指示条和图标粗细表达，不只靠颜色。老人端**故意没有**标签栏：
+  那是一整屏对话，底部是输入框，标签栏既会挤掉发送按钮，也会把唯一为这位用户做的
+  那一屏变成一个可以走开的地方；
 - Service worker **只缓存界面外壳，绝不缓存账单、待办、用药或审计链**——把缓存里的"水费已缴"念给老人听，正是本项目存在的意义所反对的；
 - 动效为**无过冲、200–250ms、减速**。这不是保守，是抄来的：`gorhom/react-native-bottom-sheet`
   用 ζ≈4.6 的过阻尼弹簧并显式 `overshootClamping: true`，`motion-primitives` 用 `bounce: 0`；
@@ -109,8 +114,15 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 自动分到一份独立的演示家庭**（`POST /v2/auth/visitor`），所以多人同时访问不会互相
 看到对方的待办，也不能改动对方的数据——家庭隔离本来就按 `family_id` 强制执行。
 
-部署到 Hugging Face Spaces（免费固定地址）的完整步骤见
-`deploy/huggingface/DEPLOY.md`；自有服务器用 `docker compose up -d` 即可。
+线上地址：<https://youhuo.onrender.com>（`/elder` 老人端、`/family` 家属端、
+`/care`、`/trust`、`/judge`）。
+
+部署走 **Render 原生 Python 运行时**，配置即仓库根目录的 `render.yaml`，完整步骤见
+`deploy/DEPLOY.md`；自有服务器用 `docker compose up -d` 即可。
+
+> `deploy/huggingface/` 保留作参考，但**不要照它走**：HF Spaces 的容器运行时在
+> 2026-08 起需要付费计划。本应用不需要容器提供的任何东西——它唯一从 `data/` 读的
+> 非包数据文件已经挪进了 `backend/youhuo/reference/`，一份源码检出就够。
 
 > 这是公开演示，数据在容器重启后清空，请不要输入任何真实个人信息。
 
@@ -119,7 +131,7 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           471项自动化测试
+backend/tests/           528项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -175,7 +187,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、471项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、528项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -191,7 +203,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**471/471通过**；
+- pytest：**528/528通过**；
 - 逐功能端到端验收：**123/123通过**，OpenAPI 操作覆盖 **99/99**；
 - 核心Python语句覆盖率：**90%**；
 - ElderBench：**34/34、120/120、300/300通过**；
@@ -210,6 +222,47 @@ python -m pip install -r requirements.txt
 2. “确认办理缴费 / 取消不要缴费”的冲突候选原只返回对话动作，现保留缴费任务域并继续强制澄清；
 3. 同一金额同时来自可信工具和冲突OCR时，旧策略可能因存在可信来源而继续；现只要关键值冲突就剥离字段并要求重新核验；
 4. HTTP烟雾测试曾错误假设首次保存档案版本必须为2，已改为验证真实字段和合法版本。
+
+## 2026-08-08 前端移动化轮：一个被所有关卡漏掉的裁剪缺陷
+
+这一轮最重要的产出不是新样式，是一个**线上一直存在、而既有关卡全部漏判**的缺陷。
+
+`main.shell { max-height: 100dvh; overflow: hidden }` 是为老人端"会话一屏"写的：
+那个屏幕里 stage 是定高的，没有东西需要生长，裁剪是安全的。但这条规则没有限定页面，
+而 6 个页面共用 `.shell`。在 390x844 实测：
+
+| 页面 | 手机上被裁掉 |
+| --- | --- |
+| `/` | 2157px |
+| `/family` | 2016px |
+| `/judge` | 1964px |
+| `/care` | 1444px |
+| `/trust` | 1223px |
+| `/elder` | 100px |
+
+也就是说手机上首屏以下的内容**根本摸不到**。它躲过了当时的每一道关卡，原因值得记下来：
+
+1. **整页截图会说谎。** `captureBeyondViewport=True` 把模拟视口拉到内容高度，`100dvh`
+   跟着一起长，于是图上永远看不出裁剪。同一个机制还让所有 `position: fixed` 的家具
+   在"首屏"截图里彻底消失（新的底部标签栏一度完全不出现，而它的布局是对的）。工具
+   现在先拍首屏、并在两次拍摄之间重置视口。
+2. **对比度审计读的是计算样式的颜色**，被裁出视野不影响颜色，所以 12/12 照样通过。
+3. **截图工具复用了持久化的 Chrome profile**，而本项目自己注册了 service worker 缓存
+   界面外壳——于是工具会渲染上一版构建。这一条在本轮里两次导出错误结论。工具现在
+   每次运行前清 profile；一个会给你看昨天构建的截图工具不是测量，是传闻。
+
+修复：裁剪改为显式 opt-in（`main.shell.app-frame`，只有 `elder.html` 带这个类）；
+删掉一段为**并不存在**的底部栏预留的 `--space-16 + 44px` 留白（那 100px 正是老人端
+当时唯一的溢出）；栏高改为单一令牌 `--tabbar-h`，让"栏高"和"给栏让出的留白"不可能
+再各写各的。
+
+`test_mobile_reachability.py` 直接测几何而不是测样式文本：在真实 390x844 视口下，
+任何声明了 `overflow: hidden` 的盒子都不许装不下自己的内容。静态检查 0.19s、几何
+检查 16s，两层都用"把 bug 原样放回去"验证过确实会失败。
+
+同轮修复的另一处：新加的标题图标用了 `.card-icon`，而这个类名已经被 index.html 的
+50x50 卡片图标占用且声明在样式表更后面——同等特异性下后者全胜，我的每一条声明都被
+静默覆盖，并且我的移动端覆写还在悄悄把 index 真正的卡片缩到 34px。已改名 `.head-icon`。
 
 ## 2026-08-08 设计稿对齐轮修复
 

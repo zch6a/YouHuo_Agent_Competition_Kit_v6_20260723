@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -86,10 +87,23 @@ def main() -> int:
         print("找不到 Chrome / Edge")
         return 1
 
+    # A fresh profile every run, and this is not optional.
+    #
+    # The app registers a service worker that caches the shell — that is the
+    # point of it. With a persistent --user-data-dir the worker survives between
+    # runs and serves the *previous* build's HTML and CSS, so the tool renders a
+    # version of the app that no longer exists. It has produced confidently
+    # wrong readings more than once: a set of freshly injected icons that
+    # "weren't rendering" (they were, in a file the browser refused to fetch),
+    # and before that a whole round of judging stale styles. A screenshot tool
+    # that can show you yesterday's build is not a measurement, it is a rumour.
+    profile = Path(os.environ.get("TEMP", "/tmp")) / "youhuo-shots"
+    shutil.rmtree(profile, ignore_errors=True)
+
     proc = subprocess.Popen(
         [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
          f"--remote-debugging-port={DEVTOOLS_PORT}", "--remote-allow-origins=*",
-         f"--user-data-dir={os.environ.get('TEMP', '/tmp')}/youhuo-shots", "about:blank"],
+         f"--user-data-dir={profile}", "about:blank"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
@@ -136,18 +150,33 @@ def main() -> int:
                         "sh:document.documentElement.scrollHeight})"
                     ), returnByValue=True)["result"]["value"]
                     stem = f"{device}{page.replace('/', '-') or '-home'}"
-                    # Full page, for reviewing the whole layout...
-                    full = tab.send(
-                        "Page.captureScreenshot", format="png", captureBeyondViewport=True
-                    )
-                    (out_dir / f"{stem}-full.png").write_bytes(base64.b64decode(full["data"]))
-                    # ...and the first screen alone, which is what decides whether
-                    # the app screen is complete without scrolling. Judging that
-                    # from a 2400px full-page capture is impossible.
+                    # The first screen alone, which is what decides whether the
+                    # app screen is complete without scrolling. Judging that from
+                    # a 2400px full-page capture is impossible.
+                    #
+                    # This comes FIRST, and the metrics are re-asserted before
+                    # it, both deliberately. captureBeyondViewport=True expands
+                    # the viewport internally to the content height and does not
+                    # reliably restore it, so a first-screen capture taken after
+                    # it is the top 844px of a 2288px-tall viewport. Everything
+                    # position:fixed then sits at the *bottom of that*, i.e. off
+                    # the crop entirely — the bottom tab bar was invisible in
+                    # every first-screen shot while being laid out correctly
+                    # (measured: fixed, bottom 0, rect 787-844). A screenshot
+                    # tool that silently drops fixed furniture is worse than no
+                    # tool, because it is the pinned bars and sheets that decide
+                    # whether a screen reads as an app.
                     first = tab.send(
                         "Page.captureScreenshot", format="png", captureBeyondViewport=False
                     )
                     (out_dir / f"{stem}.png").write_bytes(base64.b64decode(first["data"]))
+                    # ...then the whole layout, whose expansion no longer matters.
+                    tab.send("Emulation.setDeviceMetricsOverride", width=width, height=height,
+                             deviceScaleFactor=dsf, mobile=device != "desktop")
+                    full = tab.send(
+                        "Page.captureScreenshot", format="png", captureBeyondViewport=True
+                    )
+                    (out_dir / f"{stem}-full.png").write_bytes(base64.b64decode(full["data"]))
                     written.append(f"{stem}  {measured}")
                 finally:
                     tab.close()
