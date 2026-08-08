@@ -83,7 +83,15 @@ def test_nothing_dangerous_is_tracked_by_git():
     import shutil
     import subprocess
 
-    if shutil.which("git") is None or not (ROOT.parent / ".git").exists():
+    if shutil.which("git") is None:
+        pytest.skip("git not available")
+    # Ask git where the checkout is rather than guessing: this project has lived
+    # both at the repo root and one level down inside it.
+    probe = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=ROOT, capture_output=True, encoding="utf-8", errors="replace",
+    )
+    if probe.returncode != 0 or probe.stdout.strip() != "true":
         pytest.skip("not a git checkout")
     # encoding must be explicit: git emits UTF-8, and this repo has Chinese
     # filenames that the Windows CP936 default cannot decode.

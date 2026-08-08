@@ -95,7 +95,7 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           424项自动化测试
+backend/tests/           434项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -151,7 +151,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、424项测试与覆盖率、122项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、434项测试与覆盖率、122项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -167,7 +167,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**424/424通过**；
+- pytest：**434/434通过**；
 - 逐功能端到端验收：**122/122通过**，OpenAPI 操作覆盖 **98/98**；
 - 核心Python语句覆盖率：**90%**；
 - ElderBench：**34/34、120/120、300/300通过**；
