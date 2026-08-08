@@ -1,0 +1,25 @@
+{
+  "version": "6.0.0",
+  "server": "real_uvicorn_loopback",
+  "total_requests": 5000,
+  "concurrency": 100,
+  "successful": 5000,
+  "failed": 0,
+  "elapsed_seconds": 164.4999,
+  "throughput_rps": 30.4,
+  "latency_ms": {
+    "mean": 3226.354,
+    "p50": 2083.337,
+    "p95": 10230.3,
+    "p99": 16387.008,
+    "max": 27352.539
+  },
+  "mix": {
+    "liveness_reads": 3000,
+    "semantic_parses": 1000,
+    "interaction_plans": 1000
+  },
+  "keepalive_retries": 0,
+  "transport_errors": {},
+  "note": "真实Uvicorn回环网络负载；不等同于公网、多进程或真实HarmonyOS设备压测。keepalive_retries 表示连接被服务端回收后重试的次数，属于长连接竞态，不是请求失败。"
+}

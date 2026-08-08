@@ -1,0 +1,14 @@
+services:
+  youhuo:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      YOUHUO_DEMO_MODE: "true"
+      YOUHUO_DB_PATH: /app/data/youhuo.db
+    volumes:
+      - youhuo-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  youhuo-data:

@@ -1,0 +1,8 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "优活老人数字生活助手" },
+    { "name": "EntryAbility_desc", "value": "优活主入口" },
+    { "name": "EntryAbility_label", "value": "优活" },
+    { "name": "microphone_reason", "value": "用于老人主动发起语音办事请求" }
+  ]
+}

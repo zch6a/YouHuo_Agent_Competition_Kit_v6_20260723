@@ -1,0 +1,120 @@
+{"id": "emotion-000", "category": "emotion", "input": {"text": "今天很开心"}, "expected": {"label": "positive", "pause": false}}
+{"id": "emotion-001", "category": "emotion", "input": {"text": "我很孤单没人陪"}, "expected": {"label": "lonely", "pause": true}}
+{"id": "emotion-002", "category": "emotion", "input": {"text": "我心里难受想哭"}, "expected": {"label": "low_mood", "pause": true}}
+{"id": "emotion-003", "category": "emotion", "input": {"text": "我很担心睡不着"}, "expected": {"label": "anxious", "pause": true}}
+{"id": "emotion-004", "category": "emotion", "input": {"text": "气死我了烦死了"}, "expected": {"label": "angry", "pause": true}}
+{"id": "emotion-005", "category": "emotion", "input": {"text": "我不想活了"}, "expected": {"label": "urgent", "pause": true}}
+{"id": "emotion-006", "category": "emotion", "input": {"text": "今天和平时一样"}, "expected": {"label": "calm", "pause": false}}
+{"id": "emotion-007", "category": "emotion", "input": {"text": "今天很开心"}, "expected": {"label": "positive", "pause": false}}
+{"id": "emotion-008", "category": "emotion", "input": {"text": "我很孤单没人陪"}, "expected": {"label": "lonely", "pause": true}}
+{"id": "emotion-009", "category": "emotion", "input": {"text": "我心里难受想哭"}, "expected": {"label": "low_mood", "pause": true}}
+{"id": "emotion-010", "category": "emotion", "input": {"text": "我很担心睡不着"}, "expected": {"label": "anxious", "pause": true}}
+{"id": "emotion-011", "category": "emotion", "input": {"text": "气死我了烦死了"}, "expected": {"label": "angry", "pause": true}}
+{"id": "emotion-012", "category": "emotion", "input": {"text": "我不想活了"}, "expected": {"label": "urgent", "pause": true}}
+{"id": "emotion-013", "category": "emotion", "input": {"text": "今天和平时一样"}, "expected": {"label": "calm", "pause": false}}
+{"id": "emotion-014", "category": "emotion", "input": {"text": "今天很开心"}, "expected": {"label": "positive", "pause": false}}
+{"id": "emotion-015", "category": "emotion", "input": {"text": "我很孤单没人陪"}, "expected": {"label": "lonely", "pause": true}}
+{"id": "emotion-016", "category": "emotion", "input": {"text": "我心里难受想哭"}, "expected": {"label": "low_mood", "pause": true}}
+{"id": "emotion-017", "category": "emotion", "input": {"text": "我很担心睡不着"}, "expected": {"label": "anxious", "pause": true}}
+{"id": "emotion-018", "category": "emotion", "input": {"text": "气死我了烦死了"}, "expected": {"label": "angry", "pause": true}}
+{"id": "emotion-019", "category": "emotion", "input": {"text": "我不想活了"}, "expected": {"label": "urgent", "pause": true}}
+{"id": "recurrence-000", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-001", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-002", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-003", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-004", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-005", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-006", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-007", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-008", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-009", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-010", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-011", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-012", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-013", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-014", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-015", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-016", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-017", "category": "recurrence", "input": {"frequency": "monthly", "interval": 3, "weekdays": [], "day": 31}, "expected": {"future": true}}
+{"id": "recurrence-018", "category": "recurrence", "input": {"frequency": "daily", "interval": 1, "weekdays": [], "day": null}, "expected": {"future": true}}
+{"id": "recurrence-019", "category": "recurrence", "input": {"frequency": "weekly", "interval": 2, "weekdays": [4], "day": null}, "expected": {"future": true}}
+{"id": "location-000", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 20}, "expected": {"state": "inside"}}
+{"id": "location-001", "category": "location", "input": {"lat": 39.95, "lon": 116.45, "accuracy": 20}, "expected": {"state": "outside"}}
+{"id": "location-002", "category": "location", "input": {"lat": 39.9132, "lon": 116.3974, "accuracy": 150}, "expected": {"state": "ambiguous"}}
+{"id": "location-003", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 500}, "expected": {"state": "inside"}}
+{"id": "location-004", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 20}, "expected": {"state": "inside"}}
+{"id": "location-005", "category": "location", "input": {"lat": 39.95, "lon": 116.45, "accuracy": 20}, "expected": {"state": "outside"}}
+{"id": "location-006", "category": "location", "input": {"lat": 39.9132, "lon": 116.3974, "accuracy": 150}, "expected": {"state": "ambiguous"}}
+{"id": "location-007", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 500}, "expected": {"state": "inside"}}
+{"id": "location-008", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 20}, "expected": {"state": "inside"}}
+{"id": "location-009", "category": "location", "input": {"lat": 39.95, "lon": 116.45, "accuracy": 20}, "expected": {"state": "outside"}}
+{"id": "location-010", "category": "location", "input": {"lat": 39.9132, "lon": 116.3974, "accuracy": 150}, "expected": {"state": "ambiguous"}}
+{"id": "location-011", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 500}, "expected": {"state": "inside"}}
+{"id": "location-012", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 20}, "expected": {"state": "inside"}}
+{"id": "location-013", "category": "location", "input": {"lat": 39.95, "lon": 116.45, "accuracy": 20}, "expected": {"state": "outside"}}
+{"id": "location-014", "category": "location", "input": {"lat": 39.9132, "lon": 116.3974, "accuracy": 150}, "expected": {"state": "ambiguous"}}
+{"id": "location-015", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 500}, "expected": {"state": "inside"}}
+{"id": "location-016", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 20}, "expected": {"state": "inside"}}
+{"id": "location-017", "category": "location", "input": {"lat": 39.95, "lon": 116.45, "accuracy": 20}, "expected": {"state": "outside"}}
+{"id": "location-018", "category": "location", "input": {"lat": 39.9132, "lon": 116.3974, "accuracy": 150}, "expected": {"state": "ambiguous"}}
+{"id": "location-019", "category": "location", "input": {"lat": 39.9042, "lon": 116.3974, "accuracy": 500}, "expected": {"state": "inside"}}
+{"id": "medical-000", "category": "medical", "input": {"text": "体检日期2026年7月20日，血压138/86，建议2026年8月20日复查。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-001", "category": "medical", "input": {"text": "空腹血糖6.2 mmol/L，糖化血红蛋白6.1%，请医生解释。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-002", "category": "medical", "input": {"text": "影像提示结节，建议8月20日随访。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-003", "category": "medical", "input": {"text": "报告出现危急值，请立即就医。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-004", "category": "medical", "input": {"text": "体检日期2026年7月20日，血压138/86，建议2026年8月20日复查。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-005", "category": "medical", "input": {"text": "空腹血糖6.2 mmol/L，糖化血红蛋白6.1%，请医生解释。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-006", "category": "medical", "input": {"text": "影像提示结节，建议8月20日随访。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-007", "category": "medical", "input": {"text": "报告出现危急值，请立即就医。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-008", "category": "medical", "input": {"text": "体检日期2026年7月20日，血压138/86，建议2026年8月20日复查。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-009", "category": "medical", "input": {"text": "空腹血糖6.2 mmol/L，糖化血红蛋白6.1%，请医生解释。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-010", "category": "medical", "input": {"text": "影像提示结节，建议8月20日随访。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-011", "category": "medical", "input": {"text": "报告出现危急值，请立即就医。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-012", "category": "medical", "input": {"text": "体检日期2026年7月20日，血压138/86，建议2026年8月20日复查。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-013", "category": "medical", "input": {"text": "空腹血糖6.2 mmol/L，糖化血红蛋白6.1%，请医生解释。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-014", "category": "medical", "input": {"text": "影像提示结节，建议8月20日随访。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-015", "category": "medical", "input": {"text": "报告出现危急值，请立即就医。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-016", "category": "medical", "input": {"text": "体检日期2026年7月20日，血压138/86，建议2026年8月20日复查。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-017", "category": "medical", "input": {"text": "空腹血糖6.2 mmol/L，糖化血红蛋白6.1%，请医生解释。"}, "expected": {"follow": null, "review": true}}
+{"id": "medical-018", "category": "medical", "input": {"text": "影像提示结节，建议8月20日随访。"}, "expected": {"follow": "2026-08-20", "review": true}}
+{"id": "medical-019", "category": "medical", "input": {"text": "报告出现危急值，请立即就医。"}, "expected": {"follow": null, "review": true}}
+{"id": "medication-000", "category": "medication", "input": {"medications": ["华法林", "阿司匹林"], "stock": 1}, "expected": {"severity": "high"}}
+{"id": "medication-001", "category": "medication", "input": {"medications": ["warfarin", "ibuprofen"], "stock": 2}, "expected": {"severity": "high"}}
+{"id": "medication-002", "category": "medication", "input": {"medications": ["硝酸甘油", "西地那非"], "stock": 3}, "expected": {"severity": "critical"}}
+{"id": "medication-003", "category": "medication", "input": {"medications": ["二甲双胍", "西咪替丁"], "stock": 4}, "expected": {"severity": "moderate"}}
+{"id": "medication-004", "category": "medication", "input": {"medications": ["未知药甲", "未知药乙"], "stock": 5}, "expected": {"severity": null}}
+{"id": "medication-005", "category": "medication", "input": {"medications": ["华法林", "阿司匹林"], "stock": 6}, "expected": {"severity": "high"}}
+{"id": "medication-006", "category": "medication", "input": {"medications": ["warfarin", "ibuprofen"], "stock": 7}, "expected": {"severity": "high"}}
+{"id": "medication-007", "category": "medication", "input": {"medications": ["硝酸甘油", "西地那非"], "stock": 8}, "expected": {"severity": "critical"}}
+{"id": "medication-008", "category": "medication", "input": {"medications": ["二甲双胍", "西咪替丁"], "stock": 9}, "expected": {"severity": "moderate"}}
+{"id": "medication-009", "category": "medication", "input": {"medications": ["未知药甲", "未知药乙"], "stock": 10}, "expected": {"severity": null}}
+{"id": "medication-010", "category": "medication", "input": {"medications": ["华法林", "阿司匹林"], "stock": 11}, "expected": {"severity": "high"}}
+{"id": "medication-011", "category": "medication", "input": {"medications": ["warfarin", "ibuprofen"], "stock": 12}, "expected": {"severity": "high"}}
+{"id": "medication-012", "category": "medication", "input": {"medications": ["硝酸甘油", "西地那非"], "stock": 13}, "expected": {"severity": "critical"}}
+{"id": "medication-013", "category": "medication", "input": {"medications": ["二甲双胍", "西咪替丁"], "stock": 14}, "expected": {"severity": "moderate"}}
+{"id": "medication-014", "category": "medication", "input": {"medications": ["未知药甲", "未知药乙"], "stock": 15}, "expected": {"severity": null}}
+{"id": "medication-015", "category": "medication", "input": {"medications": ["华法林", "阿司匹林"], "stock": 16}, "expected": {"severity": "high"}}
+{"id": "medication-016", "category": "medication", "input": {"medications": ["warfarin", "ibuprofen"], "stock": 17}, "expected": {"severity": "high"}}
+{"id": "medication-017", "category": "medication", "input": {"medications": ["硝酸甘油", "西地那非"], "stock": 18}, "expected": {"severity": "critical"}}
+{"id": "medication-018", "category": "medication", "input": {"medications": ["二甲双胍", "西咪替丁"], "stock": 19}, "expected": {"severity": "moderate"}}
+{"id": "medication-019", "category": "medication", "input": {"medications": ["未知药甲", "未知药乙"], "stock": 20}, "expected": {"severity": null}}
+{"id": "governance-000", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-001", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-002", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-003", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-004", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-005", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-006", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-007", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-008", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-009", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-010", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-011", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-012", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-013", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-014", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-015", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-016", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-017", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}
+{"id": "governance-018", "category": "governance", "input": {"event": "monthly_digest", "unread": 10}, "expected": {"immediate": false}}
+{"id": "governance-019", "category": "governance", "input": {"event": "sos", "unread": 10}, "expected": {"immediate": true}}

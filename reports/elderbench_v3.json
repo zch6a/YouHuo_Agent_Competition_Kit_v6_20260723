@@ -1,0 +1,29 @@
+{
+  "total": 34,
+  "passed": 34,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "category_results": {
+    "task_lock": {
+      "passed": 16,
+      "failed": 0
+    },
+    "safety": {
+      "passed": 6,
+      "failed": 0
+    },
+    "document": {
+      "passed": 4,
+      "failed": 0
+    },
+    "delegation": {
+      "passed": 4,
+      "failed": 0
+    },
+    "ambiguity": {
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "failures": []
+}

@@ -1,0 +1,365 @@
+﻿START compile_v6
+PASS compile_v6
+START openapi_v6
+{"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 94, "version": "6.0.0"}
+PASS openapi_v6
+START pytest_v6
+........................................................................ [ 16%]
+........................................................................ [ 33%]
+........................................................................ [ 49%]
+.............................s.......................................... [ 66%]
+........................................................................ [ 82%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] YouHuo_Agent_Competition_Kit_v6_20260723\backend\tests\test_release_hygiene.py:87: not a git checkout
+433 passed, 1 skipped in 59.32s
+PASS pytest_v6
+START coverage_v6
+Name                                Stmts   Miss  Cover
+-------------------------------------------------------
+backend\youhuo\__init__.py              1      0   100%
+backend\youhuo\api.py                 304     66    78%
+backend\youhuo\care_voice.py          159     13    92%
+backend\youhuo\companion.py            63      0   100%
+backend\youhuo\database.py            322     28    91%
+backend\youhuo\document_guard.py       86      0   100%
+backend\youhuo\elderbench.py           97      7    93%
+backend\youhuo\engine.py              846     67    92%
+backend\youhuo\llm.py                  38     17    55%
+backend\youhuo\memory_vault.py         92      2    98%
+backend\youhuo\models.py              194      0   100%
+backend\youhuo\orchestration.py       157      4    97%
+backend\youhuo\privacy.py              71     17    76%
+backend\youhuo\security.py             86      9    90%
+backend\youhuo\semantic_router.py      64      1    98%
+backend\youhuo\services.py            174     20    89%
+backend\youhuo\teach_back.py          119     12    90%
+backend\youhuo\tool_registry.py        85     11    87%
+backend\youhuo\tts.py                  99     50    49%
+backend\youhuo\utils.py               116     16    86%
+backend\youhuo\v3_models.py            14      0   100%
+backend\youhuo\v4_api.py              326     53    84%
+backend\youhuo\v4_models.py           475     15    97%
+backend\youhuo\v4_services.py         285     21    93%
+backend\youhuo\v4_store.py            392     34    91%
+backend\youhuo\v5_api.py              194     35    82%
+backend\youhuo\v5_models.py           319      1    99%
+backend\youhuo\v5_services.py         339     27    92%
+backend\youhuo\v5_store.py            304     49    84%
+backend\youhuo\v6_api.py              145     26    82%
+backend\youhuo\v6_models.py           237      0   100%
+backend\youhuo\v6_services.py         321     49    85%
+backend\youhuo\v6_store.py             65      1    98%
+-------------------------------------------------------
+TOTAL                                6589    651    90%
+PASS coverage_v6
+{
+  "total": 34,
+  "passed": 34,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "category_results": {
+    "task_lock": {
+      "passed": 16,
+      "failed": 0
+    },
+    "safety": {
+      "passed": 6,
+      "failed": 0
+    },
+    "document": {
+      "passed": 4,
+      "failed": 0
+    },
+    "delegation": {
+      "passed": 4,
+      "failed": 0
+    },
+    "ambiguity": {
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "failures": []
+}
+{
+  "version": "ElderBench-v4",
+  "total": 120,
+  "passed": 120,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "category_results": {
+    "emotion": {
+      "passed": 20,
+      "failed": 0
+    },
+    "recurrence": {
+      "passed": 20,
+      "failed": 0
+    },
+    "location": {
+      "passed": 20,
+      "failed": 0
+    },
+    "medical": {
+      "passed": 20,
+      "failed": 0
+    },
+    "medication": {
+      "passed": 20,
+      "failed": 0
+    },
+    "governance": {
+      "passed": 20,
+      "failed": 0
+    }
+  },
+  "failures": [],
+  "scope_note": "Deterministic benchmark cases; not a substitute for older-adult user studies, clinical validation, or device certification."
+}
+{
+  "version": "5.0.0",
+  "dataset": "evaluation\\elderbench_v5.jsonl",
+  "total": 300,
+  "passed": 300,
+  "failed": 0,
+  "categories": {
+    "voice": 90,
+    "policy": 100,
+    "sync": 40,
+    "privacy": 30,
+    "saga_catalog": 20,
+    "proof": 20
+  },
+  "failures": [],
+  "compatibility_note": "v6 accepts either dialogue-act or task-domain intent for contradictory confirm/cancel candidates; the mandatory safety outcome remains clarify with candidate_contradiction."
+}
+{"dataset": "voicebench_youhuo_v6.jsonl", "synthetic_text_cases": 800, "passed": 800, "failed": 0, "categories": {"clear_bill": 100, "confirmation_conflict": 100, "amount_conflict": 100, "low_confidence_side_effect": 100, "emergency": 100, "scam": 100, "clear_reminder": 100, "social_interrupt": 100}, "failures": [], "limitations": ["This benchmark uses synthetic transcript candidates, not real audio recordings.", "Dialect and acoustic robustness still require consented recordings and device tests."]}
+PASS cognitive: Counter({'cognitive_load_governor': 100000})
+PASS semantic: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000})
+PASS preview: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000, 'safe_action_preview': 100000})
+PASS reliance: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000, 'safe_action_preview': 100000, 'reliance_glass_box': 100000})
+PASS study: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000, 'safe_action_preview': 100000, 'reliance_glass_box': 100000, 'study_and_competition_evidence': 100000})
+{"version": "6.0.0", "seed": 20260723, "deterministic_assertions": 500000, "passed": 500000, "failed": 0, "categories": {"cognitive_load_governor": 100000, "semantic_gateway": 100000, "safe_action_preview": 100000, "reliance_glass_box": 100000, "study_and_competition_evidence": 100000}, "failures": [], "scope_note": "These are deterministic software assertions, not real older-adult participants or real hospital/payment calls."}
+Secret scan passed: no credential-like values detected.
+All YAML/JSON contracts OK (29 JSON files)
+START feature_audit_v6
+
+=== 基础服务与鉴权 ===
+  [PASS] 健康检查与语义模式声明
+  [PASS] 无数据库存活探针
+  [PASS] 页面可访问：首页
+  [PASS] 页面可访问：老人端
+  [PASS] 页面可访问：家属端
+  [PASS] 页面可访问：照护中心
+  [PASS] 页面可访问：可信实验室
+  [PASS] 页面可访问：评委导览
+  [PASS] 老人演示登录
+  [PASS] 家属演示登录
+  [PASS] 次家属演示登录
+  [PASS] 未携带令牌一律401
+  [PASS] 伪造令牌一律401
+  [PASS] 严格模型拒绝多余字段
+
+=== 办事主线（设计稿 §5.4） ===
+  [PASS] 挂号：收集→复述确认→执行→权威回执
+  [PASS] 缴费：复述金额验证→老人确认→家属接力→权威状态核验
+  [PASS] 已缴清账单：提示重复而非报告完成
+  [PASS] 家属拒绝：任务安全取消而非失败
+  [PASS] 篡改审批快照被拒绝
+  [PASS] 语音创建提醒（“复诊”不被误判为挂号）
+
+=== 可验证复述确认与理解度闭环（设计稿 §4.2） ===
+  [PASS] 每次复述尝试都写入审计链
+  [PASS] 理解度闭环：听错后自动提高确认强度并放慢
+  [PASS] 理解度闭环：复述恢复正常后不再长期加强
+  [PASS] 理解度记录不保存老人原话
+  [PASS] 表单辅助：身份类字段只引导不代填
+  [PASS] 同一 request_id 幂等重放
+
+=== 双角色与刚性任务锁（设计稿 §4.1 / §5.2） ===
+  [PASS] 蓝橙双角色切换
+  [PASS] 刚性任务锁：闲聊暂存不打断事务
+  [PASS] 情绪暂停与原步骤恢复
+  [PASS] 陪伴内容不出现在家属可见任务里
+  [PASS] 无忧伴连续三轮倾诉不重复同一句
+  [PASS] 不说“调用无忧伴”也能进入陪伴
+  [PASS] 暂存话题在办完后真的能续聊
+
+=== 次要模式的语音可达性 ===
+  [PASS] 六类照护提问都能用语音问到
+  [PASS] 照护查询不遮蔽办事意图
+  [PASS] 照护查询只读、不建任务
+  [PASS] 老人可以用一句话调慢语速
+  [PASS] 跌倒识别：现在摔了报警、回忆和担心不报警
+
+=== 多轮对话稳健性 ===
+  [PASS] 一句“嗯”是确认，而不是提醒的新标题
+  [PASS] 听不懂的回答不会写进任务槽位
+  [PASS] 放宽确认词不会放行付款
+  [PASS] 中途改主意会被复述确认
+  [PASS] 老人看到的文本保留中文标点
+
+=== 安全边界 ===
+  [PASS] 越权指令被拦截
+  [PASS] 紧急表达优先进入安全流程
+  [PASS] 诈骗话术被识别
+  [PASS] 老人无权读取完整家属审计
+  [PASS] 老人不能替别人创建家庭待办
+  [PASS] 不能查看其他老人的适老档案
+
+=== 提醒、提前提醒阶梯与家庭接力（设计稿 §5.3） ===
+  [PASS] T-24/T-12/T-1 提前提醒且每档只触发一次
+  [PASS] 逾期未确认自动升级家属
+  [PASS] 老人确认与完成待办
+
+=== 老人端明语记录（设计稿 §4.4 / §6.3） ===
+  [PASS] 明语日志且不含内部事件与陪聊原文
+  [PASS] 家属查看老人记录需指明老人
+  [PASS] 家属可查看绑定老人的明语记录
+
+=== 治理内核（任务图 / 委托 / 文档防火墙 / 工具 / 记忆） ===
+  [PASS] 任务图可查询
+  [PASS] 委托策略：高额支付要求家属
+  [PASS] OCR 注入指令被识别为不可自动填充
+  [PASS] 工具清单可枚举
+  [PASS] 工具 dry-run 不产生副作用
+  [PASS] 同意优先记忆：家属提议、老人批准、可撤销
+  [PASS] 记忆列表按角色过滤
+
+=== 循环事务、情绪与隐私周报 ===
+  [PASS] 循环事务创建与幂等物化
+  [PASS] 循环事务列表
+  [PASS] 循环事项发生实例与完成
+  [PASS] 情绪分析只输出类别与强度
+  [PASS] 陪伴周报脱敏且不含诊断
+  [PASS] 月报生成
+
+=== 实物记忆、亲友与人脸边界 ===
+  [PASS] 实物备忘：家属提议、老人同意、可检索
+  [PASS] 亲友档案：家属提议、老人同意
+  [PASS] 人脸能力如实声明为摘要比对
+
+=== 健康档案与用药安全 ===
+  [PASS] 体检报告安全解读（非诊断）
+  [PASS] 健康时间线写入与读取
+  [PASS] FHIR 风格导出
+  [PASS] 用药计划、服药记录与库存预测
+  [PASS] 相互作用检查并声明规则集有限
+
+=== 位置安全与设备协同 ===
+  [PASS] 安全策略可设置
+  [PASS] 安全策略可读取
+  [PASS] 活跃心跳
+  [PASS] 无交互预警评估
+  [PASS] 地理围栏且精度不足不误报
+  [PASS] 附近 POI 查询
+  [PASS] 一键求助通知家属
+  [PASS] 设备登记
+  [PASS] 设备列表
+  [PASS] 远程协助需老人授权
+  [PASS] 远程协助不得申请屏幕接管或支付
+  [PASS] 照护关系图
+  [PASS] 能力真值清单如实分级
+
+=== 可信内核：语音共识、策略、Saga、同步、破窗、证明 ===
+  [PASS] N-best 确认/取消冲突强制澄清
+  [PASS] 一致候选正常通过
+  [PASS] 自动扣款是永久禁止动作
+  [PASS] 可信金额与冲突OCR：剥离字段并要求重核
+  [PASS] 泄露陪聊原文是永久禁止动作
+  [PASS] Saga 创建、查询与人工步骤编排
+  [PASS] Saga 版本冲突被阻断
+  [PASS] 自动工具步骤禁止由人工推进
+  [PASS] 高敏感字段离线冲突必须人工裁决
+  [PASS] 未登记设备不能写入同步操作
+  [PASS] 限时破窗只开放最小范围且可关闭
+  [PASS] 破窗申请陪聊原文被拒绝
+  [PASS] 任务解释卡
+  [PASS] Merkle 完成证明生成与篡改检测
+  [PASS] 数据导出与两阶段删除（预览优先）
+  [PASS] 可观测 trace 写入（204 无内容）
+  [PASS] 聚合指标
+  [PASS] 能力真值声明
+
+=== 适老信任层（设计稿 §4.2 / §4.3） ===
+  [PASS] 适老交互档案保存与生效
+  [PASS] 家属不能替老人关闭高风险复述
+  [PASS] 认知负荷治理：限制选项并强制复述
+  [PASS] 玻璃盒信任卡区分可信与仅供参考
+  [PASS] 安全预演剥离越界字段并列出禁止行为
+  [PASS] 任务级玻璃盒措辞与真实动作一致
+  [PASS] 受约束语义网关与确定性回退
+  [PASS] 用户实验登记、观察与汇总（含免夸大声明）
+  [PASS] 老人角色不能读取实验汇总
+  [PASS] 竞赛证据板
+  [PASS] 离线语音：启用则合成，未启用则明确回退
+  [PASS] 语音合成需要鉴权
+  [PASS] 语音合成输入有上限
+
+=== 审计链完整性 ===
+  [PASS] HMAC 哈希链在全部操作后仍然有效
+
+=== OpenAPI 覆盖率 ===
+  [PASS] 每个 OpenAPI 操作都被实际调用
+
+==============================================================
+功能审核：122/122 通过
+语义模式：deterministic_only  |  模型可授权：False
+OpenAPI 操作覆盖：98/98
+全部功能通过。
+PASS feature_audit_v6
+START browser_javascript_v6
+  ok care.js [script]
+  ok elder.js [module]
+  ok family.js [script]
+  ok judge.js [script]
+  ok speech.js [module]
+  ok trust.js [script]
+PASS browser_javascript_v6: 6 file(s)
+PASS speech_text_v6: 18 项朗读文本断言通过
+START accessibility_v6
+  ok / [light]
+  ok /elder [light]
+  ok /family [light]
+  ok /care [light]
+  ok /trust [light]
+  ok /judge [light]
+  ok / [dark]
+  ok /elder [dark]
+  ok /family [dark]
+  ok /care [dark]
+  ok /trust [dark]
+  ok /judge [dark]
+PASS contrast_v6: 12 个页面/模式全部满足 WCAG AA 与触控尺寸
+PASS accessibility_v6
+{
+  "version": "6.0.0",
+  "passed": true,
+  "checks": {
+    "required_files": true,
+    "openapi_yaml": true,
+    "json_contracts": true,
+    "openapi_v6_paths": true,
+    "openapi_version": true,
+    "workflow_v6_nodes": true,
+    "workflow_truth_warning": true,
+    "skill_count": true,
+    "skill_policy_sections": true,
+    "harmonyos_v6_page_registered": true,
+    "generic_high_risk_disabled": true,
+    "voicebench_passed": true,
+    "mass_v6_passed": true,
+    "mass_v5_regression_passed": true,
+    "load_passed": true,
+    "chaos_passed": true,
+    "http_smoke_passed": true,
+    "project_version": true,
+    "no_runtime_database": true,
+    "no_generated_audit_key": true,
+    "no_env_file": true,
+    "no_bundled_tts_model": true
+  }
+}
+ALL V6 DETERMINISTIC VERIFICATION STAGES PASSED

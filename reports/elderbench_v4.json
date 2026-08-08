@@ -1,0 +1,35 @@
+{
+  "version": "ElderBench-v4",
+  "total": 120,
+  "passed": 120,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "category_results": {
+    "emotion": {
+      "passed": 20,
+      "failed": 0
+    },
+    "recurrence": {
+      "passed": 20,
+      "failed": 0
+    },
+    "location": {
+      "passed": 20,
+      "failed": 0
+    },
+    "medical": {
+      "passed": 20,
+      "failed": 0
+    },
+    "medication": {
+      "passed": 20,
+      "failed": 0
+    },
+    "governance": {
+      "passed": 20,
+      "failed": 0
+    }
+  },
+  "failures": [],
+  "scope_note": "Deterministic benchmark cases; not a substitute for older-adult user studies, clinical validation, or device certification."
+}

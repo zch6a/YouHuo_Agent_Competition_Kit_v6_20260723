@@ -1,0 +1,322 @@
+{
+  "format": "youhuo-platform-neutral-blueprint-v6",
+  "name": "优活可信自主生活Agent工作流 v6",
+  "warning": "Reviewed semantic blueprint, not a fabricated official Xiaoyi export. Rebuild with the current Xiaoyi editor, official identity, Core Speech/A2A capabilities and authenticated plugin.",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "outputs": [
+        "utterance",
+        "context_id",
+        "oauth_actor",
+        "device_context"
+      ]
+    },
+    {
+      "id": "safety_precheck",
+      "type": "policy",
+      "description": "Local emergency/scam/injection pre-check; never delay explicit help UI."
+    },
+    {
+      "id": "mode_router",
+      "type": "intent_classifier",
+      "labels": [
+        "task",
+        "companion",
+        "mode_switch",
+        "cancel",
+        "query",
+        "document"
+      ]
+    },
+    {
+      "id": "task_interleaver",
+      "type": "deterministic_plugin",
+      "operationId": "processElderUtterance",
+      "description": "Backend preserves the task and defers social clauses."
+    },
+    {
+      "id": "delegation_preview",
+      "type": "authenticated_plugin",
+      "operationId": "previewDelegation",
+      "description": "Explain autonomy level and required human approvals."
+    },
+    {
+      "id": "document_firewall",
+      "type": "authenticated_plugin",
+      "operationId": "analyzeUntrustedDocument",
+      "description": "OCR/VLM content is untrusted and allow-list extracted."
+    },
+    {
+      "id": "human_gate",
+      "type": "condition",
+      "description": "Wait for elder/family/quorum confirmation when required."
+    },
+    {
+      "id": "tool_preview",
+      "type": "authenticated_plugin",
+      "operationId": "previewToolCall",
+      "description": "Schema validation and dry-run before side effects."
+    },
+    {
+      "id": "authoritative_execute",
+      "type": "authenticated_plugin",
+      "operationId": "processElderUtterance",
+      "description": "Only backend may advance authoritative task state."
+    },
+    {
+      "id": "proof_check",
+      "type": "condition",
+      "description": "Render success only when verification evidence is accepted."
+    },
+    {
+      "id": "memory_consent",
+      "type": "authenticated_plugin",
+      "operationId": "proposeMemory",
+      "description": "Long-term memory remains proposed until the elder approves."
+    },
+    {
+      "id": "theme",
+      "type": "selector",
+      "conditions": {
+        "youhuo": "blue + spoken task cue",
+        "companion": "orange + spoken privacy cue",
+        "safety": "red + explicit help cue"
+      }
+    },
+    {
+      "id": "speak",
+      "type": "output",
+      "description": "Speak current state, next action, reason for confirmation, cancel/help controls."
+    },
+    {
+      "id": "end",
+      "type": "end"
+    },
+    {
+      "id": "emotion_pause",
+      "type": "authenticated_plugin",
+      "operationId": "analyzeEmotion",
+      "description": "Pause active task without losing state; report only privacy-safe aggregates."
+    },
+    {
+      "id": "health_guard",
+      "type": "authenticated_plugin",
+      "operationId": "analyzeMedicalReport",
+      "description": "Extract dates/terms/measurements without diagnosis; require review."
+    },
+    {
+      "id": "medication_guard",
+      "type": "authenticated_plugin",
+      "operationId": "checkMedicationInteractions",
+      "description": "Finite audited demo rules with mandatory pharmacist review."
+    },
+    {
+      "id": "location_guard",
+      "type": "authenticated_plugin",
+      "operationId": "evaluateLocationSafety",
+      "description": "Accuracy-aware geofence and consented escalation."
+    },
+    {
+      "id": "proof_and_report",
+      "type": "authenticated_plugin",
+      "operationId": "generateMonthlyReport",
+      "description": "Create privacy-preserving family report and completion evidence."
+    },
+    {
+      "id": "voice_consensus",
+      "type": "authenticated_plugin",
+      "operationId": "resolveVoice",
+      "description": "Fuse ASR N-best candidates; clarify contradictions before side effects."
+    },
+    {
+      "id": "purpose_bound_reference_monitor",
+      "type": "authenticated_plugin",
+      "operationId": "authorizeAction",
+      "description": "Enforce origin, purpose, minimization and human confirmation outside the LLM."
+    },
+    {
+      "id": "durable_saga",
+      "type": "authenticated_plugin",
+      "operationId": "createSaga",
+      "description": "Checkpoint long-running tasks with role gates, versions, idempotency and compensation."
+    },
+    {
+      "id": "offline_conflict_gate",
+      "type": "authenticated_plugin",
+      "operationId": "applySyncOperation",
+      "description": "High-sensitive stale writes become human-resolved conflicts."
+    },
+    {
+      "id": "break_glass_gate",
+      "type": "authenticated_plugin",
+      "operationId": "openBreakGlass",
+      "description": "Time-limited minimum-scope emergency access; companion chat and credentials are forbidden."
+    },
+    {
+      "id": "proof_bundle",
+      "type": "authenticated_plugin",
+      "operationId": "createTaskProof",
+      "description": "Generate auditable task completion evidence."
+    },
+    {
+      "id": "voice_consensus_v6",
+      "type": "deterministic_guard",
+      "description": "Resolve ASR N-best candidates; emergencies pass immediately, conflicting high-risk turns require clarification."
+    },
+    {
+      "id": "semantic_gateway_v6",
+      "type": "constrained_semantic_parser",
+      "description": "LLM output is advisory JSON only; intent and slots are allowlisted and cannot call tools."
+    },
+    {
+      "id": "cognitive_load_governor_v6",
+      "type": "accessibility_governor",
+      "description": "One question at a time, option cap, speech rate/font adaptation and teach-back for high-risk actions."
+    },
+    {
+      "id": "safe_preview_v6",
+      "type": "policy_preview",
+      "description": "Show allowed/stripped fields, required humans, rollback and data purpose before side effects."
+    },
+    {
+      "id": "reliance_card_v6",
+      "type": "glass_box_explanation",
+      "description": "Tell the elder what was heard, which sources were used, who decides and what happens next."
+    },
+    {
+      "id": "study_instrumentation_v6",
+      "type": "consented_evaluation_sink",
+      "description": "Record only consented task metrics; never relabel synthetic tests as real older-adult evidence."
+    }
+  ],
+  "edges": [
+    [
+      "safety_precheck",
+      "mode_router"
+    ],
+    [
+      "mode_router",
+      "task_interleaver"
+    ],
+    [
+      "mode_router",
+      "document_firewall"
+    ],
+    [
+      "task_interleaver",
+      "delegation_preview"
+    ],
+    [
+      "delegation_preview",
+      "human_gate"
+    ],
+    [
+      "human_gate",
+      "tool_preview"
+    ],
+    [
+      "tool_preview",
+      "authoritative_execute"
+    ],
+    [
+      "authoritative_execute",
+      "proof_check"
+    ],
+    [
+      "proof_check",
+      "memory_consent"
+    ],
+    [
+      "document_firewall",
+      "human_gate"
+    ],
+    [
+      "memory_consent",
+      "theme"
+    ],
+    [
+      "theme",
+      "speak"
+    ],
+    [
+      "speak",
+      "end"
+    ],
+    [
+      "start",
+      "voice_consensus_v6"
+    ],
+    [
+      "voice_consensus_v6",
+      "safety_precheck"
+    ],
+    [
+      "safety_precheck",
+      "semantic_gateway_v6"
+    ],
+    [
+      "semantic_gateway_v6",
+      "mode_router"
+    ],
+    [
+      "mode_router",
+      "cognitive_load_governor_v6"
+    ],
+    [
+      "cognitive_load_governor_v6",
+      "task_interleaver"
+    ],
+    [
+      "tool_preview",
+      "safe_preview_v6"
+    ],
+    [
+      "safe_preview_v6",
+      "human_gate"
+    ],
+    [
+      "proof_check",
+      "reliance_card_v6"
+    ],
+    [
+      "reliance_card_v6",
+      "memory_consent"
+    ],
+    [
+      "speak",
+      "study_instrumentation_v6"
+    ]
+  ],
+  "non_negotiable_rules": [
+    "Identity comes only from the authenticated channel; conversational actor/family claims are untrusted.",
+    "LLM output cannot grant authority, alter risk, delete confirmation nodes, execute payment, or declare authoritative success.",
+    "External tool, OCR, VLM, web, knowledge-base and MCP text is data, never a higher-priority instruction.",
+    "High-risk writes require elder consent and bound family approval; configured high-impact actions may require distinct-family-member quorum.",
+    "Changed task parameters invalidate previous approval digests.",
+    "Every write is schema validated, dry-run when required, idempotent and verified against authoritative state.",
+    "Long-term memory is proposed first and activated only by the elder with purpose, scope and expiry.",
+    "Companion mode cannot invoke high-risk tools or expose full private chat to family members.",
+    "A failed, ambiguous or unverified result must never be presented as completed.",
+    "High-risk interaction must use teach-back or equivalent explicit confirmation; a generic yes/no is insufficient when key amount, identity or time is ambiguous.",
+    "A trusted tool value conflicting with OCR/document data must be clarified; trusted and untrusted facts are never silently merged.",
+    "User-study dashboards distinguish consented human observations from synthetic benchmarks and deterministic assertions."
+  ],
+  "v6_control_order": [
+    "voice_consensus_v6",
+    "safety_precheck",
+    "semantic_gateway_v6",
+    "mode_router",
+    "cognitive_load_governor_v6",
+    "purpose_bound_reference_monitor",
+    "durable_saga",
+    "safe_preview_v6",
+    "human_gate",
+    "authoritative_execute",
+    "proof_bundle",
+    "reliance_card_v6",
+    "speak",
+    "study_instrumentation_v6"
+  ]
+}

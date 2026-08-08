@@ -1,0 +1,301 @@
+openapi: 3.0.3
+info:
+  title: YouHuo Governed Elder Assistance API
+  version: 4.0.0
+  description: >-
+    Structured tools for the YouHuo v4 competition prototype, including routines, privacy-preserving emotion signals, health records, medication, location safety and family coordination. The language layer
+    never grants authority: family isolation, risk classification, explicit
+    consent, idempotency and HMAC audit are enforced by the backend.
+servers:
+  - url: https://replace-with-your-https-domain.example
+security:
+  - bearerAuth: []
+paths:
+  /v2/sessions:
+    post:
+      operationId: createYouHuoSession
+      summary: Create an authenticated elder session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreateRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        '401': { description: Missing or expired token }
+        '403': { description: Actor role is not elder }
+  /v2/chat:
+    post:
+      operationId: processElderUtterance
+      summary: Process one elder utterance through the deterministic task engine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Governed agent response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '409': { description: Reused request id with a different payload }
+  /v2/family/approve:
+    post:
+      operationId: approveHighRiskTask
+      summary: Approve or reject the exact task snapshot as a bound family member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyApprovalRequest'
+      responses:
+        '200':
+          description: Approval result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '403': { description: Family isolation or approval digest check failed }
+  /v2/family/reminders:
+    post:
+      operationId: createFamilyReminder
+      summary: Create a reminder for a bound elder with escalation timing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FamilyReminderCreateRequest'
+      responses:
+        '200':
+          description: Reminder creation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+  /v2/tasks:
+    get:
+      operationId: listAuthorizedTasks
+      summary: List only tasks visible to the authenticated family or elder
+      responses:
+        '200':
+          description: Authorized task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskView'
+  /v2/notifications:
+    get:
+      operationId: listAuthorizedNotifications
+      summary: List notifications for the authenticated actor role
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object }
+  /v3/plans/{task_type}:
+    get:
+      operationId: getAuthoritativeTaskPlan
+      summary: Return the immutable task graph and digest
+      parameters:
+        - in: path
+          name: task_type
+          required: true
+          schema: { type: string, enum: [hospital_registration, bill_payment, reminder, form_assistance] }
+      responses:
+        '200': { description: Task graph }
+  /v3/delegation/preview:
+    post:
+      operationId: previewDelegation
+      summary: Explain the bounded autonomy and human-approval requirements
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [task_type, risk_level]
+              properties:
+                task_type: { type: string }
+                risk_level: { type: integer, minimum: 1, maximum: 4 }
+                amount_cents: { type: integer, minimum: 0, default: 0 }
+                ambiguity: { type: number, minimum: 0, maximum: 1, default: 0 }
+                tool_is_reversible: { type: boolean, default: false }
+      responses:
+        '200': { description: Delegation decision }
+  /v3/documents/analyze:
+    post:
+      operationId: analyzeUntrustedDocument
+      summary: Extract allow-listed fields from untrusted OCR/VLM text without side effects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ocr_text]
+              properties:
+                ocr_text: { type: string, minLength: 1, maxLength: 5000 }
+                kind: { type: string, enum: [auto, bill, appointment, medication, other], default: auto }
+      responses:
+        '200': { description: Safe document analysis }
+  /v3/tools:
+    get:
+      operationId: listGovernedTools
+      summary: List tool schemas, risk and confirmation metadata
+      responses:
+        '200': { description: Tool manifests }
+  /v3/tools/{tool_name}/dry-run:
+    post:
+      operationId: previewToolCall
+      summary: Validate a tool call without executing a side effect
+      parameters:
+        - in: path
+          name: tool_name
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [arguments]
+              properties:
+                arguments: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Dry-run decision }
+  /v3/memories/propose:
+    post:
+      operationId: proposeMemory
+      summary: Propose a purpose-bound memory; it remains inactive until elder approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [elder_id, key, value, sensitivity, purpose]
+              properties:
+                elder_id: { type: string }
+                key: { type: string, maxLength: 80 }
+                value: {}
+                sensitivity: { type: string, enum: [preference, personal, sensitive] }
+                scope: { type: string, enum: [private, family_summary, family_shared], default: private }
+                purpose: { type: string, maxLength: 240 }
+                ttl_days: { type: integer, minimum: 1, maximum: 3650, default: 180 }
+      responses:
+        '200': { description: Proposed memory }
+  /health:
+    get:
+      security: []
+      operationId: getYouHuoHealth
+      summary: Check service and audit-chain status
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema: { type: object }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    SessionCreateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        session_id: { type: string, nullable: true, maxLength: 128 }
+    SessionCreateResponse:
+      type: object
+      required: [session_id, family_id, elder_id, mode]
+      properties:
+        session_id: { type: string }
+        family_id: { type: string }
+        elder_id: { type: string }
+        mode: { type: string, enum: [youhuo, companion] }
+    ChatRequest:
+      type: object
+      additionalProperties: false
+      required: [session_id, text]
+      properties:
+        session_id: { type: string, maxLength: 128 }
+        text: { type: string, minLength: 1, maxLength: 2000 }
+        request_id: { type: string, nullable: true, maxLength: 128 }
+    ChatResponse:
+      type: object
+      required: [code, message, mode]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        mode: { type: string, enum: [youhuo, companion] }
+        task_id: { type: string, nullable: true }
+        task_status: { type: string, nullable: true }
+        risk_level: { type: integer, nullable: true, minimum: 1, maximum: 4 }
+        approval_digest: { type: string, nullable: true }
+        ui: { type: object, additionalProperties: true }
+        data: { type: object, additionalProperties: true }
+    TaskView:
+      type: object
+      required: [id, elder_id, task_type, status, risk_level, summary, details, result, created_at, updated_at]
+      properties:
+        id: { type: string }
+        elder_id: { type: string }
+        task_type: { type: string, enum: [hospital_registration, bill_payment, reminder, form_assistance] }
+        status: { type: string }
+        risk_level: { type: integer, minimum: 1, maximum: 4 }
+        summary: { type: string }
+        approval_digest: { type: string, nullable: true }
+        details:
+          type: object
+          additionalProperties: true
+          description: Allow-listed task details; internal slots and companion topics are never returned.
+        result:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    FamilyApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [task_id, approve, approval_digest]
+      properties:
+        task_id: { type: string }
+        approve: { type: boolean }
+        approval_digest:
+          type: string
+          description: SHA-256 digest bound to the exact task version and parameters
+        reason: { type: string, nullable: true, maxLength: 300 }
+        request_id: { type: string, nullable: true, maxLength: 128 }
+    FamilyReminderCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [elder_id, title, due_at]
+      properties:
+        elder_id: { type: string }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        due_at: { type: string, format: date-time }
+        escalation_after_minutes: { type: integer, minimum: 5, maximum: 1440, default: 30 }
+        request_id: { type: string, nullable: true, maxLength: 128 }

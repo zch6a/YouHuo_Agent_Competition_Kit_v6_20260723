@@ -1,0 +1,41 @@
+{
+  "python": "3.13.5",
+  "platform": "Linux-6.12.13-x86_64-with-glibc2.41",
+  "dependencies": [
+    {
+      "name": "fastapi",
+      "version": "0.128.2",
+      "license": "MIT"
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.48.0",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.4",
+      "license": "MIT"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "pytest",
+      "version": "9.0.2",
+      "license": "MIT"
+    },
+    {
+      "name": "coverage",
+      "version": "7.13.3",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "PyYAML",
+      "version": "6.0.3",
+      "license": "MIT"
+    }
+  ]
+}

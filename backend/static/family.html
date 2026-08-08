@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>优活子女端</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-mode="youhuo">
+  <main id="main" class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">YOUHUO FAMILY CONSOLE · V6.0</p>
+        <h1 class="care-title">家属协同台</h1>
+        <p class="lead">创建待办、查看任务进行到哪一步、在支付与身份环节接力确认。陪伴聊天原文不会出现在这里。</p>
+      </div>
+      <div class="topbar-actions">
+        <a href="/" class="back-link">← 返回首页</a>
+        <button id="scheduler" class="secondary">演示提醒调度</button>
+        <button id="refresh" class="secondary">刷新</button>
+      </div>
+    </header>
+    <section class="metric-row" aria-label="今日概览">
+      <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
+      <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
+      <div class="metric"><span class="metric-label">今天到期</span><strong id="mToday">–</strong></div>
+      <div class="metric"><span class="metric-label">审计链</span><strong id="mChain">–</strong></div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>待办日历</h2>
+        <p class="meta">按日期排列，先看最近的一天。</p>
+        <div id="calendar"></div>
+      </div>
+      <div class="panel">
+        <h2>任务进度与接力确认</h2>
+        <p class="meta">支付、身份认证和超时事项会在这里请求您接力。</p>
+        <div id="tasks"></div>
+      </div>
+      <div class="panel">
+        <h2>给老人新增待办</h2>
+        <form id="reminderForm">
+          <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历" /></label>
+          <label>时间<input id="reminderDue" type="datetime-local" required /></label>
+          <label>到期后多少分钟未确认则提醒家属<input id="escalation" type="number" min="5" max="1440" value="30" /></label>
+          <button type="submit">同步到老人端</button>
+        </form>
+        <p class="meta">创建后系统会在T-24小时、T-12小时和T-1小时提前提醒老人。</p>
+      </div>
+      <div class="panel">
+        <h2>家属通知</h2>
+        <div id="notices"></div>
+      </div>
+      <div class="panel">
+        <h2>陪伴周报（已脱敏）</h2>
+        <p class="meta">无忧伴的聊天原文不会展示给家属，这里只有汇总后的风险摘要。</p>
+        <div id="weekly"></div>
+      </div>
+      <div class="panel">
+        <h2>防篡改操作日志</h2>
+        <div id="chain" class="notice"></div>
+        <div id="audit"></div>
+      </div>
+    </section>
+  </main>
+  <script src="/static/family.js"></script>
+</body>
+</html>

@@ -1,0 +1,1186 @@
+/* ==========================================================================
+   优活 Agent v6 — design system
+   All styling lives in this file: the app ships a strict CSP (style-src 'self'),
+   so no inline <style> blocks and no style="" attributes are allowed.
+   No web fonts either (font-src falls back to 'self'), so the type stack is
+   built from high-quality system Chinese faces.
+   ========================================================================== */
+
+:root {
+  /* --- brand: design §4.1 dual-role identity ------------------------------ */
+  --youhuo-blue: #4A90D9;
+  --youhuo-blue-deep: #2F6FB5;
+  --youhuo-violet: #7B61D9;
+  --wuyou-orange: #F5A623;
+  --wuyou-orange-deep: #D8860B;
+  --wuyou-yellow: #FFD466;
+
+  /* Role accent is swapped by [data-mode] and inherited by every component. */
+  --role-accent: var(--youhuo-blue);
+  --role-accent-deep: var(--youhuo-blue-deep);
+  --role-accent-2: var(--youhuo-violet);
+  --role-tint: #e9f2fd;
+  --role-glow: rgba(74, 144, 217, .32);
+
+  /* --- neutrals ----------------------------------------------------------- */
+  --bg: #f4f6fb;
+  --bg-mesh-1: rgba(74, 144, 217, .16);
+  --bg-mesh-2: rgba(123, 97, 217, .13);
+  --bg-mesh-3: rgba(245, 166, 35, .11);
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --surface-3: #eef2f9;
+  --surface-inset: #f2f5fa;
+  --line: #e3e8f1;
+  --line-strong: #cfd7e6;
+  --ink: #0f1729;
+  --ink-2: #3f4b64;
+  /* Muted text still has to clear WCAG AA 4.5:1 on --surface and --surface-2;
+     the previous #6d7a92 measured 4.33 and 4.11. */
+  --ink-3: #59657d;
+  --ink-invert: #ffffff;
+
+  --ok: #1f8a51;
+  --ok-bg: #e8f7ee;
+  --warn: #b8710a;
+  --warn-bg: #fff4e0;
+  --danger: #c02a35;
+  --danger-bg: #fdeaec;
+
+  /* --- shape and depth ---------------------------------------------------- */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-2xl: 34px;
+  --shadow-1: 0 1px 2px rgba(16, 24, 44, .05), 0 2px 8px rgba(16, 24, 44, .04);
+  --shadow-2: 0 2px 4px rgba(16, 24, 44, .05), 0 12px 30px rgba(16, 24, 44, .07);
+  --shadow-3: 0 4px 8px rgba(16, 24, 44, .06), 0 26px 60px rgba(16, 24, 44, .11);
+  --ring: 0 0 0 4px color-mix(in srgb, var(--role-accent) 22%, transparent);
+
+  --mode-fade: 1s;
+  --elder-font-scale: 1.25;
+
+  color-scheme: light;
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "MiSans", "Source Han Sans SC",
+    "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1020;
+    --bg-mesh-1: rgba(74, 144, 217, .22);
+    --bg-mesh-2: rgba(123, 97, 217, .20);
+    --bg-mesh-3: rgba(245, 166, 35, .12);
+    --surface: #141b2e;
+    --surface-2: #1a2337;
+    --surface-3: #202a41;
+    --surface-inset: #101728;
+    --line: #26314a;
+    --line-strong: #35415e;
+    --ink: #eef2fa;
+    --ink-2: #b3bdd1;
+    --ink-3: #8d99b2;
+    --role-tint: #17253c;
+    --ok: #4fd08a;
+    --ok-bg: #12301f;
+    --warn: #f0b354;
+    --warn-bg: #33260e;
+    --danger: #ff8c93;
+    --danger-bg: #35161a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, .32), 0 14px 34px rgba(0, 0, 0, .38);
+    --shadow-3: 0 6px 14px rgba(0, 0, 0, .36), 0 30px 70px rgba(0, 0, 0, .46);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Grid items default to min-width:auto, so a long placeholder or an unbreakable
+   token can push a track past the viewport. Every grid in this file wants the
+   track to shrink instead. */
+.controls > *, .home-entries > *, .calendar-entry > *, .reliance-row > *,
+.log-item > *, .digest-row > *, .glass-card > * > *, .grid > *,
+.dashboard-grid > *, .cards > *, .evidence-grid > *, .hero-roles > *,
+.preview-columns > *, .score-ribbon > *, .demo-step > * { min-width: 0; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Soft gradient mesh behind everything; purely decorative. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -10% auto -10%;
+  height: 90vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52vw 42vh at 12% 0%, var(--bg-mesh-1), transparent 62%),
+    radial-gradient(46vw 40vh at 88% 6%, var(--bg-mesh-2), transparent 60%),
+    radial-gradient(40vw 34vh at 60% 34%, var(--bg-mesh-3), transparent 64%);
+  filter: blur(6px);
+  transition: background var(--mode-fade) ease;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 40px);
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+
+h1, h2, h3, h4 {
+  line-height: 1.18;
+  letter-spacing: -.015em;
+  font-weight: 800;
+  color: var(--ink);
+}
+h1 { margin: 0 0 14px; font-size: clamp(32px, 5.4vw, 60px); }
+h2 { margin: 0 0 12px; font-size: clamp(21px, 2.6vw, 28px); }
+h3 { margin: 0 0 8px; font-size: 19px; }
+p { line-height: 1.72; color: var(--ink-2); margin: 0 0 12px; }
+a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underline-offset: 3px; }
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  /* Mostly ink with a hue cast, so small uppercase text still clears 4.5:1. */
+  color: color-mix(in srgb, var(--role-accent-deep) 34%, var(--ink));
+  margin: 0 0 10px;
+}
+.lead { max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); color: var(--ink-2); }
+.meta { font-size: 14px; color: var(--ink-3); margin-top: 5px; line-height: 1.6; }
+
+/* --------------------------------------------------------------------------
+   Surfaces
+   -------------------------------------------------------------------------- */
+
+.panel, .hero, .card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-2);
+}
+.panel { padding: clamp(18px, 2.4vw, 28px); }
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(26px, 4vw, 52px);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-3);
+  background:
+    linear-gradient(168deg, color-mix(in srgb, var(--role-accent) 8%, var(--surface)) 0%, var(--surface) 46%);
+}
+/* Thin luminous rule along the top edge of the hero. */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet) 46%, var(--wuyou-orange));
+}
+.hero h1 {
+  background: linear-gradient(120deg, var(--ink) 22%, var(--youhuo-blue-deep) 62%, var(--youhuo-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero h2 { color: var(--ink-2); font-weight: 700; font-size: clamp(18px, 2.2vw, 26px); }
+
+/* Six-column bed so the cards fall into a deliberate 1 / 2 / 3 rhythm. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.card {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .22s cubic-bezier(.2, .7, .3, 1), box-shadow .22s ease, border-color .22s ease;
+}
+.card.span-3 { grid-column: span 3; }
+.card.span-2 { grid-column: span 2; }
+.card p { flex: 1 1 auto; }
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet));
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.card:hover, .card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--youhuo-blue) 42%, var(--line));
+}
+.card:hover::before, .card:focus-visible::before { opacity: 1; }
+.card h2 { font-size: 21px; margin-bottom: 8px; }
+.card p { margin: 0; font-size: 15px; }
+
+.mode-youhuo { background: linear-gradient(165deg, color-mix(in srgb, var(--youhuo-blue) 11%, var(--surface)), var(--surface) 62%); }
+.mode-companion { background: linear-gradient(165deg, color-mix(in srgb, var(--wuyou-orange) 13%, var(--surface)), var(--surface) 62%); }
+
+/* --------------------------------------------------------------------------
+   Top bar, badges, chips
+   -------------------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+/* Text on tinted chips keeps only a hue cast: mostly --ink so it clears the
+   WCAG AA 4.5:1 floor. Measured on this page, not eyeballed. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 750;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+  background: color-mix(in srgb, var(--youhuo-blue) 15%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 34%, transparent);
+  transition: background var(--mode-fade) ease, color var(--mode-fade) ease, border-color var(--mode-fade) ease;
+}
+.badge.orange {
+  color: color-mix(in srgb, var(--wuyou-orange-deep) 26%, var(--ink));
+  background: color-mix(in srgb, var(--wuyou-orange) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--wuyou-orange) 40%, transparent);
+}
+.status-dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--youhuo-blue);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
+  transition: background var(--mode-fade) ease, box-shadow var(--mode-fade) ease;
+}
+.orange .status-dot {
+  background: var(--wuyou-orange);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wuyou-orange) 26%, transparent);
+}
+
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 11px 17px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--line);
+  text-decoration: none; font-weight: 750; color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.back-link:hover { transform: translateX(-2px); border-color: var(--line-strong); }
+.topbar-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.topbar-actions button { padding: 11px 17px; font-size: 15px; }
+
+/* --------------------------------------------------------------------------
+   Controls
+   -------------------------------------------------------------------------- */
+
+input, textarea, button, select { font: inherit; font-family: inherit; }
+
+input, textarea, select {
+  width: 100%;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--surface);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--role-accent);
+  box-shadow: var(--ring);
+}
+textarea { line-height: 1.6; resize: vertical; }
+
+button {
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: 13px 20px;
+  font-weight: 750;
+  font-size: 16px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--role-accent) 92%, #fff) 0%, var(--role-accent-deep) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, var(--shadow-1);
+  transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
+}
+button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, var(--shadow-2); }
+button:active:not(:disabled) { transform: translateY(0); filter: brightness(.96); }
+button.secondary {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-1);
+}
+button.secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--role-accent); }
+button.danger {
+  background: linear-gradient(180deg, #d8434e, #a81f2a);
+  border-color: transparent;
+  color: #fff;
+}
+button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+label { display: grid; gap: 7px; margin-bottom: 15px; font-weight: 700; color: var(--ink-2); font-size: 15px; }
+
+/* Accessibility floor: large targets and an unmistakable focus ring. */
+a, button, input, textarea, select { min-height: 48px; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+
+/* --------------------------------------------------------------------------
+   Notices
+   -------------------------------------------------------------------------- */
+
+.notice {
+  padding: 14px 18px;
+  border-left: 4px solid var(--warn);
+  background: var(--warn-bg);
+  color: color-mix(in srgb, var(--warn) 72%, var(--ink));
+  border-radius: var(--r-sm);
+  font-weight: 600;
+  line-height: 1.62;
+}
+.notice.good { border-left-color: var(--ok); background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 68%, var(--ink)); }
+.notice.warning { border-left-color: var(--warn); background: var(--warn-bg); }
+/* "waiting for a human" is a normal step, not an alarm. */
+.notice.info {
+  border-left-color: var(--youhuo-blue);
+  background: color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface));
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 82%, var(--ink));
+}
+
+/* Output panes stay out of the layout until a demo actually writes to them. */
+pre:empty { display: none; }
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Cascadia Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  background: var(--surface-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Layout helpers
+   -------------------------------------------------------------------------- */
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-top: 22px; align-items: start; }
+.feature-panel { display: flex; flex-direction: column; gap: 11px; }
+.feature-panel button { align-self: flex-start; }
+.feature-panel pre { max-height: 320px; overflow: auto; }
+.capability-card { background: var(--surface-2); }
+.task-list { display: grid; gap: 10px; margin-top: 10px; }
+
+.task {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 11px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  transition: border-color .18s ease, transform .18s ease;
+}
+.task:hover { border-color: var(--line-strong); }
+.task strong { display: block; font-size: 18px; margin-bottom: 5px; color: var(--ink); }
+.task > div { color: var(--ink-2); font-size: 15px; line-height: 1.68; }
+.task button { margin-top: 11px; padding: 10px 16px; font-size: 15px; }
+
+.care-title { font-size: clamp(28px, 5vw, 48px); margin-bottom: 8px; }
+
+/* --------------------------------------------------------------------------
+   Design §4.1 — dual-role identity light system
+   -------------------------------------------------------------------------- */
+
+body[data-mode="youhuo"] {
+  --role-accent: var(--youhuo-blue);
+  --role-accent-deep: var(--youhuo-blue-deep);
+  --role-accent-2: var(--youhuo-violet);
+  --role-glow: rgba(74, 144, 217, .32);
+}
+body[data-mode="companion"] {
+  --role-accent: var(--wuyou-orange);
+  --role-accent-deep: var(--wuyou-orange-deep);
+  --role-accent-2: var(--wuyou-yellow);
+  --role-glow: rgba(245, 166, 35, .34);
+}
+body[data-mode="companion"] {
+  --bg-mesh-1: rgba(245, 166, 35, .17);
+  --bg-mesh-2: rgba(255, 212, 102, .15);
+  --bg-mesh-3: rgba(216, 134, 11, .10);
+}
+
+/* Screen-edge breathing glow: blue→violet while working, orange→yellow while listening. */
+.role-halo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--role-accent) 26%, transparent);
+  opacity: .45;
+  transition: box-shadow var(--mode-fade) ease, opacity var(--mode-fade) ease;
+}
+body[data-activity="processing"] .role-halo { animation: halo-breathe 3.4s ease-in-out infinite; }
+body[data-activity="listening"] .role-halo { animation: halo-pulse 1.9s ease-in-out infinite; }
+@keyframes halo-breathe {
+  0%, 100% { box-shadow: inset 0 0 30px 6px color-mix(in srgb, var(--youhuo-blue) 40%, transparent); opacity: .45; }
+  50%      { box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-violet) 66%, transparent); opacity: .95; }
+}
+@keyframes halo-pulse {
+  0%, 100% { box-shadow: inset 0 0 26px 6px color-mix(in srgb, var(--wuyou-orange) 42%, transparent); opacity: .5; }
+  50%      { box-shadow: inset 0 0 60px 16px color-mix(in srgb, var(--wuyou-yellow) 74%, transparent); opacity: .94; }
+}
+
+/* Role header: icon + name + opening line carry the mode without relying on colour. */
+.role-header { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
+.role-icon {
+  width: 68px; height: 68px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 22px;
+  font-size: 32px; line-height: 1;
+  color: #fff;
+  background: linear-gradient(150deg, var(--role-accent), var(--role-accent-2));
+  box-shadow: 0 10px 26px var(--role-glow), 0 1px 0 rgba(255, 255, 255, .35) inset;
+  transition: background var(--mode-fade) ease, box-shadow var(--mode-fade) ease;
+}
+/* Both role glyphs ship in the markup; CSS reveals the one matching the mode,
+   so no innerHTML is needed to swap them. */
+.role-icon svg { display: none; }
+body[data-mode="youhuo"] .role-icon .icon-youhuo { display: block; }
+body[data-mode="companion"] .role-icon .icon-companion { display: block; }
+.role-header h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); }
+.role-opening { margin: 4px 0 0; color: var(--ink-2); font-size: 17px; font-weight: 600; }
+.mode-fade { transition: opacity calc(var(--mode-fade) * .5) ease; }
+.mode-fade.switching { opacity: 0; }
+
+/* --------------------------------------------------------------------------
+   Chat
+   -------------------------------------------------------------------------- */
+
+.chat {
+  min-height: 240px;
+  max-height: 52vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  margin-top: 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
+  border: 1px solid var(--line);
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+.bubble {
+  max-width: 84%;
+  padding: 15px 19px;
+  font-size: calc(20px * var(--elder-font-scale) / 1.25);
+  line-height: 1.6;
+  box-shadow: var(--shadow-1);
+  animation: bubble-in .26s cubic-bezier(.2, .8, .3, 1) both;
+}
+@keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.bubble.user {
+  align-self: flex-end;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--role-accent) 94%, #fff), var(--role-accent-deep));
+  border-radius: var(--r-lg) var(--r-lg) 6px var(--r-lg);
+}
+.bubble.user .meta { color: rgba(255, 255, 255, .82); }
+.bubble.agent {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 6px;
+  color: var(--ink);
+}
+.bubble .meta { font-size: 13px; margin-top: 8px; }
+
+.controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 16px; }
+.quick { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.quick button {
+  background: color-mix(in srgb, var(--role-accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--role-accent-deep) 28%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--role-accent) 28%, transparent);
+  box-shadow: none;
+  padding: 11px 16px;
+  font-size: 15px;
+}
+.quick button:hover:not(:disabled) { background: color-mix(in srgb, var(--role-accent) 20%, var(--surface)); }
+
+/* --------------------------------------------------------------------------
+   Elder console composition: conversation is the stage, everything else is a
+   quieter rail. Collapses to one column on phones.
+   -------------------------------------------------------------------------- */
+
+.shell-wide { max-width: 1240px; }
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.app-bar .back-link { gap: 8px; padding-left: 13px; }
+
+.elder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+.stage {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(20px, 2.6vw, 32px);
+  background:
+    radial-gradient(120% 70% at 50% 118%, color-mix(in srgb, var(--role-accent) 10%, transparent), transparent 70%),
+    var(--surface);
+  transition: background var(--mode-fade) ease;
+}
+/* Hairline of role colour along the top edge of the hero card. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
+  transition: background var(--mode-fade) ease;
+}
+.rail { display: grid; gap: 16px; position: sticky; top: 18px; }
+.rail-card { padding: 20px; }
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rail-head h2 { margin: 0; font-size: 19px; }
+.rail-note { font-size: 13px; color: var(--ink-3); }
+button.block { width: 100%; margin-top: 12px; }
+.log-panel { margin-top: 18px; }
+
+.role-titles { min-width: 0; }
+.composer { margin-top: 4px; }
+.status-line { min-height: 22px; margin-top: 10px; }
+
+/* Empty states read as an invitation, not a dead end. */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 26px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--ink-3);
+  text-align: center;
+  font-size: 15px;
+}
+.empty-state svg { color: color-mix(in srgb, var(--role-accent) 55%, var(--ink-3)); }
+.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 750; }
+
+/* --------------------------------------------------------------------------
+   Design §4.4 — large central microphone
+   -------------------------------------------------------------------------- */
+
+.mic-stage { display: grid; place-items: center; gap: 12px; margin: 26px 0 8px; }
+.mic-dial { position: relative; display: grid; place-items: center; width: 200px; height: 200px; }
+/* Concentric rings that only animate while the microphone is listening. */
+.mic-dial::before, .mic-dial::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--role-accent) 30%, transparent);
+  inset: 12px;
+  opacity: .55;
+  transition: border-color var(--mode-fade) ease;
+}
+.mic-dial::after { inset: 0; opacity: .3; }
+body[data-activity="listening"] .mic-dial::before { animation: ring-out 1.9s ease-out infinite; }
+body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease-out .6s infinite; }
+@keyframes ring-out {
+  0% { transform: scale(.82); opacity: .7; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+.mic-big {
+  position: relative;
+  width: 156px; height: 156px;
+  border-radius: 50%;
+  font-size: 58px; line-height: 1;
+  padding: 0;
+  color: #fff;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--role-accent) 96%, #fff), var(--role-accent-deep));
+  box-shadow: 0 18px 44px var(--role-glow), 0 2px 0 rgba(255, 255, 255, .4) inset;
+  transition: background var(--mode-fade) ease, transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .2s ease;
+}
+.mic-big:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 22px 54px var(--role-glow), 0 2px 0 rgba(255,255,255,.42) inset; }
+.mic-big:active:not(:disabled) { transform: scale(.98); }
+.mic-hint { font-size: 17px; font-weight: 750; color: var(--ink-2); }
+.mic { min-width: 58px; font-size: 22px; }
+
+.home-entries { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; margin-top: 18px; }
+.entry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 60px;
+  font-size: 17px;
+}
+.entry-btn svg { flex: 0 0 auto; color: var(--role-accent); transition: color var(--mode-fade) ease; }
+
+/* --------------------------------------------------------------------------
+   Elder preferences and trust pills
+   -------------------------------------------------------------------------- */
+
+.profile-tools {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  margin-top: 16px; padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.profile-tools label { margin: 0; display: flex; align-items: center; gap: 9px; font-size: 14px; }
+.profile-tools select { width: auto; min-width: 108px; padding: 9px 12px; font-size: 15px; border-radius: var(--r-sm); }
+.profile-tools button { padding: 10px 16px; font-size: 15px; }
+/* In the narrow rail the two settings read better as aligned rows. */
+.rail .profile-tools { display: grid; gap: 10px; }
+.rail .profile-tools label { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 12px; }
+.rail .profile-tools select { width: 100%; min-width: 0; }
+
+.trust-line { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.trust-pill {
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: color-mix(in srgb, var(--ok) 38%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--ok) 26%, transparent);
+  padding: 6px 13px;
+  font-size: 14px;
+  font-weight: 750;
+}
+/* Whether a language model is advising the semantic layer is a fact about the
+   deployment, not a promise, so it gets a neutral rather than a green chip. */
+.trust-pill.neutral {
+  background: color-mix(in srgb, var(--youhuo-blue) 11%, var(--surface));
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+  border-color: color-mix(in srgb, var(--youhuo-blue) 26%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Plain-language status chips (design §4.4 / §4.5)
+   -------------------------------------------------------------------------- */
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 13px; border-radius: 999px;
+  font-size: 14px; font-weight: 750;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.status-chip.done { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 40%, var(--ink)); border-color: color-mix(in srgb, var(--ok) 26%, transparent); }
+.status-chip.confirm { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 40%, var(--ink)); border-color: color-mix(in srgb, var(--warn) 28%, transparent); }
+.status-chip.todo { background: color-mix(in srgb, var(--youhuo-blue) 12%, var(--surface)); color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink)); border-color: color-mix(in srgb, var(--youhuo-blue) 26%, transparent); }
+.status-chip.relay { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 42%, var(--ink)); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.status-chip.cancelled { background: var(--surface-3); color: var(--ink-3); border-color: var(--line); }
+
+/* --------------------------------------------------------------------------
+   Design §4.3 — glass-box reliance card and safe action preview
+   -------------------------------------------------------------------------- */
+
+.reliance-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 18px;
+  border: 1px solid color-mix(in srgb, var(--role-accent) 34%, var(--line));
+  border-radius: var(--r-xl);
+  padding: 22px;
+  background: linear-gradient(168deg, color-mix(in srgb, var(--role-accent) 7%, var(--surface)), var(--surface) 52%);
+  box-shadow: var(--shadow-2);
+  animation: bubble-in .3s cubic-bezier(.2,.8,.3,1) both;
+}
+.reliance-card::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
+}
+.reliance-card h3 { margin: 4px 0 14px; font-size: 22px; }
+.reliance-row {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--ink);
+}
+.reliance-row:first-of-type { border-top: 0; }
+.reliance-row strong { color: var(--ink-3); font-weight: 750; font-size: 15px; }
+.reliance-card ul { margin: 6px 0 0; padding-left: 20px; line-height: 1.68; color: var(--ink-2); }
+.reliance-card .notice { margin-top: 14px; }
+
+.preview-details { margin-top: 12px; }
+.preview-details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--ink-2);
+  min-height: 44px;
+}
+.preview-details > summary::-webkit-details-marker { display: none; }
+.preview-details > summary::after { content: "▾"; font-size: 12px; color: var(--ink-3); }
+.preview-details[open] > summary::after { content: "▴"; }
+.preview-details > summary:hover { border-color: var(--role-accent); }
+.preview-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.preview-columns section {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 15px 17px;
+  background: var(--surface);
+}
+.preview-columns h4 { margin: 0 0 8px; font-size: 16px; }
+.preview-columns section:first-child h4 { color: color-mix(in srgb, var(--ok) 74%, var(--ink)); }
+.preview-columns section:last-child h4 { color: color-mix(in srgb, var(--danger) 76%, var(--ink)); }
+.preview-columns ul { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.7; color: var(--ink-2); }
+
+/* --------------------------------------------------------------------------
+   Elder activity log (design §4.4)
+   -------------------------------------------------------------------------- */
+
+.log-list { display: grid; gap: 9px; margin-top: 14px; }
+.log-item {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.log-item time { display: block; color: var(--ink-3); font-size: 13px; margin-top: 2px; }
+.log-item .who { font-weight: 800; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
+
+/* --------------------------------------------------------------------------
+   Family day-grouped calendar (design §4.5)
+   -------------------------------------------------------------------------- */
+
+.calendar-day {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 15px 17px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+}
+.calendar-day > h3 { margin: 0 0 10px; font-size: 17px; color: var(--ink-2); letter-spacing: .01em; }
+.calendar-day.today {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--youhuo-blue) 9%, var(--surface)), var(--surface-2));
+  border-color: color-mix(in srgb, var(--youhuo-blue) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--youhuo-blue) 12%, transparent);
+}
+.calendar-day.today > h3 { color: var(--youhuo-blue-deep); }
+.calendar-entry {
+  display: grid;
+  grid-template-columns: 62px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+}
+.calendar-day .calendar-entry:first-of-type { border-top: 0; }
+.calendar-entry time { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Family console overview strip. */
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.metric {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+.metric-label { font-size: 13px; color: var(--ink-3); font-weight: 700; }
+.metric strong {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.metric.alert { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-bg); }
+.metric.alert strong { color: color-mix(in srgb, var(--warn) 76%, var(--ink)); }
+.metric.good strong { color: color-mix(in srgb, var(--ok) 72%, var(--ink)); font-size: 22px; }
+.metric.bad strong { color: color-mix(in srgb, var(--danger) 78%, var(--ink)); font-size: 22px; }
+
+/* Redacted companion digest table. */
+.digest { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.digest-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 14px;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  background: var(--surface);
+}
+.digest-row:nth-child(even) { background: var(--surface-2); }
+.digest-row strong { color: var(--ink-3); font-weight: 750; }
+
+/* Compact audit rows: a long chain reads better as a dense timeline than as cards. */
+.audit-row {
+  padding: 11px 14px;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 4px;
+  background: linear-gradient(90deg, var(--surface-2), transparent 70%);
+}
+.audit-row + .audit-row { border-top: 1px solid var(--line); }
+.audit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.audit-head code {
+  font-family: "Cascadia Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 86%, var(--ink));
+}
+.audit-head time { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.audit-row .meta { margin-top: 2px; font-size: 13px; }
+
+/* --------------------------------------------------------------------------
+   Landing hero
+   -------------------------------------------------------------------------- */
+
+.hero-head { display: flex; align-items: center; gap: 20px; margin-bottom: 6px; }
+.hero-head h1 { margin: 0; }
+.hero-head h2 { margin: 6px 0 0; }
+.hero-mark {
+  width: 84px; height: 84px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 26px;
+  font-size: 42px; font-weight: 800; line-height: 1;
+  color: #fff;
+  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-violet));
+  box-shadow: 0 14px 34px rgba(74, 144, 217, .34), 0 1px 0 rgba(255, 255, 255, .4) inset;
+}
+
+.hero-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 12px; margin: 22px 0 4px; }
+.role-tile {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.role-tile.youhuo {
+  border-color: color-mix(in srgb, var(--youhuo-blue) 34%, transparent);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface)), var(--surface-2));
+}
+.role-tile.companion {
+  border-color: color-mix(in srgb, var(--wuyou-orange) 38%, transparent);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--wuyou-orange) 12%, var(--surface)), var(--surface-2));
+}
+.role-tile > div { display: grid; gap: 3px; }
+.role-tile strong { font-size: 17px; color: var(--ink); }
+.role-tile span { font-size: 14px; color: var(--ink-3); line-height: 1.6; }
+.role-quote { font-style: italic; color: var(--ink-2) !important; font-weight: 650; }
+.role-swatch {
+  width: 46px; height: 46px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 15px;
+  font-size: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.card-icon {
+  display: grid; place-items: center;
+  width: 50px; height: 50px;
+  flex: 0 0 auto;
+  border-radius: 15px;
+  margin-bottom: 14px;
+  color: var(--youhuo-blue-deep);
+  background: color-mix(in srgb, var(--youhuo-blue) 13%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
+  transition: background .22s ease, color .22s ease;
+}
+.card:hover .card-icon { background: color-mix(in srgb, var(--youhuo-blue) 22%, var(--surface-2)); }
+.card-cta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 16px;
+  padding: 11px 20px;
+  border-radius: var(--r-md);
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  background: linear-gradient(180deg, var(--youhuo-blue), var(--youhuo-blue-deep));
+  box-shadow: 0 6px 18px rgba(74, 144, 217, .3);
+  transition: transform .18s ease;
+}
+.card.featured:hover .card-cta { transform: translateX(3px); }
+
+.card.featured {
+  grid-column: span 6;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 28px;
+  background: linear-gradient(130deg, color-mix(in srgb, var(--youhuo-blue) 16%, var(--surface)) 0%, color-mix(in srgb, var(--youhuo-violet) 9%, var(--surface)) 48%, var(--surface) 100%);
+  border-color: color-mix(in srgb, var(--youhuo-blue) 32%, transparent);
+}
+.card.featured::before { opacity: 1; }
+.featured-body { flex: 1 1 auto; display: flex; align-items: flex-start; gap: 20px; }
+.featured-body .card-icon { margin-bottom: 0; width: 56px; height: 56px; }
+.featured-body .eyebrow { margin-bottom: 6px; }
+.card.featured h2 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 6px; }
+.card.featured p { margin: 0; }
+.card.featured .card-cta { flex: 0 0 auto; margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   Landing page evidence strip
+   -------------------------------------------------------------------------- */
+
+.innovation-strip { display: flex; flex-wrap: wrap; gap: 9px; margin: 22px 0 4px; }
+.innovation-strip span {
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 24%, transparent);
+  font-weight: 750;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+}
+/* In dark mode --ink is near-white, so the blue cast has to come from a light
+   stop of the ramp rather than the deep one. */
+@media (prefers-color-scheme: dark) {
+  .innovation-strip span { color: color-mix(in srgb, var(--youhuo-blue) 30%, var(--ink)); }
+}
+.evidence { margin-top: 24px; }
+.evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 12px; }
+.evidence-grid div {
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  display: grid;
+  gap: 6px;
+  background: var(--surface-2);
+}
+.evidence-grid strong { font-size: 17px; }
+.evidence-grid span { color: var(--ink-3); font-size: 14px; line-height: 1.6; }
+
+/* --------------------------------------------------------------------------
+   Judge walkthrough
+   -------------------------------------------------------------------------- */
+
+.judge-shell { max-width: 1140px; }
+.judge-header { align-items: flex-start; padding: 22px 0 6px; }
+.judge-header h1 { max-width: 900px; font-size: clamp(30px, 5vw, 56px); }
+
+.score-ribbon { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
+.score-ribbon div {
+  min-height: 100px;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+}
+.score-ribbon strong {
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(140deg, var(--youhuo-blue-deep), var(--youhuo-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: 14px; }
+
+.timeline { display: grid; gap: 18px; margin-top: 20px; }
+.demo-step {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 22px;
+  border: 1px solid var(--line);
+  transition: transform .22s cubic-bezier(.2,.8,.3,1), border-color .22s ease, box-shadow .22s ease;
+}
+.demo-step.active {
+  border-color: color-mix(in srgb, var(--youhuo-blue) 46%, transparent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-3);
+}
+.step-index {
+  width: 70px; height: 70px;
+  display: grid; place-items: center;
+  border-radius: 22px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(150deg, var(--youhuo-blue-deep), #17356f);
+  box-shadow: 0 10px 24px rgba(23, 53, 111, .28);
+}
+.demo-step pre {
+  background: #0d1526;
+  color: #d6e4ff;
+  border-color: #1d2b46;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.glass-card { display: grid; gap: 10px; margin-top: 14px; }
+.glass-card > div {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 16px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  line-height: 1.62;
+}
+.glass-card strong { color: color-mix(in srgb, var(--youhuo-blue-deep) 88%, var(--ink)); }
+
+.evidence-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: 12px; margin-top: 14px; }
+.evidence-mini { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; background: var(--surface-2); }
+.evidence-mini h3 { margin: 0 0 8px; }
+.evidence-mini ul { padding-left: 20px; line-height: 1.6; color: var(--ink-2); font-size: 14px; }
+
+.final-claim {
+  margin-top: 26px;
+  border: 0;
+  color: #fff;
+  background: linear-gradient(140deg, #14224a 0%, #24509f 52%, #4a3f9e 100%);
+  box-shadow: var(--shadow-3);
+}
+.final-claim .eyebrow { color: #b9d0ff; }
+.final-claim h2 { color: #fff; font-size: clamp(21px, 3.4vw, 34px); line-height: 1.4; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.button-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 52px;
+  padding: 13px 22px;
+  border-radius: var(--r-md);
+  color: #14224a;
+  background: #fff;
+  text-decoration: none;
+  font-weight: 800;
+  transition: transform .18s ease;
+}
+.button-link:hover { transform: translateY(-2px); }
+.button-link.secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid rgba(255, 255, 255, .38);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1040px) {
+  .elder-layout { grid-template-columns: 1fr; }
+  .rail { position: static; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+}
+@media (max-width: 900px) {
+  .score-ribbon { grid-template-columns: repeat(2, 1fr); }
+  .card.span-3, .card.span-2 { grid-column: span 3; }
+  .card.featured { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 720px) {
+  .card.span-3, .card.span-2 { grid-column: span 6; }
+  .hero-head { gap: 14px; }
+  .hero-mark { width: 62px; height: 62px; border-radius: 20px; font-size: 30px; }
+  .grid, .dashboard-grid { grid-template-columns: 1fr; }
+  .preview-columns { grid-template-columns: 1fr; }
+  .demo-step { grid-template-columns: 1fr; }
+  .step-index { width: 56px; height: 56px; border-radius: 17px; font-size: 20px; }
+  .reliance-row, .glass-card > div, .log-item, .digest-row { grid-template-columns: 1fr; gap: 4px; }
+  .calendar-entry { grid-template-columns: 56px 1fr; }
+  .calendar-entry .status-chip { grid-column: 2; justify-self: start; }
+  .mic-dial { width: 176px; height: 176px; }
+  .mic-big { width: 138px; height: 138px; font-size: 50px; }
+  .mic-big svg { width: 52px; height: 52px; }
+  .bubble { max-width: 94%; }
+  .chat { padding: 13px; }
+  .entry-btn { font-size: 16px; gap: 8px; }
+  .topbar { gap: 10px; }
+  .badge { padding: 9px 13px; font-size: 14px; }
+  .profile-tools { gap: 10px; }
+}
+
+/* Honour the OS motion preference: the halo and rings stop, colours remain. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

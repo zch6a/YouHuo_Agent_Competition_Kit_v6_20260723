@@ -1,0 +1,12 @@
+{
+  "version": "5.0.0",
+  "scenarios": 400,
+  "assertions": 1400,
+  "completed_sagas": 200,
+  "compensated_sagas": 200,
+  "duplicate_replays": 200,
+  "invalid_or_conflicting_advances_blocked": 400,
+  "failed": 0,
+  "failures": [],
+  "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。"
+}

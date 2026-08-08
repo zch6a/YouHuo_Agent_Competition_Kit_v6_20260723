@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>优活 v5 可信智能体实验室</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-mode="youhuo">
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">YOUHUO TRUST LAB · V5.0</p>
+        <h1 class="care-title">可信智能体实验室</h1>
+        <p class="lead">N-best语音共识、目的绑定数据流、可恢复Saga、离线冲突、紧急破窗、解释卡与完成证明。</p>
+      </div>
+      <a class="back-link" href="/">← 返回首页</a>
+    </header>
+
+    <section class="panel notice good" aria-live="polite" id="status">正在建立老人、家属与系统演示身份……</section>
+
+    <section class="dashboard-grid" aria-label="可信能力演示">
+      <article class="panel feature-panel">
+        <h2>语音共识与保守澄清</h2>
+        <p>多路ASR候选不一致时不猜测；支付、删除、认证等副作用任务使用更高阈值。</p>
+        <button id="voiceSafe">演示一致候选</button>
+        <button class="secondary" id="voiceConflict">演示确认/取消冲突</button>
+        <pre id="voiceOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>目的绑定策略防火墙</h2>
+        <p>OCR账单中的金额可以作为待核验数据，不能直接成为支付授权或控制字段。</p>
+        <button id="policySafe">演示可信账单</button>
+        <button class="danger" id="policyAttack">演示恶意文档金额</button>
+        <pre id="policyOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>可恢复任务Saga</h2>
+        <p>每一步持久化、带版本与幂等键；失败时只补偿已经完成且可逆的步骤。</p>
+        <button id="sagaCreate">创建缴费Saga</button>
+        <button class="secondary" id="sagaAdvance">按角色安全推进一步</button>
+        <pre id="sagaOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>跨设备离线冲突</h2>
+        <p>普通字段可按版本合并；健康、身份等高敏感字段发生并发修改时必须由人选择。</p>
+        <button id="syncDemo">生成高敏感冲突</button>
+        <pre id="syncOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>限时紧急破窗</h2>
+        <p>只开放位置、健康摘要、紧急联系人和活动任务；陪聊原文与支付凭据永久禁止。</p>
+        <button class="danger" id="breakGlassDemo">开启10分钟最小访问</button>
+        <pre id="breakGlassOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>能力真值与运行指标</h2>
+        <p>明确区分已实现、适配器和仍需真机/正式接口验证的能力，避免答辩过度宣传。</p>
+        <button id="truthDemo">加载能力真值</button>
+        <button class="secondary" id="metricsDemo">加载聚合指标</button>
+        <pre id="truthOutput" aria-live="polite"></pre>
+      </article>
+    </section>
+  </main>
+  <script src="/static/trust.js" defer></script>
+</body>
+</html>

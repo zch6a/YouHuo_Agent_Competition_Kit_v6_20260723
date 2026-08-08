@@ -1,0 +1,21 @@
+{
+  "dataset": "voicebench_youhuo_v6.jsonl",
+  "synthetic_text_cases": 800,
+  "passed": 800,
+  "failed": 0,
+  "categories": {
+    "clear_bill": 100,
+    "confirmation_conflict": 100,
+    "amount_conflict": 100,
+    "low_confidence_side_effect": 100,
+    "emergency": 100,
+    "scam": 100,
+    "clear_reminder": 100,
+    "social_interrupt": 100
+  },
+  "failures": [],
+  "limitations": [
+    "This benchmark uses synthetic transcript candidates, not real audio recordings.",
+    "Dialect and acoustic robustness still require consented recordings and device tests."
+  ]
+}

@@ -1,0 +1,6363 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "优活 Agent API",
+    "description": "面向独居老人的家庭协同式可信生活智能体。语言层只负责理解；办事、循环事务、情绪陪伴、记忆、健康、用药、位置安全与家庭协同由可审计代码控制。",
+    "version": "4.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/auth/demo": {
+      "post": {
+        "summary": "Demo Login",
+        "operationId": "demo_login_v2_auth_demo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoLoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/sessions": {
+      "post": {
+        "summary": "Create Session Endpoint",
+        "operationId": "create_session_endpoint_v2_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v2/chat": {
+      "post": {
+        "summary": "Chat",
+        "operationId": "chat_v2_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v2/family/approve": {
+      "post": {
+        "summary": "Approve",
+        "operationId": "approve_v2_family_approve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v2/family/reminders": {
+      "post": {
+        "summary": "Create Family Reminder",
+        "operationId": "create_family_reminder_v2_family_reminders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyReminderCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v2/reminders/{reminder_id}/acknowledge": {
+      "post": {
+        "summary": "Acknowledge Reminder",
+        "operationId": "acknowledge_reminder_v2_reminders__reminder_id__acknowledge_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/reminders/{reminder_id}/complete": {
+      "post": {
+        "summary": "Complete Reminder",
+        "operationId": "complete_reminder_v2_reminders__reminder_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/demo/scheduler/evaluate": {
+      "post": {
+        "summary": "Scheduler Evaluate",
+        "operationId": "scheduler_evaluate_v2_demo_scheduler_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderEvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Scheduler Evaluate V2 Demo Scheduler Evaluate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v2/tasks": {
+      "get": {
+        "summary": "List Tasks",
+        "operationId": "list_tasks_v2_tasks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskView"
+                  },
+                  "title": "Response List Tasks V2 Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/reminders": {
+      "get": {
+        "summary": "List Reminders",
+        "operationId": "list_reminders_v2_reminders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Reminders V2 Reminders Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/notifications": {
+      "get": {
+        "summary": "List Notifications",
+        "operationId": "list_notifications_v2_notifications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Notifications V2 Notifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/audit": {
+      "get": {
+        "summary": "List Audit",
+        "operationId": "list_audit_v2_audit_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2000,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Audit V2 Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/plans/{task_type}": {
+      "get": {
+        "summary": "Task Plan",
+        "operationId": "task_plan_v3_plans__task_type__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TaskType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGraph"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/delegation/preview": {
+      "post": {
+        "summary": "Delegation Preview",
+        "operationId": "delegation_preview_v3_delegation_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegationDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v3/documents/analyze": {
+      "post": {
+        "summary": "Analyze Document",
+        "operationId": "analyze_document_v3_documents_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v3/tools": {
+      "get": {
+        "summary": "List Tool Manifests",
+        "operationId": "list_tool_manifests_v3_tools_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolManifest"
+                  },
+                  "type": "array",
+                  "title": "Response List Tool Manifests V3 Tools Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v3/tools/{tool_name}/dry-run": {
+      "post": {
+        "summary": "Tool Dry Run",
+        "operationId": "tool_dry_run_v3_tools__tool_name__dry_run_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tool_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tool Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolDryRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDryRunResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/memories/propose": {
+      "post": {
+        "summary": "Propose Memory",
+        "operationId": "propose_memory_v3_memories_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v3/memories/decide": {
+      "post": {
+        "summary": "Decide Memory",
+        "operationId": "decide_memory_v3_memories_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v3/memories/{memory_id}": {
+      "delete": {
+        "summary": "Revoke Memory",
+        "operationId": "revoke_memory_v3_memories__memory_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/memories/{elder_id}": {
+      "get": {
+        "summary": "List Memories",
+        "operationId": "list_memories_v3_memories__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemoryItem"
+                  },
+                  "title": "Response List Memories V3 Memories  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/routines": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Routine",
+        "operationId": "create_routine_v4_routines_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/routines/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Routines",
+        "operationId": "list_routines_v4_routines__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoutineRecord"
+                  },
+                  "title": "Response List Routines V4 Routines  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/routines/materialize": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Materialize Routines",
+        "operationId": "materialize_routines_v4_routines_materialize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutineMaterializeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Materialize Routines V4 Routines Materialize Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/routine-occurrences/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Occurrences",
+        "operationId": "list_occurrences_v4_routine_occurrences__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoutineOccurrence"
+                  },
+                  "title": "Response List Occurrences V4 Routine Occurrences  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/routine-occurrences/{occurrence_id}/complete": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Complete Occurrence",
+        "operationId": "complete_occurrence_v4_routine_occurrences__occurrence_id__complete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "occurrence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Occurrence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineOccurrence"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/emotions/analyze": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Analyze Emotion",
+        "operationId": "analyze_emotion_v4_emotions_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmotionAnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmotionAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/reports/emotion/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Emotion Report",
+        "operationId": "emotion_report_v4_reports_emotion__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          },
+          {
+            "name": "period_start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Period Start"
+            }
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Period End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/items": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Item",
+        "operationId": "create_item_v4_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemMemoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemMemoryRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/items/decide": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Decide Item",
+        "operationId": "decide_item_v4_items_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemMemoryRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/items/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Search Items",
+        "operationId": "search_items_v4_items__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/contacts": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Contact",
+        "operationId": "create_contact_v4_contacts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/contacts/decide": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Decide Contact",
+        "operationId": "decide_contact_v4_contacts_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/contacts/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Contacts",
+        "operationId": "list_contacts_v4_contacts__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContactRecord"
+                  },
+                  "title": "Response List Contacts V4 Contacts  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/contacts/faces/enroll": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Enroll Face",
+        "operationId": "enroll_face_v4_contacts_faces_enroll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceEnrollmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/contacts/faces/match": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Match Face",
+        "operationId": "match_face_v4_contacts_faces_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaceMatchResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/medical-reports/analyze": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Analyze Medical Report",
+        "operationId": "analyze_medical_report_v4_medical_reports_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicalReportAnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalReportAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/health/events": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Health Event",
+        "operationId": "create_health_event_v4_health_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthEventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthEventRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/health/events/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Health Events",
+        "operationId": "list_health_events_v4_health_events__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HealthEventRecord"
+                  },
+                  "title": "Response List Health Events V4 Health Events  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/health/fhir/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Export Fhir",
+        "operationId": "export_fhir_v4_health_fhir__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Fhir V4 Health Fhir  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/medications": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Medication",
+        "operationId": "create_medication_v4_medications_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicationPlanCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationPlanRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/medications/decide": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Decide Medication",
+        "operationId": "decide_medication_v4_medications_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicationPlanRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/medications/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Medications",
+        "operationId": "list_medications_v4_medications__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MedicationPlanRecord"
+                  },
+                  "title": "Response List Medications V4 Medications  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/medications/{plan_id}/doses": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Record Dose",
+        "operationId": "record_dose_v4_medications__plan_id__doses_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoseRecordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoseRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/medications/{plan_id}/inventory": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Medication Inventory",
+        "operationId": "medication_inventory_v4_medications__plan_id__inventory_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryForecast"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/medications/interactions/check": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Check Interactions",
+        "operationId": "check_interactions_v4_medications_interactions_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InteractionCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionCheckResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/safety/policy": {
+      "put": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Update Safety Policy",
+        "operationId": "update_safety_policy_v4_safety_policy_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SafetyPolicyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Update Safety Policy V4 Safety Policy Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/safety/policy/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Get Safety Policy",
+        "operationId": "get_safety_policy_v4_safety_policy__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Safety Policy V4 Safety Policy  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/safety/heartbeat": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Heartbeat",
+        "operationId": "heartbeat_v4_safety_heartbeat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityHeartbeatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Heartbeat V4 Safety Heartbeat Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/safety/inactivity/evaluate": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Inactivity Evaluate",
+        "operationId": "inactivity_evaluate_v4_safety_inactivity_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InactivityEvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Inactivity Evaluate V4 Safety Inactivity Evaluate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/safety/sos": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Sos",
+        "operationId": "sos_v4_safety_sos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SOSRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Sos V4 Safety Sos Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/location/ping": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Location Ping",
+        "operationId": "location_ping_v4_location_ping_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationPingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeofenceResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/navigation/nearby": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Nearby Poi",
+        "operationId": "nearby_poi_v4_navigation_nearby_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Latitude"
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Longitude"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/POIKind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/POIRecord"
+                  },
+                  "title": "Response Nearby Poi V4 Navigation Nearby Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/devices": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Devices",
+        "operationId": "list_devices_v4_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceRecord"
+                  },
+                  "type": "array",
+                  "title": "Response List Devices V4 Devices Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Register Device",
+        "operationId": "register_device_v4_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/assistance": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Create Assistance",
+        "operationId": "create_assistance_v4_assistance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistanceRequestCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistanceRequestRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/assistance/decide": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Decide Assistance",
+        "operationId": "decide_assistance_v4_assistance_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistanceRequestRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/reports/monthly": {
+      "post": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Monthly Report",
+        "operationId": "monthly_report_v4_reports_monthly_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonthlyReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v4/care-graph/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Care Graph",
+        "operationId": "care_graph_v4_care_graph__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareGraph"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/capabilities": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Capabilities",
+        "operationId": "capabilities_v4_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CapabilityStatus"
+                  },
+                  "type": "array",
+                  "title": "Response Capabilities V4 Capabilities Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityHeartbeatRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "kind": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Kind",
+            "default": "interaction"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "occurred_at"
+        ],
+        "title": "ActivityHeartbeatRequest"
+      },
+      "ActorRole": {
+        "type": "string",
+        "enum": [
+          "elder",
+          "family",
+          "system"
+        ],
+        "title": "ActorRole"
+      },
+      "AssistanceRequestCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "requested_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Requested Capabilities"
+          },
+          "expires_in_minutes": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Expires In Minutes",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "requested_capabilities"
+        ],
+        "title": "AssistanceRequestCreate"
+      },
+      "AssistanceRequestRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "requested_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requested Capabilities"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "requested_by",
+          "requested_capabilities",
+          "status",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "AssistanceRequestRecord"
+      },
+      "AuthContext": {
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "title": "Actor Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ActorRole"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "actor_id",
+          "family_id",
+          "role",
+          "display_name"
+        ],
+        "title": "AuthContext"
+      },
+      "CapabilityStatus": {
+        "properties": {
+          "capability": {
+            "type": "string",
+            "title": "Capability"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "implementation": {
+            "type": "string",
+            "title": "Implementation"
+          },
+          "production_dependency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Dependency"
+          },
+          "safety_boundary": {
+            "type": "string",
+            "title": "Safety Boundary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "capability",
+          "state",
+          "implementation",
+          "production_dependency",
+          "safety_boundary"
+        ],
+        "title": "CapabilityStatus"
+      },
+      "CareGraph": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/CareGraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/CareGraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "nodes",
+          "edges",
+          "generated_at"
+        ],
+        "title": "CareGraph"
+      },
+      "CareGraphEdge": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "relation": {
+            "type": "string",
+            "title": "Relation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "relation"
+        ],
+        "title": "CareGraphEdge"
+      },
+      "CareGraphNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "risk": {
+            "type": "string",
+            "title": "Risk"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "occurred_at",
+          "risk"
+        ],
+        "title": "CareGraphNode"
+      },
+      "ChatRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Session Id"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "text"
+        ],
+        "title": "ChatRequest"
+      },
+      "ChatResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ResponseCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/Mode"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Digest"
+          },
+          "ui": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Ui"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "mode"
+        ],
+        "title": "ChatResponse"
+      },
+      "ConsentDecisionRequest": {
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Record Id"
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "record_id",
+          "approve"
+        ],
+        "title": "ConsentDecisionRequest"
+      },
+      "ContactCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "relation": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Relation"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Notes",
+            "default": ""
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope",
+            "default": "family_shared"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "display_name",
+          "relation"
+        ],
+        "title": "ContactCreate"
+      },
+      "ContactRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "relation": {
+            "type": "string",
+            "title": "Relation"
+          },
+          "phone_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Masked"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope"
+          },
+          "face_template_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Face Template Digest"
+          },
+          "consented_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consented By"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "display_name",
+          "relation",
+          "phone_masked",
+          "notes",
+          "scope",
+          "face_template_digest",
+          "consented_by",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ContactRecord"
+      },
+      "DelegationDecision": {
+        "properties": {
+          "autonomy_level": {
+            "type": "string",
+            "title": "Autonomy Level"
+          },
+          "elder_confirmation_required": {
+            "type": "boolean",
+            "title": "Elder Confirmation Required"
+          },
+          "family_approvals_required": {
+            "type": "integer",
+            "title": "Family Approvals Required"
+          },
+          "dry_run_required": {
+            "type": "boolean",
+            "title": "Dry Run Required"
+          },
+          "reversible_only": {
+            "type": "boolean",
+            "title": "Reversible Only"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "autonomy_level",
+          "elder_confirmation_required",
+          "family_approvals_required",
+          "dry_run_required",
+          "reversible_only",
+          "reasons"
+        ],
+        "title": "DelegationDecision"
+      },
+      "DelegationPreviewRequest": {
+        "properties": {
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "risk_level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "maximum": 100000000.0,
+            "minimum": 0.0,
+            "title": "Amount Cents",
+            "default": 0
+          },
+          "ambiguity": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Ambiguity",
+            "default": 0.0
+          },
+          "tool_is_reversible": {
+            "type": "boolean",
+            "title": "Tool Is Reversible",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_type",
+          "risk_level"
+        ],
+        "title": "DelegationPreviewRequest"
+      },
+      "DemoLoginRequest": {
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Actor Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "actor_id"
+        ],
+        "title": "DemoLoginRequest"
+      },
+      "DemoLoginResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuthContext"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "access_token",
+          "actor",
+          "expires_at"
+        ],
+        "title": "DemoLoginResponse"
+      },
+      "DeviceRecord": {
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Actor Id"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id"
+          },
+          "platform": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Platform"
+          },
+          "brand": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Brand"
+          },
+          "device_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Device Name"
+          },
+          "push_capable": {
+            "type": "boolean",
+            "title": "Push Capable",
+            "default": true
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "trust_level": {
+            "type": "string",
+            "title": "Trust Level"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "registered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Registered At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "actor_id",
+          "device_id",
+          "platform",
+          "brand",
+          "device_name",
+          "family_id",
+          "trust_level",
+          "last_seen_at",
+          "registered_at"
+        ],
+        "title": "DeviceRecord"
+      },
+      "DeviceRegisterRequest": {
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Actor Id"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id"
+          },
+          "platform": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Platform"
+          },
+          "brand": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Brand"
+          },
+          "device_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Device Name"
+          },
+          "push_capable": {
+            "type": "boolean",
+            "title": "Push Capable",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "actor_id",
+          "device_id",
+          "platform",
+          "brand",
+          "device_name"
+        ],
+        "title": "DeviceRegisterRequest"
+      },
+      "DocumentAnalysis": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "safe_for_autofill": {
+            "type": "boolean",
+            "title": "Safe For Autofill"
+          },
+          "source_digest": {
+            "type": "string",
+            "title": "Source Digest"
+          },
+          "human_review_required": {
+            "type": "boolean",
+            "title": "Human Review Required"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "fields",
+          "warnings",
+          "safe_for_autofill",
+          "source_digest",
+          "human_review_required"
+        ],
+        "title": "DocumentAnalysis"
+      },
+      "DocumentAnalysisRequest": {
+        "properties": {
+          "ocr_text": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Ocr Text"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ocr_text"
+        ],
+        "title": "DocumentAnalysisRequest"
+      },
+      "DocumentKind": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "bill",
+          "appointment",
+          "medication",
+          "other"
+        ],
+        "title": "DocumentKind"
+      },
+      "DoseRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scheduled At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DoseStatus"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "plan_id",
+          "scheduled_at",
+          "status",
+          "recorded_at",
+          "note"
+        ],
+        "title": "DoseRecord"
+      },
+      "DoseRecordRequest": {
+        "properties": {
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scheduled At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DoseStatus"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 240,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scheduled_at",
+          "status"
+        ],
+        "title": "DoseRecordRequest"
+      },
+      "DoseStatus": {
+        "type": "string",
+        "enum": [
+          "taken",
+          "skipped",
+          "missed"
+        ],
+        "title": "DoseStatus"
+      },
+      "EmotionAnalysis": {
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/EmotionLabel"
+          },
+          "valence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "Valence"
+          },
+          "arousal": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Arousal"
+          },
+          "distress": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Distress"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "evidence_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Categories"
+          },
+          "should_pause_task": {
+            "type": "boolean",
+            "title": "Should Pause Task"
+          },
+          "should_notify_family": {
+            "type": "boolean",
+            "title": "Should Notify Family"
+          },
+          "user_message": {
+            "type": "string",
+            "title": "User Message"
+          },
+          "privacy_safe_note": {
+            "type": "string",
+            "title": "Privacy Safe Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "valence",
+          "arousal",
+          "distress",
+          "confidence",
+          "should_pause_task",
+          "should_notify_family",
+          "user_message",
+          "privacy_safe_note"
+        ],
+        "title": "EmotionAnalysis"
+      },
+      "EmotionAnalyzeRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Source",
+            "default": "voice"
+          },
+          "store_event": {
+            "type": "boolean",
+            "title": "Store Event",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "text"
+        ],
+        "title": "EmotionAnalyzeRequest"
+      },
+      "EmotionLabel": {
+        "type": "string",
+        "enum": [
+          "positive",
+          "calm",
+          "lonely",
+          "low_mood",
+          "anxious",
+          "angry",
+          "urgent"
+        ],
+        "title": "EmotionLabel"
+      },
+      "FaceEnrollmentRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "image_b64": {
+            "type": "string",
+            "maxLength": 2800000,
+            "minLength": 4,
+            "title": "Image B64"
+          },
+          "contact_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Contact Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "image_b64",
+          "contact_id"
+        ],
+        "title": "FaceEnrollmentRequest"
+      },
+      "FaceImageRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "image_b64": {
+            "type": "string",
+            "maxLength": 2800000,
+            "minLength": 4,
+            "title": "Image B64"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "image_b64"
+        ],
+        "title": "FaceImageRequest"
+      },
+      "FaceMatchResult": {
+        "properties": {
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "contact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "production_ready": {
+            "type": "boolean",
+            "title": "Production Ready"
+          },
+          "warning": {
+            "type": "string",
+            "title": "Warning"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "matched",
+          "contact",
+          "confidence",
+          "engine",
+          "production_ready",
+          "warning"
+        ],
+        "title": "FaceMatchResult"
+      },
+      "FamilyApprovalRequest": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Task Id"
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          },
+          "approval_digest": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 16,
+            "title": "Approval Digest"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_id",
+          "approve",
+          "approval_digest"
+        ],
+        "title": "FamilyApprovalRequest"
+      },
+      "FamilyReminderCreateRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "escalation_after_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 5.0,
+            "title": "Escalation After Minutes",
+            "default": 30
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "title",
+          "due_at"
+        ],
+        "title": "FamilyReminderCreateRequest"
+      },
+      "GeofenceResult": {
+        "properties": {
+          "inside_home_area": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inside Home Area"
+          },
+          "distance_from_home_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance From Home M"
+          },
+          "alert_created": {
+            "type": "boolean",
+            "title": "Alert Created"
+          },
+          "accuracy_warning": {
+            "type": "boolean",
+            "title": "Accuracy Warning"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inside_home_area",
+          "distance_from_home_m",
+          "alert_created",
+          "accuracy_warning",
+          "message"
+        ],
+        "title": "GeofenceResult"
+      },
+      "GraphNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NodeKind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Depends On"
+          },
+          "required_slots": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Slots"
+          },
+          "risk_gate": {
+            "$ref": "#/components/schemas/RiskLevel",
+            "default": 1
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          },
+          "human_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Role"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "title": "GraphNode"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthEventCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HealthEventKind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Event At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Source",
+            "default": "manual"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope",
+            "default": "family_summary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "kind",
+          "title",
+          "event_at"
+        ],
+        "title": "HealthEventCreate"
+      },
+      "HealthEventKind": {
+        "type": "string",
+        "enum": [
+          "checkup",
+          "visit",
+          "medication",
+          "note"
+        ],
+        "title": "HealthEventKind"
+      },
+      "HealthEventRecord": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HealthEventKind"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Event At"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Source",
+            "default": "manual"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope",
+            "default": "family_summary"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "kind",
+          "title",
+          "event_at",
+          "id",
+          "family_id",
+          "created_at"
+        ],
+        "title": "HealthEventRecord"
+      },
+      "InactivityEvaluationRequest": {
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Now"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "now"
+        ],
+        "title": "InactivityEvaluationRequest"
+      },
+      "InteractionCheckRequest": {
+        "properties": {
+          "medication_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 2,
+            "title": "Medication Names"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "medication_names"
+        ],
+        "title": "InteractionCheckRequest"
+      },
+      "InteractionCheckResult": {
+        "properties": {
+          "normalized_medications": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Normalized Medications"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/InteractionFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "database_scope": {
+            "type": "string",
+            "title": "Database Scope"
+          },
+          "requires_pharmacist_review": {
+            "type": "boolean",
+            "title": "Requires Pharmacist Review",
+            "default": true
+          },
+          "warning": {
+            "type": "string",
+            "title": "Warning"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "normalized_medications",
+          "findings",
+          "database_scope",
+          "warning"
+        ],
+        "title": "InteractionCheckResult"
+      },
+      "InteractionFinding": {
+        "properties": {
+          "medication_a": {
+            "type": "string",
+            "title": "Medication A"
+          },
+          "medication_b": {
+            "type": "string",
+            "title": "Medication B"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "evidence_level": {
+            "type": "string",
+            "title": "Evidence Level"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "medication_a",
+          "medication_b",
+          "severity",
+          "message",
+          "source",
+          "evidence_level"
+        ],
+        "title": "InteractionFinding"
+      },
+      "InventoryForecast": {
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "title": "Plan Id"
+          },
+          "stock_units": {
+            "type": "number",
+            "title": "Stock Units"
+          },
+          "units_per_day": {
+            "type": "number",
+            "title": "Units Per Day"
+          },
+          "days_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Remaining"
+          },
+          "estimated_depletion_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Depletion Date"
+          },
+          "alert_level": {
+            "type": "string",
+            "title": "Alert Level"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "plan_id",
+          "stock_units",
+          "units_per_day",
+          "days_remaining",
+          "estimated_depletion_date",
+          "alert_level"
+        ],
+        "title": "InventoryForecast"
+      },
+      "ItemCategory": {
+        "type": "string",
+        "enum": [
+          "key",
+          "medication",
+          "document",
+          "bankbook",
+          "contact",
+          "other"
+        ],
+        "title": "ItemCategory"
+      },
+      "ItemMemoryCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "location_text": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Location Text"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Notes",
+            "default": ""
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/MemorySensitivityV4",
+            "default": "personal"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope",
+            "default": "private"
+          },
+          "photo_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "label",
+          "category",
+          "location_text"
+        ],
+        "title": "ItemMemoryCreate"
+      },
+      "ItemMemoryRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "location_text": {
+            "type": "string",
+            "title": "Location Text"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/MemorySensitivityV4"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ShareScope"
+          },
+          "photo_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Sha256"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "consented_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consented By"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "label",
+          "category",
+          "location_text",
+          "notes",
+          "sensitivity",
+          "scope",
+          "photo_sha256",
+          "created_by",
+          "consented_by",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ItemMemoryRecord"
+      },
+      "ItemSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/ItemMemoryRecord"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "spoken_answer": {
+            "type": "string",
+            "title": "Spoken Answer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query",
+          "matches",
+          "spoken_answer"
+        ],
+        "title": "ItemSearchResponse"
+      },
+      "LocationPingRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "accuracy_m": {
+            "type": "number",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Accuracy M",
+            "default": 50
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Source",
+            "default": "device"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "latitude",
+          "longitude",
+          "occurred_at"
+        ],
+        "title": "LocationPingRequest"
+      },
+      "MedicalDocumentKind": {
+        "type": "string",
+        "enum": [
+          "checkup_report",
+          "discharge_note",
+          "prescription",
+          "appointment_notice"
+        ],
+        "title": "MedicalDocumentKind"
+      },
+      "MedicalReportAnalysis": {
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MedicalDocumentKind"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "measurements": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Measurements"
+          },
+          "terms": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Terms"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "summary_for_elder": {
+            "type": "string",
+            "title": "Summary For Elder"
+          },
+          "caution_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caution Flags"
+          },
+          "review_required": {
+            "type": "boolean",
+            "title": "Review Required",
+            "default": true
+          },
+          "source_digest": {
+            "type": "string",
+            "title": "Source Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "dates",
+          "measurements",
+          "terms",
+          "follow_up_date",
+          "summary_for_elder",
+          "caution_flags",
+          "source_digest"
+        ],
+        "title": "MedicalReportAnalysis"
+      },
+      "MedicalReportAnalyzeRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MedicalDocumentKind"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "source_name": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Source Name",
+            "default": "拍照OCR"
+          },
+          "create_followup_reminder": {
+            "type": "boolean",
+            "title": "Create Followup Reminder",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "kind",
+          "text"
+        ],
+        "title": "MedicalReportAnalyzeRequest"
+      },
+      "MedicationPlanCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "normalized_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Normalized Name"
+          },
+          "dose_text": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Dose Text"
+          },
+          "times_local": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Times Local"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "stock_units": {
+            "type": "number",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Stock Units",
+            "default": 0
+          },
+          "units_per_dose": {
+            "type": "number",
+            "maximum": 1000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Units Per Dose",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Source",
+            "default": "manual"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "display_name",
+          "normalized_name",
+          "dose_text",
+          "times_local",
+          "start_date"
+        ],
+        "title": "MedicationPlanCreate"
+      },
+      "MedicationPlanRecord": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "normalized_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Normalized Name"
+          },
+          "dose_text": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Dose Text"
+          },
+          "times_local": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Times Local"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "stock_units": {
+            "type": "number",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Stock Units",
+            "default": 0
+          },
+          "units_per_dose": {
+            "type": "number",
+            "maximum": 1000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Units Per Dose",
+            "default": 1
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 80,
+            "title": "Source",
+            "default": "manual"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "display_name",
+          "normalized_name",
+          "dose_text",
+          "times_local",
+          "start_date",
+          "id",
+          "family_id",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MedicationPlanRecord"
+      },
+      "MemoryDecision": {
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "title": "Memory Id"
+          },
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "memory_id",
+          "approve"
+        ],
+        "title": "MemoryDecision"
+      },
+      "MemoryItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/MemorySensitivity"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MemoryScope"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemoryStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "consent_actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Actor Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "key",
+          "value",
+          "sensitivity",
+          "scope",
+          "purpose",
+          "status",
+          "created_at",
+          "updated_at",
+          "expires_at"
+        ],
+        "title": "MemoryItem"
+      },
+      "MemoryProposal": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/MemorySensitivity"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/MemoryScope",
+            "default": "private"
+          },
+          "purpose": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Purpose"
+          },
+          "ttl_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Ttl Days",
+            "default": 180
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "key",
+          "value",
+          "sensitivity",
+          "purpose"
+        ],
+        "title": "MemoryProposal"
+      },
+      "MemoryScope": {
+        "type": "string",
+        "enum": [
+          "private",
+          "family_summary",
+          "family_shared"
+        ],
+        "title": "MemoryScope"
+      },
+      "MemorySensitivity": {
+        "type": "string",
+        "enum": [
+          "preference",
+          "personal",
+          "sensitive"
+        ],
+        "title": "MemorySensitivity"
+      },
+      "MemorySensitivityV4": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "personal",
+          "high"
+        ],
+        "title": "MemorySensitivityV4"
+      },
+      "MemoryStatus": {
+        "type": "string",
+        "enum": [
+          "proposed",
+          "active",
+          "revoked",
+          "expired"
+        ],
+        "title": "MemoryStatus"
+      },
+      "Mode": {
+        "type": "string",
+        "enum": [
+          "youhuo",
+          "companion"
+        ],
+        "title": "Mode"
+      },
+      "MonthlyReportRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 2020.0,
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Month"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "year",
+          "month"
+        ],
+        "title": "MonthlyReportRequest"
+      },
+      "NodeKind": {
+        "type": "string",
+        "enum": [
+          "collect",
+          "clarify",
+          "review",
+          "confirm",
+          "execute",
+          "verify",
+          "notify",
+          "remember"
+        ],
+        "title": "NodeKind"
+      },
+      "OccurrenceStatus": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "completed",
+          "skipped",
+          "overdue"
+        ],
+        "title": "OccurrenceStatus"
+      },
+      "POIKind": {
+        "type": "string",
+        "enum": [
+          "hospital",
+          "pharmacy",
+          "market"
+        ],
+        "title": "POIKind"
+      },
+      "POIRecord": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/POIKind"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "distance_m": {
+            "type": "number",
+            "title": "Distance M"
+          },
+          "navigation_instruction": {
+            "type": "string",
+            "title": "Navigation Instruction"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "demo_catalog"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "latitude",
+          "longitude",
+          "distance_m",
+          "navigation_instruction"
+        ],
+        "title": "POIRecord"
+      },
+      "PrivacyReport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "report_type": {
+            "type": "string",
+            "title": "Report Type"
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Period End"
+          },
+          "summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Summary"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "privacy_guarantee": {
+            "type": "string",
+            "title": "Privacy Guarantee"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "report_type",
+          "period_start",
+          "period_end",
+          "summary",
+          "generated_at",
+          "privacy_guarantee"
+        ],
+        "title": "PrivacyReport"
+      },
+      "ReminderActionRequest": {
+        "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ReminderActionRequest"
+      },
+      "ReminderEvaluationRequest": {
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Now"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "now"
+        ],
+        "title": "ReminderEvaluationRequest"
+      },
+      "ResponseCode": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "need_more_info",
+          "need_elder_confirmation",
+          "need_family_approval",
+          "task_completed",
+          "task_cancelled",
+          "duplicate_blocked",
+          "safety_alert",
+          "mode_switched",
+          "chat",
+          "error"
+        ],
+        "title": "ResponseCode"
+      },
+      "RiskLevel": {
+        "type": "integer",
+        "enum": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "title": "RiskLevel"
+      },
+      "RoutineCategory": {
+        "type": "string",
+        "enum": [
+          "life",
+          "medication",
+          "medical",
+          "payment",
+          "social"
+        ],
+        "title": "RoutineCategory"
+      },
+      "RoutineCreate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "category": {
+            "$ref": "#/components/schemas/RoutineCategory",
+            "default": "life"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/RoutineFrequency"
+          },
+          "interval": {
+            "type": "integer",
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Interval",
+            "default": 1
+          },
+          "weekdays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 7,
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 31.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "time_local": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$",
+            "title": "Time Local"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Timezone",
+            "default": "Asia/Shanghai"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "escalation_after_minutes": {
+            "type": "integer",
+            "maximum": 10080.0,
+            "minimum": 5.0,
+            "title": "Escalation After Minutes",
+            "default": 60
+          },
+          "positive_message": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Positive Message",
+            "default": "这件事已经完成了，我们做得可真棒！"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "title",
+          "frequency",
+          "time_local",
+          "start_date"
+        ],
+        "title": "RoutineCreate"
+      },
+      "RoutineFrequency": {
+        "type": "string",
+        "enum": [
+          "daily",
+          "weekly",
+          "monthly"
+        ],
+        "title": "RoutineFrequency"
+      },
+      "RoutineMaterializeRequest": {
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Now"
+          },
+          "horizon_days": {
+            "type": "integer",
+            "maximum": 366.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "default": 45
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "now"
+        ],
+        "title": "RoutineMaterializeRequest"
+      },
+      "RoutineOccurrence": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "routine_id": {
+            "type": "string",
+            "title": "Routine Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OccurrenceStatus"
+          },
+          "reminder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Id"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "routine_id",
+          "family_id",
+          "elder_id",
+          "due_at",
+          "status",
+          "created_at"
+        ],
+        "title": "RoutineOccurrence"
+      },
+      "RoutineRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "category": {
+            "$ref": "#/components/schemas/RoutineCategory"
+          },
+          "frequency": {
+            "$ref": "#/components/schemas/RoutineFrequency"
+          },
+          "interval": {
+            "type": "integer",
+            "title": "Interval"
+          },
+          "weekdays": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Weekdays"
+          },
+          "day_of_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "time_local": {
+            "type": "string",
+            "title": "Time Local"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "next_due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Next Due At"
+          },
+          "escalation_after_minutes": {
+            "type": "integer",
+            "title": "Escalation After Minutes"
+          },
+          "positive_message": {
+            "type": "string",
+            "title": "Positive Message"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RoutineStatus"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "family_id",
+          "elder_id",
+          "title",
+          "category",
+          "frequency",
+          "interval",
+          "weekdays",
+          "day_of_month",
+          "time_local",
+          "timezone",
+          "start_date",
+          "next_due_at",
+          "escalation_after_minutes",
+          "positive_message",
+          "status",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoutineRecord"
+      },
+      "RoutineStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "paused",
+          "archived"
+        ],
+        "title": "RoutineStatus"
+      },
+      "SOSRequest": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 240,
+            "title": "Message",
+            "default": "老人主动呼救"
+          },
+          "include_community": {
+            "type": "boolean",
+            "title": "Include Community",
+            "default": true
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id"
+        ],
+        "title": "SOSRequest"
+      },
+      "SafetyPolicyUpdate": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "inactivity_minutes": {
+            "type": "integer",
+            "maximum": 10080.0,
+            "minimum": 30.0,
+            "title": "Inactivity Minutes",
+            "default": 720
+          },
+          "home_lat": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Lat"
+          },
+          "home_lon": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Lon"
+          },
+          "geofence_radius_m": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 100.0,
+            "title": "Geofence Radius M",
+            "default": 1500
+          },
+          "notify_community": {
+            "type": "boolean",
+            "title": "Notify Community",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id"
+        ],
+        "title": "SafetyPolicyUpdate"
+      },
+      "SessionCreateRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SessionCreateRequest"
+      },
+      "SessionCreateResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "family_id",
+          "elder_id",
+          "mode"
+        ],
+        "title": "SessionCreateResponse"
+      },
+      "ShareScope": {
+        "type": "string",
+        "enum": [
+          "private",
+          "family_summary",
+          "family_shared"
+        ],
+        "title": "ShareScope"
+      },
+      "TaskGraph": {
+        "properties": {
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": "3.0"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "terminal_node": {
+            "type": "string",
+            "title": "Terminal Node"
+          },
+          "graph_digest": {
+            "type": "string",
+            "title": "Graph Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task_type",
+          "nodes",
+          "terminal_node",
+          "graph_digest"
+        ],
+        "title": "TaskGraph"
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "collecting",
+          "awaiting_elder_confirmation",
+          "awaiting_family_approval",
+          "executing",
+          "completed",
+          "cancelled",
+          "failed"
+        ],
+        "title": "TaskStatus"
+      },
+      "TaskType": {
+        "type": "string",
+        "enum": [
+          "hospital_registration",
+          "bill_payment",
+          "reminder",
+          "form_assistance"
+        ],
+        "title": "TaskType"
+      },
+      "TaskView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "risk_level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "approval_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Digest"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "elder_id",
+          "task_type",
+          "status",
+          "risk_level",
+          "summary",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TaskView",
+        "description": "Privacy-preserving task projection returned to clients.\n\nInternal state such as deferred companion topics, semantic hashes, raw slots,\napproval versioning and confirmation hashes never crosses the API boundary."
+      },
+      "ToolDryRunRequest": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Arguments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ToolDryRunRequest"
+      },
+      "ToolDryRunResult": {
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "tool_name": {
+            "type": "string",
+            "title": "Tool Name"
+          },
+          "normalized_arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Normalized Arguments"
+          },
+          "required_confirmations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Confirmations"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "allowed",
+          "tool_name",
+          "normalized_arguments",
+          "required_confirmations",
+          "warnings"
+        ],
+        "title": "ToolDryRunResult"
+      },
+      "ToolManifest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input Schema"
+          },
+          "output_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Output Schema"
+          },
+          "risk_level": {
+            "$ref": "#/components/schemas/RiskLevel"
+          },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only"
+          },
+          "reversible": {
+            "type": "boolean",
+            "title": "Reversible"
+          },
+          "requires_elder_confirmation": {
+            "type": "boolean",
+            "title": "Requires Elder Confirmation"
+          },
+          "requires_family_approval": {
+            "type": "boolean",
+            "title": "Requires Family Approval"
+          },
+          "untrusted_output_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Untrusted Output Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "purpose",
+          "input_schema",
+          "output_schema",
+          "risk_level",
+          "read_only",
+          "reversible",
+          "requires_elder_confirmation",
+          "requires_family_approval"
+        ],
+        "title": "ToolManifest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

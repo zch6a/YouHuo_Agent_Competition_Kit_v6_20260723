@@ -1,0 +1,18 @@
+{
+  "version": "5.0.0",
+  "seed": 20260723,
+  "total_checks": 1000000,
+  "passed": 1000000,
+  "failed": 0,
+  "categories": {
+    "voice": 150000,
+    "purpose_policy": 250000,
+    "offline_sync": 150000,
+    "proof_integrity": 150000,
+    "privacy": 100000,
+    "saga_catalog": 100000,
+    "safety_invariant": 100000
+  },
+  "failures": [],
+  "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。"
+}

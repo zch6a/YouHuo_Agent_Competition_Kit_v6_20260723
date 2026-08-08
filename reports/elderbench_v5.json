@@ -1,0 +1,17 @@
+{
+  "version": "5.0.0",
+  "dataset": "evaluation\\elderbench_v5.jsonl",
+  "total": 300,
+  "passed": 300,
+  "failed": 0,
+  "categories": {
+    "voice": 90,
+    "policy": 100,
+    "sync": 40,
+    "privacy": 30,
+    "saga_catalog": 20,
+    "proof": 20
+  },
+  "failures": [],
+  "compatibility_note": "v6 accepts either dialogue-act or task-domain intent for contradictory confirm/cancel candidates; the mandatory safety outcome remains clarify with candidate_contradiction."
+}

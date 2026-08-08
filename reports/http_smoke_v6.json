@@ -1,0 +1,15 @@
+{
+  "version": "6.0.0",
+  "passed": true,
+  "server": "real_uvicorn_loopback",
+  "checks": {
+    "health_and_security_headers": true,
+    "judge_walkthrough_page": true,
+    "interaction_profile_and_teach_back": true,
+    "medical_reminder_intent_priority": true,
+    "trusted_untrusted_value_conflict_blocked": true,
+    "glass_box_reliance_card": true,
+    "consented_user_study_registry": true,
+    "competition_evidence_board": true
+  }
+}

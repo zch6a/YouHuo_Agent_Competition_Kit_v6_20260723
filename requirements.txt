@@ -1,0 +1,11 @@
+# Direct runtime and verification dependencies pinned for the tested 2026-07-22 environment.
+fastapi==0.128.2
+uvicorn[standard]==0.48.0
+pydantic==2.13.4
+httpx==0.28.1
+pytest==9.0.2
+coverage==7.13.3
+PyYAML==6.0.3
+# Windows and slim Linux images ship no system tz database; zoneinfo needs this
+# for Asia/Shanghai routine scheduling.
+tzdata==2026.1; platform_system == "Windows"

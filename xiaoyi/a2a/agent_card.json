@@ -1,0 +1,65 @@
+{
+  "name": "YouHuo Trusted Elderly Agent",
+  "version": "6.0.0",
+  "description": "优活v6：面向独居老人的可信、适老、可恢复生活Agent；包含认知负荷治理、玻璃盒信任校准和安全预演。",
+  "capabilities": {
+    "streaming": true,
+    "long_running_tasks": true,
+    "user_intervention": true,
+    "ui_companion": true
+  },
+  "task_state_mapping": {
+    "collecting": "TASK_STATE_INPUT_REQUIRED",
+    "awaiting_elder_confirmation": "TASK_STATE_INPUT_REQUIRED",
+    "awaiting_family_approval": "TASK_STATE_INPUT_REQUIRED",
+    "executing": "TASK_STATE_WORKING",
+    "completed": "TASK_STATE_COMPLETED",
+    "cancelled": "TASK_STATE_CANCELLED",
+    "failed": "TASK_STATE_FAILED"
+  },
+  "artifacts": [
+    "task_summary",
+    "confirmation_card",
+    "family_handoff",
+    "proof_of_completion",
+    "safety_notice",
+    "privacy_emotion_report",
+    "health_timeline",
+    "medication_plan",
+    "geofence_notice",
+    "monthly_routine_report",
+    "voice_consensus_clarification",
+    "purpose_bound_decision",
+    "saga_checkpoint",
+    "offline_sync_conflict",
+    "break_glass_notice",
+    "merkle_proof_bundle",
+    "privacy_export_receipt"
+  ],
+  "security": {
+    "authoritative_backend_required": true,
+    "external_text_untrusted": true,
+    "high_risk_human_confirmation": true,
+    "purpose_bound_data_flow": true,
+    "untrusted_content_cannot_control_tools": true,
+    "break_glass_scopes_are_minimized": true,
+    "completion_requires_authoritative_evidence": true
+  },
+  "skills": [
+    {
+      "id": "cognitive-load-governor",
+      "name": "适老认知负荷治理",
+      "description": "一次只问一件事、限制选项、适配语速/字号并对高风险使用复述确认。"
+    },
+    {
+      "id": "reliance-card",
+      "name": "玻璃盒信任校准卡",
+      "description": "显示系统听到什么、来源是否核验、谁决定和下一步。"
+    },
+    {
+      "id": "safe-action-preview",
+      "name": "安全动作预演",
+      "description": "在副作用前展示允许字段、被剥离字段、人工确认和回滚计划。"
+    }
+  ]
+}

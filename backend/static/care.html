@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>优活 v4 全景照护中心</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-mode="youhuo">
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">YOUHUO CARE HUB · V4.0</p>
+        <h1 class="care-title">全景照护中心</h1>
+        <p class="lead">循环事务、情绪隐私周报、实物记忆、健康档案、用药管理、位置安全与跨设备协同。</p>
+      </div>
+      <a class="back-link" href="/">← 返回首页</a>
+    </header>
+
+    <section class="panel notice good" aria-live="polite" id="status">正在建立老人端与家属端演示会话……</section>
+
+    <section class="dashboard-grid" aria-label="核心功能演示">
+      <article class="panel feature-panel">
+        <h2>循环事务与月报</h2>
+        <p>创建每月固定事项，幂等生成提醒；月报不包含无忧伴聊天原文。</p>
+        <button id="routineDemo">创建并物化“每月交水费”</button>
+        <button class="secondary" id="monthlyReport">查看本月隐私月报</button>
+        <pre id="routineOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel mode-companion">
+        <h2>情绪优先任务锁</h2>
+        <p>只保存情绪类别与趋势，不把聊天原文推给家属；高风险表达转人工。</p>
+        <textarea id="emotionText" rows="3">我一个人很孤单，没人陪</textarea>
+        <button id="emotionDemo">分析并生成隐私信号</button>
+        <pre id="emotionOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>体检报告与健康时间线</h2>
+        <p>整理日期、指标和医学术语，不诊断；复查日期经确认后进入待办。</p>
+        <textarea id="medicalText" rows="4">体检日期2026年7月20日。血压138/86 mmHg，发现结节。建议2026年8月20日复查。</textarea>
+        <button id="medicalDemo">安全解读并归档</button>
+        <pre id="medicalOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>用药与库存安全</h2>
+        <p>有限规则集只用于演示，未发现规则不代表安全；真实版必须由医生或药师复核。</p>
+        <button id="interactionDemo">检查“华法林 + 阿司匹林”</button>
+        <pre id="interactionOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>位置围栏与一键求助</h2>
+        <p>精度不足时不自动报警；位置按最小必要原则留存。</p>
+        <button id="locationInside">测试家庭范围内</button>
+        <button class="secondary" id="locationOutside">测试超出范围</button>
+        <button class="danger" id="sosDemo">模拟老人主动呼救</button>
+        <pre id="locationOutput" aria-live="polite"></pre>
+      </article>
+
+      <article class="panel feature-panel">
+        <h2>能力真实性清单</h2>
+        <p>明确区分已实现、沙箱闭环、演示适配与仍需真机或正式接口验证的能力。</p>
+        <button id="capabilitiesDemo">加载能力矩阵</button>
+        <div id="capabilityList" class="task-list" aria-live="polite"></div>
+      </article>
+    </section>
+  </main>
+  <script src="/static/care.js" defer></script>
+</body>
+</html>

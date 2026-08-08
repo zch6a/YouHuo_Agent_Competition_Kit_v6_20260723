@@ -1,0 +1,28 @@
+{
+  "version": "6.0.0",
+  "passed": true,
+  "checks": {
+    "required_files": true,
+    "openapi_yaml": true,
+    "json_contracts": true,
+    "openapi_v6_paths": true,
+    "openapi_version": true,
+    "workflow_v6_nodes": true,
+    "workflow_truth_warning": true,
+    "skill_count": true,
+    "skill_policy_sections": true,
+    "harmonyos_v6_page_registered": true,
+    "generic_high_risk_disabled": true,
+    "voicebench_passed": true,
+    "mass_v6_passed": true,
+    "mass_v5_regression_passed": true,
+    "load_passed": true,
+    "chaos_passed": true,
+    "http_smoke_passed": true,
+    "project_version": true,
+    "no_runtime_database": true,
+    "no_generated_audit_key": true,
+    "no_env_file": true,
+    "no_bundled_tts_model": true
+  }
+}

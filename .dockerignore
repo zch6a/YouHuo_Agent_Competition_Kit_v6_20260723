@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.coverage
+*.pyc
+*.pyo
+*.db
+*.db-wal
+*.db-shm
+*.audit.key
+data/tts
+reports
+harmonyos
+competition_materials
+docs

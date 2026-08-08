@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>优活 v6 决赛导览</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="judge-body" data-mode="youhuo">
+  <main class="shell judge-shell">
+    <header class="topbar judge-header">
+      <div>
+        <p class="eyebrow">YOUHUO FINALIST WALKTHROUGH · V6.0</p>
+        <h1>五分钟看懂优活为什么不是套壳聊天助手</h1>
+        <p class="lead">从老人一句含糊的话开始，依次展示认知负荷治理、可信来源、人工接力、安全预演与可验证结果。</p>
+      </div>
+      <a class="back-link" href="/">返回首页</a>
+    </header>
+
+    <section class="score-ribbon" aria-label="评分维度">
+      <div><strong>50</strong><span>创新性</span></div>
+      <div><strong>20</strong><span>完整度</span></div>
+      <div><strong>20</strong><span>应用前景</span></div>
+      <div><strong>10</strong><span>规范性</span></div>
+    </section>
+
+    <section class="panel notice good" id="judgeStatus" aria-live="polite">正在建立评委演示环境……</section>
+
+    <section class="timeline">
+      <article class="panel demo-step active" data-step="1">
+        <div class="step-index">01</div>
+        <div>
+          <p class="eyebrow">老人表达不标准，也不能让系统猜</p>
+          <h2>N-best语音共识</h2>
+          <p>同一句话出现“确认办理”和“取消办理”冲突时，优活拒绝执行并要求老人明确复述。</p>
+          <button id="demoVoice">运行语音冲突</button>
+          <pre id="demoVoiceOut"></pre>
+        </div>
+      </article>
+
+      <article class="panel demo-step" data-step="2">
+        <div class="step-index">02</div>
+        <div>
+          <p class="eyebrow">适老化不是把字体放大</p>
+          <h2>认知负荷治理器</h2>
+          <p>高风险时一次只问一件事，最多给一个选择，并要求老人用自己的话复述金额和对象。</p>
+          <button id="demoLoad">运行适老交互计划</button>
+          <pre id="demoLoadOut"></pre>
+        </div>
+      </article>
+
+      <article class="panel demo-step" data-step="3">
+        <div class="step-index">03</div>
+        <div>
+          <p class="eyebrow">文档和模型都只是数据，不是命令</p>
+          <h2>目的绑定安全预演</h2>
+          <p>OCR中伪造的金额和“直接支付”指令会被剥离；优活不会自动扣款，也不会读取验证码。</p>
+          <button id="demoPreview" class="danger">运行恶意账单预演</button>
+          <pre id="demoPreviewOut"></pre>
+        </div>
+      </article>
+
+      <article class="panel demo-step" data-step="4">
+        <div class="step-index">04</div>
+        <div>
+          <p class="eyebrow">让老人从盲目信任变成知情依赖</p>
+          <h2>玻璃盒依赖校准卡</h2>
+          <p>明确展示系统听到了什么、哪些来源已核验、谁做最终决定、下一步是什么以及能否撤销。</p>
+          <button id="demoCard">生成解释卡</button>
+          <div id="glassCard" class="glass-card" aria-live="polite"></div>
+        </div>
+      </article>
+
+      <article class="panel demo-step" data-step="5">
+        <div class="step-index">05</div>
+        <div>
+          <p class="eyebrow">代码数量不等于比赛证据</p>
+          <h2>评分证据与真实边界</h2>
+          <p>自动汇总四项评分的现有证据、剩余缺口和禁止过度宣传的能力。</p>
+          <button id="demoBoard">加载竞争力证据板</button>
+          <div id="evidenceBoard" class="evidence-board"></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel final-claim">
+      <p class="eyebrow">ONE SENTENCE</p>
+      <h2>老人开口表达目标，优活降低理解负担、守住副作用边界，并让每一步都能由老人、家人和证据共同确认。</h2>
+      <div class="cta-row">
+        <a class="button-link" href="/elder">进入老人端真实办事</a>
+        <a class="button-link secondary" href="/trust">查看可信实验室</a>
+        <a class="button-link secondary" href="/docs">查看完整API</a>
+      </div>
+    </section>
+  </main>
+  <script src="/static/judge.js" defer></script>
+</body>
+</html>

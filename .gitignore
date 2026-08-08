@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+.DS_Store
+
+# Runtime state, wherever it lands. These used to be anchored to data/ only, so
+# the copies the app actually writes — backend/data/, or any directory it is
+# launched from — were tracked and pushed. Match by name, not by location.
+*.db
+*.db-wal
+*.db-shm
+*.audit.key
+
+# Coverage data (the human-readable report in reports/ is kept on purpose).
+.coverage
+.coverage.*
+htmlcov/
+
+# The optional neural voice model is a ~160MB download, never committed.
+*.onnx
+data/tts/
+
+reports/*_console.txt
+reports/*_time.txt

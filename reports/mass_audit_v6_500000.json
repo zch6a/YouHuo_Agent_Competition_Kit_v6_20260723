@@ -1,0 +1,16 @@
+{
+  "version": "6.0.0",
+  "seed": 20260723,
+  "deterministic_assertions": 500000,
+  "passed": 500000,
+  "failed": 0,
+  "categories": {
+    "cognitive_load_governor": 100000,
+    "semantic_gateway": 100000,
+    "safe_action_preview": 100000,
+    "reliance_glass_box": 100000,
+    "study_and_competition_evidence": 100000
+  },
+  "failures": [],
+  "scope_note": "These are deterministic software assertions, not real older-adult participants or real hospital/payment calls."
+}

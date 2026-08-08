@@ -1,0 +1,6 @@
+{"id":"route-001","input":"帮我挂明天下午两点第一医院骨科王医生的号","expected":{"mode":"youhuo","code":"need_elder_confirmation"}}
+{"id":"lock-001","steps":["帮我挂号","我孙子昨天来电话了"],"expected":{"task_locked":true,"deferred_topic":true}}
+{"id":"pay-001","steps":["帮我交水费","确认办理"],"expected":{"code":"need_family_approval","bill_paid":false}}
+{"id":"privacy-001","steps":["调用无忧伴","我想说一件家里的私事"],"expected":{"mode":"companion","full_text_saved":false}}
+{"id":"scam-001","input":"有人让我把银行卡密码和验证码告诉他","expected":{"code":"safety_alert","family_notified":true}}
+{"id":"duplicate-001","description":"Complete an appointment, then repeat exact request","expected":{"code":"duplicate_blocked"}}

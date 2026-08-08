@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>优活老人端 · v6适老交互</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body data-mode="youhuo" data-activity="idle">
+  <div class="role-halo" aria-hidden="true"></div>
+  <main id="main" class="shell shell-wide">
+
+    <header class="app-bar">
+      <a href="/" class="back-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        返回
+      </a>
+      <div id="modeBadge" class="badge"><span class="status-dot"></span><span id="modeName">优活办事模式</span></div>
+    </header>
+
+    <div class="elder-layout">
+
+      <section class="panel stage">
+        <div id="roleHeader" class="role-header mode-fade">
+          <div class="role-icon" aria-hidden="true">
+            <svg class="icon-youhuo" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 21.4 12 12 21.4 2.6 12z"/><path d="M12 7.6 16.4 12 12 16.4 7.6 12z"/></svg>
+            <svg class="icon-companion" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 8.6c0 5.2-8.6 10.4-8.6 10.4S3.4 13.8 3.4 8.6a4.4 4.4 0 0 1 8.6-1.4 4.4 4.4 0 0 1 8.6 1.4z"/></svg>
+          </div>
+          <div class="role-titles">
+            <h1 id="agentTitle">优活</h1>
+            <p id="roleOpening" class="role-opening">我在，您请说。</p>
+          </div>
+        </div>
+
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <div id="relianceHost"></div>
+
+        <div class="mic-stage">
+          <div class="mic-dial">
+            <button id="mic" class="mic-big" title="按一下开始说话" aria-label="按一下开始说话">
+              <svg viewBox="0 0 24 24" width="62" height="62" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.4" width="6" height="11.2" rx="3"/><path d="M5.4 11.2a6.6 6.6 0 0 0 13.2 0M12 17.8V21.4M8.4 21.4h7.2"/></svg>
+            </button>
+          </div>
+          <div id="micHint" class="mic-hint">按一下，然后慢慢说</div>
+        </div>
+
+        <div class="composer">
+          <div class="quick">
+            <button data-text="帮我挂明天下午两点第一医院骨科王医生的号">演示挂号</button>
+            <button data-text="帮我交水费">演示缴费</button>
+            <button data-text="提醒我明天上午九点复诊">演示提醒</button>
+          </div>
+          <div class="controls">
+            <input id="text" aria-label="对优活说" placeholder="也可以打字：帮我挂明天下午的骨科号" />
+            <button id="send">发送</button>
+          </div>
+          <div id="status" class="meta status-line"></div>
+        </div>
+      </section>
+
+      <aside class="rail">
+        <section class="panel rail-card">
+          <div class="rail-head">
+            <h2>我的待办</h2>
+            <span class="rail-note">最要紧的三件</span>
+          </div>
+          <div id="reminders"></div>
+          <button id="toggleReminders" class="secondary block">查看全部待办</button>
+        </section>
+
+        <section class="panel rail-card">
+          <div class="rail-head"><h2>常用</h2></div>
+          <div class="home-entries" aria-label="主要入口">
+            <button id="companionEntry" class="secondary entry-btn">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 8.6c0 5.2-8.6 10.4-8.6 10.4S3.4 13.8 3.4 8.6a4.4 4.4 0 0 1 8.6-1.4 4.4 4.4 0 0 1 8.6 1.4z"/></svg>
+              <span id="companionEntryLabel">找无忧伴聊聊</span>
+            </button>
+            <button id="logEntry" class="secondary entry-btn">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.4h11a1.6 1.6 0 0 1 1.6 1.6v14a1.6 1.6 0 0 1-1.6 1.6h-11A1.6 1.6 0 0 1 4.9 19V5a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M8.4 8.2h7.2M8.4 12h7.2M8.4 15.8h4.4"/></svg>
+              <span id="logEntryLabel">查看我的记录</span>
+            </button>
+            <button id="repeatLast" class="secondary entry-btn">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.6 12a8.4 8.4 0 0 1 14.4-5.9l2.4 2.3"/><path d="M20.4 3.6v4.8h-4.8"/><path d="M20.4 12a8.4 8.4 0 0 1-14.4 5.9l-2.4-2.3"/><path d="M3.6 20.4v-4.8h4.8"/></svg>
+              <span>再说一遍</span>
+            </button>
+            <button id="stepBack" class="secondary entry-btn">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 5.4 3.6 11.4l6 6"/><path d="M3.6 11.4h10.8a6 6 0 0 1 0 12h-1.2"/></svg>
+              <span>返回上一步</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel rail-card">
+          <div class="rail-head">
+            <h2>问问看</h2>
+            <span class="rail-note">照护类问题，直接开口</span>
+          </div>
+          <div class="home-entries" aria-label="照护类提问">
+            <button class="secondary entry-btn" data-text="我今天吃药了吗">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.2 4.2 4.2 10.2a4.2 4.2 0 0 0 6 6l6-6a4.2 4.2 0 0 0-6-6z"/><path d="M7.2 7.2l6 6"/></svg>
+              <span>今天吃药了吗</span>
+            </button>
+            <button class="secondary entry-btn" data-text="我的药还够吃吗">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.8 7.2h14.4v12H4.8z"/><path d="M4.8 7.2 8.4 3.6h7.2l3.6 3.6"/><path d="M9.6 11.4h4.8"/></svg>
+              <span>药还够吃吗</span>
+            </button>
+            <button class="secondary entry-btn" data-text="我今天有什么事">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="5.4" width="16.8" height="15" rx="1.8"/><path d="M3.6 10.2h16.8M8.4 3.6v3.6M15.6 3.6v3.6"/></svg>
+              <span>今天有什么事</span>
+            </button>
+            <button class="secondary entry-btn" data-text="我血压怎么样">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12.6h4.2l2.4-5.4 3 10.8 2.4-6.6 1.8 3.6H21"/></svg>
+              <span>上次的血压</span>
+            </button>
+          </div>
+          <p class="rail-note">这些只念记录，不做医学判断。</p>
+        </section>
+
+        <section class="panel rail-card">
+          <div class="rail-head"><h2>看得清、听得懂</h2></div>
+          <div class="profile-tools" aria-label="适老交互设置">
+            <label>语速
+              <select id="speechRate">
+                <option value="0.72">慢</option>
+                <option value="0.88" selected>舒适</option>
+                <option value="1.0">正常</option>
+              </select>
+            </label>
+            <label>文字大小
+              <select id="fontScale">
+                <option value="1.1">较大</option>
+                <option value="1.25" selected>大</option>
+                <option value="1.5">特大</option>
+              </select>
+            </label>
+          </div>
+          <button id="saveProfile" class="secondary block">保存我的习惯</button>
+          <div class="trust-line" aria-label="可信提示">
+            <span id="semanticPill" class="trust-pill neutral">语义层：检测中…</span>
+            <span id="voicePill" class="trust-pill neutral">语音：检测中…</span>
+            <span class="trust-pill">一次只问一件事</span>
+            <span class="trust-pill">高风险需要复述</span>
+            <span class="trust-pill">不会自动扣款</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <section id="logPanel" class="panel log-panel" hidden>
+      <div class="rail-head">
+        <h2>我的记录</h2>
+        <span class="rail-note">和无忧伴聊天的内容不会记在这里</span>
+      </div>
+      <div id="activityLog" class="log-list"></div>
+    </section>
+  </main>
+  <script type="module" src="/static/elder.js"></script>
+</body>
+</html>

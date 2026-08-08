@@ -1,0 +1,86 @@
+{
+  "schema_version": "2.0",
+  "server": "youhuo-governed-tools-v5",
+  "default_mode": "dry_run",
+  "tools": [
+    {
+      "name": "youhuo.get_task_plan",
+      "side_effect": "none",
+      "risk": "information",
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.preview_delegation",
+      "side_effect": "none",
+      "risk": "information",
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.analyze_document",
+      "side_effect": "none",
+      "risk": "sensitive",
+      "requires_auth": true,
+      "requires_human_confirmation": false,
+      "treat_output_as_untrusted": true
+    },
+    {
+      "name": "youhuo.preview_tool_call",
+      "side_effect": "none",
+      "risk": "sensitive",
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.execute_high_risk",
+      "side_effect": "write",
+      "risk": "high",
+      "enabled": false,
+      "requires_auth": true,
+      "requires_human_confirmation": true,
+      "note": "Must remain disabled unless the authoritative backend verifies elder/family consent."
+    },
+    {
+      "name": "youhuo.resolve_voice_consensus",
+      "side_effect": "none",
+      "risk": "information",
+      "enabled": true,
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.authorize_purpose_bound_action",
+      "side_effect": "none",
+      "risk": "sensitive",
+      "enabled": true,
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.get_saga_state",
+      "side_effect": "none",
+      "risk": "sensitive",
+      "enabled": true,
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.get_task_proof",
+      "side_effect": "none",
+      "risk": "sensitive",
+      "enabled": true,
+      "requires_auth": true,
+      "requires_human_confirmation": false
+    },
+    {
+      "name": "youhuo.open_break_glass",
+      "side_effect": "write",
+      "risk": "high",
+      "enabled": false,
+      "requires_auth": true,
+      "requires_human_confirmation": true,
+      "note": "Generic MCP execution remains disabled; use authoritative family-bound API only."
+    }
+  ]
+}
