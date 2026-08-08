@@ -1,0 +1,29 @@
+# Render Blueprint: one free web service, native Python runtime.
+#
+# Deliberately NOT Docker. Docker itself is free, but some hosts (Hugging Face
+# Spaces, as of 2026-08) only offer container runtimes on a paid plan, while a
+# plain Python service stays free. This app needs nothing a container provided:
+# the one non-package data file it used to read from data/ now ships inside
+# backend/youhuo/reference/, so a source checkout is enough.
+#
+# Render injects $PORT and health-checks it. The free instance type needs no
+# credit card; it spins down after ~15 minutes idle and wakes in ~50s.
+services:
+  - type: web
+    name: youhuo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn youhuo.api:app --host 0.0.0.0 --port $PORT --app-dir backend --timeout-keep-alive 120
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.1"
+      # Demo mode is what lets a visitor use the site with no login at all.
+      - key: YOUHUO_DEMO_MODE
+        value: "true"
+      # The free filesystem is ephemeral, so SQLite resets on restart. That is
+      # fine — and deliberate — for a public demo: every visitor is handed a
+      # freshly seeded household of their own regardless.
+      - key: YOUHUO_DB_PATH
+        value: /tmp/youhuo.db
