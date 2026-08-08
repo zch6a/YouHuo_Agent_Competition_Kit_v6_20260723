@@ -79,10 +79,32 @@ function spokenMoney(amount) {
   return out;
 }
 
+/** Digit by digit, the way phone numbers and ids are said: 1111 -> 一一一一. */
+function spokenDigitRun(digits) {
+  return String(digits).split('').map(d => DIGITS[Number(d)] ?? d).join('');
+}
+
+/** Units a synthesiser either spells out letter by letter or skips entirely. */
+const UNITS = [
+  [/(\d+(?:\.\d+)?)\s*mmHg/gi, (_, n) => `${n}毫米汞柱`],
+  [/(\d+(?:\.\d+)?)\s*(?:℃|°C)/gi, (_, n) => `${n}摄氏度`],
+  [/(\d+(?:\.\d+)?)\s*kg\b/gi, (_, n) => `${n}千克`],
+  [/(\d+(?:\.\d+)?)\s*ml\b/gi, (_, n) => `${n}毫升`],
+  [/(\d+(?:\.\d+)?)\s*mg\b/gi, (_, n) => `${n}毫克`],
+  [/(\d+(?:\.\d+)?)\s*m\b/g, (_, n) => `${n}米`],
+];
+
+/* Decorative pairs carry no meaning aloud. Some engines announce them
+   ("引号"), others break prosody around them; either way the elder hears
+   punctuation instead of the thing being quoted. The characters stay in the
+   *visible* bubble — only the spoken copy is stripped. */
+const DECORATIVE = /[“”「」『』‘’"＂〈〉《》（）()【】\[\]]/g;
+
 /**
  * Rewrite machine-formatted values into speakable Chinese.
  * Order matters: the most specific patterns run first so a datetime is not
- * half-consumed by the date rule.
+ * half-consumed by the date rule, and the bare-digit rule runs last so it
+ * cannot eat a year, a clock time or an amount.
  */
 export function speakableText(text, today = new Date()) {
   if (!text) return '';
@@ -101,8 +123,21 @@ export function speakableText(text, today = new Date()) {
   out = out.replace(/(?<!\d)(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)/g, (_, h, mi) => spokenTime(h, mi));
   // 126.50元 / 68元
   out = out.replace(/(\d+(?:\.\d{1,2})?)\s*元/g, (_, amount) => spokenMoney(amount));
+  // 35% -> 百分之三十五
+  out = out.replace(/(\d+(?:\.\d+)?)\s*%/g, (_, n) => `百分之${n}`);
+  for (const [pattern, replacer] of UNITS) out = out.replace(pattern, replacer);
 
-  return out;
+  // Phone-shaped values. "尾号1111" is what the backend now says, and a bare run
+  // of seven or more digits is an id or a number, never a quantity. Three-digit
+  // values such as a blood pressure of 148 are deliberately left alone: those
+  // *are* quantities and "一百四十八" is the correct reading.
+  out = out.replace(/(尾号)\s*(\d{2,})/g, (_, head, digits) => `${head}${spokenDigitRun(digits)}`);
+  out = out.replace(/(?<![\d.])(\d{7,})(?![\d.])/g, (_, digits) => spokenDigitRun(digits));
+
+  // An ellipsis should be heard as a beat, not as dots.
+  out = out.replace(/[.]{3,}|…+/g, '，');
+
+  return out.replace(DECORATIVE, '');
 }
 
 /** Voices worth preferring, best first; matched loosely against voice names. */
@@ -143,10 +178,15 @@ export function splitClauses(text) {
     .filter(Boolean);
 }
 
-/** Pause after a clause, in milliseconds, based on how it ended. */
+/** Pause after a clause, in milliseconds, based on how it ended.
+ *
+ * An enumeration comma (、) separates items in one breath and wants a shorter
+ * gap than a sentence comma, or a read-back list of dose times sounds like four
+ * unrelated sentences. */
 function pauseAfter(clause) {
   if (/[。！？!?]$/.test(clause)) return 320;
   if (/[；;]$/.test(clause)) return 240;
+  if (/、$/.test(clause)) return 90;
   return 140;
 }
 

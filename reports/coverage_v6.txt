@@ -1,8 +1,8 @@
 ﻿Name                                Stmts   Miss  Cover
 -------------------------------------------------------
 backend\youhuo\__init__.py              1      0   100%
-backend\youhuo\api.py                 315     58    82%
-backend\youhuo\care_voice.py          159     13    92%
+backend\youhuo\api.py                 321     58    82%
+backend\youhuo\care_voice.py          166     15    91%
 backend\youhuo\companion.py            63      0   100%
 backend\youhuo\database.py            338     27    92%
 backend\youhuo\document_guard.py       86      0   100%
@@ -34,4 +34,4 @@ backend\youhuo\v6_models.py           237      0   100%
 backend\youhuo\v6_services.py         321     49    85%
 backend\youhuo\v6_store.py             65      1    98%
 -------------------------------------------------------
-TOTAL                                6630    640    90%
+TOTAL                                6643    642    90%

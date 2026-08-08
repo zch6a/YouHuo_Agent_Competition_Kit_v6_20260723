@@ -191,6 +191,22 @@ def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = No
     def home() -> FileResponse:
         return FileResponse(static_dir / "index.html")
 
+    @app.get("/sw.js", include_in_schema=False)
+    def service_worker() -> FileResponse:
+        # Must be served from the origin root: a worker's scope cannot rise above
+        # its own path, and /static/sw.js could only ever control /static/.
+        return FileResponse(
+            static_dir / "sw.js",
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+        )
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    def web_manifest() -> FileResponse:
+        return FileResponse(
+            static_dir / "manifest.webmanifest", media_type="application/manifest+json"
+        )
+
     @app.get("/elder", include_in_schema=False)
     def elder_ui() -> FileResponse:
         return FileResponse(static_dir / "elder.html")

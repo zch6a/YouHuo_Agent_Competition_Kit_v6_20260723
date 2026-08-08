@@ -4,21 +4,21 @@ START openapi_v6
 {"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 95, "version": "6.0.0"}
 PASS openapi_v6
 START pytest_v6
-........................................................................ [ 16%]
-........................................................................ [ 32%]
-........................................................................ [ 48%]
-........................................................................ [ 64%]
-........................................................................ [ 80%]
-........................................................................ [ 96%]
-.................                                                        [100%]
-449 passed in 72.00s (0:01:11)
+........................................................................ [ 15%]
+........................................................................ [ 30%]
+........................................................................ [ 45%]
+........................................................................ [ 61%]
+........................................................................ [ 76%]
+........................................................................ [ 91%]
+.......................................                                  [100%]
+471 passed in 63.62s (0:01:03)
 PASS pytest_v6
 START coverage_v6
 Name                                Stmts   Miss  Cover
 -------------------------------------------------------
 backend\youhuo\__init__.py              1      0   100%
-backend\youhuo\api.py                 315     58    82%
-backend\youhuo\care_voice.py          159     13    92%
+backend\youhuo\api.py                 321     58    82%
+backend\youhuo\care_voice.py          166     15    91%
 backend\youhuo\companion.py            63      0   100%
 backend\youhuo\database.py            338     27    92%
 backend\youhuo\document_guard.py       86      0   100%
@@ -50,7 +50,7 @@ backend\youhuo\v6_models.py           237      0   100%
 backend\youhuo\v6_services.py         321     49    85%
 backend\youhuo\v6_store.py             65      1    98%
 -------------------------------------------------------
-TOTAL                                6630    640    90%
+TOTAL                                6643    642    90%
 PASS coverage_v6
 {
   "total": 34,
@@ -315,10 +315,12 @@ START browser_javascript_v6
   ok family.js [script]
   ok identity.js [script]
   ok judge.js [script]
+  ok register-sw.js [script]
   ok speech.js [module]
+  ok sw.js [script]
   ok trust.js [script]
-PASS browser_javascript_v6: 7 file(s)
-PASS speech_text_v6: 18 项朗读文本断言通过
+PASS browser_javascript_v6: 9 file(s)
+PASS speech_text_v6: 29 项朗读文本断言通过
 START accessibility_v6
   ok / [light]
   ok /elder [light]

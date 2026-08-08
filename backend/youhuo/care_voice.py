@@ -350,6 +350,22 @@ def answer_schedule_today(*, reminders: list[Any], now: datetime) -> CareAnswer:
     )
 
 
+def _spoken_phone(masked: str | None) -> str:
+    """Say a masked number the way a person does, not as a cardinal.
+
+    The stored form is `*******1111`. Read literally a synthesiser says
+    "一千一百一十一", which is not a phone number in any language. Chinese
+    speakers say "尾号一一一一", and speech.js reads the digits after 尾号
+    one at a time.
+    """
+    if not masked:
+        return "还没有登记"
+    tail = "".join(ch for ch in masked if ch.isdigit())
+    if not tail:
+        return "还没有登记"
+    return f"尾号{tail[-4:]}"
+
+
 def answer_contact_reach(*, contacts: list[Any], text: str) -> CareAnswer:
     """We never place a call. Say who is reachable and hand it to the elder.
 
@@ -368,7 +384,7 @@ def answer_contact_reach(*, contacts: list[Any], text: str) -> CareAnswer:
         wanted = next((c for c in contacts if c.display_name and c.display_name in text), None)
     if wanted is not None:
         return CareAnswer(
-            f"{wanted.display_name}（{wanted.relation}）的号码是{wanted.phone_masked or '未登记'}。"
+            f"{wanted.display_name}（{wanted.relation}）的号码{_spoken_phone(wanted.phone_masked)}。"
             "比赛演示版不能替您拨号，需要您自己拨，或者我给家人发条消息请他们回电。",
             "CARE_QUERY_CONTACT",
             {"matched": True},

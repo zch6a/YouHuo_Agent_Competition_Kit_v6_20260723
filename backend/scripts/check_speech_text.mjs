@@ -53,6 +53,23 @@ const cases = [
     '接下来有1件事：明天09:00复诊。',
     '接下来有1件事：明天上午九点复诊。',
   ],
+  // Phone-shaped values must be read digit by digit, not as a cardinal.
+  ['尾号1111', '尾号一一一一'],
+  ['号码尾号8899。', '号码尾号八八九九。'],
+  ['13900001111', '一三九零零零零一一一一'],
+  // A quantity of the same magnitude is NOT a digit run: 148 is a blood
+  // pressure and "一百四十八" is the correct reading, so it stays untouched.
+  ['收缩压148', '收缩压148'],
+  ['还能吃大约30天', '还能吃大约30天'],
+  // Units a synthesiser spells out letter by letter or skips.
+  ['血压148mmHg', '血压148毫米汞柱'],
+  ['体温36.5℃', '体温36.5摄氏度'],
+  ['依从率80%', '依从率百分之80'],
+  // Decorative pairs are dropped from the spoken copy only.
+  ['请确认：在提醒您“复诊”。', '请确认：在提醒您复诊。'],
+  ['李慧（女儿）的号码', '李慧女儿的号码'],
+  // An ellipsis is a beat, not dots.
+  ['我在听……您慢慢说', '我在听，您慢慢说'],
 ];
 
 let failed = 0;

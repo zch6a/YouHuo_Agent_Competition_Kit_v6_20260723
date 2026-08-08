@@ -90,6 +90,19 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 
 合成完全在本机进行，不联网、不上传文本；模型不随发布包分发。`GET /v6/speech/voice` 如实报告当前用的是哪一种，老人端右下角也会显示。
 
+## 手机 App 形态
+
+最终交付的原生端是 **HarmonyOS ArkTS**（`harmonyos/`）。这个 Web 端是同一个产品在手机
+浏览器上的形态，**可以直接装到主屏**：`manifest.webmanifest` 声明 `display: standalone`，
+装上之后没有浏览器界面，与 App 无异。
+
+- 安全区与动态视口：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，不压刘海、不被手势条盖住；
+- 触控：去掉灰色高亮与 300ms 延迟，主控件吸底到拇指可达区，≤760px 单列；
+- Service worker **只缓存界面外壳，绝不缓存账单、待办、用药或审计链**——把缓存里的"水费已缴"念给老人听，正是本项目存在的意义所反对的；
+- 动效为**无过冲、200–250ms、减速**。这不是保守，是抄来的：`gorhom/react-native-bottom-sheet`
+  用 ζ≈4.6 的过阻尼弹簧并显式 `overshootClamping: true`，`motion-primitives` 用 `bounce: 0`；
+  回弹对前庭敏感的人读起来是"不稳"，会过冲的控件就是会从手指底下跑掉的控件。
+
 ## 在线演示（免登录）
 
 应用本身不需要注册也不需要登录：打开 `/elder` 就能用。公网部署时**每个浏览器会
@@ -106,7 +119,7 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           449项自动化测试
+backend/tests/           471项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -162,7 +175,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、449项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、471项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -178,7 +191,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**449/449通过**；
+- pytest：**471/471通过**；
 - 逐功能端到端验收：**123/123通过**，OpenAPI 操作覆盖 **99/99**；
 - 核心Python语句覆盖率：**90%**；
 - ElderBench：**34/34、120/120、300/300通过**；

@@ -2,9 +2,23 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <!-- Matches the app bar so the phone status bar blends into the header. -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+  <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
+  <!-- iOS ignores the manifest; these are what make "add to home screen" open
+       fullscreen without Safari's chrome. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="优活" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>优活子女端</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo">
   <main id="main" class="shell">

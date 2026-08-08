@@ -5,14 +5,14 @@
   "concurrency": 100,
   "successful": 5000,
   "failed": 0,
-  "elapsed_seconds": 164.4999,
-  "throughput_rps": 30.4,
+  "elapsed_seconds": 101.2308,
+  "throughput_rps": 49.39,
   "latency_ms": {
-    "mean": 3226.354,
-    "p50": 2083.337,
-    "p95": 10230.3,
-    "p99": 16387.008,
-    "max": 27352.539
+    "mean": 1983.783,
+    "p50": 1382.013,
+    "p95": 5984.15,
+    "p99": 9337.825,
+    "max": 24058.537
   },
   "mix": {
     "liveness_reads": 3000,

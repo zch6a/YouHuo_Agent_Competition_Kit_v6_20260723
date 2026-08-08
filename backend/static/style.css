@@ -58,6 +58,66 @@
   --shadow-3: 0 4px 8px rgba(16, 24, 44, .06), 0 26px 60px rgba(16, 24, 44, .11);
   --ring: 0 0 0 4px color-mix(in srgb, var(--role-accent) 22%, transparent);
 
+  /* --- spacing: 4px base, so margins and padding share one rhythm ---------
+     Sizes were previously chosen per component, which is why panels that sit
+     side by side did not line up. Everything below is a multiple of 4. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- type scale ---------------------------------------------------------
+     Fluid, and deliberately starting high: this product is read by people with
+     presbyopia, so the smallest token here (--text-sm) is still 15px, and body
+     copy is 17px before --elder-font-scale multiplies it. Light weights are
+     never used — thin strokes are the first thing to disappear for aging eyes. */
+  --text-xs: 0.8125rem;                              /* 13px, metadata only */
+  --text-sm: 0.9375rem;                              /* 15px */
+  --text-base: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
+  --text-xl: clamp(1.1875rem, 1.1rem + 0.4vw, 1.375rem);
+  --text-2xl: clamp(1.375rem, 1.25rem + 0.6vw, 1.75rem);
+  --text-3xl: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
+
+  /* Chinese needs looser leading than Latin at the same size: the glyphs are
+     denser and full-width punctuation carries no visual descender. */
+  --lh-tight: 1.25;
+  --lh-snug: 1.45;
+  --lh-base: 1.7;
+  --lh-loose: 1.85;
+
+  /* --- motion -------------------------------------------------------------
+     These numbers are borrowed, not guessed. Two of the most respected mobile
+     motion implementations independently land in the same place:
+
+       gorhom/react-native-bottom-sheet  stiffness 1000, damping 500, mass 3,
+                                         overshootClamping: true, ~250ms
+                                         → damping ratio ≈ 4.6, i.e. heavily
+                                           overdamped with overshoot switched off
+       ibelick/motion-primitives         bounce: 0, duration: 0.2, easeInOut
+
+     Reanimated's *generic* default is stiffness 100 / damping 10 → ratio 0.5,
+     which visibly bounces — and the sheet library deliberately overrides it.
+     So the house style here is: no overshoot, 200–250ms, decelerating. That is
+     also the only defensible choice for this audience, because bounce reads as
+     instability to someone with vestibular sensitivity, and an overshooting
+     control is a control that moves away from the finger chasing it.
+
+     An overdamped clamped spring has no cubic-bezier with y > 1; .22,1,.36,1 is
+     that curve — fast departure, long settle, never past the target. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-sheet: 250ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+
   --mode-fade: 1s;
   --elder-font-scale: 1.25;
 
@@ -118,6 +178,110 @@ body {
   color: var(--ink);
   position: relative;
   overflow-x: hidden;
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  /* Chinese line breaking: `strict` stops a line from beginning with 、。」etc,
+     which is the single most obvious sign of untypeset CJK text. `allow-end`
+     lets full-width punctuation hang into the margin so the right edge reads as
+     straight instead of visibly ragged. */
+  line-break: strict;
+  hanging-punctuation: allow-end;
+}
+
+/* Long unbreakable tokens (ids, URLs, tokens shown in the trust lab) must wrap
+   rather than push a card wide, but ordinary Chinese must not break mid-word. */
+p, li, td, .bubble, .meta, .rail-note { overflow-wrap: break-word; }
+
+/* Headings set as a block read better ragged-balanced than ragged-right; the
+   difference is most visible on the two- and three-line Chinese titles. */
+h1, h2, h3, .hero-title, .rail-head h2 { text-wrap: balance; }
+/* Avoid a single word alone on the last line of body copy. */
+p, .bubble, .rail-note, .trust-line { text-wrap: pretty; }
+
+::selection {
+  background: color-mix(in srgb, var(--role-accent) 26%, transparent);
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   Phone app shell
+   The delivered product is a HarmonyOS app; this web build is the same product
+   on a phone browser, and installed to the home screen it runs with no browser
+   chrome at all. The rules below are what separate "a responsive page" from
+   "an app": real safe areas, a viewport that does not jump when the URL bar
+   hides, no text auto-inflation, no 300ms tap delay, and no accidental
+   selection or callout when a shaky finger presses a little too long.
+   ========================================================================== */
+
+html {
+  /* iOS inflates text in landscape unless told not to; on a page whose whole
+     point is a controlled type scale that is not a favour. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  /* dvh follows the URL bar as it collapses; svh is the safe floor for
+     browsers without dvh. Both beat 100vh, which is taller than the visible
+     area on every mobile browser and pushes the composer off-screen. */
+  min-height: 100svh;
+  min-height: 100dvh;
+  /* Stop the whole page rubber-banding when a scrollable list hits its end. */
+  overscroll-behavior-y: none;
+}
+
+/* Touch affordances. The grey flash and the long-press callout both read as
+   "web page"; an app has its own pressed state, which buttons already define. */
+a, button, .entry-btn, .quick button, .mic-big, .bottom-nav a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button, .mic-big, .bottom-nav a { -webkit-user-select: none; user-select: none; }
+
+/* Reach under the notch and the home bar. Padding rather than margin so the
+   backgrounds still bleed to the physical edges. */
+.shell {
+  padding-left: max(var(--space-4), env(safe-area-inset-left));
+  padding-right: max(var(--space-4), env(safe-area-inset-right));
+}
+
+@media (max-width: 760px) {
+  /* One column, full-bleed cards, and a header that stays put — the three
+     things that make a browser page read as an app screen. */
+  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); }
+
+  .app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-top: max(var(--space-2), env(safe-area-inset-top));
+    /* Frosted, so content scrolling underneath stays legible. */
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* The rail is a desktop sidebar; on a phone it is simply the rest of the
+     screen, stacked. */
+  .rail { display: grid; gap: var(--space-4); }
+  .panel, .hero, .card { border-radius: var(--r-lg); }
+
+  /* Leave room for the fixed bottom bar plus the home gesture area, or the last
+     card sits under it and cannot be scrolled into view. */
+  main.shell { padding-bottom: calc(var(--space-16) + env(safe-area-inset-bottom) + 44px); }
+
+  /* Thumb reach: the primary control belongs at the bottom of a phone screen,
+     not the middle. */
+  .mic-stage { position: sticky; bottom: var(--space-3); z-index: 15; }
+}
+
+/* Installed to the home screen there is no browser UI to lean on, so the app
+   supplies its own top inset. */
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
+  /* A back link to a page the user cannot see the URL of is just confusing. */
+  .back-link { display: none; }
 }
 
 /* Soft gradient mesh behind everything; purely decorative. */
@@ -333,14 +497,21 @@ textarea { line-height: 1.6; resize: vertical; }
 button {
   border: 1px solid transparent;
   border-radius: var(--r-md);
-  padding: 13px 20px;
+  padding: var(--space-3) var(--space-5);
   font-weight: 750;
-  font-size: 16px;
+  font-size: var(--text-base);
+  line-height: var(--lh-snug);
+  /* Chinese button labels are short and dense; a hair of tracking stops
+     two-character labels like 发送 from looking cramped. */
+  letter-spacing: .01em;
   cursor: pointer;
   color: #fff;
   background: linear-gradient(180deg, color-mix(in srgb, var(--role-accent) 92%, #fff) 0%, var(--role-accent-deep) 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, var(--shadow-1);
-  transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    filter var(--dur-base) var(--ease-out);
 }
 button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, var(--shadow-2); }
 button:active:not(:disabled) { transform: translateY(0); filter: brightness(.96); }
@@ -360,9 +531,22 @@ button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 
 label { display: grid; gap: 7px; margin-bottom: 15px; font-weight: 700; color: var(--ink-2); font-size: 15px; }
 
-/* Accessibility floor: large targets and an unmistakable focus ring. */
+/* Accessibility floor: large targets and an unmistakable focus ring.
+   48px rather than the 44px in Apple's HIG — the extra 4px matters for tremor
+   and for reading glasses, and nothing on these pages is dense enough to need
+   the space back. */
 a, button, input, textarea, select { min-height: 48px; }
-:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+
+/* The single authoritative focus ring. --ink rather than the role accent: this
+   has to stay visible on tinted, accented and inverted surfaces alike, and
+   maximum contrast beats matching the brand. The accent halo underneath gives
+   it a designed edge without costing contrast. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--role-accent) 20%, transparent);
+}
 
 /* --------------------------------------------------------------------------
    Notices
@@ -516,11 +700,13 @@ body[data-mode="companion"] .role-icon .icon-companion { display: block; }
 }
 .bubble {
   max-width: 84%;
-  padding: 15px 19px;
+  padding: var(--space-4) var(--space-5);
   font-size: calc(20px * var(--elder-font-scale) / 1.25);
-  line-height: 1.6;
+  /* Looser than the 1.6 it replaces: this is the one place on the page where
+     someone reads several lines of Chinese in a row. */
+  line-height: var(--lh-loose);
   box-shadow: var(--shadow-1);
-  animation: bubble-in .26s cubic-bezier(.2, .8, .3, 1) both;
+  animation: bubble-in var(--dur-slow) var(--ease-out) both;
 }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .bubble.user {

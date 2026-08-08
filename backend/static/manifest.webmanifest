@@ -1,0 +1,26 @@
+{
+  "id": "/elder",
+  "name": "优活 · 独居老人可信生活助手",
+  "short_name": "优活",
+  "description": "老人只需开口：挂号、缴费、提醒、陪伴。高风险不猜、不越权，家人只在必要节点接力。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/elder",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#f4f6fb",
+  "theme_color": "#2F6FB5",
+  "categories": ["health", "lifestyle", "utilities"],
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "找无忧伴聊聊", "short_name": "无忧伴", "url": "/elder?mode=companion" },
+    { "name": "家属端", "short_name": "家属", "url": "/family" }
+  ]
+}
