@@ -299,9 +299,32 @@ class SafetyPolicy:
         start = boundary + 1
         return before[start:], start
 
+    @staticmethod
+    def _without_invisibles(value: str) -> str:
+        """删掉零宽与格式字符，再做注入匹配。
+
+        `clean_user_text` 把 Cf 类字符替换成**空格**而不是删除，于是
+        `执行​隐藏命令` 变成 `执行 隐藏命令`，而 `执行隐藏命令` 这条模式是紧连
+        字面串——不命中。实测 4 条注入里有 2 条能这样绕过（另外 2 条侥幸活下来，
+        只是因为它们的模式里正好有 `\\s*` 或 `[^。；;]{0,N}` 的间隔）。
+
+        这里不动 `clean_user_text`：它的"替换成空格"是**面向展示**的正确行为，
+        `优​活` 不该被悄悄拼成一个词，而且那个行为被 test_utils 和
+        run_mass_audit_v3 两处钉住。对抗性匹配需要的是另一套预处理，就放在这里。
+        """
+        normalized = unicodedata.normalize("NFKC", value)
+        return "".join(ch for ch in normalized if unicodedata.category(ch) != "Cf")
+
     @classmethod
     def sanitize_untrusted_text(cls, value: str, max_length: int = 500) -> str:
         """Sanitize display text from tools while preserving it as non-executable data."""
+        # **顺序要紧。** 先删不可见字符，再交给 clean_user_text。
+        #
+        # 反过来写是不行的：clean_user_text 会把 Cf 类字符替换成一个空格，等它跑完
+        # `执行​隐藏命令` 已经变成 `执行 隐藏命令`，那个零宽字符不再是 Cf、删无可删，
+        # 而模式仍然不命中。这一版最初就是这么写的，插字矩阵里 contains_ 那侧绿了、
+        # 这侧还红着——两个函数用同一个 helper，却因为调用顺序得出相反的结论。
+        value = cls._without_invisibles(value)
         try:
             value = clean_user_text(value, max_length=max_length)
         except ValueError:
@@ -312,7 +335,7 @@ class SafetyPolicy:
 
     @classmethod
     def contains_prompt_injection(cls, value: str) -> bool:
-        normalized = unicodedata.normalize("NFKC", value)
+        normalized = cls._without_invisibles(value)
         return any(re.search(pattern, normalized, flags=re.I) for pattern in cls._prompt_injection_patterns)
 
     @staticmethod
