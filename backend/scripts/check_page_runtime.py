@@ -32,6 +32,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -47,6 +48,17 @@ PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge"]
 #: 和几个 GET，抛错往往发生在这一段而不是解析期。
 SETTLE_SECONDS = 4.0
 
+#: 每次点击后等多久。这些按钮背后是真实 HTTP 往返。
+CLICK_SETTLE_SECONDS = 1.6
+
+#: 不点的按钮。
+#:
+#: 只排除会把页面**导航走**的控件——一旦离开当前页，后面的点击就落在别的文档上，
+#: 收集到的错误会张冠李戴。真正做事的按钮一个都不放过，包括 SOS 和限时破窗：
+#: 它们是这个产品的安全路径，正因为危险才更需要每轮都真的走一遍。演示库是每次
+#: 新建的临时文件，点坏了也只坏它自己。
+SKIP_SELECTORS = "a, [data-sheet-open], [data-sheet-close], .back-link, .tab"
+
 
 class CDP:
     """会把事件留下来的 CDP 连接。
@@ -60,6 +72,25 @@ class CDP:
         self.n = 0
         self.events: list[dict] = []
 
+    #: 拆对话框用的固定 id。用一个不会和 self.n 撞上的大数，它的响应就会被读循环
+    #: 当成"不是我等的那条"直接跳过，不干扰正在进行的 send。
+    DIALOG_ID = 9_000_001
+
+    def _keep_alive(self, message: dict) -> None:
+        """记下事件；如果是原生对话框，立刻拆掉。
+
+        `alert()` / `confirm()` 会挂起渲染进程，此后任何 `Runtime.evaluate` 都不会
+        再返回——第一版这个检查就是这样卡死在 60 秒超时上的，而原因（family.js 里
+        六处 `alert()`）从堆栈里完全看不出来。
+        """
+        if message.get("method") == "Page.javascriptDialogOpening":
+            self.ws.send(json.dumps({
+                "id": self.DIALOG_ID, "method": "Page.handleJavaScriptDialog",
+                "params": {"accept": True},
+            }))
+        if "method" in message:
+            self.events.append(message)
+
     def send(self, method: str, **params) -> dict:
         self.n += 1
         self.ws.send(json.dumps({"id": self.n, "method": method, "params": params}))
@@ -69,8 +100,7 @@ class CDP:
                 if "error" in message:
                     raise RuntimeError(f"{method}: {message['error']}")
                 return message.get("result", {})
-            if "method" in message:
-                self.events.append(message)
+            self._keep_alive(message)
 
     def drain(self, seconds: float) -> None:
         """收集这段时间里到达的事件。"""
@@ -84,8 +114,7 @@ class CDP:
                 message = json.loads(self.ws.recv())
             except Exception:
                 break
-            if "method" in message:
-                self.events.append(message)
+            self._keep_alive(message)
         self.ws.settimeout(60)
 
     def close(self) -> None:
@@ -157,6 +186,14 @@ def collect(events: list[dict], page: str) -> list[str]:
             if status >= 400 and url.startswith(BASE):
                 problems.append(f"{page}  HTTP {status}：{url[len(BASE):]}")
 
+        elif method == "Page.javascriptDialogOpening":
+            # 原生 alert()/confirm() 在装到主屏的 PWA 里会弹出带域名的系统弹窗，
+            # 而且会冻住整页。对这个受众来说这是最糟的一种反馈方式：一位老人的
+            # 家属在手机上看到一个"127.0.0.1 显示"的灰框，只能确定出事了。
+            problems.append(
+                f"{page}  弹出了原生对话框（{params.get('type')}）：{params.get('message', '')}"
+            )
+
         elif method == "Network.loadingFailed":
             url = requests.get(params.get("requestId", ""), "?")
             # 取消的请求不算失败（导航打断、service worker 接管都会走这里）。
@@ -166,6 +203,38 @@ def collect(events: list[dict], page: str) -> list[str]:
                 )
 
     return problems
+
+
+def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
+    """把这一页上每个按钮都按一遍，每按一次收一次网。
+
+    只加载页面是不够的。`/care` 和 `/trust` 的按钮曾经**全部是死的**——脚本在第一
+    条语句就抛了 ReferenceError——而任何"页面能打开吗"的检查都看不出区别：那两页
+    照样渲染出完整的卡片、标题和按钮，只是按下去什么也不会发生。真正区分"活的"和
+    "画出来的"，只有按一下。
+
+    逐个按、逐个收网，是为了让报错能指到具体哪个按钮；一次点完再收，只会得到一堆
+    不知道属于谁的异常。
+    """
+    count = tab.send("Runtime.evaluate", expression=(
+        "(() => {"
+        f"  const skip = new Set(document.querySelectorAll('{SKIP_SELECTORS}'));"
+        "   window.__probe = [...document.querySelectorAll('button')]"
+        "     .filter(el => !skip.has(el) && !el.disabled && el.offsetParent !== null);"
+        "   return window.__probe.length;"
+        "})()"
+    ), returnByValue=True)["result"].get("value", 0)
+
+    for index in range(int(count)):
+        label = tab.send("Runtime.evaluate", expression=(
+            f"(window.__probe[{index}].textContent || '').trim().slice(0, 20)"
+            f" + '#' + (window.__probe[{index}].id || '{index}')"
+        ), returnByValue=True)["result"].get("value", str(index))
+        tab.events.clear()
+        tab.send("Runtime.evaluate", expression=f"window.__probe[{index}].click()")
+        tab.drain(CLICK_SETTLE_SECONDS)
+        failures.extend(collect(tab.events, f"{page} 点击「{label}」"))
+    return int(count)
 
 
 def main() -> int:
@@ -179,7 +248,17 @@ def main() -> int:
         print("SKIP page_runtime: no Chromium browser found")
         return 0
 
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "YOUHUO_DEMO_MODE": "true"}
+    # 独立的一次性数据库。这个检查会真的按下每一个按钮，包括 SOS、限时破窗和支付
+    # 授权——那些写操作不能落进仓库的 data/youhuo.db，否则它会污染后面的检查，也会
+    # 让"重跑一次"不再等价。演示播种也一并打开，否则基线那几个按钮无数据可算。
+    workdir = tempfile.mkdtemp(prefix="youhuo-page-runtime-")
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(ROOT / "backend"),
+        "YOUHUO_DEMO_MODE": "true",
+        "YOUHUO_DB_PATH": str(Path(workdir) / "runtime.db"),
+        "YOUHUO_SEED_BASELINE": "true",
+    }
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "youhuo.api:app", "--host", "127.0.0.1",
          "--port", str(PORT), "--app-dir", "backend", "--log-level", "warning"],
@@ -193,6 +272,7 @@ def main() -> int:
 
     browser_proc = None
     failures: list[str] = []
+    clicked = 0
     try:
         for _ in range(80):
             try:
@@ -244,6 +324,8 @@ def main() -> int:
                 tab.send("Page.navigate", url=BASE + page)
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
+                tab.events.clear()
+                clicked += press_every_control(tab, page, failures)
             finally:
                 tab.close()
                 browser.send("Target.closeTarget", targetId=target)
@@ -251,13 +333,15 @@ def main() -> int:
         if browser_proc:
             browser_proc.terminate()
         server.terminate()
+        shutil.rmtree(workdir, ignore_errors=True)
 
     if failures:
         print(f"FAIL page_runtime: {len(failures)} 项")
         for item in failures:
             print(f"  {item}")
         return 1
-    print(f"OK page_runtime: {len(PAGES)} 个页面加载后无异常、无 console.error、无失败请求")
+    print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，"
+          f"{clicked} 个控件逐个按过，无异常、无 console.error、无失败请求")
     return 0
 
 

@@ -589,7 +589,12 @@ async function reminderAction(id, action) {
     if (data.ui?.speak) speak(adapted.speak_text || data.message, adapted.speech_rate);
     loadReminders();
     if (!logPanel.hidden) loadActivity();
-  } catch (e) { alert(e.message); }
+  } catch (e) {
+    // 老人端尤其不能弹 `alert()`：装到主屏后那是一个带 "127.0.0.1 显示" 字样的
+    // 系统灰框，会盖住整屏、冻住页面，而且只有一个"确定"可按。这一页其余的失败
+    // 都写在状态行里，这一处也照做。
+    status.textContent = `这条待办没能更新：${e.message}`;
+  }
 }
 
 /** Design §4.4: only the three most pressing items unless the elder asks for all. */

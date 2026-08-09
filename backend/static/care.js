@@ -156,10 +156,23 @@ byId('coldRoomDemo').addEventListener('click', async () => {
 // 不是把界面切到"异常"配色看看效果——那是假的。这里真的往 /v4/safety/heartbeat 写
 // 一条 11:20 的活动记录，然后整条链路（事件流 → 推导观测 → 与他自己的常态比 → 关怀
 // 动作）自己得出结论。演示里能看到的东西，和真实运行时是同一条路径。
+// 演示用的偏离时刻必须是**已经发生过的**。
+//
+// 原先写死"今天 11:20"。在 11:20 之前按下这个按钮，那是一条未来的活动记录：后端现在
+// 会 422 拒掉（因为一条未来心跳会让无交互预警永久失效），而在加那道校验之前，它会被
+// 收下——演示按钮亲手关掉了这位老人的安全告警。
+//
+// 还没到 11:20 就退到"刚刚"。偏离方向会从"起晚了"变成"起早了"，但那同样是真实的
+// 偏离，而且结论仍然由后端拿他自己的常态算出来，不是界面演的。
+function pastDeviationMoment() {
+  const now = new Date();
+  const late = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 11, 20);
+  return late < now ? late : new Date(now.getTime() - 2 * 60 * 1000);
+}
+
 byId('lateWakeDemo').addEventListener('click', async () => {
   try {
-    const today = new Date();
-    const late = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 20);
+    const late = pastDeviationMoment();
     await api('/v4/safety/heartbeat', {
       method: 'POST', body: JSON.stringify({
         elder_id: state.elderId, kind: 'morning_activity', occurred_at: late.toISOString(),

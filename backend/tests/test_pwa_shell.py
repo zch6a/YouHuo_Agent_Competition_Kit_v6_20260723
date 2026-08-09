@@ -125,6 +125,25 @@ def test_service_worker_still_caches_the_shell(path):
     assert not _is_api_matcher().search(path), f"{path} 被误判成 API，外壳缓存会失效"
 
 
+@pytest.mark.parametrize("script", sorted(p.name for p in STATIC.glob("*.js")))
+def test_no_native_dialogs(script):
+    """`alert()` / `confirm()` / `prompt()` 在装到主屏的 PWA 里是最差的一种反馈。
+
+    它显示成一个带来源域名的系统灰框（"127.0.0.1 显示：…"），盖住整屏、只有一个
+    按钮，读屏软件读不到，而且**会冻住整个页面**——自动化点击检查第一次真跑时就是
+    这样卡死在 60 秒超时上的，堆栈里完全看不出原因是 family.js 里的六处 alert()。
+
+    对这个受众更具体：一位 78 岁的用户，或者一位正在确认支付的家属，看到那个灰框
+    只能知道"出事了"，不知道是哪一步。页面里的 live region 才说得清。
+    """
+    source = (STATIC / script).read_text(encoding="utf-8")
+    # 去掉注释再查：本项目的注释里正引用着它删掉的那几处 alert()。
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    source = re.sub(r"//[^\n]*", "", source)
+    found = re.findall(r"(?<![.\w])(alert|confirm|prompt)\s*\(", source)
+    assert not found, f"{script} 里还有原生对话框：{sorted(set(found))}"
+
+
 def test_service_worker_bails_out_before_responding():
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
     # 直接放行，而不是先缓存再过滤。

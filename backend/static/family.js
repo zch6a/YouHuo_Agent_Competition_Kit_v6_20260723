@@ -153,6 +153,21 @@ function fmtTask(t) {
   return div;
 }
 
+/** 操作结果条：把消息说在页面里，而不是弹一个系统对话框。
+ *
+ * 这里原先用 `alert()`（六处）。三个问题，从轻到重：装到主屏的 PWA 里它会显示成
+ * 一个带 "127.0.0.1 显示" 字样的系统灰框，对家属来说读不出是哪一步出了事；它会
+ * **冻住整页**，在自动化里表现为浏览器再也不回应任何指令；而且它不进无障碍的
+ * live region，读屏用户什么也听不到。
+ */
+function notify(message, tone) {
+  const host = document.querySelector('#familyNotice');
+  if (!host) return;
+  host.className = `notice ${tone || 'good'}`;
+  host.textContent = message;
+  host.hidden = false;
+}
+
 async function approve(taskId, approvalDigest, approveValue) {
   try {
     const data = await api('/v2/family/approve', {
@@ -162,8 +177,8 @@ async function approve(taskId, approvalDigest, approveValue) {
         reason: approveValue ? '家属已核对任务摘要' : '家属拒绝', request_id: crypto.randomUUID()
       })
     });
-    alert(data.message); load();
-  } catch (e) { alert(e.message); }
+    notify(data.message); load();
+  } catch (e) { notify(e.message, 'warning'); }
 }
 
 async function createReminder(e) {
@@ -179,8 +194,8 @@ async function createReminder(e) {
       body: JSON.stringify({elder_id: ELDER_ID, title, due_at: dueAt,
         escalation_after_minutes: escalation, request_id: crypto.randomUUID()})
     });
-    alert(data.message); e.target.reset(); load();
-  } catch (err) { alert(err.message); }
+    notify(data.message); e.target.reset(); load();
+  } catch (err) { notify(err.message, 'warning'); }
 }
 
 async function runScheduler() {
@@ -188,9 +203,10 @@ async function runScheduler() {
     const data = await api('/v2/demo/scheduler/evaluate', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({now: new Date().toISOString()})
     });
-    alert(`提前提醒 ${data.advance_notified} 条，到期提醒 ${data.notified} 条，升级家属 ${data.escalated} 条`);
+    notify(`提前提醒 ${data.advance_notified} 条，到期提醒 ${data.notified} 条，`
+      + `升级家属 ${data.escalated} 条`);
     load();
-  } catch (e) { alert(e.message); }
+  } catch (e) { notify(e.message, 'warning'); }
 }
 
 /** Overview strip: what actually needs the family's attention right now. */
