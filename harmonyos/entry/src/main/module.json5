@@ -28,6 +28,8 @@
     ],
     "requestPermissions": [
       { "name": "ohos.permission.INTERNET" },
+      // system_grant：不需要 reason/usedScene，也不会弹窗。
+      { "name": "ohos.permission.VIBRATE" },
       { "name": "ohos.permission.MICROPHONE", "reason": "$string:microphone_reason", "usedScene": { "abilities": ["EntryAbility"], "when": "inuse" } }
     ]
   }

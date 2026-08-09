@@ -1,4 +1,4 @@
-# 优活 Agent v6.0 交付索引
+﻿# 优活 Agent v6.0 交付索引
 
 ## 首先查看
 
@@ -52,7 +52,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：528项自动化测试；
+- `backend/tests/`：546项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -87,7 +87,7 @@
 
 - FastAPI OpenAPI路径：94个；
 - 小艺Skill：13个；
-- 自动化测试：528项；逐功能验收：123项；
+- 自动化测试：546项；逐功能验收：123项；
 - 核心Python语句覆盖率：90%。
 
 `MANIFEST.sha256` 与包内文件计数需在重新打包时用同一脚本重算，本轮改动后尚未重新生成。

@@ -23,6 +23,7 @@ $Log = Join-Path $Root "reports/verify_all_v6.txt"
   python backend/scripts/validate_contracts_v6.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
   Write-Host "START feature_audit_v6"; python backend/scripts/run_feature_audit.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS feature_audit_v6"
   Write-Host "START browser_javascript_v6"; python backend/scripts/check_browser_js.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+  Write-Host "START arkts_v6"; python backend/scripts/check_arkts.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS arkts_v6"
   Write-Host "START accessibility_v6"; python backend/scripts/check_contrast.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS accessibility_v6"
   Remove-Item -Force -ErrorAction SilentlyContinue data/youhuo.db, data/youhuo.db-wal, data/youhuo.db-shm, data/youhuo.db.audit.key
   python backend/scripts/check_artifacts_v6.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }

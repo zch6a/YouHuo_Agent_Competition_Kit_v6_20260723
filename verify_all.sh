@@ -20,6 +20,7 @@ rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.
   echo "START contracts_v6"; python backend/scripts/validate_contracts_v6.py; echo "PASS contracts_v6"
   echo "START feature_audit_v6"; python backend/scripts/run_feature_audit.py; echo "PASS feature_audit_v6"
   echo "START browser_javascript_v6"; python backend/scripts/check_browser_js.py
+  echo "START arkts_v6"; python backend/scripts/check_arkts.py
   echo "START accessibility_v6"; python backend/scripts/check_contrast.py
   rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.key
   echo "START artifact_check_v6"; python backend/scripts/check_artifacts_v6.py; echo "PASS artifact_check_v6"

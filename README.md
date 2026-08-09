@@ -1,4 +1,4 @@
-# 优活 Agent v6.0：独居老人可信适老生活智能体
+﻿# 优活 Agent v6.0：独居老人可信适老生活智能体
 
 > 老人只需开口，优活降低数字办事负担；高风险不猜、不越权，家人只在必要节点接力，每个关键决定都可理解、可核验、可追溯。
 
@@ -96,6 +96,43 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 浏览器上的形态，**可以直接装到主屏**：`manifest.webmanifest` 声明 `display: standalone`，
 装上之后没有浏览器界面，与 App 无异。
 
+### 原生端（`harmonyos/`）
+
+2026-08-09 这一轮把原生端从"能跑通的骨架"补成真正的 App。此前它是：五个导航按钮挤在
+标题行里（390px 宽根本排不下）、用已废弃的 `router`、颜色全是写死的十六进制、消息用
+`ForEach` 整表重建，而且——对一个语音产品来说最要命的——**没有麦克风**，主控件是一个
+输入框。一个语音助手把主控件做成输入框，等于要求一位可能不会拼音、看不清小键盘的老人
+先学会打字，才能用上"说一句话就办事"的产品。
+
+现在：
+
+- **麦克风是屏幕上最大的控件**（116vp）。点一下开始、再点一下结束，**不做"按住说话"**：
+  长按需要持续用力，帕金森、关节炎和握力下降都会让手中途松开，而松开就等于话说到一半
+  被切断。按下反馈是**缩小**而不是放大——放大会让按钮边缘从手指底下涨出去，看起来像
+  没按中。状态有三条通道：颜色、图标、以及按钮下方那行字。
+- **底部标签栏**（对话/家人/照护/可信），与 Web 端同一套信息架构；`.scrollable(false)`，
+  因为这个受众滑动时手抖得比想象中多，误触横滑不该换页。
+- **设计令牌 + 深色模式**：颜色走 `$r('app.color.*')` 与 `resources/dark/`，而不是写死的
+  十六进制——写死的颜色不会跟着系统深色模式走。两端共用同一套比例尺。
+- **`LazyForEach` + `@Reusable`** 取代整表重建的 `ForEach`。
+- **每台设备一份独立演示家庭**：原生端此前固定用 `elder-demo` 登录，意味着所有评委的
+  手机落在同一户，彼此看得见对方的待办。现在与 Web 端一致走 `POST /v2/auth/visitor`，
+  并存进 `preferences` 跨冷启动复用。
+- **HTTPS**：`BASE_URL` 此前是 `http://192.168.1.100:8000`——一个只在某台开发机网段里
+  存在的地址，装到评委手机上就是一个永远连不上的 App。
+
+**尚未完成、且不假装完成的部分**：端侧 ASR 走 Core Speech Kit 需要 PCM/16kHz/单声道/16bit
+的音频采集，这一步还没接。麦克风按钮切到"正在听"只是把提示语交给语音路径，识别结果目前
+仍由输入框提供。宁可让按钮少做一件事，也不能让一位老人对着一个不会听的麦克风说完一整段话。
+
+> 这台开发机上没有 HarmonyOS SDK，`harmonyos/` **无法编译**。因此
+> `backend/scripts/check_arkts.py` 用静态检查替代编译器抓那一类错误：`$r()` 里的模板
+> 字符串、未定义的 `app.color.*`、不存在的 `sys.symbol.*`、只在 dark 里定义的颜色、
+> 已废弃的 `getContext(this)`、断掉的相对 import、登记了却不存在的页面、以及资源 JSON
+> 里的 UTF-8 BOM。这些都会**静默失败**（渲染成空白而不是报错），所以值得单独一道关卡。
+> 八类缺陷都用"把 bug 原样放回去"验证过检查确实会失败。`Haptics.ets` 里那一个我无法
+> 离线核实的 import 被单独隔离，文件头写清了如果编译报错该换成什么。
+
 - 安全区与动态视口：`viewport-fit=cover` + `env(safe-area-inset-*)` + `100dvh`，不压刘海、不被手势条盖住；
 - 触控：去掉灰色高亮与 300ms 延迟，主控件吸底到拇指可达区，≤760px 单列；
 - **常驻底部标签栏**（首页/家人/照护/可信/评委）：当前项由 HTML 里的 `aria-current`
@@ -131,7 +168,7 @@ export YOUHUO_TTS_MODEL_DIR=/opt/youhuo-tts/vits-melo-tts-zh_en
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           528项自动化测试
+backend/tests/           546项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -187,7 +224,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、528项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、546项测试与覆盖率、123项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -203,7 +240,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**528/528通过**；
+- pytest：**546/546通过**；
 - 逐功能端到端验收：**123/123通过**，OpenAPI 操作覆盖 **99/99**；
 - 核心Python语句覆盖率：**90%**；
 - ElderBench：**34/34、120/120、300/300通过**；

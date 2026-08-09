@@ -1,5 +1,28 @@
 {
   "color": [
-    { "name": "start_window_background", "value": "#F5F7FB" }
+    { "name": "start_window_background", "value": "#F5F7FB" },
+
+    { "name": "youhuo_blue", "value": "#4A90D9" },
+    { "name": "youhuo_blue_deep", "value": "#2F6FB5" },
+    { "name": "youhuo_tint", "value": "#E7F0FB" },
+    { "name": "wuyou_orange", "value": "#F5A623" },
+    { "name": "wuyou_orange_deep", "value": "#9E5D00" },
+    { "name": "wuyou_tint", "value": "#FDF1DE" },
+
+    { "name": "bg", "value": "#F4F6FB" },
+    { "name": "surface", "value": "#FFFFFF" },
+    { "name": "surface_2", "value": "#F7F9FD" },
+    { "name": "surface_3", "value": "#EEF2F9" },
+    { "name": "line", "value": "#E3E8F1" },
+    { "name": "line_strong", "value": "#CFD7E6" },
+
+    { "name": "ink", "value": "#0F1729" },
+    { "name": "ink_2", "value": "#3F4B64" },
+    { "name": "ink_3", "value": "#59657D" },
+    { "name": "ink_invert", "value": "#FFFFFF" },
+
+    { "name": "ok", "value": "#1E7A46" },
+    { "name": "warn", "value": "#A25C00" },
+    { "name": "danger", "value": "#B3261E" }
   ]
 }

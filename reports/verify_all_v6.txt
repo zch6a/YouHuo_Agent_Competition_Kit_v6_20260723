@@ -5,14 +5,14 @@ START openapi_v6
 PASS openapi_v6
 START pytest_v6
 ........................................................................ [ 13%]
-........................................................................ [ 27%]
-........................................................................ [ 40%]
-........................................................................ [ 54%]
-........................................................................ [ 68%]
-........................................................................ [ 81%]
-........................................................................ [ 95%]
-........................                                                 [100%]
-528 passed in 151.92s (0:02:31)
+........................................................................ [ 26%]
+........................................................................ [ 39%]
+........................................................................ [ 52%]
+........................................................................ [ 65%]
+........................................................................ [ 79%]
+........................................................................ [ 92%]
+..........................................                               [100%]
+546 passed in 130.08s (0:02:10)
 PASS pytest_v6
 START coverage_v6
 Name                                Stmts   Miss  Cover
@@ -142,7 +142,7 @@ PASS reliance: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 1
 PASS study: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000, 'safe_action_preview': 100000, 'reliance_glass_box': 100000, 'study_and_competition_evidence': 100000})
 {"version": "6.0.0", "seed": 20260723, "deterministic_assertions": 500000, "passed": 500000, "failed": 0, "categories": {"cognitive_load_governor": 100000, "semantic_gateway": 100000, "safe_action_preview": 100000, "reliance_glass_box": 100000, "study_and_competition_evidence": 100000}, "failures": [], "scope_note": "These are deterministic software assertions, not real older-adult participants or real hospital/payment calls."}
 Secret scan passed: no credential-like values detected.
-All YAML/JSON contracts OK (29 JSON files)
+All YAML/JSON contracts OK (30 JSON files)
 START feature_audit_v6
 
 === 基础服务与鉴权 ===
@@ -323,6 +323,9 @@ START browser_javascript_v6
   ok trust.js [script]
 PASS browser_javascript_v6: 10 file(s)
 PASS speech_text_v6: 29 项朗读文本断言通过
+START arkts_v6
+PASS check_arkts: 21 个 .ets 文件，20 个颜色令牌，无问题
+PASS arkts_v6
 START accessibility_v6
   ok / [light]
   ok /elder [light]
