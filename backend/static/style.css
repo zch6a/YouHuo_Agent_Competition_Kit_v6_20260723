@@ -1712,10 +1712,16 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
     overscroll-behavior: contain;
     scroll-behavior: smooth;
     /* A line of Chinese cut through the middle of its glyphs reads as a broken
-       layout. Fading the last few pixels says "there is more below" instead,
-       which is what the clipping actually means. */
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+       layout. Fading the edge says "there is more" instead, which is what the
+       clipping actually means.
+       **Both** ends, not just the bottom: now that the conversation stacks
+       upward from the composer, a long message overflows at the *top*. On an
+       iPhone SE the opening line was hard-cut mid-glyph at the top edge while
+       the only fade sat at the bottom, where nothing was being clipped. */
+    mask-image: linear-gradient(to bottom, transparent 0, #000 18px,
+                                #000 calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px,
+                                        #000 calc(100% - 18px), transparent);
   }
 
   /* Fixed furniture: never shrinks, always at the foot of the screen. */
@@ -1725,6 +1731,10 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   /* 217px of microphone is a desktop hero, not a phone control. Still far above
      the 48px touch floor, and still the largest thing on the screen. */
   .mic-stage { margin: var(--space-4) 0 var(--space-2); gap: var(--space-2); }
+  /* 圈层容器是**固定 200x200** 的，只缩里面的按钮，这一块的高度纹丝不动——
+     实测 iPhone SE 上 .mic-stage 仍占 213px，而整屏只有 667px。两个都要缩。
+     圈层比按钮大 40px，正好容下两道呼吸圈。 */
+  .mic-dial { width: 156px; height: 156px; }
   .mic-big { width: 116px; height: 116px; }
   .mic-big svg { width: 46px; height: 46px; }
 
@@ -1826,6 +1836,25 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
      row of prime real estate directly under the microphone. */
   .quick { display: none; }
+
+  /* ----------------------------------------------------------------------
+     短屏。iPhone SE 是 667px 高，比 iPhone 14 少 177px——而固定家具（角色头 +
+     麦克风 + 输入区 + Sheet 触发器）一点没少，全部差额由对话区独自承担。结果是
+     开场白只剩两行、还被从顶部切开。
+     这里从家具上各匀一点回来给对话，而不是把字缩小：这一位用户看不清小字，
+     缩字是把问题从"看不全"换成"看不清"。
+     ---------------------------------------------------------------------- */
+  @media (max-height: 700px) {
+    .mic-dial { width: 132px; height: 132px; }
+    .mic-big { width: 96px; height: 96px; }
+    .mic-big svg { width: 38px; height: 38px; }
+    /* 状态行在短屏上是空的居多，先把它的保留高度收掉。 */
+    .status-line { min-height: 0; margin-top: var(--space-1); }
+    .mic-stage { margin: var(--space-2) 0 var(--space-1); }
+    .role-icon { width: 38px; height: 38px; }
+    .role-header { margin-bottom: var(--space-1); }
+    #agentTitle { font-size: var(--text-lg); }
+  }
 
   /* ----------------------------------------------------------------------
      Page headers, compacted.

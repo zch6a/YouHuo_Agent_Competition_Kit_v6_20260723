@@ -5,8 +5,8 @@ backend\youhuo\api.py                   330     58    82%
 backend\youhuo\baseline.py              130      2    98%
 backend\youhuo\baseline_api.py           66      1    98%
 backend\youhuo\baseline_models.py        87      0   100%
-backend\youhuo\baseline_services.py     215     14    93%
-backend\youhuo\baseline_store.py        160     19    88%
+backend\youhuo\baseline_services.py     215     15    93%
+backend\youhuo\baseline_store.py        160     20    88%
 backend\youhuo\care_voice.py            166     15    91%
 backend\youhuo\companion.py              63      0   100%
 backend\youhuo\database.py              338     26    92%
@@ -39,4 +39,4 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           321     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7310    677    91%
+TOTAL                                  7310    679    91%
