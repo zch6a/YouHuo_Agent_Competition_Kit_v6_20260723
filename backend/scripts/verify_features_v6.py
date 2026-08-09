@@ -1282,6 +1282,77 @@ def run(base: str) -> int:
         lambda: http("POST", "/v6/speech/synthesize", {"text": "啊" * 400}, elder_token, expect=422),
     )
 
+    # ------------------------------------------- 个性化基线、生活日报与兜底预警
+    audit.section("个性化基线与生活日报（设计稿 核心创新点 ①②③④）")
+
+    def baseline_established():
+        """演示家庭必须能立刻展示基线，否则核心创新点在演示里是一片空白。"""
+        out = http("GET", f"/v7/baseline/{ELDER}", token=elder_token)
+        assert out["established"] is True, "演示家庭没有可用的基线"
+        assert out["observed_days"] >= 7, out["observed_days"]
+        wake = next(b for b in out["baselines"] if b["channel"] == "wake")
+        assert wake["center_text"].startswith("06:"), wake
+        return out
+
+    audit.check("① 演示家庭已建立个人生活基线", baseline_established)
+
+    def baseline_channels():
+        out = http("GET", f"/v7/baseline/{ELDER}", token=elder_token)
+        channels = {b["channel"] for b in out["baselines"]}
+        assert channels == {"wake", "sleep", "outing", "medication", "conversation"}, channels
+        return len(channels)
+
+    audit.check("① 五个通道全部由既有事件流推导（老人无需多做任何事）", baseline_channels)
+
+    def environment_no_images():
+        """"看不见，但能感知"必须是接口层面的保证，不是一句宣传。"""
+        http("POST", "/v7/environment/samples", {
+            "elder_id": ELDER, "temperature_c": 13.0, "humidity_pct": 45.0,
+            "lux": 220.0, "occurred_at": iso(datetime.now(UTC)), "source": "audit-sensor",
+        }, elder_token, expect=201)
+        return http("POST", "/v7/environment/samples", {
+            "elder_id": ELDER, "temperature_c": 22.0, "occurred_at": iso(datetime.now(UTC)),
+            "source": "audit", "image_base64": "iVBORw0KGgo=",
+        }, elder_token, expect=422)
+
+    audit.check("① 环境上报接收温湿度光照，并在协议层拒绝图像字段", environment_no_images)
+
+    def care_reacts_to_a_cold_room():
+        """同样的基线，屋里冷要说不同的话——这就是"联动环境感知"。"""
+        out = http("GET", f"/v7/care/{ELDER}", token=elder_token)
+        assert "加件衣服" in out["spoken"], out["spoken"]
+        for word in ("异常", "不正常", "警告"):
+            assert word not in out["spoken"], f"对老人说的话里出现了「{word}」"
+        return out
+
+    audit.check("①③ 关怀语随室内环境改变，且措辞是陈述不是评判", care_reacts_to_a_cold_room)
+
+    def daily_report_leads_with_a_conclusion():
+        out = http("GET", f"/v7/daily-report/{ELDER}", token=family_token)
+        report = out["report"]
+        assert report["headline"], "日报没有结论"
+        assert "平常" in report["headline"], "结论必须是和他自己比"
+        assert {"作息", "活动与交流", "用药"} == {s["title"] for s in report["sections"]}
+        assert "陪伴聊天" in report["privacy_note"] and "不包含" in report["privacy_note"]
+        return report
+
+    audit.check("② 生活日报结论在前，且不含陪伴聊天原文", daily_report_leads_with_a_conclusion)
+
+    def alert_shares_the_snapshot():
+        """分两次取就会出现"日报说正常、推送说赶紧回家"这种自相矛盾。"""
+        out = http("GET", f"/v7/daily-report/{ELDER}", token=family_token)
+        deviated = out["report"]["overall"] == "marked"
+        assert out["alert"]["baseline_deviated"] == deviated, out["alert"]
+        assert out["alert"]["reason"], "推送与否必须能解释"
+        return out["alert"]
+
+    audit.check("④ 日报与推送决定来自同一份快照，且理由可解释", alert_shares_the_snapshot)
+
+    def baseline_is_family_scoped():
+        return http("GET", "/v7/baseline/elder-nobody", token=elder_token, expect=403)
+
+    audit.check("① 基线数据受家庭隔离保护", baseline_is_family_scoped)
+
     # ---------------------------------------------------------------- 审计链
     audit.section("审计链完整性")
 

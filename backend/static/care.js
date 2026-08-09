@@ -51,6 +51,125 @@ async function bootstrap() {
   }
 }
 
+// 个性化基线（核心创新点 ①）。
+//
+// 这一块不是又一个 JSON 输出框。它要回答的是设计稿里那个具体问题："老人 A 每天上午
+// 散步，老人 B 每天上午在家读书"——所以先把**他自己的**常态一行行摆出来，再说今天。
+const CHANNEL_ICON = { wake: '起床', sleep: '就寝', outing: '外出', medication: '服药', conversation: '说话' };
+const VERDICT_PILL = { typical: ['和平常一样', 'good'], notice: ['有一点不同', 'warn'],
+                       marked: ['和平常不太一样', 'bad'], unknown: ['还不好说', ''] };
+
+function renderBaseline(snapshot, care) {
+  const host = byId('baselineOutput');
+  host.replaceChildren();
+
+  const head = document.createElement('div');
+  const [word, tone] = VERDICT_PILL[snapshot.overall] || VERDICT_PILL.unknown;
+  head.className = `report-verdict ${tone}`;
+  const badge = document.createElement('span');
+  badge.className = 'report-badge';
+  badge.textContent = word;
+  const line = document.createElement('strong');
+  line.textContent = snapshot.headline;
+  head.append(badge, line);
+  host.appendChild(head);
+
+  // 他自己的常态。这张表就是"千人千面"本身——同一个 0 次外出，对散步的老人和
+  // 读书的老人是两个结论，因为这一列的数字不一样。
+  const table = document.createElement('div');
+  table.className = 'digest';
+  snapshot.baselines.forEach((b) => {
+    const dev = snapshot.deviations.find((d) => d.channel === b.channel);
+    const row = document.createElement('div');
+    row.className = 'digest-row';
+    const label = document.createElement('strong');
+    label.textContent = CHANNEL_ICON[b.channel] || b.label;
+    const cell = document.createElement('div');
+    cell.textContent = b.established
+      ? `他平常 ${b.center_text}｜今天 ${dev && dev.observed_text ? dev.observed_text : '还没有记录'}`
+      : b.reason;
+    row.append(label, cell);
+    table.appendChild(row);
+  });
+  host.appendChild(table);
+
+  if (care) {
+    const spoken = document.createElement('p');
+    spoken.className = 'notice good';
+    spoken.textContent = `会对老人说：「${care.spoken}」`;
+    host.appendChild(spoken);
+    if (care.light) {
+      const light = document.createElement('p');
+      light.className = 'meta';
+      light.textContent = `灯光建议：亮度 ${care.light.brightness_pct}%`
+        + `${care.light.warm ? '、暖光' : ''}${care.light.breathing ? '、慢呼吸' : ''}`
+        + `——${care.light.reason}（建议，未驱动任何设备）`;
+      host.appendChild(light);
+    }
+    if (care.suggest_mode) {
+      const mode = document.createElement('p');
+      mode.className = 'meta';
+      mode.textContent = '建议切换到无忧伴陪伴模式主动安抚。';
+      host.appendChild(mode);
+    }
+    care.schedule_hints.forEach((hint) => {
+      const item = document.createElement('p');
+      item.className = 'meta';
+      item.textContent = `日程建议：${hint}`;
+      host.appendChild(item);
+    });
+  }
+}
+
+byId('baselineDemo').addEventListener('click', async () => {
+  try {
+    const [snapshot, care] = await Promise.all([
+      api(`/v7/baseline/${state.elderId}`),
+      api(`/v7/care/${state.elderId}`),
+    ]);
+    renderBaseline(snapshot, care);
+  } catch (error) { setOutput('baselineOutput', error.message); }
+});
+
+// 环境上报：演示"同样的偏离，屋里冷要说不同的话"。
+byId('coldRoomDemo').addEventListener('click', async () => {
+  try {
+    await api('/v7/environment/samples', {
+      method: 'POST', body: JSON.stringify({
+        elder_id: state.elderId, temperature_c: 13.5, humidity_pct: 28.0, lux: 40.0,
+        occurred_at: new Date().toISOString(), source: 'care-demo',
+      })
+    });
+    const [snapshot, care] = await Promise.all([
+      api(`/v7/baseline/${state.elderId}`),
+      api(`/v7/care/${state.elderId}`),
+    ]);
+    renderBaseline(snapshot, care);
+  } catch (error) { setOutput('baselineOutput', error.message); }
+});
+
+// 让偏离真的发生一次。
+//
+// 不是把界面切到"异常"配色看看效果——那是假的。这里真的往 /v4/safety/heartbeat 写
+// 一条 11:20 的活动记录，然后整条链路（事件流 → 推导观测 → 与他自己的常态比 → 关怀
+// 动作）自己得出结论。演示里能看到的东西，和真实运行时是同一条路径。
+byId('lateWakeDemo').addEventListener('click', async () => {
+  try {
+    const today = new Date();
+    const late = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 11, 20);
+    await api('/v4/safety/heartbeat', {
+      method: 'POST', body: JSON.stringify({
+        elder_id: state.elderId, kind: 'morning_activity', occurred_at: late.toISOString(),
+      })
+    });
+    const [snapshot, care] = await Promise.all([
+      api(`/v7/baseline/${state.elderId}`),
+      api(`/v7/care/${state.elderId}`),
+    ]);
+    renderBaseline(snapshot, care);
+  } catch (error) { setOutput('baselineOutput', error.message); }
+});
+
 byId('routineDemo').addEventListener('click', async () => {
   try {
     const suffix = String(Date.now()).slice(-6);

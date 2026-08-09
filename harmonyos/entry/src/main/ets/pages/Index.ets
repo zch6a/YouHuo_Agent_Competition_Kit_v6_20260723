@@ -1,5 +1,7 @@
 import { window } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { ApiClient } from '../services/ApiClient';
+import { SpeechInput } from '../services/SpeechInput';
 import { ChatResponse } from '../model/Models';
 import { MessageItem, MessageSource } from '../model/MessageSource';
 import { ChatBubble } from '../components/ChatBubble';
@@ -34,6 +36,7 @@ struct Index {
 
   private messages: MessageSource = new MessageSource();
   private scroller: Scroller = new Scroller();
+  private speech: SpeechInput = new SpeechInput();
 
   aboutToAppear(): void {
     this.measureBottomInset();
@@ -119,18 +122,54 @@ struct Index {
   }
 
   /**
-   * 语音输入开关。
+   * 语音输入开关。真的会听。
    *
-   * 端侧 ASR 走 Core Speech Kit，需要 PCM/16kHz/单声道/16bit 的音频流；接麦克风
-   * 采集是独立的一步，尚未接入。这里**不假装**已经能听：切到 listening 只是把
-   * 输入焦点和提示语交给语音路径，真正的识别结果目前仍由输入框提供。
-   * 宁可让按钮少做一件事，也不能让一位老人对着一个不会听的麦克风说完一整段话。
+   * 走 `SpeechInput`：`@kit.AudioKit` 采 16kHz/单声道/16bit PCM，喂给 Core Speech Kit
+   * 端侧识别。识别中的临时结果直接回显到输入框——老人看得见字在一个一个出来，才知道
+   * 系统真的在听；一个只会变色的麦克风，和一个坏掉的麦克风在体验上没有区别。
+   *
+   * 任何一步失败都退回打字，并**说明原因**，而不是留下一个安静地什么也不做的按钮。
    */
-  private toggleListening(): void {
+  private async toggleListening(): Promise<void> {
     if (this.busy) {
       return;
     }
-    this.listening = !this.listening;
+    if (this.listening) {
+      this.listening = false;
+      await this.speech.stop();
+      // 松手时把已经听到的内容直接发出去，不用老人再找一次发送键。
+      if (this.inputText.trim()) {
+        await this.send();
+      }
+      return;
+    }
+
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.listening = true;
+    const ok = await this.speech.start(context, {
+      onPartial: (text: string) => {
+        this.inputText = text;
+      },
+      onFinal: (text: string) => {
+        this.inputText = text;
+        this.listening = false;
+        this.send();
+      },
+      onError: (reason: string) => {
+        this.listening = false;
+        // 用对话气泡说，而不是一个 Toast：Toast 会在老人抬头看之前消失。
+        this.messages.append('agent', reason);
+        this.scrollToLatest();
+      },
+    });
+    if (!ok) {
+      this.listening = false;
+    }
+  }
+
+  aboutToDisappear(): void {
+    // 页面离开时一定要释放麦克风。漏掉这一句，下一次录音会失败得毫无线索。
+    this.speech.stop();
   }
 
   @Builder

@@ -22,6 +22,10 @@ services:
       # Demo mode is what lets a visitor use the site with no login at all.
       - key: YOUHUO_DEMO_MODE
         value: "true"
+      # 给每个访客的沙箱铺一段合成作息历史，个性化基线才有东西可看。
+      # 默认关闭；只有演示部署打开。见 create_app 的说明。
+      - key: YOUHUO_SEED_BASELINE
+        value: "true"
       # The free filesystem is ephemeral, so SQLite resets on restart. That is
       # fine — and deliberate — for a public demo: every visitor is handed a
       # freshly seeded household of their own regardless.

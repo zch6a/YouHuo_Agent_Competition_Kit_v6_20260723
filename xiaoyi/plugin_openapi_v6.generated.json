@@ -4549,6 +4549,250 @@
           }
         ]
       }
+    },
+    "/v7/environment/samples": {
+      "post": {
+        "tags": [
+          "v7 个性化基线与生活日报"
+        ],
+        "summary": "Record Environment",
+        "description": "接收一次室内环境读数。\n\n刻意只收温度、湿度、光照——没有图像。设计稿把这一点写进了产品定位：\n家庭空间不是公共区域，长期视频监控会让老人产生心理压力。",
+        "operationId": "record_environment_v7_environment_samples_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentSample"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentAck"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v7/baseline/{elder_id}": {
+      "get": {
+        "tags": [
+          "v7 个性化基线与生活日报"
+        ],
+        "summary": "Get Baseline",
+        "description": "这位老人**自己的**常态，以及今天偏离了多少。",
+        "operationId": "get_baseline_v7_baseline__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "默认今天（UTC）",
+              "title": "Day"
+            },
+            "description": "默认今天（UTC）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaselineSnapshot"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v7/care/{elder_id}": {
+      "get": {
+        "tags": [
+          "v7 个性化基线与生活日报"
+        ],
+        "summary": "Get Care",
+        "description": "基于基线与此刻环境生成的关怀动作：说什么、要不要调日程、灯光建议。",
+        "operationId": "get_care_v7_care__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CareAction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v7/daily-report/{elder_id}": {
+      "get": {
+        "tags": [
+          "v7 个性化基线与生活日报"
+        ],
+        "summary": "Get Daily Report",
+        "description": "给子女的生活日报，以及\"现在要不要打扰您\"的决定。",
+        "operationId": "get_daily_report_v7_daily_report__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReportEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4726,6 +4970,41 @@
         ],
         "title": "ActorRole"
       },
+      "AlertDecision": {
+        "properties": {
+          "push": {
+            "type": "boolean",
+            "title": "Push"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "baseline_deviated": {
+            "type": "boolean",
+            "title": "Baseline Deviated"
+          },
+          "errand_at_risk": {
+            "type": "boolean",
+            "title": "Errand At Risk"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "push",
+          "channel",
+          "reason",
+          "baseline_deviated",
+          "errand_at_risk"
+        ],
+        "title": "AlertDecision",
+        "description": "要不要现在就打扰子女。\n\n设计稿的要求：\"仅基线偏离 + 该办的事情临近预期才推送紧急提醒，大幅减少无效消息\"。\n\n这条规则的价值不在于它推送了什么，而在于它**不推**什么。一个每天推三条\"老人今天\n起晚了\"的 App，两周内就会被子女静音，然后真正要紧的那一条也一起消失了。"
+      },
       "AssistanceRequestCreate": {
         "properties": {
           "elder_id": {
@@ -4863,6 +5142,62 @@
           "deny"
         ],
         "title": "AuthorizationDecision"
+      },
+      "BaselineSnapshot": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "baselines": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelBaselineView"
+            },
+            "type": "array",
+            "title": "Baselines"
+          },
+          "deviations": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelDeviationView"
+            },
+            "type": "array",
+            "title": "Deviations"
+          },
+          "observed_days": {
+            "type": "integer",
+            "title": "Observed Days"
+          },
+          "established": {
+            "type": "boolean",
+            "title": "Established"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "day",
+          "overall",
+          "headline",
+          "baselines",
+          "deviations",
+          "observed_days",
+          "established"
+        ],
+        "title": "BaselineSnapshot",
+        "description": "一位老人在某一天的\"他自己的常态 vs 今天\"。"
       },
       "BreakGlassRecord": {
         "properties": {
@@ -5017,6 +5352,70 @@
         ],
         "title": "CapabilityStatus"
       },
+      "CareAction": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "spoken": {
+            "type": "string",
+            "title": "Spoken"
+          },
+          "suggest_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggest Mode"
+          },
+          "schedule_hints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Schedule Hints"
+          },
+          "light": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LightCue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "environment_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "spoken",
+          "rationale"
+        ],
+        "title": "CareAction",
+        "description": "基于\"他自己的常态 + 此刻的环境\"生成的关怀动作。"
+      },
       "CareGraph": {
         "properties": {
           "elder_id": {
@@ -5116,6 +5515,126 @@
           "risk"
         ],
         "title": "CareGraphNode"
+      },
+      "Channel": {
+        "type": "string",
+        "enum": [
+          "wake",
+          "sleep",
+          "outing",
+          "medication",
+          "conversation"
+        ],
+        "title": "Channel",
+        "description": "基线观察的几个通道。\n\n刻意只有这几个，而且都能从**已有**的事件流里算出来，不需要摄像头，也不需要\n老人多做任何事。\"看不见，但能感知\"落到工程上就是这个意思。"
+      },
+      "ChannelBaselineView": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "established": {
+            "type": "boolean",
+            "title": "Established"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "center_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Center Text"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channel",
+          "label",
+          "established",
+          "days",
+          "center_text",
+          "reason"
+        ],
+        "title": "ChannelBaselineView"
+      },
+      "ChannelDeviationView": {
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "observed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Text"
+          },
+          "center_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Center Text"
+          },
+          "delta_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Minutes"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channel",
+          "label",
+          "verdict",
+          "observed_text",
+          "center_text",
+          "delta_minutes",
+          "explanation"
+        ],
+        "title": "ChannelDeviationView"
       },
       "ChatRequest": {
         "properties": {
@@ -5493,6 +6012,96 @@
           "updated_at"
         ],
         "title": "ContactRecord"
+      },
+      "DailyReport": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/ReportSection"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "errands": {
+            "$ref": "#/components/schemas/ErrandDigest"
+          },
+          "suggested_for_family": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggested For Family"
+          },
+          "privacy_note": {
+            "type": "string",
+            "title": "Privacy Note"
+          },
+          "environment_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "day",
+          "generated_at",
+          "overall",
+          "headline",
+          "sections",
+          "errands",
+          "suggested_for_family",
+          "privacy_note"
+        ],
+        "title": "DailyReport",
+        "description": "给子女的生活日报（②）。\n\n设计稿的要求是\"日报不再是单纯数据罗列，AI 基于基线对比，标注'今日作息偏离自身\n常态'，子女一眼识别老人异常\"。所以结构是**结论在最前**：`headline` 一句话说完\n今天怎么样，`overall` 给颜色，后面才是分项。\n\n隐私边界与既有规则一致：**不包含无忧伴陪伴聊天的任何原文**。日报里出现的情绪信息\n只有类别和趋势。"
+      },
+      "DailyReportEnvelope": {
+        "properties": {
+          "report": {
+            "$ref": "#/components/schemas/DailyReport"
+          },
+          "alert": {
+            "$ref": "#/components/schemas/AlertDecision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "report",
+          "alert"
+        ],
+        "title": "DailyReportEnvelope",
+        "description": "日报 + 这份日报要不要现在就推给子女。\n\n两者放在一起返回，是因为它们必须由同一份快照得出。分成两个端点调用两次，就会\n出现\"日报说一切正常、推送说赶紧回家\"这种自相矛盾的情况——而那正是子女再也不\n信任这个 App 的开始。"
       },
       "DataFact": {
         "properties": {
@@ -6098,6 +6707,137 @@
           "urgent"
         ],
         "title": "EmotionLabel"
+      },
+      "EnvironmentAck": {
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "title": "Sample Id"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sample_id",
+          "accepted",
+          "note"
+        ],
+        "title": "EnvironmentAck"
+      },
+      "EnvironmentSample": {
+        "properties": {
+          "elder_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Elder Id"
+          },
+          "temperature_c": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 60.0,
+                "minimum": -40.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature C"
+          },
+          "humidity_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Humidity Pct"
+          },
+          "lux": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lux"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Source",
+            "default": "unknown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elder_id",
+          "occurred_at"
+        ],
+        "title": "EnvironmentSample",
+        "description": "一次室内环境读数。\n\n刻意**不含**任何图像。设计稿把这一点列为产品定位的一部分：\"看不见，但能感知\"——\n家庭空间不是公共区域，长期视频监控会让老人产生心理压力，而这类产品最终被拔掉电源\n的原因往往就是这个。温湿度和光照足以支撑\"今天是否正常\"的判断。\n\n本项目**不附带任何传感器**。这是一个上报端点，由智能家居设备或鸿蒙分布式设备推送，\n与既有的 `/v4/location/ping` 是同一种关系。没有设备时日报照常工作，只是少一层环境\n联动——而不是假装读到了数据。"
+      },
+      "ErrandDigest": {
+        "properties": {
+          "due_today": {
+            "type": "integer",
+            "title": "Due Today"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "awaiting_family": {
+            "type": "integer",
+            "title": "Awaiting Family"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "due_today",
+          "completed",
+          "awaiting_family",
+          "overdue",
+          "lines"
+        ],
+        "title": "ErrandDigest",
+        "description": "今天该办的事办得怎么样。日报里子女最先看的一块。"
       },
       "ExplanationCard": {
         "properties": {
@@ -7357,6 +8097,43 @@
         ],
         "title": "ItemSearchResponse"
       },
+      "LightCue": {
+        "properties": {
+          "brightness_pct": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Brightness Pct"
+          },
+          "warm": {
+            "type": "boolean",
+            "title": "Warm"
+          },
+          "breathing": {
+            "type": "boolean",
+            "title": "Breathing"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "brightness_pct",
+          "warm",
+          "breathing",
+          "reason"
+        ],
+        "title": "LightCue",
+        "description": "给灯光设备的建议。\n\n**没有驱动任何灯**。本项目不附带智能家居设备，也不该假装能控制别人家的灯。这里\n输出的是一个建议状态，由已接入的设备去执行；`applied` 恒为 False，直到真的有设备\n回报执行结果。把\"建议\"和\"已执行\"分开，是这个项目一贯的做法——只有权威状态返回\n成功，才敢对老人说\"办好了\"。"
+      },
       "LocationPingRequest": {
         "properties": {
           "elder_id": {
@@ -8585,6 +9362,32 @@
           "now"
         ],
         "title": "ReminderEvaluationRequest"
+      },
+      "ReportSection": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "verdict",
+          "lines"
+        ],
+        "title": "ReportSection"
       },
       "ResponseCode": {
         "type": "string",
@@ -10863,6 +11666,16 @@
           "gentle"
         ],
         "title": "VerbosityMode"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "unknown",
+          "typical",
+          "notice",
+          "marked"
+        ],
+        "title": "Verdict"
       },
       "VisitorSandboxResponse": {
         "properties": {

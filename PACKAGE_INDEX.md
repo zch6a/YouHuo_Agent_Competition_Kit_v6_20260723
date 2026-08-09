@@ -52,7 +52,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：546项自动化测试；
+- `backend/tests/`：634项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -63,7 +63,7 @@
 - `check_browser_js.py`：按真实加载方式（script/module）校验前端脚本；
 - `check_speech_text.mjs`：29项朗读文本规范化断言；
 - `check_contrast.py`：6个页面×明暗两模式的 WCAG AA 与触控尺寸审计；
-- `verify_features_v6.py` / `run_feature_audit.py`：123项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
+- `verify_features_v6.py` / `run_feature_audit.py`：130项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
 - `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）；
 - `verify_all.*`：确定性日常回归；
 - `verify_heavy.*`：百万回归、故障和网络重验证。
@@ -87,7 +87,7 @@
 
 - FastAPI OpenAPI路径：94个；
 - 小艺Skill：13个；
-- 自动化测试：546项；逐功能验收：123项；
+- 自动化测试：634项；逐功能验收：130项；
 - 核心Python语句覆盖率：90%。
 
 `MANIFEST.sha256` 与包内文件计数需在重新打包时用同一脚本重算，本轮改动后尚未重新生成。

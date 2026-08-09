@@ -70,6 +70,88 @@ def test_voice_input_is_tap_to_start_not_press_and_hold():
     assert ".onClick(" in mic
 
 
+def test_the_microphone_actually_listens():
+    """按钮曾经只会变色。一个只会变色的麦克风，和一个坏掉的麦克风体验上没有区别。"""
+    assert (ETS / "services" / "AudioCapture.ets").is_file(), "没有音频采集"
+    assert (ETS / "services" / "SpeechInput.ets").is_file(), "没有语音识别接入"
+    index = read("pages/Index.ets")
+    assert "SpeechInput" in index and "this.speech.start(" in index, "麦克风没有接到识别上"
+
+
+def test_capture_format_matches_what_the_recogniser_requires():
+    """16kHz/单声道/16bit 是 Core Speech 端侧识别唯一接受的格式。
+
+    采集这一步做错，识别端只会返回空结果，而且不会说为什么——这是最难查的一类。
+    每个常量都已对照 SDK 声明文件核实过。
+    """
+    capture = read("services/AudioCapture.ets")
+    for token in ("SAMPLE_RATE_16000", "CHANNEL_1", "SAMPLE_FORMAT_S16LE",
+                  "ENCODING_TYPE_RAW"):
+        assert token in capture, f"采集参数缺少 {token}"
+    speech = read("services/SpeechInput.ets")
+    assert "sampleRate: 16000" in speech and "soundChannel: 1" in speech
+    assert "sampleBit: 16" in speech
+
+
+def test_capture_uses_the_speech_tuned_source():
+    """SOURCE_TYPE_VOICE_RECOGNITION 会启用为识别调校的回声消除和降噪。
+
+    对着电视说话的独居老人，这个差别就是能不能识别出来的差别。
+    """
+    assert "SOURCE_TYPE_VOICE_RECOGNITION" in read("services/AudioCapture.ets")
+
+
+def test_recognition_runs_on_device():
+    """陪伴与办事内容不该为了识别而离开这台设备。"""
+    assert "online: 0" in read("services/SpeechInput.ets")
+
+
+def test_the_microphone_is_always_released():
+    """老人会连点、会中途返回、会锁屏。任何一条路径漏了释放，下一次录音就会
+
+    失败得毫无线索——而那种失败没有任何提示可以告诉老人该怎么办。
+    """
+    capture = read("services/AudioCapture.ets")
+    assert "release()" in capture, "采集器从不释放"
+    index = read("pages/Index.ets")
+    assert "aboutToDisappear" in index and "this.speech.stop()" in index, (
+        "离开页面时没有释放麦克风"
+    )
+
+
+def test_every_voice_failure_explains_itself_to_the_elder():
+    """降级必须是"说清楚然后退回打字"，不是一个安静地什么也不做的按钮。"""
+    speech = read("services/SpeechInput.ets")
+    assert "onError" in speech
+    for phrase in ("先打字", "再说一遍"):
+        assert phrase in speech, f"缺少面向老人的降级说明：{phrase}"
+
+
+def test_microphone_permission_is_requested_not_assumed():
+    speech = read("services/SpeechInput.ets")
+    assert "ensurePermission" in speech
+    module = json.loads(
+        re.sub(r"//[^\n]*", "", (HM / "module.json5").read_text(encoding="utf-8"))
+    )
+    names = {p["name"] for p in module["module"]["requestPermissions"]}
+    assert "ohos.permission.MICROPHONE" in names
+    mic = next(p for p in module["module"]["requestPermissions"]
+               if p["name"] == "ohos.permission.MICROPHONE")
+    assert "reason" in mic and "usedScene" in mic, "user_grant 权限必须写明用途"
+
+
+def test_the_unverifiable_kit_is_isolated_to_one_file():
+    """本机的 OpenHarmony SDK 没有 Core Speech Kit，那是 HarmonyOS 闭源部分。
+
+    无法核实的 import 必须只有一处，而且写明为什么——散落各处就没人记得哪些是
+    核实过的、哪些是猜的。
+    """
+    users = [p.name for p in ETS.rglob("*.ets")
+             if "@kit.CoreSpeechKit" in p.read_text(encoding="utf-8")]
+    assert users == ["SpeechInput.ets"], f"CoreSpeechKit 被多处引用：{users}"
+    assert "无法核实" in read("services/SpeechInput.ets")
+
+
 def test_the_microphone_state_is_not_colour_only():
     """色觉障碍者、单色屏、阳光下的屏幕——只靠颜色的状态就是没有状态。"""
     mic = read("components/MicButton.ets")

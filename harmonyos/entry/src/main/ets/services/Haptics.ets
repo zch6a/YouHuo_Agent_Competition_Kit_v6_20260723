@@ -4,19 +4,10 @@ import { BusinessError } from '@kit.BasicServicesKit';
 /**
  * 触感反馈。
  *
- * ⚠️ 这个文件存在的理由是**隔离一个我没能离线核实的 import**。
- *
- * 这台开发机上没有装 HarmonyOS SDK，所以 `vibrator` 属于 `@kit.SensorServiceKit`
- * 还是 `@kit.BasicServicesKit`，我无法用编译器确认——两者在不同资料里都出现过。
- * 错的 import 是编译错误而不是运行时错误，try/catch 兜不住。
- *
- * 所以全工程只有这一行 import 碰它。在 DevEco Studio 里首次编译时如果报
- * "Cannot find name 'vibrator'"，只需把上面第一行换成：
- *
- *     import { vibrator } from '@kit.BasicServicesKit';
- *
- * 其余代码一行都不用动。把它写在这里，而不是让调用方各自 import，是为了让这个
- * 待核实项只有一个位置、并且写着为什么。
+ * `vibrator` 属于 `@kit.SensorServiceKit`——这一点已经用 SDK 自己的 kit 配置核实过
+ * （`ets-loader/kit_configs/@kit.SensorServiceKit.json` 里有 `vibrator` 符号，
+ * 指向 `@ohos.vibrator.d.ts`），不再是猜测。`check_arkts.py` 现在会对每一个
+ * `@kit.*` import 做同样的核对，写错 kit 会直接失败而不是等到编译。
  *
  * `module.json5` 需要 `ohos.permission.VIBRATE`（system_grant，无需运行时申请）。
  */

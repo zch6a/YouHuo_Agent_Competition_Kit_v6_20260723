@@ -29,6 +29,8 @@ from .v5_store import V5FeatureStore
 from .tts import NeuralVoice
 from .v6_api import build_v6_router
 from .v6_store import V6FeatureStore
+from .baseline_api import build_baseline_router
+from .baseline_store import BaselineStore
 from .models import (
     ActorRole,
     AuthContext,
@@ -49,7 +51,23 @@ from .models import (
 )
 
 
-def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = None) -> FastAPI:
+def create_app(
+    db_path: str | Path | None = None,
+    *,
+    demo_mode: bool | None = None,
+    seed_baseline_history: bool | None = None,
+) -> FastAPI:
+    """
+    `seed_baseline_history` 铺一段合成的作息历史，好让个性化基线在演示里立刻有东西可看。
+
+    **默认关闭，而且必须默认关闭。** 它写的是 `activity_events_v4`——一张运营表，
+    无交互预警（`evaluate_inactivity`）会取其中的 `MAX(occurred_at)`。默认打开时，
+    这些"今天"的合成事件让一条以 2026-07-23 为 now 的既有测试再也触发不了预警：
+    最后一次活动落在了查询时点之后。合成回填悄悄改掉真实功能的输入，是比"演示里
+    没东西看"糟糕得多的一件事。
+
+    所以它是显式开关：部署演示和 `run_demo` 打开，测试默认不打开。
+    """
     resolved_db = Path(db_path or os.getenv("YOUHUO_DB_PATH", "data/youhuo.db"))
     resolved_db.parent.mkdir(parents=True, exist_ok=True)
     db = Database(resolved_db)
@@ -62,6 +80,14 @@ def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = No
     medication_kb = MedicationKnowledgeBase()
     v5_store = V5FeatureStore(db)
     v6_store = V6FeatureStore(db)
+    baseline_store = BaselineStore(db)
+    seed_history = (
+        seed_baseline_history
+        if seed_baseline_history is not None
+        else os.getenv("YOUHUO_SEED_BASELINE", "false").lower() == "true"
+    )
+    if seed_history:
+        baseline_store.seed_demo_for()
     # Optional offline neural voice; absent package or model simply means the
     # elder client keeps using the browser's own speech synthesis.
     neural_voice = NeuralVoice(Path(__file__).resolve().parents[2])
@@ -274,6 +300,11 @@ def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = No
         suffix = f"v{secrets.token_hex(6)}"
         ids = db.seed_demo(suffix)
         v4_store.seed_demo(suffix)
+        # 每位访客的沙箱也要有自己的作息历史，否则新开的家庭永远停在"还在熟悉
+        # 他的生活规律"，个性化基线这个核心创新点在公网演示里就是一片空白。
+        # 与默认家庭同一个开关：合成回填只在演示部署里发生。
+        if seed_history:
+            baseline_store.seed_demo_for(suffix)
         elder_token, elder, expires_at = engine.demo_login(ids.elder_id)
         family_token, _, _ = engine.demo_login(ids.daughter_id)
         return VisitorSandboxResponse(
@@ -546,6 +577,9 @@ def create_app(db_path: str | Path | None = None, *, demo_mode: bool | None = No
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
     app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))
+    app.include_router(
+        build_baseline_router(db, baseline_store, current_actor, baseline_store.errand_facts)
+    )
 
     return app
 

@@ -76,6 +76,7 @@ const chainEl = document.querySelector('#chain');
 const calendarEl = document.querySelector('#calendar');
 const noticesEl = document.querySelector('#notices');
 const weeklyEl = document.querySelector('#weekly');
+const dailyEl = document.querySelector('#dailyReport');
 
 async function resolveIdentity() {
   if (IDENTITY) return IDENTITY;
@@ -279,6 +280,96 @@ async function loadWeekly() {
   } catch (e) { weeklyEl.textContent = `周报加载失败：${e.message}`; }
 }
 
+// 生活日报（设计稿 核心创新点 ②）。
+//
+// 与既有的情绪周报刻意不同：周报是"这一周发生了什么"，日报是"今天和他自己的常态
+// 比，怎么样"。所以这里先画结论，再画分项——一份把结论埋在第四行的日报，子女读两
+// 次就不会再读第三次了。
+const VERDICT_TEXT = {
+  typical: ['和平常一样', 'good'],
+  notice: ['有一点不同', 'warn'],
+  marked: ['和平常不太一样', 'bad'],
+  unknown: ['还不好说', ''],
+};
+
+function renderDailyReport(envelope) {
+  const {report, alert} = envelope;
+  dailyEl.replaceChildren();
+
+  // 1. 结论。一句话，最大字号，带颜色。
+  const [word, tone] = VERDICT_TEXT[report.overall] || VERDICT_TEXT.unknown;
+  const verdict = document.createElement('div');
+  verdict.className = `report-verdict ${tone}`;
+  const badge = document.createElement('span');
+  badge.className = 'report-badge';
+  badge.textContent = word;
+  const headline = document.createElement('strong');
+  headline.textContent = report.headline;
+  verdict.append(badge, headline);
+  dailyEl.appendChild(verdict);
+
+  // 2. 要不要现在打扰您，以及为什么不。把"没有推送"的理由也写出来，
+  //    是因为沉默本身需要解释——否则子女无法判断是"今天没事"还是"App 坏了"。
+  const alertRow = document.createElement('p');
+  alertRow.className = `meta ${alert.push ? 'bad' : ''}`;
+  alertRow.textContent = (alert.push ? '⚠ 已推送提醒：' : '未打扰您：') + alert.reason;
+  dailyEl.appendChild(alertRow);
+
+  // 3. 分项，每一项都带他自己的常态。
+  report.sections.forEach(section => {
+    if (!section.lines.length) return;
+    const block = document.createElement('div');
+    block.className = 'report-section';
+    const title = document.createElement('h3');
+    const [sword, stone] = VERDICT_TEXT[section.verdict] || VERDICT_TEXT.unknown;
+    title.textContent = section.title;
+    const tag = document.createElement('span');
+    tag.className = `pill ${stone}`;
+    tag.textContent = sword;
+    title.appendChild(tag);
+    block.appendChild(title);
+    section.lines.forEach(text => line(block, text));
+    dailyEl.appendChild(block);
+  });
+
+  // 4. 今天该办的事。
+  const errands = report.errands;
+  const errandBlock = document.createElement('div');
+  errandBlock.className = 'report-section';
+  const errandTitle = document.createElement('h3');
+  errandTitle.textContent = '今天该办的事';
+  errandBlock.appendChild(errandTitle);
+  line(errandBlock, `到期 ${errands.due_today} 项，已完成 ${errands.completed} 项，`
+    + `等您确认 ${errands.awaiting_family} 项，超期 ${errands.overdue} 项。`, 'meta');
+  errands.lines.forEach(text => line(errandBlock, text));
+  dailyEl.appendChild(errandBlock);
+
+  // 5. 建议。空着也要说出来——"今天不用您操心"是一个结论，不是没有结论。
+  const advice = document.createElement('div');
+  advice.className = 'report-section';
+  const adviceTitle = document.createElement('h3');
+  adviceTitle.textContent = '需要您做的';
+  advice.appendChild(adviceTitle);
+  if (report.suggested_for_family.length) {
+    report.suggested_for_family.forEach(text => line(advice, text));
+  } else {
+    line(advice, '今天不用您操心。', 'good');
+  }
+  dailyEl.appendChild(advice);
+
+  if (report.environment_note) line(dailyEl, report.environment_note, 'meta');
+  line(dailyEl, report.privacy_note, 'notice good');
+}
+
+async function loadDailyReport() {
+  try {
+    renderDailyReport(await api(`/v7/daily-report/${ELDER_ID}`));
+  } catch (e) {
+    dailyEl.replaceChildren();
+    dailyEl.textContent = `生活日报加载失败：${e.message}`;
+  }
+}
+
 async function load() {
   try {
     const [tasks, audit, reminders, notices] = await Promise.all([
@@ -326,6 +417,7 @@ async function load() {
     if (!notices.length) noticesEl.textContent = '暂无通知';
   } catch (e) { chainEl.textContent = `加载失败：${e.message}`; }
   loadWeekly();
+  loadDailyReport();
 }
 
 document.querySelector('#refresh').addEventListener('click', load);

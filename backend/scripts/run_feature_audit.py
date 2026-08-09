@@ -57,7 +57,14 @@ def wait_for_server(timeout: float = 40.0) -> bool:
 
 def main() -> int:
     clean_database()
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "YOUHUO_DEMO_MODE": "true"}
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(ROOT / "backend"),
+        "YOUHUO_DEMO_MODE": "true",
+        # 个性化基线要有历史才有东西可验；这个开关默认关闭（见 create_app），
+        # 所以审核这里必须显式打开。
+        "YOUHUO_SEED_BASELINE": "true",
+    }
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "youhuo.api:app",
          "--host", "127.0.0.1", "--port", str(PORT), "--app-dir", "backend"],

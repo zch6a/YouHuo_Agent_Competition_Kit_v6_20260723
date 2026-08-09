@@ -614,6 +614,54 @@ pre {
 .feature-panel { display: flex; flex-direction: column; gap: 11px; }
 
 /* ------------------------------------------------------------------------
+   生活日报（核心创新点 ②）。
+   结论在最前，而且比其它任何东西都大。一份把结论埋在第四行的日报，子女读两次就
+   不会再读第三次了——而这个产品的价值恰恰在于它被持续读下去。
+   ------------------------------------------------------------------------ */
+.report-verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+  font-size: 19px;
+  line-height: 1.5;
+}
+.report-badge {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 750;
+  font-size: 15px;
+  /* 默认中性；下面按结论着色。颜色不是唯一通道——徽标里写的就是结论本身。 */
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.report-verdict.good .report-badge { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 72%, var(--ink)); }
+.report-verdict.warn .report-badge { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
+.report-verdict.bad  .report-badge { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 72%, var(--ink)); }
+
+.report-section { margin-top: var(--space-4); }
+.report-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: 16px;
+}
+.pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.pill.good { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 72%, var(--ink)); }
+.pill.warn { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
+.pill.bad  { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 72%, var(--ink)); }
+
+/* ------------------------------------------------------------------------
    Card heading icon chip.
    A stack of six bare <h2>s on white is a document outline: to find
    "用药与库存安全" you read four headings first. A chip gives each card a

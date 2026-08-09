@@ -19,6 +19,15 @@ r"""ArkTS 静态检查：在没有 DevEco Studio 的机器上，把编译期才�
 8. 资源 JSON 里的 UTF-8 BOM：鸿蒙资源编译器和 `json.loads` 都会拒绝它，而
    Windows PowerShell 5.1 的 `Set-Content -Encoding UTF8` **默认就写 BOM**——本轮
    就是这样把 color.json 写坏的。这条检查很便宜，而症状（"资源找不到"）离原因很远。
+9. **`@kit.*` import 的符号归属**——如果本机装了公开的 OpenHarmony SDK。
+   `ets-loader/kit_configs/` 下有 47 个 kit 的符号表，可以逐个核对"这个符号确实
+   由这个 kit 导出"。把 `vibrator` 写成 `@kit.BasicServicesKit` 是编译错误，而在
+   没有 SDK 的机器上只能靠猜——本轮一开始就是猜的（猜对了，但那是运气）。
+
+   SDK 的取得方式（无需登录，约 2.4GB）：
+       https://repo.huaweicloud.com/openharmony/os/6.1-Release/ohos-sdk-windows_linux-public.tar.gz
+   解开其中的 ets-windows-x64 即可，路径由 `YOUHUO_OHOS_SDK` 指定。没装就跳过这一
+   条，其余检查照常。
 
 用法：python backend/scripts/check_arkts.py
 """
@@ -26,6 +35,7 @@ r"""ArkTS 静态检查：在没有 DevEco Studio 的机器上，把编译期才�
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -44,6 +54,45 @@ KNOWN_SYMBOLS = {
 }
 # 反复被误用、但官方图标集里并不存在的名字。
 ABSENT_SYMBOLS = {"photo", "image", "sparkles", "doc_richtext", "checklist", "location_fill"}
+
+
+#: OpenHarmony 公开 SDK 里没有、但 HarmonyOS 上真实存在的闭源 kit。
+#: 引用它们不算错，只是这台机器核对不了——写在这里，而不是假装检查过。
+UNVERIFIABLE_KITS = {
+    "@kit.CoreSpeechKit",     # 端侧 ASR/TTS，HarmonyOS 闭源
+    "@kit.CoreVisionKit",
+    "@kit.IntentsKit",
+    "@kit.UIDesignKit",
+    "@kit.MapKit",
+    "@kit.PushKit",
+    "@kit.ScanKit",
+    "@kit.AccountKit",
+    "@kit.PaymentKit",
+    "@kit.ShareKit",
+    "@kit.LiveViewKit",
+    "@kit.AppLinkingKit",
+    "@kit.WeatherServiceKit",
+    "@kit.HealthServiceKit",
+    "@kit.NaturalLanguageKit",
+    "@kit.AgentFrameworkKit",
+}
+
+
+def kit_symbol_index() -> tuple[dict[str, set[str]], Path | None]:
+    """符号 -> 导出它的 kit 集合。没装 SDK 就返回空表。"""
+    root = os.environ.get("YOUHUO_OHOS_SDK") or r"F:\ohos-sdk\sdk\ets"
+    configs = Path(root) / "build-tools" / "ets-loader" / "kit_configs"
+    if not configs.is_dir():
+        return {}, None
+    index: dict[str, set[str]] = {}
+    for config in sorted(configs.glob("@kit.*.json")):
+        try:
+            data = json.loads(config.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        for symbol in data.get("symbols", {}):
+            index.setdefault(symbol, set()).add(config.stem)
+    return index, configs
 
 
 def load_colors(path: Path) -> set[str]:
@@ -75,6 +124,8 @@ def main() -> int:
         for item in problems:
             print(f"  {item}")
         return 1
+
+    kit_index, kit_dir = kit_symbol_index()
 
     base_colors = load_colors(RES / "base" / "element" / "color.json")
     dark_colors = load_colors(RES / "dark" / "element" / "color.json")
@@ -125,6 +176,26 @@ def main() -> int:
                 "应为 `this.getUIContext().getHostContext()`"
             )
 
+        # 9. @kit.* import 的符号必须真的由那个 kit 导出。
+        if kit_index:
+            for match in re.finditer(r"import\s*\{([^}]+)\}\s*from\s*'(@kit\.[A-Za-z0-9]+)'", code):
+                kit = match.group(2)
+                if kit in UNVERIFIABLE_KITS:
+                    continue
+                line = code[: match.start()].count("\n") + 1
+                for symbol in (s.strip() for s in match.group(1).split(",")):
+                    if not symbol:
+                        continue
+                    owners = kit_index.get(symbol)
+                    if owners is None:
+                        problems.append(
+                            f"{rel}:{line} SDK 里没有符号 {symbol}（import 自 {kit}）"
+                        )
+                    elif kit not in owners:
+                        problems.append(
+                            f"{rel}:{line} {symbol} 不由 {kit} 导出，应为：{'、'.join(sorted(owners))}"
+                        )
+
         # 7. 相对 import 必须指向真实文件
         for match in re.finditer(r"from\s+'(\.[^']+)'", code):
             target = (path.parent / match.group(1)).resolve()
@@ -145,8 +216,10 @@ def main() -> int:
             print(f"  {item}")
         return 1
 
+    kits = (f"，已按 SDK 核对 {len(kit_index)} 个 kit 符号"
+            if kit_index else "，未装 OpenHarmony SDK（跳过 kit 符号核对）")
     print(f"PASS check_arkts: {len(sources)} 个 .ets 文件，"
-          f"{len(base_colors)} 个颜色令牌，无问题")
+          f"{len(base_colors)} 个颜色令牌{kits}")
     return 0
 
 
