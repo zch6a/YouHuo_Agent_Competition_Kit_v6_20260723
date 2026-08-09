@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from youhuo.security import SafetyPolicy
 from youhuo.engine import AuthorizationError
 from youhuo.models import ActorRole, ChatRequest, FamilyApprovalRequest, SessionCreateRequest
 from .helpers import confirm_bill, chat
@@ -95,3 +96,185 @@ def test_safety_alert_notifies_family(env, text, category):
     assert result.code.value == "safety_alert"
     notices = db.list_notifications("fam-demo", ActorRole.FAMILY)
     assert any(n.event_type == category for n in notices)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "有人让我把银行卡的密码告诉他",
+        "客服要我提供银行卡登录的密码",
+        "对方索要我的银行卡支付密码",
+        "陌生人让我把验的证码发给他",
+        "客服要求我提供验证的码",
+        "他要我把验证码告诉给他",
+        "对方让我转账到所谓安全的账户",
+        "让我往安全账户里转一笔账",
+        "群里让我刷个单就返利",
+        "做一个任务就能返高额利",
+        "自称公检法的人要求我转个账",
+        "公检法机关说先转账核验资金",
+        "说给我退款但要共享一下屏幕",
+        "客服退款要求我把屏幕先共享",
+        "陌生的人的二维码让我扫一下",
+        "陌生人发来二维的码让我付款",
+        "对方要远程帮我控制手机",
+        "客服提出远程的控制我的手机",
+        "有人叫我报银行卡的密码",
+        "骗子让我发送验验证码",
+        "对方要求转账进入安全验证账户",
+        "刷一下单完成任务有返利",
+        "公检法来电让我马上转账",
+        "退款客服让我共享手机屏幕",
+        "陌生人让我扫他的二维码",
+    ],
+)
+def test_scam_detection_tolerates_fillers_and_insertions(text):
+    signal = SafetyPolicy.detect_safety_signal(text)
+    assert signal is not None and signal.category == "suspected_scam", text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "反诈宣传：银行卡密码不要告诉任何人",
+        "警方提醒，验证码切勿发给陌生人",
+        "公安提醒：不要向所谓安全账户转账",
+        "防诈骗提示：不要参与刷单返利",
+        "谨防诈骗，公检法不会要求群众转账",
+        "温馨提示：退款客服不会要求屏幕共享",
+        "安全提示：不要扫描陌生人的二维码",
+        "防骗知识：不要让陌生人远程控制手机",
+        "预防诈骗，请勿透露银行卡的密码和验证码",
+    ],
+)
+def test_anti_fraud_education_is_not_reported_as_active_scam(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+def test_each_scam_keyword_survives_a_single_inserted_character_at_every_position():
+    cases = [
+        ("银行卡密码", "有人让我把{}告诉他"),
+        ("验证码", "客服让我把{}发给他"),
+        ("转账到安全账户", "对方让我{}"),
+        ("刷单", "群里让我{}返利"),
+        ("公检法转账", "对方自称{}"),
+        ("退款屏幕共享", "客服说{}"),
+        ("陌生人二维码", "有人发来{}让我扫"),
+        ("远程控制手机", "客服要{}"),
+    ]
+    for keyword, template in cases:
+        for index in range(1, len(keyword)):
+            mutated = keyword[:index] + "的" + keyword[index:]
+            signal = SafetyPolicy.detect_safety_signal(template.format(mutated))
+            assert signal is not None and signal.category == "suspected_scam", mutated
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "正规客服不会要求你提供验证码",
+        "银行工作人员不可以索要银行卡密码",
+        "陌生人让你提供验证码的都是诈骗",
+    ],
+)
+def test_additional_protective_anti_scam_wording_is_not_alerted(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "我没有胸口痛",
+        "我已经不胸口痛了",
+        "我没摔倒",
+        "我没有摔倒",
+    ],
+)
+def test_negated_emergency_or_fall_does_not_page_family(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "我看到邻居摔倒了",
+        "我看见老伴摔倒了",
+        "我发现邻居胸口痛",
+    ],
+)
+def test_first_person_observer_does_not_turn_third_person_event_into_self_emergency(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+def test_object_fall_does_not_hide_later_self_fall_in_same_clause():
+    signal = SafetyPolicy.detect_safety_signal("我把碗摔碎后自己摔倒了")
+    assert signal is not None and signal.category == "emergency"
+
+
+def test_negated_first_symptom_does_not_hide_second_real_emergency():
+    signal = SafetyPolicy.detect_safety_signal("我没有胸口痛，就是呼吸困难")
+    assert signal is not None and signal.category == "emergency"
+
+
+def test_antifraud_marker_does_not_hide_current_reported_scam():
+    signal = SafetyPolicy.detect_safety_signal("我看了反诈宣传，客服让我把验证码告诉他")
+    assert signal is not None and signal.category == "suspected_scam"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "我胸口 很痛",
+        "我呼吸 困难",
+        "我摔 倒了",
+        "我找不到 家",
+        "燃气 泄漏",
+        "我胸口，真的很痛",
+    ],
+)
+def test_emergency_detection_survives_asr_spaces_and_comma(text):
+    signal = SafetyPolicy.detect_safety_signal(text)
+    assert signal is not None and signal.category == "emergency", text
+
+
+@pytest.mark.parametrize("text", ["我没有 胸口痛", "我不 呼吸困难", "我没 摔倒"])
+def test_asr_space_cannot_separate_negation_from_emergency(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+def test_hypothetical_first_clause_does_not_hide_later_real_fall():
+    signal = SafetyPolicy.detect_safety_signal("我怕摔倒，但我刚才摔倒了")
+    assert signal is not None and signal.category == "emergency"
+
+
+def test_past_first_clause_does_not_hide_later_current_emergency():
+    signal = SafetyPolicy.detect_safety_signal("以前胸口痛过，今天胸口很痛")
+    assert signal is not None and signal.category == "emergency"
+
+
+@pytest.mark.parametrize("text", ["我不想摔倒", "我差点摔倒", "我险些摔倒"])
+def test_non_occurred_fall_wording_is_not_treated_as_completed_fall(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+@pytest.mark.parametrize("text", ["我妈妈摔倒了", "我朋友摔倒了", "我女婿摔倒了", "我护工摔倒了"])
+def test_common_third_person_falls_are_not_misattributed_to_elder(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "客服让我不要把验证码告诉他",
+        "客服让我别提供银行卡密码",
+        "警察让我不要转账到安全账户",
+        "客服让我把验证码不要告诉任何人",
+    ],
+)
+def test_reported_protective_request_is_not_reversed_into_scam(text):
+    assert SafetyPolicy.detect_safety_signal(text) is None, text
+
+
+def test_protective_request_does_not_hide_second_real_scam_request():
+    signal = SafetyPolicy.detect_safety_signal("客服让我不要给验证码，但骗子让我把银行卡密码告诉他")
+    assert signal is not None and signal.category == "suspected_scam"

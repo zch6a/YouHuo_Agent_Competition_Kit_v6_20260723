@@ -4,12 +4,18 @@ import re
 from typing import Any
 
 from .models import AuditEvent, ElderActivityEntry, TaskRecord, TaskType, TaskView
+from .utils import normalize_text
 
 
-_PHONE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+_PHONE = re.compile(r"(?<!\d)1[3-9]\d(?:[ -]?\d){8}(?!\d)")
 _ID_CARD = re.compile(r"(?<!\d)\d{17}[0-9Xx](?!\w)")
 _BANK_CARD = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
-_CODE = re.compile(r"(?<!\d)\d{4,8}(?!\d)")
+_CODE = re.compile(r"(?<!\d)\d(?:[ -]?\d){3,7}(?!\d)")
+_SECRET_KEYS = {
+    "password", "passwd", "pwd", "密码", "验证码", "校验码",
+    "token", "access_token", "refresh_token", "api_key", "apikey",
+    "secret", "client_secret", "identity_token", "face_template_digest",
+}
 
 
 def redact_text(text: str) -> str:
@@ -26,7 +32,12 @@ def redact_payload(value: Any) -> Any:
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, dict):
-        return {str(k): redact_payload(v) for k, v in value.items()}
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            rendered = str(key)
+            canonical = normalize_text(rendered).replace("-", "_").replace(" ", "_")
+            result[rendered] = "[已隐藏]" if canonical in _SECRET_KEYS else redact_payload(item)
+        return result
     if isinstance(value, list):
         return [redact_payload(v) for v in value]
     if isinstance(value, tuple):

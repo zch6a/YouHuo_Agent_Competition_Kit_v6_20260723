@@ -236,3 +236,54 @@ def test_baseline_is_order_independent():
     second = build_baseline(obs(Channel.WAKE, list(reversed(values))), Channel.WAKE, today=TODAY)
     assert first.center == second.center
     assert first.spread == second.spread
+
+
+def test_circular_median_tie_break_is_rotation_equivariant():
+    values = [at("01:40"), at("03:20"), at("08:20"), at("10:00")]
+    shift = 317.0
+    first = _circular_median_minutes(values)
+    rotated = _circular_median_minutes([(value + shift) % 1440 for value in values])
+    assert _circular_delta(rotated, (first + shift) % 1440) == pytest.approx(0.0)
+
+
+def test_perfectly_symmetric_circular_median_fails_closed():
+    with pytest.raises(ValueError, match="对称并列"):
+        _circular_median_minutes([at("00:00"), at("12:00")])
+
+
+def test_nan_observation_does_not_fail_open_to_typical():
+    baseline = build_baseline(obs(Channel.WAKE, [at("06:00")] * 14), Channel.WAKE, today=TODAY)
+    result = evaluate(baseline, float("nan"), label="起床")
+    assert result.verdict is Verdict.UNKNOWN
+    assert result.sigma is None
+    assert result.observed is None
+
+
+def test_nan_history_day_does_not_count_toward_minimum_days():
+    history = obs(Channel.WAKE, [at("06:00")] * (MIN_DAYS - 1))
+    history.append(Observation(day=TODAY - timedelta(days=20), channel=Channel.WAKE, value=float("nan")))
+    baseline = build_baseline(history, Channel.WAKE, today=TODAY)
+    assert not baseline.established
+    assert baseline.days == MIN_DAYS - 1
+
+
+def test_duplicate_observations_same_day_count_as_one_day():
+    day = TODAY - timedelta(days=1)
+    duplicates = [Observation(day=day, channel=Channel.WAKE, value=at("06:00")) for _ in range(MIN_DAYS + 5)]
+    baseline = build_baseline(duplicates, Channel.WAKE, today=TODAY)
+    assert not baseline.established
+    assert baseline.days == 1
+
+
+def test_duplicate_same_day_cannot_overweight_the_baseline():
+    history = []
+    for offset in range(1, 8):
+        history.append(Observation(day=TODAY - timedelta(days=offset), channel=Channel.WAKE, value=at("06:00")))
+    poisoned_day = TODAY - timedelta(days=8)
+    history.extend(
+        Observation(day=poisoned_day, channel=Channel.WAKE, value=at("14:00"))
+        for _ in range(101)
+    )
+    baseline = build_baseline(history, Channel.WAKE, today=TODAY)
+    assert baseline.established
+    assert abs(_circular_delta(baseline.center, at("06:00"))) <= 1.0

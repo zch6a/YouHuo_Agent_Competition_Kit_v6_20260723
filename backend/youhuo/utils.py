@@ -109,16 +109,24 @@ def parse_relative_date(text: str, today: date) -> str | None:
             days_ahead = 7
         return (today + timedelta(days=days_ahead)).isoformat()
 
-    match = re.search(r"(?:(\d{4})[年/-])?(\d{1,2})[月/-](\d{1,2})日?", text)
+    # Numeric boundaries are required on both ends.  Keep yearful and yearless
+    # forms separate: with an optional year, ``12026-08-10`` can otherwise fall
+    # back to the tail ``08-10`` and still be accepted as this year's date.
+    match = re.search(r"(?<!\d)(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})日?(?!\d)", text)
+    has_explicit_year = match is not None
+    if match is None:
+        match = re.search(r"(?<![\d年/-])(\d{1,2})[月/-](\d{1,2})日?(?!\d)", text)
     if match:
-        year = int(match.group(1) or today.year)
-        month = int(match.group(2))
-        day = int(match.group(3))
+        if has_explicit_year:
+            year, month, day = (int(match.group(index)) for index in (1, 2, 3))
+        else:
+            year = today.year
+            month, day = (int(match.group(index)) for index in (1, 2))
         try:
             candidate = date(year, month, day)
         except ValueError:
             return None
-        if match.group(1) is None and candidate < today:
+        if not has_explicit_year and candidate < today:
             try:
                 candidate = date(today.year + 1, month, day)
             except ValueError:

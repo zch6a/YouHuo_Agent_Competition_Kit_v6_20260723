@@ -4,13 +4,17 @@ import hashlib
 import hmac
 import math
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
+from .security import SafetyPolicy
+from .teach_back import parse_spoken_amount_cents
 from .utils import canonical_json, clean_user_text, normalize_text, semantic_hash
+from .utils import parse_time_text
 from .v5_models import (
     ActionAuthorization,
     ActionAuthorizeRequest,
@@ -70,7 +74,8 @@ class VoiceConsensusEngine:
         keeps emergencies first, explicit reminder/scheduling acts ahead of
         medical nouns, and domain intents ahead of generic confirm/cancel acts.
         """
-        if any(term in text for term in cls._EMERGENCY_TERMS):
+        signal = SafetyPolicy.detect_safety_signal(text)
+        if signal is not None and signal.category == "emergency":
             return "emergency"
 
         reminder_terms = {"提醒", "日历", "待办", "记得", "闹钟", "到时候叫我", "别忘了"}
@@ -103,12 +108,41 @@ class VoiceConsensusEngine:
         has_affirm = [any(term in text for term in cls._AFFIRMATION) for text in candidates]
         if any(has_negative) and any(has_affirm):
             return True
-        amounts: set[str] = set()
-        dates: set[str] = set()
-        for text in candidates:
-            amounts.update(re.findall(r"\d+(?:\.\d{1,2})?\s*(?:元|块)", text))
-            dates.update(re.findall(r"\d{1,2}\s*(?:月|号|日)", text))
-        return len(amounts) > 1 or len(dates) > 2
+        # Compare critical semantic slots, not just surface similarity.  The old
+        # amount regex read both ``1,234元`` and ``2,234元`` as ``234元``; ISO
+        # dates, relative dates and HH:MM times were not compared at all.  High
+        # ASR similarity must never override disagreement on a side-effect value.
+        signatures = [cls._critical_slot_signature(text) for text in candidates]
+        for field in ("amount_cents", "date", "time"):
+            values = [item[field] for item in signatures if item.get(field) is not None]
+            if len(set(values)) > 1:
+                return True
+        return False
+
+    @classmethod
+    def _critical_slot_signature(cls, text: str) -> dict[str, Any]:
+        return {
+            "amount_cents": parse_spoken_amount_cents(text),
+            "date": cls._date_signature(text),
+            "time": parse_time_text(text),
+        }
+
+    @staticmethod
+    def _date_signature(text: str) -> str | None:
+        # Preserve relative meaning without depending on the server clock.
+        for token in ("大后天", "后天", "明天", "今天", "今日"):
+            if token in text:
+                return f"relative:{token}"
+        weekday = re.search(r"(下周|下星期|本周|这周|星期|周)([一二三四五六日天])", text)
+        if weekday:
+            return f"weekday:{weekday.group(1)}{weekday.group(2)}"
+        absolute = re.search(r"(?<!\d)(20\d{2})[-年/.](\d{1,2})[-月/.](\d{1,2})日?(?!\d)", text)
+        if absolute:
+            return f"ymd:{int(absolute.group(1)):04d}-{int(absolute.group(2)):02d}-{int(absolute.group(3)):02d}"
+        month_day = re.search(r"(?<!\d)(\d{1,2})月(\d{1,2})(?:日|号)(?!\d)", text)
+        if month_day:
+            return f"md:{int(month_day.group(1)):02d}-{int(month_day.group(2)):02d}"
+        return None
 
     @classmethod
     def resolve(cls, payload: VoiceTurnRequest) -> VoiceTurnResolution:
@@ -129,10 +163,10 @@ class VoiceConsensusEngine:
         contradiction = cls._contradiction(normalized)
         intent = cls._intent(best)
         safety_flags: list[str] = []
-        joined = "|".join(normalized)
-        if any(term in joined for term in cls._EMERGENCY_TERMS):
+        signals = [SafetyPolicy.detect_safety_signal(text) for text in normalized]
+        if any(signal is not None and signal.category == "emergency" for signal in signals):
             safety_flags.append("possible_emergency")
-        if any(term in joined for term in cls._SCAM_TERMS):
+        if any(signal is not None and signal.category == "suspected_scam" for signal in signals):
             safety_flags.append("possible_scam")
         if contradiction:
             safety_flags.append("candidate_contradiction")
@@ -328,31 +362,35 @@ class PurposeBoundPolicy:
         trusted_values_by_name: dict[str, set[str]] = {}
         untrusted_values_by_name: dict[str, set[str]] = {}
         for fact in payload.facts:
-            purpose_by_name.setdefault(fact.name, set()).add(fact.purpose)
-            origin_by_name.setdefault(fact.name, set()).add(fact.origin)
-            sensitivity_by_name[fact.name] = max(sensitivity_by_name.get(fact.name, DataSensitivity.PUBLIC), fact.sensitivity)
-            trusted_control[fact.name] = trusted_control.get(fact.name, False) or fact.trusted_for_control
+            fact_key = cls._field_key(fact.name)
+            purpose_by_name.setdefault(fact_key, set()).add(fact.purpose)
+            origin_by_name.setdefault(fact_key, set()).add(fact.origin)
+            sensitivity_by_name[fact_key] = max(
+                sensitivity_by_name.get(fact_key, DataSensitivity.PUBLIC), fact.sensitivity
+            )
+            trusted_control[fact_key] = trusted_control.get(fact_key, False) or fact.trusted_for_control
             serialized_value = canonical_json(fact.value)
             if fact.trusted_for_control and fact.origin != DataOrigin.UNTRUSTED_DOCUMENT:
-                trusted_values_by_name.setdefault(fact.name, set()).add(serialized_value)
+                trusted_values_by_name.setdefault(fact_key, set()).add(serialized_value)
             if fact.origin == DataOrigin.UNTRUSTED_DOCUMENT:
-                untrusted_values_by_name.setdefault(fact.name, set()).add(serialized_value)
+                untrusted_values_by_name.setdefault(fact_key, set()).add(serialized_value)
         for key, value in payload.arguments.items():
             if key not in spec.allowed_fields:
                 stripped.append(key)
                 reasons.append(f"字段 {key} 不属于动作Schema，已剥离。")
                 continue
-            purposes = purpose_by_name.get(key, set())
+            fact_key = cls._field_key(key)
+            purposes = purpose_by_name.get(fact_key, set())
             if purposes and not purposes.intersection(spec.allowed_purposes):
                 stripped.append(key)
                 reasons.append(f"字段 {key} 的采集目的与当前动作不匹配。")
                 continue
-            origins = origin_by_name.get(key, set())
-            if DataOrigin.UNTRUSTED_DOCUMENT in origins and key in cls._CONTROL_FIELDS:
-                trusted_values = trusted_values_by_name.get(key, set())
-                untrusted_values = untrusted_values_by_name.get(key, set())
+            origins = origin_by_name.get(fact_key, set())
+            if DataOrigin.UNTRUSTED_DOCUMENT in origins and fact_key in cls._CONTROL_FIELDS:
+                trusted_values = trusted_values_by_name.get(fact_key, set())
+                untrusted_values = untrusted_values_by_name.get(fact_key, set())
                 argument_value = canonical_json(value)
-                if not trusted_control.get(key, False) or not trusted_values:
+                if not trusted_control.get(fact_key, False) or not trusted_values:
                     stripped.append(key)
                     reasons.append(f"不可信文档中的 {key} 不能控制副作用或授权。")
                     continue
@@ -364,7 +402,7 @@ class PurposeBoundPolicy:
                     stripped.append(key)
                     reasons.append(f"字段 {key} 的可信来源与不可信文档值冲突，必须重新核验。")
                     continue
-            sensitivity = sensitivity_by_name.get(key, DataSensitivity.PUBLIC)
+            sensitivity = sensitivity_by_name.get(fact_key, DataSensitivity.PUBLIC)
             if sensitivity >= DataSensitivity.HIGH and key not in cls._HIGH_SENSITIVITY_ALLOWED.get(payload.action, set()):
                 stripped.append(key)
                 reasons.append(f"高敏感字段 {key} 对当前动作并非必要，按最小化原则移除。")
@@ -413,18 +451,58 @@ class PurposeBoundPolicy:
         return cls._result(AuthorizationDecision.ALLOW, reasons, allowed_arguments, stripped, [], True, payload)
 
     @staticmethod
+    def _field_key(name: str) -> str:
+        """Canonical schema identifier used for provenance/conflict matching.
+
+        Field names are identifiers, not user-visible prose.  Treating their case
+        as semantically different lets ``Amount_cents`` bypass the provenance map
+        for the ``amount_cents`` control field.
+        """
+        return unicodedata.normalize("NFKC", name).strip().casefold()
+
+    @staticmethod
     def _goal_aligned(goal: str, action: str) -> bool:
         goal = normalize_text(goal)
         groups = {
             "lookup_bill": {"账单", "水费", "电费", "燃气", "缴费", "查询"},
             "create_payment_request": {"支付", "缴费", "水费", "电费", "燃气费", "账单", "交水费", "交电费", "交燃气费"},
-            "reserve_appointment": {"挂号", "医院", "医生", "看病", "复诊"},
+            "reserve_appointment": {"挂号", "预约", "医院", "医生", "看病", "复诊"},
             "create_reminder": {"提醒", "日历", "待办", "吃药", "复查"},
             "send_family_notification": {"通知", "提醒家人", "兜底", "求助", "报告"},
             "store_health_summary": {"体检", "报告", "健康档案", "保存"},
             "emergency_contact": {"救命", "紧急", "摔倒", "胸口痛", "迷路", "煤气"},
         }
-        return any(token in goal for token in groups.get(action, set()))
+        tokens = groups.get(action, set())
+        if not tokens:
+            return False
+
+        # Keyword presence is not consent.  "不要支付水费" used to satisfy the
+        # same token test as "支付水费" and could reach ALLOW once boolean
+        # confirmation fields were true.  Keep common "don't forget to remind"
+        # wording affirmative, then reject action tokens under an explicit
+        # cancel/negative scope.
+        scan = re.sub(r"(?:不要|别)忘(?:了|记)?", "", goal)
+        negative_terms = {
+            "lookup_bill": {"查询", "查", "看账单"},
+            "create_payment_request": {"支付", "缴费", "缴", "交", "付款", "扣款", "转账"},
+            "reserve_appointment": {"挂号", "预约", "看病", "复诊"},
+            "create_reminder": {"提醒", "建提醒", "创建提醒"},
+            "send_family_notification": {"通知", "提醒家人", "发消息"},
+            "store_health_summary": {"保存", "存档", "写入"},
+            "emergency_contact": {"联系", "呼叫", "通知"},
+        }.get(action, tokens)
+        token_pattern = "|".join(re.escape(token) for token in sorted(negative_terms, key=len, reverse=True))
+        negation = r"(?:取消|停止|不要|别|不用|不想|不需要|无需|暂不|先不|不再|别再)"
+        # Negation can wrap a short object phrase ("取消这笔水费支付"), include
+        # polite fillers ("先不替我缴费"), or trail the verb ("支付水费先不要").
+        # Restrict the window to the action phrase so an unrelated negative
+        # clause such as "不用查账单，帮我支付水费" does not block payment.
+        scoped_gap = r"[^，,。！？!?；;]{0,8}"
+        if re.search(rf"{negation}(?:再)?{scoped_gap}(?:{token_pattern})", scan):
+            return False
+        if re.search(rf"(?:{token_pattern}){scoped_gap}{negation}", scan):
+            return False
+        return any(token in goal for token in tokens)
 
     @classmethod
     def _result(
@@ -672,9 +750,14 @@ class SyncConflictPolicy:
 
 
 class PrivacyRedactor:
-    _PHONE = re.compile(r"(?<!\d)(1\d{10}|\d{3,4}-?\d{7,8})(?!\d)")
+    _PHONE = re.compile(r"(?<!\d)(1[3-9]\d(?:[ -]?\d){8}|\d{3,4}[ -]?\d{7,8})(?!\d)")
     _ID = re.compile(r"(?<!\d)\d{17}[\dXx](?!\d)")
-    _CARD = re.compile(r"(?<!\d)\d{16,19}(?!\d)")
+    _CARD = re.compile(r"(?<!\d)(?:\d[ -]?){16,19}(?!\d)")
+    _SECRET_KEYS = {
+        "password", "passwd", "pwd", "验证码", "校验码", "密码",
+        "token", "access_token", "refresh_token", "api_key", "apikey",
+        "secret", "client_secret", "identity_token", "face_template_digest",
+    }
 
     @classmethod
     def redact_text(cls, value: str) -> str:
@@ -692,7 +775,8 @@ class PrivacyRedactor:
         if isinstance(value, dict):
             result: dict[str, Any] = {}
             for key, item in value.items():
-                if normalize_text(key) in {"password", "验证码", "密码", "token", "secret", "face_template_digest"}:
+                canonical = normalize_text(key).replace("-", "_").replace(" ", "_")
+                if canonical in cls._SECRET_KEYS:
                     result[key] = "[已隐藏]"
                 else:
                     result[key] = cls.redact_value(item)

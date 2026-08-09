@@ -77,6 +77,49 @@ def test_voice_candidate_contradiction_is_not_guessed() -> None:
     assert result.ambiguity >= 0.9
 
 
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("帮我支付水费1,234元", "帮我支付水费2,234元"),
+        ("帮我支付水费1,234.50元", "帮我支付水费2,234.50元"),
+        ("帮我支付水费一千二百三十四元", "帮我支付水费二千二百三十四元"),
+        ("预约2026-08-10下午两点", "预约2026-08-11下午两点"),
+        ("预约明天下午两点", "预约后天下午两点"),
+        ("提醒我23:30吃药", "提醒我22:30吃药"),
+    ],
+)
+def test_voice_critical_slot_disagreement_is_never_hidden_by_high_text_similarity(first: str, second: str) -> None:
+    result = VoiceConsensusEngine.resolve(
+        VoiceTurnRequest(
+            elder_id="elder-demo",
+            candidates=[candidate(first, 0.97), candidate(second, 0.96, "backup")],
+            side_effect_possible=True,
+        )
+    )
+    assert result.status == VoiceResolutionStatus.CLARIFY
+    assert "candidate_contradiction" in result.safety_flags
+    assert result.ambiguity >= 0.9
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "我没有胸口痛",
+        "我怕摔倒",
+        "邻居摔倒了",
+        "反诈宣传说不要给验证码",
+        "正规客服不会要求验证码",
+    ],
+)
+def test_voice_consensus_reuses_guarded_safety_policy_for_non_events(text: str) -> None:
+    result = VoiceConsensusEngine.resolve(
+        VoiceTurnRequest(elder_id="elder-demo", candidates=[candidate(text, 0.95)])
+    )
+    assert "possible_emergency" not in result.safety_flags
+    assert "possible_scam" not in result.safety_flags
+    assert result.semantic_intent != "emergency"
+
+
 def test_voice_emergency_kept_even_with_low_confidence() -> None:
     result = VoiceConsensusEngine.resolve(
         VoiceTurnRequest(elder_id="elder-demo", candidates=[candidate("救命我胸口痛", 0.42)])
@@ -280,3 +323,75 @@ def test_policy_accepts_untrusted_document_only_as_corroboration_when_value_matc
     result = PurposeBoundPolicy.authorize(payload)
     assert result.decision == AuthorizationDecision.ALLOW
     assert result.allowed_arguments["amount_cents"] == 6840
+
+
+def test_policy_conflict_detection_is_case_insensitive_for_fact_names() -> None:
+    payload = payment_request(
+        facts=[
+            DataFact(name="bill_id", value="b1", origin=DataOrigin.TRUSTED_TOOL, purpose="bill_payment", trusted_for_control=True),
+            DataFact(name="amount_cents", value=6840, origin=DataOrigin.TRUSTED_TOOL, purpose="bill_payment", trusted_for_control=True),
+            DataFact(name="Amount_cents", value=999999, origin=DataOrigin.UNTRUSTED_DOCUMENT, purpose="bill_payment"),
+            DataFact(name="elder_id", value="elder-demo", origin=DataOrigin.SYSTEM, purpose="bill_payment", sensitivity=DataSensitivity.HIGH, trusted_for_control=True),
+        ]
+    )
+    result = PurposeBoundPolicy.authorize(payload)
+    assert result.decision == AuthorizationDecision.CLARIFY
+    assert "amount_cents" in result.stripped_fields
+    assert "amount_cents" not in result.allowed_arguments
+
+
+def test_policy_conflict_detection_nfkc_normalizes_fact_names() -> None:
+    payload = payment_request(
+        facts=[
+            DataFact(name="bill_id", value="b1", origin=DataOrigin.TRUSTED_TOOL, purpose="bill_payment", trusted_for_control=True),
+            DataFact(name="amount_cents", value=6840, origin=DataOrigin.TRUSTED_TOOL, purpose="bill_payment", trusted_for_control=True),
+            DataFact(name="ＡＭＯＵＮＴ＿ＣＥＮＴＳ", value=999999, origin=DataOrigin.UNTRUSTED_DOCUMENT, purpose="bill_payment"),
+            DataFact(name="elder_id", value="elder-demo", origin=DataOrigin.SYSTEM, purpose="bill_payment", sensitivity=DataSensitivity.HIGH, trusted_for_control=True),
+        ]
+    )
+    result = PurposeBoundPolicy.authorize(payload)
+    assert result.decision == AuthorizationDecision.CLARIFY
+    assert "amount_cents" in result.stripped_fields
+
+
+@pytest.mark.parametrize(
+    "goal",
+    [
+        "不要支付水费",
+        "别交这个账单",
+        "取消缴费",
+        "不想再交水费",
+        "取消这笔水费支付",
+        "支付水费先不要",
+        "先不替我缴水费",
+    ],
+)
+def test_policy_rejects_explicitly_negated_payment_goal(goal: str) -> None:
+    result = PurposeBoundPolicy.authorize(payment_request(goal=goal))
+    assert result.decision == AuthorizationDecision.DENY
+
+
+def test_policy_keeps_do_not_forget_payment_wording_affirmative() -> None:
+    result = PurposeBoundPolicy.authorize(payment_request(goal="不要忘了交水费"))
+    assert result.decision == AuthorizationDecision.ALLOW
+
+
+def test_policy_does_not_let_unrelated_negative_lookup_clause_cancel_payment_intent() -> None:
+    result = PurposeBoundPolicy.authorize(payment_request(goal="不用查账单，帮我支付水费"))
+    assert result.decision == AuthorizationDecision.ALLOW
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("user_confirmed", "yes"),
+        ("user_confirmed", 1),
+        ("family_approvals", True),
+        ("family_approvals", "1"),
+        ("reversible", 1),
+        ("emergency", "true"),
+    ],
+)
+def test_authorization_confirmation_and_safety_flags_are_strictly_typed(field: str, bad_value) -> None:
+    with pytest.raises(Exception):
+        payment_request(**{field: bad_value})

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import IntEnum, StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
 from .utils import clean_user_text
 
@@ -98,10 +98,10 @@ class ActionAuthorizeRequest(StrictModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     facts: list[DataFact] = Field(default_factory=list, max_length=64)
     ambiguity: float = Field(default=0.0, ge=0.0, le=1.0)
-    user_confirmed: bool = False
-    family_approvals: int = Field(default=0, ge=0, le=10)
-    reversible: bool = True
-    emergency: bool = False
+    user_confirmed: StrictBool = False
+    family_approvals: StrictInt = Field(default=0, ge=0, le=10)
+    reversible: StrictBool = True
+    emergency: StrictBool = False
 
     @field_validator("goal", "action")
     @classmethod

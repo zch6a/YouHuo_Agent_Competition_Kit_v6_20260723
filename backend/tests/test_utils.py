@@ -36,3 +36,8 @@ def test_clean_fullwidth_normalization():
 def test_clean_blank_rejected():
     with pytest.raises(ValueError):
         clean_user_text("\u200b\x00", max_length=50)
+
+
+@pytest.mark.parametrize("text", ["12026-08-10", "2026-08-101", "202607-08-10"])
+def test_parse_date_does_not_truncate_from_a_longer_digit_run(text):
+    assert parse_relative_date(text, date(2026, 8, 9)) is None

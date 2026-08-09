@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from youhuo.api import create_app
@@ -197,6 +198,22 @@ def test_v6_semantic_gateway_deterministic_and_emergency_first(tmp_path) -> None
             json={"elder_id": "elder-demo", "text": "那个事情帮我弄一下"},
         ).json()
         assert unknown["needs_clarification"] is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "我没有摔倒",
+        "我怕摔倒",
+        "邻居摔倒了",
+        "反诈宣传说不要给验证码",
+        "正规客服不会要求验证码",
+    ],
+)
+def test_semantic_gateway_safety_classification_cannot_drift_from_main_policy(text) -> None:
+    frame = SemanticGateway.parse(type("Req", (), {"text": text, "permit_remote_model": False})())
+    assert frame.intent not in {"emergency", "scam_risk"}
+    assert frame.safety_flags == []
 
 
 def test_v6_study_registry_requires_family_and_summarizes(tmp_path) -> None:

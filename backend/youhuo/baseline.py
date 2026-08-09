@@ -154,15 +154,35 @@ def _circular_median_minutes(values: list[float]) -> float:
     """
     if not values:
         raise ValueError("空样本没有中位数")
-    best: float | None = None
-    best_cost = math.inf
-    for candidate in values:
-        cost = sum(abs(_circular_delta(v, candidate)) for v in values)
-        # 相等时取更小的时刻，保证结果与输入顺序无关（可复现）。
-        if cost < best_cost - 1e-9 or (abs(cost - best_cost) <= 1e-9 and (best is None or candidate < best)):
-            best, best_cost = candidate, cost
-    assert best is not None
-    return best
+    normalized = [float(value) % 1440.0 for value in values]
+    if any(not math.isfinite(value) for value in normalized):
+        raise ValueError("圆周中位数不能包含 NaN 或无穷值")
+
+    costs: dict[float, float] = {}
+    for candidate in set(normalized):
+        costs[candidate] = sum(abs(_circular_delta(v, candidate)) for v in normalized)
+    best_cost = min(costs.values())
+    tied = [candidate for candidate, cost in costs.items() if abs(cost - best_cost) <= 1e-9]
+    if len(tied) == 1:
+        return tied[0]
+
+    # Never break a circular tie by the absolute clock value (for example,
+    # "pick the smaller HH:MM").  That changes the answer when every observation
+    # is rotated by the same amount.  Instead compare each tied candidate only by
+    # its signed relative deltas to the sample; those signatures are invariant to
+    # a common rotation and independent of input order.
+    signatures: dict[float, tuple[float, ...]] = {
+        candidate: tuple(sorted(round(_circular_delta(v, candidate), 9) for v in normalized))
+        for candidate in tied
+    }
+    best_signature = min(signatures.values())
+    winners = [candidate for candidate, signature in signatures.items() if signature == best_signature]
+    if len(winners) != 1:
+        # A perfectly symmetric sample (for example two antipodal times) has no
+        # mathematically well-defined single rotation-equivariant median.  Failing
+        # closed is safer than inventing a clock-dependent answer.
+        raise ValueError("圆周中位数存在不可消解的对称并列")
+    return winners[0]
 
 
 def _circular_delta(value: float, center: float) -> float:
@@ -212,12 +232,33 @@ def build_baseline(
     复现，测试也只能靠运气。
     """
     horizon = today - timedelta(days=window_days)
-    # 今天本身不参与自己的基线——否则异常的一天会把标准朝自己拉，偏离越大拉得越多。
-    values = [
-        o.value for o in observations
-        if o.channel is channel and horizon <= o.day < today
-    ]
     circular = channel in _TIME_CHANNELS
+
+    # One calendar day is one vote.  Counting raw rows lets duplicated observations
+    # from a single day satisfy MIN_DAYS and lets that day dominate the median.
+    # Invalid numeric rows invalidate only their own day; they are never allowed to
+    # flow through comparisons where NaN would make every threshold test false.
+    daily: dict[date, list[float]] = {}
+    invalid_days: set[date] = set()
+    for observation in observations:
+        if observation.channel is not channel or not (horizon <= observation.day < today):
+            continue
+        value = float(observation.value)
+        if not math.isfinite(value):
+            invalid_days.add(observation.day)
+            continue
+        daily.setdefault(observation.day, []).append(value)
+    for day in invalid_days:
+        daily.pop(day, None)
+
+    values: list[float] = []
+    for day_values in daily.values():
+        try:
+            values.append(_circular_median_minutes(day_values) if circular else _median(day_values))
+        except ValueError:
+            # Contradictory/symmetric duplicates on one day do not get an
+            # arbitrary representative and do not count toward MIN_DAYS.
+            continue
 
     if len(values) < min_days:
         return ChannelBaseline(
@@ -229,7 +270,17 @@ def build_baseline(
             reason=f"只有 {len(values)} 天的记录，不足 {min_days} 天，还不能说这是他的常态。",
         )
 
-    center = _circular_median_minutes(values) if circular else _median(values)
+    try:
+        center = _circular_median_minutes(values) if circular else _median(values)
+    except ValueError:
+        return ChannelBaseline(
+            channel=channel,
+            established=False,
+            days=len(values),
+            center=0.0,
+            spread=0.0,
+            reason="这些记录在圆周上完全对称，无法得到唯一且稳定的个人常态。",
+        )
     raw = _mad(values, center, circular=circular)
     floor = MIN_SPREAD_MINUTES if circular else MIN_SPREAD_COUNT
     spread = max(raw, floor)
@@ -288,9 +339,24 @@ def evaluate(
             sigma=None,
             explanation=f"{label}：{baseline.reason}",
         )
-    if observed is None:
-        # 有基线、也过了该有记录的时候，却一条都没有——这是 UNKNOWN，不是 PENDING。
-        # （"今天还没过完"那一类由上层在传入 observed 之前就压制掉了。）
+    if (
+        not math.isfinite(float(baseline.center))
+        or not math.isfinite(float(baseline.spread))
+        or baseline.spread <= 0
+    ):
+        return ChannelDeviation(
+            channel=baseline.channel,
+            verdict=Verdict.UNKNOWN,
+            observed=None,
+            center=None,
+            delta_minutes=None,
+            sigma=None,
+            explanation=f"{label}：个人基线数据无效，需要重新采集。",
+        )
+    if observed is None or not math.isfinite(float(observed)):
+        # 有基线、也过了该有记录的时候，却没有一条有效数值——这是 UNKNOWN。
+        # NaN 尤其不能继续往下走：NaN 的大小比较全部为 False，会把异常静默
+        # 落进 TYPICAL 分支，形成 fail-open。
         return ChannelDeviation(
             channel=baseline.channel,
             verdict=Verdict.UNKNOWN,
@@ -298,9 +364,10 @@ def evaluate(
             center=baseline.center,
             delta_minutes=None,
             sigma=None,
-            explanation=f"{label}：今天还没有记录。",
+            explanation=f"{label}：今天还没有有效记录。",
         )
 
+    observed = float(observed)
     if baseline.is_time():
         delta = _circular_delta(observed, baseline.center)
     else:

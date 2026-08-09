@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from .llm import LLMConfigurationError, OpenAICompatibleConfig, StructuredIntentClient
 from .models import TaskRecord, TaskStatus, TaskType
+from .security import SafetyPolicy
 from .utils import canonical_json, clean_user_text, combine_date_time, restore_cjk_punctuation
 from .v5_models import ActionAuthorizeRequest, AuthorizationDecision, DataFact, DataOrigin, DataSensitivity
 from .v5_services import PurposeBoundPolicy
@@ -613,10 +614,14 @@ class SemanticGateway:
     def _heuristic(cls, text: str) -> tuple[str, float, dict[str, Any], bool, list[str]]:
         normalized = clean_user_text(text, max_length=2000)
         flags: list[str] = []
-        if any(term in normalized for term in ("救命", "摔倒", "胸口痛", "煤气", "走失", "迷路")):
+        # Reuse the same guarded safety detector as the main conversation path.
+        # Maintaining a second keyword-only safety classifier here had drifted:
+        # "我没有摔倒" became emergency and anti-fraud education became scam_risk.
+        signal = SafetyPolicy.detect_safety_signal(normalized)
+        if signal is not None and signal.category == "emergency":
             flags.append("possible_emergency")
             return "emergency", 0.98, {}, False, flags
-        if any(term in normalized for term in ("验证码", "银行卡密码", "安全账户", "转账给陌生人", "客服让我")):
+        if signal is not None and signal.category == "suspected_scam":
             flags.append("possible_scam")
             return "scam_risk", 0.96, {}, False, flags
         if any(term in normalized for term in ("取消", "不办了", "算了")):
