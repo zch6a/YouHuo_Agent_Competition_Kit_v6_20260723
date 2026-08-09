@@ -24,7 +24,10 @@
 - `backend/youhuo/teach_back.py`：中文口语金额解析与权威值比对；
 - `backend/youhuo/tts.py`：可选离线神经语音，缺失时自动回退浏览器语音；
 - `backend/static/speech.js`：朗读文本规范化、择优选音与分句停顿；
-- `backend/static/style.css`：双色身份光效设计系统，浅色/深色令牌与适老无障碍基线；
+- `backend/static/{tokens,base,components,pages}.css`：双色身份光效设计系统，拆成四层，**加载顺序即层叠顺序**（响应式覆写全在 pages 里，媒体查询不增加特异性，排在被覆写的组件之前会静默失效）；
+- `backend/static/common.js`：全站唯一的身份与请求层——演示登录、401 重放、令牌缓存、结构化结果渲染、五态判定词表。此前这些在五个页面里各有一份且已经分叉；
+- `backend/static/glassbox.js`：玻璃盒信任卡渲染，从 `elder.js` 抽出；
+- `backend/static/icons/tabs.svg`：底部标签栏五个图标的 symbol sprite，五个页面共用一份；
 - `backend/static/judge.html/js`：五步评委导览；
 - `backend/static/elder.js`：老人端接入v6档案、交互计划、玻璃盒与明语记录日志；
 - `backend/static/family.js`：待办日历、任务进度明语化与脱敏陪伴周报。

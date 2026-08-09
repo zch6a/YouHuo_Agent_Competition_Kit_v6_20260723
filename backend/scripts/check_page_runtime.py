@@ -230,6 +230,30 @@ def check_sprite_icons(tab: "CDP", page: str, failures: list[str]) -> None:
         failures.append(f"{page}  标签栏第 {empty} 个图标是空的：外部 sprite 没有解析")
 
 
+def check_glass_box(tab: "CDP", page: str, failures: list[str]) -> None:
+    """老人端说一句会产生高风险任务的话，信任卡必须画出来。
+
+    这条单列，是因为 `showGlassBox()` 外面包着 try/catch：渲染函数一旦抛错，它会
+    静默清空 relianceHost，页面上什么都不剩，而点击闸门收不到任何异常——玻璃盒是
+    这个项目的三项核心创新之一，坏掉却完全无声。
+
+    只在老人端跑。
+    """
+    if page != "/elder":
+        return
+    tab.send("Runtime.evaluate", expression=(
+        "(() => {const i = document.getElementById('text');"
+        " if (!i) return; i.value = '帮我交水费';"
+        " document.getElementById('send').click();})()"
+    ))
+    tab.drain(5.0)
+    rows = tab.send("Runtime.evaluate", expression=(
+        "document.querySelectorAll('#relianceHost .reliance-row').length"
+    ), returnByValue=True)["result"].get("value", 0)
+    if not rows:
+        failures.append(f"{page}  高风险任务没有带出玻璃盒信任卡（relianceHost 是空的）")
+
+
 def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     """把这一页上每个按钮都按一遍，每按一次收一次网。
 
@@ -350,6 +374,9 @@ def main() -> int:
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
                 check_sprite_icons(tab, page, failures)
+                tab.events.clear()
+                check_glass_box(tab, page, failures)
+                failures.extend(collect(tab.events, f"{page} 玻璃盒"))
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
             finally:

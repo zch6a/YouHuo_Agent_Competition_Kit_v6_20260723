@@ -1,6 +1,7 @@
 import {
   configureNeuralVoice, pickVoice, probeNeuralVoice, resetVoiceCache, speakClauses,
 } from '/static/speech.js';
+import {renderGlassBox} from '/static/glassbox.js';
 
 // Resolved from identity.js: on a public deployment each browser gets its own
 // isolated demo household, so visitors do not share one elder's data. Falls back
@@ -76,6 +77,23 @@ const fontScaleEl = document.querySelector('#fontScale');
 
 function setActivity(state) {
   document.body.dataset.activity = state;
+}
+
+/** 状态行。这一页对老人说的每一句"现在怎么了"都从这里出去。
+ *
+ * 原先 12 处直接写 `status.textContent`，麦克风提示又另有 4 处写 `#micHint`。两处
+ * 后果：一是同一时刻两条提示可能互相矛盾（状态行说"正在听"，micHint 还停在上一次的
+ * 错误），二是想给状态加一条无障碍播报或一个自动清除，得改十六个地方。
+ *
+ * `#status` 已经带 aria-live，收敛到一个入口之后，读屏用户听到的顺序才是确定的。
+ */
+function setStatus(text) {
+  status.textContent = text;
+}
+
+/** 麦克风下方那行提示。与状态行分开是有意的：它只描述录音本身。 */
+function setMicHint(text) {
+  if (micHint) micHint.textContent = text;
 }
 
 /** Inline SVG built without innerHTML, so the strict CSP stays satisfied. */
@@ -179,8 +197,16 @@ async function refreshProfile() {
 function applyProfile(profile) {
   interactionProfile = profile || interactionProfile;
   const scale = Number(interactionProfile.font_scale || 1.25);
+  // 只设这一个变量。
+  //
+  // 这里原先还逐个给已有气泡写内联 `style.fontSize = 21 * scale / 1.25`，和 CSS 里
+  // 的 `calc(20px * var(--elder-font-scale) / 1.25)` 两套并存——内联优先级更高，
+  // 基数还差 1px。结果是：调整字号**之前**就在屏幕上的气泡按 21 算，之后新增的按
+  // 20 算，同一屏里两种字号，而且只有老人自己会看出来"字大小不一样"。
+  //
+  // CSS 变量本来就会让所有气泡（包括后来才添加的）一起跟着变，那套内联从来都是多余
+  // 的，只是多余得刚好不一致。
   document.documentElement.style.setProperty('--elder-font-scale', String(scale));
-  document.querySelectorAll('.bubble').forEach(el => { el.style.fontSize = `${21 * scale / 1.25}px`; });
   if (speechRateEl) selectValue(speechRateEl, interactionProfile.speech_rate || 0.88, '我调过的语速');
   if (fontScaleEl) selectValue(fontScaleEl, scale, '我调过的字号');
 }
@@ -260,7 +286,7 @@ async function loadSemanticMode() {
 }
 
 async function saveProfile() {
-  status.textContent = '正在保存您的语音和显示习惯……';
+  setStatus('正在保存您的语音和显示习惯……');
   const profile = await api(`/v6/profiles/${ELDER_ID}`, {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -270,7 +296,7 @@ async function saveProfile() {
     })
   });
   applyProfile(profile);
-  status.textContent = '已保存。以后优活会按这个语速和文字大小与您沟通。';
+  setStatus('已保存。以后优活会按这个语速和文字大小与您沟通。');
   speak(status.textContent, profile.speech_rate);
 }
 
@@ -364,117 +390,6 @@ const STATE_WORD = {
   failed: '未成功，已安全停下',
 };
 
-// Policy field names are engineering identifiers; the elder sees ordinary words.
-const FIELD_LABEL = {
-  elder_id: '您的身份', hospital: '医院', department: '科室', doctor: '医生',
-  date: '就诊日期', time: '就诊时间', bill_id: '账单编号', amount_cents: '金额',
-  recipient_family_id: '接力的家人', title: '事项', due_at: '提醒时间',
-  summary: '摘要', source_digest: '来源指纹', event_type: '事件类型',
-  urgency: '紧急程度', reason: '原因', location: '位置', period: '账期',
-  bill_type: '账单类型', timezone: '时区', health_summary: '健康摘要',
-};
-
-// Decision → tone of the safe-preview banner, so "waiting for you" does not
-// look like the same kind of alarm as "blocked".
-const DECISION_TONE = {
-  allow: 'good',
-  require_elder_confirmation: 'info',
-  require_family_approval: 'info',
-  clarify: 'warning',
-  deny: 'warning',
-};
-
-function relianceRow(label, value) {
-  const row = document.createElement('div');
-  row.className = 'reliance-row';
-  const strong = document.createElement('strong');
-  strong.textContent = label;
-  const body = document.createElement('div');
-  body.textContent = value;
-  row.append(strong, body);
-  return row;
-}
-
-function bulletList(items) {
-  const ul = document.createElement('ul');
-  items.forEach(item => {
-    const li = document.createElement('li');
-    li.textContent = item;
-    ul.appendChild(li);
-  });
-  return ul;
-}
-
-function renderReliance(card, preview) {
-  relianceHost.replaceChildren();
-  const box = document.createElement('div');
-  box.className = 'reliance-card';
-  const heading = document.createElement('h3');
-  heading.textContent = `🔍 ${card.title}`;
-  box.appendChild(heading);
-  box.appendChild(relianceRow('我听到', card.heard));
-  box.appendChild(relianceRow('要办的事', card.goal));
-  box.appendChild(relianceRow('现在这一步', card.current_step));
-  box.appendChild(relianceRow('准备做', card.action_summary));
-  box.appendChild(relianceRow('谁来决定', card.who_decides));
-  box.appendChild(relianceRow('能否撤销', card.reversible ? '可以撤销' : '不能自动撤销，所以要多确认一次'));
-  box.appendChild(relianceRow('下一步', card.next_step));
-  box.appendChild(relianceRow('信息核验', card.confidence_message));
-  if (card.warning) {
-    const warn = document.createElement('div');
-    warn.className = 'notice warning';
-    warn.textContent = card.warning;
-    box.appendChild(warn);
-  }
-
-  if (preview) {
-    const auth = preview.authorization;
-    const summary = document.createElement('div');
-    summary.className = `notice ${DECISION_TONE[auth.decision] || 'warning'}`;
-    summary.textContent = `安全预演：${preview.plain_summary}`;
-    box.appendChild(summary);
-
-    // Design §4.2 caps how much is shown at once, so the field-level detail sits
-    // behind a disclosure instead of adding a dozen rows to the card.
-    const details = document.createElement('details');
-    details.className = 'preview-details';
-    const marker = document.createElement('summary');
-    marker.textContent = '看看具体会用到哪些信息';
-    details.appendChild(marker);
-
-    const columns = document.createElement('div');
-    columns.className = 'preview-columns';
-
-    // Read the allow-list straight from the authorization rather than parsing the
-    // server's sentence, so the elder sees named fields in ordinary words.
-    const fields = Object.keys(auth.allowed_arguments || {});
-    const willDoItems = fields.length
-      ? fields.map(key => `只会用到：${FIELD_LABEL[key] || key}`)
-      : ['不会产生真实副作用'];
-    const willDo = document.createElement('section');
-    willDo.appendChild(Object.assign(document.createElement('h4'), {textContent: '会做的事'}));
-    willDo.appendChild(bulletList(willDoItems));
-
-    const willNotItems = [...preview.will_not_do];
-    if (auth.stripped_fields?.length) {
-      willNotItems.push('不会使用被剥离的信息：' + auth.stripped_fields.map(k => FIELD_LABEL[k] || k).join('、'));
-    }
-    const willNot = document.createElement('section');
-    willNot.appendChild(Object.assign(document.createElement('h4'), {textContent: '不会做的事'}));
-    willNot.appendChild(bulletList(willNotItems));
-
-    columns.append(willDo, willNot);
-    details.appendChild(columns);
-
-    if (preview.required_humans.length) {
-      details.appendChild(relianceRow('需要谁确认', preview.required_humans.join('、')));
-    }
-    details.appendChild(relianceRow('失败怎么办', preview.rollback_plan));
-    box.appendChild(details);
-  }
-
-  relianceHost.appendChild(box);
-}
 
 // The card and preview are assembled on the server from the stored task, so the
 // wording always matches the action the engine would actually run.
@@ -485,7 +400,7 @@ async function showGlassBox(heardText, data) {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({heard_text: heardText})
     });
-    renderReliance(glassBox.card, glassBox.preview);
+    renderGlassBox(relianceHost, glassBox.card, glassBox.preview);
   } catch (_) {
     relianceHost.replaceChildren();
   }
@@ -499,7 +414,7 @@ async function send(text) {
   input.value = '';
   addBubble(text, 'user');
   setActivity('processing');
-  status.textContent = '正在理解您的目标，并检查权限与风险……';
+  setStatus('正在理解您的目标，并检查权限与风险……');
   try {
     const data = await postChat(text);
     setMode(data.mode);
@@ -539,15 +454,15 @@ async function send(text) {
       relianceHost.replaceChildren();
     }
 
-    status.textContent = data.task_id
+    setStatus(data.task_id
       ? `当前任务：${data.task_id}。您随时可以说“再说一遍”或“取消”。`
-      : '办事可留痕；陪伴默认不向家属展示聊天全文。';
+      : '办事可留痕；陪伴默认不向家属展示聊天全文。');
     loadReminders();
     if (!logPanel.hidden) loadActivity();
   } catch (e) {
     recentRetries += 1;
     addBubble(`系统暂时不可用：${e.message}`, 'agent');
-    status.textContent = '没有执行任何操作，请稍后再试。';
+    setStatus('没有执行任何操作，请稍后再试。');
   } finally {
     setActivity('idle');
   }
@@ -568,7 +483,7 @@ async function reminderAction(id, action) {
     // 老人端尤其不能弹 `alert()`：装到主屏后那是一个带 "127.0.0.1 显示" 字样的
     // 系统灰框，会盖住整屏、冻住页面，而且只有一个"确定"可按。这一页其余的失败
     // 都写在状态行里，这一处也照做。
-    status.textContent = `这条待办没能更新：${e.message}`;
+    setStatus(`这条待办没能更新：${e.message}`);
   }
 }
 
@@ -697,11 +612,11 @@ document.querySelector('#stepBack').addEventListener('click', () => {
   input.value = '';
   addBubble(previous.text, 'agent', '返回上一步');
   speak(previous.speak, previous.rate);
-  status.textContent = '已经回到上一个问题，任务没有被取消。';
+  setStatus('已经回到上一个问题，任务没有被取消。');
 });
 
 document.querySelector('#saveProfile').addEventListener('click', () => {
-  saveProfile().catch(e => { status.textContent = e.message; });
+  saveProfile().catch(e => { setStatus(e.message); });
 });
 fontScaleEl.addEventListener('change', () => applyProfile({...interactionProfile, font_scale: Number(fontScaleEl.value)}));
 speechRateEl.addEventListener('change', () => { interactionProfile.speech_rate = Number(speechRateEl.value); });
@@ -713,24 +628,24 @@ if (SR) {
   rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 3;
   rec.onstart = () => {
     setActivity('listening');
-    micHint.textContent = '正在听，请慢慢说';
-    status.textContent = '正在听，请慢慢说。一次只说一件事也可以。';
+    setMicHint('正在听，请慢慢说');
+    setStatus('正在听，请慢慢说。一次只说一件事也可以。');
   };
   rec.onresult = e => { input.value = e.results[0][0].transcript; send(); };
   rec.onend = () => {
     if (document.body.dataset.activity === 'listening') setActivity('idle');
-    micHint.textContent = '按一下，然后慢慢说';
+    setMicHint('按一下，然后慢慢说');
   };
   rec.onerror = e => {
     recentRetries += 1;
     setActivity('idle');
-    micHint.textContent = '按一下，然后慢慢说';
-    status.textContent = `语音识别没有成功：${e.error}。没有执行任何操作，请再说一遍。`;
+    setMicHint('按一下，然后慢慢说');
+    setStatus(`语音识别没有成功：${e.error}。没有执行任何操作，请再说一遍。`);
   };
   mic.addEventListener('click', () => rec.start());
 } else {
   mic.addEventListener('click', () => {
-    micHint.textContent = '这个浏览器不支持语音，请在下面打字';
+    setMicHint('这个浏览器不支持语音，请在下面打字');
     input.focus();
   });
   mic.title = '当前浏览器不支持语音识别，请使用下方输入框';
@@ -757,4 +672,4 @@ login()
   .then(loadVoiceMode)
   .then(loadProfile)
   .then(loadReminders)
-  .catch(e => { status.textContent = e.message; });
+  .catch(e => { setStatus(e.message); });
