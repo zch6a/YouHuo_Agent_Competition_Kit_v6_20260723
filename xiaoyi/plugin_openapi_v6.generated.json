@@ -11674,6 +11674,7 @@
       "Verdict": {
         "type": "string",
         "enum": [
+          "pending",
           "unknown",
           "typical",
           "notice",

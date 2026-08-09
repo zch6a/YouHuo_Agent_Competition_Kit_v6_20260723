@@ -30,6 +30,16 @@ def read(rel: str) -> str:
     return (ETS / rel).read_text(encoding="utf-8")
 
 
+def _code(source: str) -> str:
+    """去掉注释，只留代码。
+
+    这个项目的注释里经常引用它修掉的那段旧代码，按位置判断顺序的检查如果不去注释，
+    量到的就是散文。长度用空格补齐，保持偏移可比。
+    """
+    source = re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), source, flags=re.S)
+    return re.sub(r"//[^\n]*", lambda m: " " * len(m.group(0)), source)
+
+
 # --- 编译期那一类，直接复用脚本 -------------------------------------------
 
 
@@ -104,6 +114,108 @@ def test_capture_uses_the_speech_tuned_source():
 def test_recognition_runs_on_device():
     """陪伴与办事内容不该为了识别而离开这台设备。"""
     assert "online: 0" in read("services/SpeechInput.ets")
+
+
+def test_the_capturer_is_registered_before_it_is_started():
+    """`start()` 抛错时必须还找得到采集器。
+
+    原来是 `await capturer.start()` 成功之后才赋值给 `this.capturer`，于是一旦
+    start 抛错，这个持有原生音频流的采集器就永远留在那里——`stop()` 只看
+    `this.capturer`，看到 null 直接返回，局部变量在 catch 里甚至不在作用域内。
+    而 start 失败是常态不是意外：音频焦点被抢、别的应用在用麦克风、来电。
+    """
+    # 先去注释再量位置。这条测试第一版就栽在这里：注释里引用了
+    # `await capturer.start()` 来说明旧 bug，于是它比真正的调用先被找到，
+    # 顺序判断量的是散文而不是代码。
+    capture = _code(read("services/AudioCapture.ets"))
+    body = capture[capture.index("async start("):]
+    create_at = body.index("createAudioCapturer")
+    register_at = body.index("this.capturer = capturer")
+    start_at = body.index("await capturer.start()")
+    assert create_at < register_at < start_at, (
+        "必须在 createAudioCapturer 之后、capturer.start() 之前登记"
+    )
+
+
+@pytest.mark.parametrize("service", ["AudioCapture", "SpeechInput"])
+def test_stop_during_start_is_not_a_no_op(service: str):
+    """`stop()` 落在 `start()` 的两个 await 之间时，不能什么都不做。
+
+    那一刻 `this.capturer` 还是 null，`stop()` 直接返回，随后 `start()` 把麦克风
+    打开——**在停止请求之后**。这正是老人在权限弹窗上按返回时走的路径。
+    一个 `starting` 布尔量挡不住它，要靠一个会被 `stop()` 作废的号。
+    """
+    source = read(f"services/{service}.ets")
+    assert "this.generation" in source, f"{service} 没有代次守卫"
+    assert "++this.generation" in source, f"{service} 的 start 没有领号"
+    assert re.search(r"mine !== this\.generation", source), (
+        f"{service} 的 start 在 await 之后没有检查号是否已作废"
+    )
+
+
+def test_the_ui_only_reports_listening_after_the_await():
+    """权限弹窗会让 start() 停留数秒。在 await **之前**就把 listening 置 true，
+
+    第二次点击会看到 true、改回 false、await 一个还没开始的 stop()；第一次点击
+    随后拿到权限并真的打开麦克风。最终麦克风在录、按钮显示未开启、读屏念的是
+    "点一下开始说话"。对这个受众这是隐私缺陷，不是界面瑕疵。
+    """
+    index = read("pages/Index.ets")
+    body = index[index.index("private async toggleListening"):]
+    assert "this.startingVoice" in body, "缺少与 listening 分开的启动中标志"
+    assert re.search(r"this\.listening = ok", body), (
+        "listening 必须在 await 返回之后按真实结果赋值"
+    )
+
+
+def test_leaving_the_conversation_screen_releases_the_microphone():
+    """切标签页时 Index 这个 struct 还活着，aboutToDisappear 不触发；
+
+    按 Home 键同理。少了这两条，麦克风会在一个连录音指示都没有的屏幕上继续录。
+    """
+    index = read("pages/Index.ets")
+    assert "onPageHide" in index, "缺少 onPageHide，按 Home 后麦克风不会停"
+    assert re.search(r"if \(index !== 0\)[\s\S]{0,120}releaseVoice", index), (
+        "切换标签页时没有释放麦克风"
+    )
+
+
+def test_recognition_finishing_also_closes_the_microphone():
+    """识别结束不等于麦克风已关。"""
+    index = read("pages/Index.ets")
+    final = index[index.index("onFinal:"):]
+    final = final[: final.index("onError:")]
+    assert "this.speech.stop()" in final, "onFinal 没有关闭麦克风"
+
+
+def test_the_window_listener_is_unregistered():
+    """匿名回调是取消不掉的，而闭包会一直抓着这个页面。"""
+    index = read("pages/Index.ets")
+    assert "this.insetListener" in index
+    assert re.search(r"off\('avoidAreaChange'", index), "avoidAreaChange 从未反注册"
+
+
+def test_host_context_is_checked_before_use():
+    """`getHostContext()` 的返回类型是 `Context | undefined`。不判空的话
+
+    undefined 会一路传到 requestPermissionsFromUser 抛出，被采集层吞成
+    "还没有麦克风权限"——一句错误的解释。
+    """
+    index = read("pages/Index.ets")
+    body = index[index.index("private async toggleListening"):]
+    assert "common.UIAbilityContext | undefined" in body
+    assert re.search(r"if \(!context\)", body), "拿到 host context 后没有判空"
+
+
+def test_vibration_uses_named_types_not_a_bare_object_literal():
+    """`startVibration` 的第一个参数是联合类型 `VibrateEffect`，而 ArkTS 的
+
+    `arkts-no-untyped-obj-literals` 要求对象字面量的上下文类型是**单个**明确声明的
+    类或接口——联合类型不算，直接写字面量是编译错误。
+    """
+    haptics = read("services/Haptics.ets")
+    assert "vibrator.VibratePreset" in haptics
+    assert "vibrator.VibrateAttribute" in haptics
 
 
 def test_the_microphone_is_always_released():

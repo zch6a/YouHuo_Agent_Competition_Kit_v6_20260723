@@ -126,9 +126,11 @@ class BaselineAnalyzer:
                 )
             deviation = evaluate(baseline, observed, label=label)
             if observed is None and today_values.get(channel) is not None:
-                # 数据是有的，只是这一天还没走到能下结论的时候。说清楚是哪一种。
+                # 数据是有的，只是这一天还没走到能下结论的时候——这是 PENDING，
+                # 不是 UNKNOWN。区分这两者，日报才能既不在上午虚报"还不好说"，
+                # 又不会把"整天一条记录都没有"说成"和平常差不多"。
                 deviation = ChannelDeviation(
-                    channel=channel, verdict=deviation.verdict, observed=None,
+                    channel=channel, verdict=Verdict.PENDING, observed=None,
                     center=baseline.center, delta_minutes=None, sigma=None,
                     explanation=f"{label}：今天还没过完，现在下结论太早。",
                 )
@@ -213,8 +215,13 @@ class BaselineAnalyzer:
                 f"还在熟悉他的生活规律（已记录 {observed_days} 天）。"
                 "在攒够之前，不会拿别人的标准来评价他。"
             )
+        if overall is Verdict.PENDING:
+            return "今天还没过完，还不到下结论的时候。"
         if overall is Verdict.UNKNOWN:
-            return "今天还没有足够的记录。"
+            # 这句话现在有分量了：本该有记录却一条都没有。
+            missing = [d.explanation for d in deviations if d.verdict is Verdict.UNKNOWN]
+            lead = f"（{missing[0]}）" if missing else ""
+            return f"今天该有的记录还没出现{lead}，建议打个电话问一声。"
         if overall is Verdict.TYPICAL:
             return "今天和他平常差不多。"
         worst = [d for d in deviations if d.verdict in (Verdict.MARKED, Verdict.NOTICE)]
@@ -467,11 +474,12 @@ class DailyReportBuilder:
 
     @staticmethod
     def _worst(verdicts: Iterable[Verdict]) -> Verdict:
+        # 与 overall_verdict 同一套顺序：UNKNOWN 高于 TYPICAL，PENDING 最低。
         values = list(verdicts)
-        for level in (Verdict.MARKED, Verdict.NOTICE, Verdict.TYPICAL):
+        for level in (Verdict.MARKED, Verdict.NOTICE, Verdict.UNKNOWN, Verdict.TYPICAL):
             if level in values:
                 return level
-        return Verdict.UNKNOWN
+        return Verdict.PENDING
 
     @staticmethod
     def _suggestions(snapshot: BaselineSnapshot, errands: ErrandFacts) -> list[str]:

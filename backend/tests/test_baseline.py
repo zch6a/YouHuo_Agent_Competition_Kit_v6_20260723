@@ -129,7 +129,7 @@ def test_a_short_history_yields_no_verdict():
                               Channel.WAKE, today=TODAY)
     assert not baseline.established
     result = evaluate(baseline, at("14:00"), label="起床")
-    assert result.verdict is Verdict.UNKNOWN, (
+    assert result.verdict is Verdict.PENDING, (
         "用不到一周的数据宣称偏离，就是把统一规则换了个说法"
     )
     assert result.sigma is None
@@ -204,9 +204,9 @@ def test_the_worst_channel_wins_rather_than_the_average():
     assert overall_verdict(typical + [marked]) is Verdict.MARKED
 
 
-def test_all_unknown_stays_unknown():
+def test_all_pending_stays_pending():
     empty = build_baseline([], Channel.WAKE, today=TODAY)
-    assert overall_verdict([evaluate(empty, None, label="起床")]) is Verdict.UNKNOWN
+    assert overall_verdict([evaluate(empty, None, label="起床")]) is Verdict.PENDING
 
 
 # --- 阈值本身 ---------------------------------------------------------------

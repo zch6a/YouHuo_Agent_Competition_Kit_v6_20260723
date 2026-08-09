@@ -37,6 +37,11 @@ struct Index {
   private messages: MessageSource = new MessageSource();
   private scroller: Scroller = new Scroller();
   private speech: SpeechInput = new SpeechInput();
+  /** 正在启动语音（权限弹窗可能停留数秒）。与 `listening` 分开，见 toggleListening。 */
+  private startingVoice: boolean = false;
+  /** 持有窗口引用才能反注册监听；不反注册，闭包会一直抓着这个页面。 */
+  private win: window.Window | null = null;
+  private insetListener: ((data: window.AvoidAreaOptions) => void) | null = null;
 
   aboutToAppear(): void {
     this.measureBottomInset();
@@ -68,14 +73,29 @@ struct Index {
         this.bottomInset = this.getUIContext().px2vp(area.bottomRect.height);
       };
       apply(win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM));
-      win.on('avoidAreaChange', (data: window.AvoidAreaOptions) => {
+      // 存下 win 和回调本身：`off` 需要它们，而匿名回调是取消不掉的。
+      this.win = win;
+      this.insetListener = (data: window.AvoidAreaOptions): void => {
         if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
           apply(data.area);
         }
-      });
+      };
+      win.on('avoidAreaChange', this.insetListener);
     }).catch(() => {
       // 拿不到窗口就保持 0：宁可少让一点位，也不要凭空加一段谁都解释不了的留白。
     });
+  }
+
+  private stopWatchingInsets(): void {
+    if (this.win !== null && this.insetListener !== null) {
+      try {
+        this.win.off('avoidAreaChange', this.insetListener);
+      } catch (err) {
+        // 没注册成功过就取消注册会抛，这不是错误。
+      }
+    }
+    this.win = null;
+    this.insetListener = null;
   }
 
   /** 当前角色的强调色。走资源而不是常量，深色模式才会自动换一套。 */
@@ -144,8 +164,25 @@ struct Index {
       return;
     }
 
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.listening = true;
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext | undefined;
+    if (!context) {
+      // getHostContext() 的返回类型是 `Context | undefined`。不判空的话
+      // undefined 会一路传到 requestPermissionsFromUser 抛出，然后被采集层的
+      // catch 吞成"还没有麦克风权限"——一句**错误**的解释。
+      this.messages.append('agent', '这台设备暂时不能听写，您可以先打字。');
+      this.scrollToLatest();
+      return;
+    }
+    // `starting` 与 `listening` 分开：`listening` 是给界面看的状态，
+    // 而权限弹窗会让下面这个 await 停留好几秒。原来在 await **之前**就把
+    // listening 置 true，于是第二次点击看到 true、把它改回 false、await 一个还没
+    // 开始的 stop()；第一次点击随后拿到权限、打开麦克风并返回成功。
+    // 最终状态是**麦克风在录、按钮显示未开启、读屏念的是"点一下开始说话"**。
+    // 对这个受众这是隐私缺陷，不是界面瑕疵。
+    if (this.startingVoice) {
+      return;
+    }
+    this.startingVoice = true;
     const ok = await this.speech.start(context, {
       onPartial: (text: string) => {
         this.inputText = text;
@@ -153,6 +190,9 @@ struct Index {
       onFinal: (text: string) => {
         this.inputText = text;
         this.listening = false;
+        // 识别结束不等于麦克风已关。不显式停，采集器会一直录到引擎自己
+        // 触发 onComplete 为止——同样是"麦克风开着、指示灯灭着"。
+        this.speech.stop().catch(() => {});
         this.send();
       },
       onError: (reason: string) => {
@@ -162,14 +202,29 @@ struct Index {
         this.scrollToLatest();
       },
     });
-    if (!ok) {
-      this.listening = false;
-    }
+    // 只有在 await 之后才把状态告诉界面——它现在反映的是真实情况。
+    this.listening = ok;
+    this.startingVoice = false;
+  }
+
+  /** 无论从哪条路径离开对话屏，麦克风都必须关掉。 */
+  private async releaseVoice(): Promise<void> {
+    this.listening = false;
+    this.startingVoice = false;
+    await this.speech.stop();
+  }
+
+  onPageHide(): void {
+    // 按 Home 键、锁屏、被其它页面覆盖——`aboutToDisappear` 在这些情况下都不触发，
+    // 只有页面被销毁时才会。少了这一句，老人按下 Home 之后麦克风还在录。
+    this.releaseVoice().catch(() => {});
   }
 
   aboutToDisappear(): void {
     // 页面离开时一定要释放麦克风。漏掉这一句，下一次录音会失败得毫无线索。
-    this.speech.stop();
+    // 框架不会等这个 Promise，所以显式 catch，别让拒绝被静默吞掉。
+    this.releaseVoice().catch(() => {});
+    this.stopWatchingInsets();
   }
 
   @Builder
@@ -269,6 +324,11 @@ struct Index {
     .scrollable(false)   // 误触横滑不该换页：这个受众滑动时手抖得比想象中多
     .onChange((index: number) => {
       this.tabIndex = index;
+      // 切到家人/照护/可信时，Index 这个 struct 还活着，`aboutToDisappear`
+      // 不会触发——麦克风会在一个连录音指示都没有的屏幕上继续录。
+      if (index !== 0) {
+        this.releaseVoice().catch(() => {});
+      }
     })
     .width('100%')
     .height('100%')

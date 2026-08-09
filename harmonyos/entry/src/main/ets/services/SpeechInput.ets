@@ -36,6 +36,13 @@ export class SpeechInput {
   private capture: AudioCapture = new AudioCapture();
   private sessionId: string = '';
   private running: boolean = false;
+  /**
+   * `running` 只在 `start()` 的**最后一行**置位，而入口守卫读的是它。两次重叠调用
+   * （权限弹窗期间的双击、或 `onFinal → send()` 之后再点一次）会双双越过守卫、
+   * 双双走到 `createEngine`，第二次的赋值把第一个引擎变成孤儿——既不 finish 也不
+   * shutdown。这个号从入口就领，与 AudioCapture 同一套做法。
+   */
+  private generation: number = 0;
 
   isRunning(): boolean {
     return this.running;
@@ -48,9 +55,10 @@ export class SpeechInput {
    * 才发现没有权限"，那一小段录音既没用也不该存在。
    */
   async start(context: common.UIAbilityContext, callbacks: SpeechCallbacks): Promise<boolean> {
-    if (this.running) {
+    if (this.running || this.engine !== null) {
       return true;
     }
+    const mine = ++this.generation;
 
     if (!await AudioCapture.ensurePermission(context)) {
       // 系统在用户拒绝一次后不再弹窗，所以这里不重试，直接说明。
@@ -69,6 +77,11 @@ export class SpeechInput {
       callbacks.onError('这台设备暂时不能听写，您可以先打字。');
       return false;
     }
+    if (mine !== this.generation) {
+      // 建引擎期间有人要求停止：立刻还回去，不要留一个没人管的引擎。
+      await this.stop();
+      return false;
+    }
 
     this.sessionId = `asr_${Date.now()}`;
     this.engine.setListener({
@@ -81,13 +94,17 @@ export class SpeechInput {
           callbacks.onPartial(result.result);
         }
       },
+      // 这两个回调可能在 `start()` 还没跑完时就触发。`stop()` 会把号作废，
+      // 下面两个检查点会让 `start()` 自行收尾——否则会出现"麦克风开着、引擎已死、
+      // writeAudio 永远静默无效"的状态，而 isRunning() 还报 true。
+      // 加 catch：浮空的 Promise 拒绝会被吞掉。
       onComplete: (_sessionId: string, _eventMessage: string) => {
-        this.stop();
+        this.stop().catch(() => {});
       },
       onError: (_sessionId: string, errorCode: number, errorMessage: string) => {
         console.error(`SpeechInput: 识别错误 ${errorCode} ${errorMessage}`);
         callbacks.onError('刚才没听清，您再说一遍好吗？');
-        this.stop();
+        this.stop().catch(() => {});
       },
     });
 
@@ -123,6 +140,10 @@ export class SpeechInput {
       await this.stop();
       return false;
     }
+    if (mine !== this.generation) {
+      await this.stop();
+      return false;
+    }
 
     this.running = true;
     return true;
@@ -130,6 +151,8 @@ export class SpeechInput {
 
   /** 停止。可重复调用，也可以在从未 start 过时调用。 */
   async stop(): Promise<void> {
+    // 先作废号码：进行中的 start() 会在下一个检查点自行收尾。
+    this.generation++;
     this.running = false;
     await this.capture.stop();
     const engine = this.engine;

@@ -54,7 +54,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：693项自动化测试；
+- `backend/tests/`：705项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -91,7 +91,7 @@
 
 - FastAPI OpenAPI路径：99个；
 - 小艺Skill：13个；
-- 自动化测试：693项；逐功能验收：130项；
+- 自动化测试：705项；逐功能验收：130项；
 - 核心Python语句覆盖率：90%。
 
 `MANIFEST.sha256` 与包内文件计数需在重新打包时用同一脚本重算，本轮改动后尚未重新生成。

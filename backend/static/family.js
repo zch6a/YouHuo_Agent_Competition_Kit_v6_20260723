@@ -289,7 +289,10 @@ const VERDICT_TEXT = {
   typical: ['和平常一样', 'good'],
   notice: ['有一点不同', 'warn'],
   marked: ['和平常不太一样', 'bad'],
-  unknown: ['还不好说', ''],
+  // unknown 和 pending 不是一回事：pending 是"今天还没过完"，unknown 是"本该有
+  // 记录却一条都没有"。后者在养老场景里是要看见的，所以给它警示色。
+  unknown: ['还没有记录', 'warn'],
+  pending: ['还不好说', ''],
 };
 
 function renderDailyReport(envelope) {

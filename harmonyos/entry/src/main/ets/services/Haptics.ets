@@ -18,9 +18,17 @@ export class Haptics {
    */
   static tap(): void {
     try {
+      // 必须先落到具名类型的局部变量上，不能直接写对象字面量。
+      // `startVibration` 的第一个参数是联合类型 `VibrateEffect`
+      // （@ohos.vibrator.d.ts:862），而 ArkTS 的 `arkts-no-untyped-obj-literals`
+      // 要求对象字面量的上下文类型是**单个**明确声明的类/接口——联合类型不算。
+      const effect: vibrator.VibratePreset = {
+        type: 'preset', effectId: 'haptic.clock.timer', count: 1,
+      };
+      const attribute: vibrator.VibrateAttribute = { usage: 'touch' };
       vibrator.startVibration(
-        { type: 'preset', effectId: 'haptic.clock.timer', count: 1 },
-        { usage: 'touch' },
+        effect,
+        attribute,
         (error: BusinessError) => {
           if (error) {
             console.info(`Haptics: 设备无震动能力，忽略 (${error.code})`);

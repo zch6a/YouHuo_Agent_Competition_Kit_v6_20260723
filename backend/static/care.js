@@ -57,7 +57,8 @@ async function bootstrap() {
 // 散步，老人 B 每天上午在家读书"——所以先把**他自己的**常态一行行摆出来，再说今天。
 const CHANNEL_ICON = { wake: '起床', sleep: '就寝', outing: '外出', medication: '服药', conversation: '说话' };
 const VERDICT_PILL = { typical: ['和平常一样', 'good'], notice: ['有一点不同', 'warn'],
-                       marked: ['和平常不太一样', 'bad'], unknown: ['还不好说', ''] };
+                       marked: ['和平常不太一样', 'bad'],
+                       unknown: ['还没有记录', 'warn'], pending: ['还不好说', ''] };
 
 function renderBaseline(snapshot, care) {
   const host = byId('baselineOutput');

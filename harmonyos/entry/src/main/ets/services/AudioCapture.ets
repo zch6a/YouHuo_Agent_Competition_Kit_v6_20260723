@@ -1,5 +1,10 @@
 import { audio } from '@kit.AudioKit';
-import { abilityAccessCtrl, bundleManager, common, Permissions } from '@kit.AbilityKit';
+// `PermissionRequestResult` 是**顶层导出**（@ohos.abilityAccessCtrl.d.ts:710），
+// 不是 abilityAccessCtrl 命名空间的成员——命名空间在 :688 就闭合了。所以只能具名
+// 导入，写成 `abilityAccessCtrl.PermissionRequestResult` 编译不过。
+import {
+  abilityAccessCtrl, bundleManager, common, Permissions, PermissionRequestResult,
+} from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 /**
@@ -26,20 +31,19 @@ export type PcmListener = (chunk: ArrayBuffer) => void;
 
 const MIC_PERMISSION: Permissions = 'ohos.permission.MICROPHONE';
 
-/**
- * `requestPermissionsFromUser` 有回调和 Promise 两个重载，类型检查偶尔会把它们交成
- * `void & Promise<…>`，于是 `.authResults` "不存在"。而 `PermissionRequestResult`
- * 本身并没有从 `@ohos.abilityAccessCtrl.d.ts` 导出（已核对 SDK 声明文件）。
- * 所以在本地声明需要的那一部分并显式断言——这是官方文档记录的写法。
- */
-interface PermResult {
-  authResults: number[];
-}
 
 export class AudioCapture {
   private capturer: audio.AudioCapturer | null = null;
   private listener: PcmListener | null = null;
-  private starting: boolean = false;
+  /**
+   * 每次 `start()` 领一个号，`stop()` 把号作废。
+   *
+   * 只有一个 `starting` 布尔量是不够的：它能挡住重入的 `start()`，却挡不住
+   * `stop()` 在 `start()` 的两个 await 之间进来。那时 `this.capturer` 还是 null，
+   * `stop()` 直接返回，随后 `start()` 把麦克风打开——**在停止请求之后**。
+   * 这正是老人在权限弹窗上按返回时走的路径。
+   */
+  private generation: number = 0;
 
   /** 是否正在采集。UI 用它决定按钮状态，不要自己另存一份。 */
   isCapturing(): boolean {
@@ -62,9 +66,11 @@ export class AudioCapture {
       if (granted === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
         return true;
       }
-      const result = await (
-        manager.requestPermissionsFromUser(context, [MIC_PERMISSION]) as Promise<PermResult>
-      );
+      // 两参重载唯一解析到 Promise 版本，不需要断言。`PermissionRequestResult`
+      // 是从 `@ohos.abilityAccessCtrl.d.ts` 顶层导出的（此前这里注释说它没导出，
+      // 那句话是错的，已按 SDK 声明核实）。authResults[0] === 0 表示已授权。
+      const result: PermissionRequestResult =
+        await manager.requestPermissionsFromUser(context, [MIC_PERMISSION]);
       return result.authResults.length > 0 && result.authResults[0] === 0;
     } catch (err) {
       const error = err as BusinessError;
@@ -79,10 +85,10 @@ export class AudioCapture {
    * 重复调用是安全的（已在采集就直接返回 true），因为老人连点是常态而不是异常。
    */
   async start(listener: PcmListener): Promise<boolean> {
-    if (this.capturer !== null || this.starting) {
+    if (this.capturer !== null) {
       return true;
     }
-    this.starting = true;
+    const mine = ++this.generation;
     this.listener = listener;
     try {
       const options: audio.AudioCapturerOptions = {
@@ -98,6 +104,18 @@ export class AudioCapture {
         },
       };
       const capturer = await audio.createAudioCapturer(options);
+      // **立刻**登记，不要等 start() 成功。
+      //
+      // 原来是在 `await capturer.start()` 之后才赋值，于是 start() 一抛错，这个
+      // 持有原生音频流的采集器就永远留在那里——`stop()` 只看 this.capturer，
+      // 看到 null 直接返回，局部变量在 catch 里甚至不在作用域内。
+      // 而 start() 失败是常态不是意外：音频焦点被抢、别的应用在用麦克风、来电。
+      // 每失败一次泄漏一个，直到 createAudioCapturer 本身开始失败。
+      this.capturer = capturer;
+      if (mine !== this.generation) {
+        await this.stop();
+        return false;
+      }
       capturer.on('readData', (buffer: ArrayBuffer) => {
         // 用局部引用而不是 this.listener：stop() 可能在两帧之间把它置空。
         const sink = this.listener;
@@ -106,7 +124,11 @@ export class AudioCapture {
         }
       });
       await capturer.start();
-      this.capturer = capturer;
+      if (mine !== this.generation) {
+        // 启动期间有人要求停止：立刻还回去，而不是把麦克风留着。
+        await this.stop();
+        return false;
+      }
       return true;
     } catch (err) {
       const error = err as BusinessError;
@@ -114,8 +136,6 @@ export class AudioCapture {
       // 半开状态比不开更糟：下一次 start 会以为还在录。
       await this.stop();
       return false;
-    } finally {
-      this.starting = false;
     }
   }
 
@@ -126,6 +146,8 @@ export class AudioCapture {
    * 每一条路径都会走到这里。任何一条路径上没释放，下一次录音就会失败得毫无线索。
    */
   async stop(): Promise<void> {
+    // 先作废号码：进行中的 start() 会在下一个检查点看到号变了，自行释放。
+    this.generation++;
     const capturer = this.capturer;
     this.capturer = null;
     this.listener = null;

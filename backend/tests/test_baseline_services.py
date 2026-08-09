@@ -295,7 +295,7 @@ def test_no_bedtime_verdict_before_bedtime():
         today=TODAY, now_minutes=at("10:00"),
     )
     sleep = next(d for d in morning.deviations if d.channel is Channel.SLEEP)
-    assert sleep.verdict is Verdict.UNKNOWN, sleep.explanation
+    assert sleep.verdict is Verdict.PENDING, sleep.explanation
     assert "还没过完" in sleep.explanation
     assert morning.overall is not Verdict.MARKED
 
@@ -313,7 +313,7 @@ def test_no_bedtime_verdict_at_any_hour_before_bedtime(hour):
         today_values={Channel.SLEEP: at("06:05")}, today=TODAY, now_minutes=at(hour),
     )
     sleep = next(d for d in snapshot.deviations if d.channel is Channel.SLEEP)
-    assert sleep.verdict is Verdict.UNKNOWN, f"{hour}: {sleep.explanation}"
+    assert sleep.verdict is Verdict.PENDING, f"{hour}: {sleep.explanation}"
 
 
 def test_bedtime_is_judged_once_it_is_genuinely_late():
@@ -334,7 +334,7 @@ def test_counts_are_not_judged_low_before_the_day_is_over():
         today_values={Channel.OUTING: 0.0}, today=TODAY, now_minutes=at("09:00"),
     )
     outing = next(d for d in morning.deviations if d.channel is Channel.OUTING)
-    assert outing.verdict is Verdict.UNKNOWN, outing.explanation
+    assert outing.verdict is Verdict.PENDING, outing.explanation
 
 
 def test_counts_are_judged_low_once_the_day_is_over():
@@ -364,6 +364,69 @@ def test_a_past_day_is_always_judged_in_full():
     )
     outing = next(d for d in yesterday.deviations if d.channel is Channel.OUTING)
     assert outing.verdict in (Verdict.NOTICE, Verdict.MARKED)
+
+
+def test_one_normal_channel_cannot_wash_out_four_missing_ones():
+    """老人整天零活动、零位置、零对话，只有护工代记了一次服药。
+
+    原来 `overall_verdict` 把 UNKNOWN 排在 TYPICAL **之下**，于是那一个 TYPICAL
+    赢了，日报头条写"今天和他平常差不多"——而"一整天没有任何活动记录"恰恰是养老
+    场景里最该被看见的一天。"不知道"不是"比正常轻"。
+
+    注意这与"今天还没过完"是两回事：后者是 PENDING，不该影响结论（否则每个正常的
+    早晨都会被说成"还不好说"）。这条测试同时钉住这个区分。
+    """
+    snapshot = BaselineAnalyzer.snapshot(
+        elder_id="elder-demo", observations=REGULAR,
+        today_values={
+            Channel.WAKE: None, Channel.SLEEP: None, Channel.OUTING: None,
+            Channel.CONVERSATION: None, Channel.MEDICATION: at("08:05"),
+        },
+        today=TODAY,
+        # 傍晚：早就过了该有记录的时候，所以这些空缺不是"还没到时候"。
+        now_minutes=at("18:00"),
+    )
+    assert snapshot.overall is Verdict.UNKNOWN, snapshot.headline
+    assert "打个电话" in snapshot.headline, snapshot.headline
+
+
+def test_a_normal_morning_is_still_typical():
+    """上面那条修复不能把正常的早晨变成警报。
+
+    早上 09:00：起床和服药都正常，就寝和外出只是还没到时候（PENDING）。
+    """
+    snapshot = BaselineAnalyzer.snapshot(
+        elder_id="elder-demo", observations=REGULAR,
+        today_values={
+            Channel.WAKE: at("06:05"), Channel.MEDICATION: at("08:02"),
+            Channel.SLEEP: at("06:05"), Channel.OUTING: 0.0, Channel.CONVERSATION: 1.0,
+        },
+        today=TODAY, now_minutes=at("09:00"),
+    )
+    assert snapshot.overall is Verdict.TYPICAL, snapshot.headline
+
+
+def test_an_irregular_elder_can_still_trigger_an_alert():
+    """作息本身很乱时，原来会得到一个**数学上永远不会报警**的基线。
+
+    时刻偏差被钳在 ±720，所以 sigma <= 720/spread；spread 一旦超过 205.7，
+    MARKED 就不可能出现，而兜底预警只在 MARKED 时推送。也就是说节律紊乱的老人
+    ——正是这个产品最该关注的人群——永久收不到预警，而且系统只会每天安静地说
+    "和平常差不多"。现在超过上限就诚实地说"没有可比的常态"。
+    """
+    chaotic = history(wake=[at("05:00"), at("06:00"), at("07:00"), at("11:00"),
+                            at("13:00"), at("15:00"), at("17:00"), at("19:00"),
+                            at("21:00"), at("23:00")])
+    snapshot = BaselineAnalyzer.snapshot(
+        elder_id="elder-demo", observations=chaotic,
+        today_values={Channel.WAKE: at("06:00")}, today=TODAY,
+    )
+    wake = next(b for b in snapshot.baselines if b.channel is Channel.WAKE)
+    assert not wake.established, "作息极不规律却宣称有常态"
+    assert "不规律" in wake.reason
+    # 而且绝不能说成"和平常差不多"。
+    deviation = next(d for d in snapshot.deviations if d.channel is Channel.WAKE)
+    assert deviation.verdict is not Verdict.TYPICAL
 
 
 # --- 千人千面，端到端 -------------------------------------------------------

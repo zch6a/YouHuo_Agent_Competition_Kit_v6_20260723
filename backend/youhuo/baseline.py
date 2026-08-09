@@ -85,7 +85,12 @@ class Channel(StrEnum):
 
 
 class Verdict(StrEnum):
-    UNKNOWN = "unknown"    # 数据不足，不下结论
+    #: 还没到能下结论的时候：今天没过完，或者这个通道还没攒够历史。
+    #: 这是**预期之内**的不知道，不该影响当天的总体结论。
+    PENDING = "pending"
+    #: 本该有记录却一条都没有。这不是"轻于正常"，是"不知道"，而在养老场景里
+    #: "一整天没有任何活动记录"恰恰是最该被看见的一种情况。
+    UNKNOWN = "unknown"
     TYPICAL = "typical"    # 符合他自己的常态
     NOTICE = "notice"      # 轻度偏离
     MARKED = "marked"      # 显著偏离
@@ -228,6 +233,22 @@ def build_baseline(
     raw = _mad(values, center, circular=circular)
     floor = MIN_SPREAD_MINUTES if circular else MIN_SPREAD_COUNT
     spread = max(raw, floor)
+
+    if circular and raw > MAX_SPREAD_MINUTES:
+        # 他本来就没有一个可比的常态。诚实说"不知道"，而不是给出一个
+        # 数学上永远不会报警的基线——后者每天都会说"和平常差不多"。
+        return ChannelBaseline(
+            channel=channel,
+            established=False,
+            days=len(values),
+            center=center,
+            spread=spread,
+            reason=(
+                f"他这{len(values)}天的{_channel_word(channel)}时间本身就很不规律"
+                f"（前后差{_duration(raw)}），暂时没有可比的常态。"
+            ),
+        )
+
     return ChannelBaseline(
         channel=channel,
         established=True,
@@ -238,6 +259,16 @@ def build_baseline(
     )
 
 
+def _channel_word(channel: Channel) -> str:
+    return {
+        Channel.WAKE: "起床",
+        Channel.SLEEP: "就寝",
+        Channel.MEDICATION: "服药",
+        Channel.OUTING: "外出",
+        Channel.CONVERSATION: "说话",
+    }[channel]
+
+
 def evaluate(
     baseline: ChannelBaseline,
     observed: float | None,
@@ -246,9 +277,11 @@ def evaluate(
 ) -> ChannelDeviation:
     """今天这个通道偏离了多少。`label` 是给人看的通道名，例如"起床"。"""
     if not baseline.established:
+        # 没有基线是**预期之内**的不知道：还没攒够，或者他本来就没有常态。
+        # 用 PENDING，别让它把一个正常的日子说成"还不好说"。
         return ChannelDeviation(
             channel=baseline.channel,
-            verdict=Verdict.UNKNOWN,
+            verdict=Verdict.PENDING,
             observed=observed,
             center=None,
             delta_minutes=None,
@@ -256,6 +289,8 @@ def evaluate(
             explanation=f"{label}：{baseline.reason}",
         )
     if observed is None:
+        # 有基线、也过了该有记录的时候，却一条都没有——这是 UNKNOWN，不是 PENDING。
+        # （"今天还没过完"那一类由上层在传入 observed 之前就压制掉了。）
         return ChannelDeviation(
             channel=baseline.channel,
             verdict=Verdict.UNKNOWN,
@@ -334,11 +369,17 @@ def overall_verdict(deviations: list[ChannelDeviation]) -> Verdict:
 
     取最严重的那一个，而不是求平均：三个通道正常、一个通道显著偏离，重要的是那
     一个。平均会把它稀释成"大致正常"，而那正是子女最需要看见的一天。
+
+    **`UNKNOWN` 排在 `TYPICAL` 之上**，这一条是被一个具体场景换来的：老人整天零
+    活动、零位置、零对话，只有护工代记了一次服药——四个通道 UNKNOWN、一个 TYPICAL，
+    而原来的顺序让那一个 TYPICAL 赢了，日报头条写"今天和他平常差不多"。
+    "不知道"不是"比正常轻"；在养老场景里，"一整天没有任何记录"正是最该被看见的
+    那一天。
+
+    `PENDING` 则相反，排在最后：今天没过完、或某个通道还没攒够历史，都是预期之内的，
+    不该把一个正常的早晨说成"还不好说"。
     """
-    if any(d.verdict is Verdict.MARKED for d in deviations):
-        return Verdict.MARKED
-    if any(d.verdict is Verdict.NOTICE for d in deviations):
-        return Verdict.NOTICE
-    if any(d.verdict is Verdict.TYPICAL for d in deviations):
-        return Verdict.TYPICAL
-    return Verdict.UNKNOWN
+    for level in (Verdict.MARKED, Verdict.NOTICE, Verdict.UNKNOWN, Verdict.TYPICAL):
+        if any(d.verdict is level for d in deviations):
+            return level
+    return Verdict.PENDING
