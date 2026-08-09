@@ -1,43 +1,24 @@
 'use strict';
 
-const state = { elderToken: '', familyToken: '', systemToken: '', saga: null, sagaRole: 'system',
-  // Resolved in bootstrap() from identity.js; see the note in that file. The
-  // literals below are only the fallback for when identity.js is unavailable.
-  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo' };
-const byId = (id) => document.getElementById(id);
-const pretty = (value) => JSON.stringify(value, null, 2);
-
-async function login(actorId) {
-  const response = await fetch('/v2/auth/demo', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actor_id: actorId })
-  });
-  if (!response.ok) throw new Error(`登录失败：${actorId}`);
-  return (await response.json()).access_token;
-}
-
-async function api(path, options = {}, role = 'elder') {
-  const token = role === 'family' ? state.familyToken : role === 'system' ? state.systemToken : state.elderToken;
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}), Authorization: `Bearer ${token}` };
-  const response = await fetch(path, { ...options, headers });
-  const body = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-  if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
-  return body;
-}
+// 身份、登录、401 重放和令牌缓存都在 common.js 里。
+//
+// 顺带修掉这一页原有的两个差异：它此前无条件写 `Authorization: Bearer ${token}`，
+// token 为空串时会发出一个后面什么都没有的头；也没有 401 重放，令牌一过期，六张卡
+// 的按钮就开始静默失败。
+const {api, byId, pretty} = window.YouHuo;
+const state = {saga: null, sagaRole: 'system',
+  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
 function output(id, value) { byId(id).textContent = typeof value === 'string' ? value : pretty(value); }
 
-async function resolveIdentity() {
-  if (!window.YouHuoIdentity) return;
-  const identity = await window.YouHuoIdentity.ready();
-  state.elderId = identity.elderId;
-  state.daughterId = identity.daughterId;
-  state.systemId = identity.systemId;
-}
-
 async function bootstrap() {
   try {
-    [state.elderToken, state.familyToken, state.systemToken] = await Promise.all([
-      login(state.elderId), login(state.daughterId), login(state.systemId)
+    const ids = await window.YouHuo.ready();
+    state.elderId = ids.elderId;
+    state.daughterId = ids.daughterId;
+    state.systemId = ids.systemId;
+    await Promise.all([
+      window.YouHuo.login('elder'), window.YouHuo.login('family'), window.YouHuo.login('system'),
     ]);
     byId('status').textContent = '演示身份已就绪。高风险动作不会由语言模型直接执行。';
   } catch (error) { byId('status').textContent = error.message; }

@@ -50,7 +50,6 @@ const REMINDER_STATUS = {
 };
 
 let sessionId = localStorage.getItem('youhuo_session_v2');
-let accessToken = sessionStorage.getItem('youhuo_elder_token');
 let lastSpoken = '';
 let currentMode = 'youhuo';
 let interactionProfile = {speech_rate: 0.88, font_scale: 1.25};
@@ -204,51 +203,25 @@ function selectValue(select, value, customLabel) {
   select.value = wanted;
 }
 
-async function api(path, options = {}) {
-  if (!accessToken) await login();
-  const headers = {...(options.headers || {}), Authorization: `Bearer ${accessToken}`};
-  const r = await fetch(path, {...options, headers});
-  if (r.status === 401) {
-    accessToken = null;
-    sessionStorage.removeItem('youhuo_elder_token');
-    await login();
-    return api(path, options);
-  }
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const error = new Error(data.detail || `请求失败（${r.status}）`);
-    error.status = r.status;
-    throw error;
-  }
-  return data;
+// 身份、登录、401 重放和令牌缓存都在 common.js 里。它是经典脚本，在这个模块之前
+// 执行，`window.YouHuo` 对模块一样可见。
+//
+// 这一页原来那份 `api()` 是五份里唯一把 `status` 挂到 Error 上的——`postChat` 靠它
+// 区分 400 去重建会话。共用实现保留了这个行为，另外四页现在也一并有了。
+function api(path, options = {}) {
+  return window.YouHuo.api(path, options, 'elder');
 }
 
 async function resolveIdentity() {
   if (IDENTITY) return IDENTITY;
-  IDENTITY = window.YouHuoIdentity
-    ? await window.YouHuoIdentity.ready()
-    : {elderId: 'elder-demo', elderToken: null};
+  IDENTITY = await window.YouHuo.ready();
   ELDER_ID = IDENTITY.elderId;
   return IDENTITY;
 }
 
 async function login() {
-  const identity = await resolveIdentity();
-  // The visitor endpoint already minted a token for this sandbox; reuse it
-  // rather than logging in again as a household that may not be 'elder-demo'.
-  if (identity.elderToken) {
-    accessToken = identity.elderToken;
-    sessionStorage.setItem('youhuo_elder_token', accessToken);
-    return;
-  }
-  const r = await fetch('/v2/auth/demo', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({actor_id: ELDER_ID})
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.detail || '老人端演示登录失败');
-  accessToken = data.access_token;
-  sessionStorage.setItem('youhuo_elder_token', accessToken);
+  await resolveIdentity();
+  await window.YouHuo.login('elder');
 }
 
 async function loadProfile() {
@@ -257,7 +230,9 @@ async function loadProfile() {
 
 /** Probe the offline voice once logged in; silently keeps browser speech if absent. */
 async function loadVoiceMode() {
-  configureNeuralVoice({getToken: () => accessToken});
+  // 每次现取，而不是闭包捕获一个当时的值：401 重放换了令牌之后，捕获的那个就是
+  // 过期的，而音频流失败只会表现成"这句没读出来"。
+  configureNeuralVoice({getToken: () => window.YouHuo.token('elder')});
   const pill = document.querySelector('#voicePill');
   const status = await probeNeuralVoice();
   if (!pill) return;

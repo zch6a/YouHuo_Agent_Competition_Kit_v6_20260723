@@ -1,39 +1,21 @@
-let token = sessionStorage.getItem('youhuo_judge_token');
 const statusEl = document.querySelector('#judgeStatus');
 
-// Resolved from identity.js: on a public deployment this browser owns its own
-// demo household, and posting a different family's elder_id would be rejected.
-let IDS = {elderId: 'elder-demo', daughterId: 'daughter-demo', familyToken: null};
+// 这一页以家属身份走全流程。身份、登录、401 重放都在 common.js 里；此前这一页没有
+// 401 重放，令牌一过期，五步导览就会在评委面前静默失败。
+let IDS = {elderId: 'elder-demo', daughterId: 'daughter-demo'};
 
 async function resolveIdentity() {
-  if (window.YouHuoIdentity) IDS = await window.YouHuoIdentity.ready();
+  IDS = await window.YouHuo.ready();
   return IDS;
 }
 
 async function login() {
-  const ids = await resolveIdentity();
-  if (ids.familyToken) {
-    token = ids.familyToken;
-    sessionStorage.setItem('youhuo_judge_token', token);
-    return;
-  }
-  const response = await fetch('/v2/auth/demo', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({actor_id: ids.daughterId})
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.detail || '演示登录失败');
-  token = data.access_token;
-  sessionStorage.setItem('youhuo_judge_token', token);
+  await resolveIdentity();
+  await window.YouHuo.login('family');
 }
 
-async function api(path, options={}) {
-  if (!token) await login();
-  const headers = {...(options.headers || {}), Authorization: `Bearer ${token}`};
-  const response = await fetch(path, {...options, headers});
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || `请求失败（${response.status}）`);
-  return data;
+function api(path, options = {}) {
+  return window.YouHuo.api(path, options, 'family');
 }
 
 function showJSON(id, data) {

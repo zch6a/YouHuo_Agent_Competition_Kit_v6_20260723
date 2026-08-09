@@ -69,7 +69,6 @@ function weeklyValue(key, value) {
   return String(value);
 }
 
-let accessToken = sessionStorage.getItem('youhuo_family_token');
 const tasksEl = document.querySelector('#tasks');
 const auditEl = document.querySelector('#audit');
 const chainEl = document.querySelector('#chain');
@@ -78,42 +77,21 @@ const noticesEl = document.querySelector('#notices');
 const weeklyEl = document.querySelector('#weekly');
 const dailyEl = document.querySelector('#dailyReport');
 
+// 身份、登录、401 重放和令牌缓存都在 common.js 里。
 async function resolveIdentity() {
   if (IDENTITY) return IDENTITY;
-  IDENTITY = window.YouHuoIdentity
-    ? await window.YouHuoIdentity.ready()
-    : {elderId: 'elder-demo', daughterId: 'daughter-demo', familyToken: null};
+  IDENTITY = await window.YouHuo.ready();
   ELDER_ID = IDENTITY.elderId;
   return IDENTITY;
 }
 
 async function login() {
-  const identity = await resolveIdentity();
-  if (identity.familyToken) {
-    accessToken = identity.familyToken;
-    sessionStorage.setItem('youhuo_family_token', accessToken);
-    return;
-  }
-  const r = await fetch('/v2/auth/demo', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({actor_id: identity.daughterId})
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.detail || '家属端演示登录失败');
-  accessToken = data.access_token;
-  sessionStorage.setItem('youhuo_family_token', accessToken);
+  await resolveIdentity();
+  await window.YouHuo.login('family');
 }
 
-async function api(path, options = {}) {
-  if (!accessToken) await login();
-  const headers = {...(options.headers || {}), Authorization: `Bearer ${accessToken}`};
-  const r = await fetch(path, {...options, headers});
-  if (r.status === 401) {
-    accessToken = null; sessionStorage.removeItem('youhuo_family_token'); await login(); return api(path, options);
-  }
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.detail || `请求失败（${r.status}）`);
-  return data;
+function api(path, options = {}) {
+  return window.YouHuo.api(path, options, 'family');
 }
 
 function line(parent, text, className = '') {
@@ -301,22 +279,16 @@ async function loadWeekly() {
 // 与既有的情绪周报刻意不同：周报是"这一周发生了什么"，日报是"今天和他自己的常态
 // 比，怎么样"。所以这里先画结论，再画分项——一份把结论埋在第四行的日报，子女读两
 // 次就不会再读第三次了。
-const VERDICT_TEXT = {
-  typical: ['和平常一样', 'good'],
-  notice: ['有一点不同', 'warn'],
-  marked: ['和平常不太一样', 'bad'],
-  // unknown 和 pending 不是一回事：pending 是"今天还没过完"，unknown 是"本该有
-  // 记录却一条都没有"。后者在养老场景里是要看见的，所以给它警示色。
-  unknown: ['还没有记录', 'warn'],
-  pending: ['还不好说', ''],
-};
+// 五个判定词的表在 common.js 里（care.js 曾有一份键与文案完全相同的副本）。
+// pending 与 unknown 的区别是这个功能的要害，那个说明也在那边。
+const verdictOf = window.YouHuo.verdictOf;
 
 function renderDailyReport(envelope) {
   const {report, alert} = envelope;
   dailyEl.replaceChildren();
 
   // 1. 结论。一句话，最大字号，带颜色。
-  const [word, tone] = VERDICT_TEXT[report.overall] || VERDICT_TEXT.unknown;
+  const [word, tone] = verdictOf(report.overall);
   const verdict = document.createElement('div');
   verdict.className = `report-verdict ${tone}`;
   const badge = document.createElement('span');
@@ -340,7 +312,7 @@ function renderDailyReport(envelope) {
     const block = document.createElement('div');
     block.className = 'report-section';
     const title = document.createElement('h3');
-    const [sword, stone] = VERDICT_TEXT[section.verdict] || VERDICT_TEXT.unknown;
+    const [sword, stone] = verdictOf(section.verdict);
     title.textContent = section.title;
     const tag = document.createElement('span');
     tag.className = `pill ${stone}`;

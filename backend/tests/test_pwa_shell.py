@@ -144,6 +144,32 @@ def test_no_native_dialogs(script):
     assert not found, f"{script} 里还有原生对话框：{sorted(set(found))}"
 
 
+#: 页面脚本。请求层归 common.js 独有。
+#:
+#: identity.js 不在内：它做的是访客沙箱开通（POST /v2/auth/visitor），是身份的来源
+#: 而不是消费者。speech.js 也不在内：它是被 configureNeuralVoice 注入令牌的音频库，
+#: 自己不登录、不知道有几种角色。
+_PAGE_SCRIPTS = ["elder.js", "family.js", "care.js", "trust.js", "judge.js"]
+
+
+@pytest.mark.parametrize("script", _PAGE_SCRIPTS)
+def test_only_one_file_owns_the_request_layer(script):
+    """五个页面曾各写一份 api()/login()，而且已经分叉。
+
+    只有 elder 和 family 有 401 自动重放；只有 elder 把 status 挂到 Error 上
+    （postChat 靠它区分 400 去重建会话）；trust 无条件写 `Bearer ` 后面什么都没有；
+    演示身份兜底 'elder-demo' 硬编码了四份。
+
+    这不是洁癖：同一段代码抄五遍，就会有五个版本各自正确、各自不同。让 /care 和
+    /trust 两整页全死的那个 TDZ 笔误，正是这样在两个文件里同时存在的。
+    """
+    source = (STATIC / script).read_text(encoding="utf-8")
+    source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
+    source = re.sub(r"//[^\n]*", "", source)
+    assert "/v2/auth/demo" not in source, f"{script} 又自己实现了演示登录"
+    assert "Bearer" not in source, f"{script} 又自己拼 Authorization 头"
+
+
 def test_service_worker_bails_out_before_responding():
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
     # 直接放行，而不是先缓存再过滤。

@@ -219,11 +219,21 @@ def test_a_local_morning_lands_in_the_local_day(client, elder_auth):
     于是"平常起床时间"学成了前一天深夜。这类错误不报错，只会给出很有说服力的
     错误结论，而这份结论会被发给子女。
     """
-    # 北京时间今天早上 6:30，一个完全正常的起床时刻——如果那个点还没到（凌晨跑），
-    # 就退到今天已经过去的那一段里去。要验的性质与具体钟点无关：本地时刻写进去，
-    # 读出来必须是同一个本地时刻。按 UTC 分天的话，它要么落进昨天、要么差 8 小时。
-    normal_hour = local_today_at(6, 30)
-    local_wake = normal_hour or elapsed_fraction_today(0.5)
+    # 北京时间今天清晨 5:40。三个约束同时满足才选得出这个时刻：
+    #
+    #  * 必须已经过去——否则就是一条未来的活动记录，写入侧会拒（422）；
+    #  * 必须**早于播种的 06:05±12 分**，否则它不是当天第一次活动，读回来的就是
+    #    播种那条而不是我们写的这条。原先写的是 6:30，断言又只是 `startswith("06:")`
+    #    ——06:05 和 06:30 都以 "06:" 开头，所以这条测试其实一直在为播种数据背书，
+    #    过了 6 点半之后才因为收紧成精确比较而暴露；
+    #  * 相对 06:05 的常态要够近（差 25 分，正好一个 spread 下限），这样 verdict
+    #    仍然是 typical，那条断言才有意义。
+    #
+    # 5:40 之前跑（凌晨）就退到今天已过去的那一段，那时今天还没有任何播种记录，
+    # 我们这条自然是第一条。要验的性质与具体钟点无关：本地时刻写进去，读出来必须是
+    # 同一个本地时刻。按 UTC 分天的话，它要么落进昨天、要么差 8 小时。
+    normal_hour = local_today_at(5, 40)
+    local_wake = normal_hour or elapsed_fraction_today(0.4)
     response = client.post(
         "/v4/safety/heartbeat",
         headers=elder_auth,
@@ -239,7 +249,7 @@ def test_a_local_morning_lands_in_the_local_day(client, elder_auth):
         f"起床时刻按本地读应当是 {local_wake.strftime('%H:%M')}，实际 {wake['observed_text']}"
     )
     if normal_hour is not None:
-        # 6:30 相对 6:05 的常态是正常的；只有在真用上 6:30 时这条才成立。
+        # 5:40 相对 6:05 的常态只差 25 分，是正常范围；只有真用上 5:40 时这条才成立。
         assert wake["verdict"] == "typical", wake["explanation"]
 
 

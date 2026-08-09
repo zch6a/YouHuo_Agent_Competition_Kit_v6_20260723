@@ -1,52 +1,20 @@
 'use strict';
 
-const state = { elderToken: '', familyToken: '',
-  // Resolved in bootstrap() from identity.js: on a public deployment each
-  // browser owns an isolated demo household, so these are not fixed. The
-  // literals below are only the fallback for when identity.js is unavailable,
-  // and they match the SHARED household in that file.
-  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo' };
-const byId = (id) => document.getElementById(id);
-
-function pretty(value) {
-  return JSON.stringify(value, null, 2);
-}
-
-async function api(path, options = {}, role = 'elder') {
-  const token = role === 'family' ? state.familyToken : state.elderToken;
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(path, { ...options, headers });
-  const body = await response.json().catch(() => ({ detail: '非JSON响应' }));
-  if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
-  return body;
-}
-
-async function login(actorId) {
-  const response = await fetch('/v2/auth/demo', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actor_id: actorId })
-  });
-  if (!response.ok) throw new Error(`演示登录失败：${actorId}`);
-  return (await response.json()).access_token;
-}
+// 身份、登录、401 重放和令牌缓存都在 common.js 里。这一页只留下它自己的状态。
+const {api, byId, pretty} = window.YouHuo;
+const state = {elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
 function setOutput(id, value) {
   byId(id).textContent = typeof value === 'string' ? value : pretty(value);
 }
 
-async function resolveIdentity() {
-  if (!window.YouHuoIdentity) return;
-  const identity = await window.YouHuoIdentity.ready();
-  state.elderId = identity.elderId;
-  state.daughterId = identity.daughterId;
-  state.systemId = identity.systemId;
-}
-
 async function bootstrap() {
   try {
-    await resolveIdentity();
-    [state.elderToken, state.familyToken] = await Promise.all(
-      [login(state.elderId), login(state.daughterId)]);
+    const ids = await window.YouHuo.ready();
+    state.elderId = ids.elderId;
+    state.daughterId = ids.daughterId;
+    state.systemId = ids.systemId;
+    await Promise.all([window.YouHuo.login('elder'), window.YouHuo.login('family')]);
     byId('status').textContent = '演示账户已就绪：老人本人负责同意，家属负责建议与高风险接力。';
   } catch (error) {
     byId('status').textContent = `初始化失败：${error.message}`;
@@ -58,16 +26,15 @@ async function bootstrap() {
 // 这一块不是又一个 JSON 输出框。它要回答的是设计稿里那个具体问题："老人 A 每天上午
 // 散步，老人 B 每天上午在家读书"——所以先把**他自己的**常态一行行摆出来，再说今天。
 const CHANNEL_ICON = { wake: '起床', sleep: '就寝', outing: '外出', medication: '服药', conversation: '说话' };
-const VERDICT_PILL = { typical: ['和平常一样', 'good'], notice: ['有一点不同', 'warn'],
-                       marked: ['和平常不太一样', 'bad'],
-                       unknown: ['还没有记录', 'warn'], pending: ['还不好说', ''] };
+// 判定词表在 common.js 里，与家属端共用一份——此前两边各写一份、键与文案完全相同。
+const verdictOf = window.YouHuo.verdictOf;
 
 function renderBaseline(snapshot, care) {
   const host = byId('baselineOutput');
   host.replaceChildren();
 
   const head = document.createElement('div');
-  const [word, tone] = VERDICT_PILL[snapshot.overall] || VERDICT_PILL.unknown;
+  const [word, tone] = verdictOf(snapshot.overall);
   head.className = `report-verdict ${tone}`;
   const badge = document.createElement('span');
   badge.className = 'report-badge';
@@ -154,9 +121,10 @@ byId('coldRoomDemo').addEventListener('click', async () => {
 // 让偏离真的发生一次。
 //
 // 不是把界面切到"异常"配色看看效果——那是假的。这里真的往 /v4/safety/heartbeat 写
-// 一条 11:20 的活动记录，然后整条链路（事件流 → 推导观测 → 与他自己的常态比 → 关怀
-// 动作）自己得出结论。演示里能看到的东西，和真实运行时是同一条路径。
-// 演示用的偏离时刻必须是**已经发生过的**。
+// 一条活动记录，然后整条链路（事件流 → 推导观测 → 与他自己的常态比 → 关怀动作）
+// 自己得出结论。演示里能看到的东西，和真实运行时是同一条路径。
+//
+// 而且这个时刻必须是**已经发生过的**。
 //
 // 原先写死"今天 11:20"。在 11:20 之前按下这个按钮，那是一条未来的活动记录：后端现在
 // 会 422 拒掉（因为一条未来心跳会让无交互预警永久失效），而在加那道校验之前，它会被
