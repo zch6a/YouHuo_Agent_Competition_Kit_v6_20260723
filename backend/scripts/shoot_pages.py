@@ -27,10 +27,18 @@ from pathlib import Path
 DEVTOOLS_PORT = 9333
 
 #: Real devices worth checking, plus the smallest phone still in wide use.
+#:
+#: The two 鸿蒙 form factors matter for this project specifically: the target
+#: platform ships foldables, and the layout switches at 760px — a folded Mate X
+#: is just under it and an unfolded one just over, so the fold crosses the
+#: breakpoint. Testing only 390 and 1360 never exercises that transition.
 VIEWPORTS = {
     "iphone-se": (375, 667, 2),
     "iphone-14": (390, 844, 3),
     "pixel-7": (412, 915, 3),
+    "fold-closed": (344, 882, 3),    # Mate X5 外屏，比 iPhone SE 还窄
+    "fold-open": (720, 748, 3),       # Mate X5 内屏展开，仍在 760px 断点之下
+    "tablet": (800, 1200, 2),         # MatePad 竖屏，刚过断点
     "desktop": (1360, 900, 1),
 }
 PAGES = ["/elder", "/family", "/care", "/trust", "/judge", "/"]

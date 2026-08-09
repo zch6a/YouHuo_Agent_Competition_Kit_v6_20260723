@@ -1639,6 +1639,9 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
 
   #chat {
     background: none;
+    /* 边框和背景、圆角要一起去掉。只去掉后两者会留下一个几乎看不见的方框——
+       在窄屏上被贴边掩盖，在展开的折叠屏上就露出来了。 */
+    border: 0;
     border-radius: 0;
     /* Gutter on the scroller, not on the bubbles. Putting it on `#chat > *`
        makes every bubble full-bleed with inner padding, so they run edge to
@@ -1647,6 +1650,20 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
     padding: 0 var(--space-4);
     display: flex;
     flex-direction: column;
+  }
+
+  /* An unfolded Mate X is 720px wide and still gets this layout — the fold
+     crosses the 760px breakpoint. At that width a bubble at 93% is ~670px, i.e.
+     a 40-character line of Chinese; the eye loses the start of the next line.
+     Cap the conversation at a readable measure and centre it, so unfolding the
+     phone gives more *margin* rather than longer lines. */
+  @media (min-width: 600px) {
+    /* 收窄的是**整根栏**，加在 stage 上，于是角色头、对话、麦克风和输入框共用
+       同一条左边线。分别给每个元素加 max-width + margin:auto 会让它们各自居中，
+       结果是角色头居中、气泡靠左，两条对不齐的边。
+       用内边距而不是给气泡加 margin:auto 还有一个原因：后者会把每个气泡也居中，
+       "老人说的靠右、优活说的靠左"这条区分就没了。 */
+    .elder-layout > .stage { padding-inline: calc((100% - 560px) / 2); }
   }
 
   /* Conversations grow upward from the composer. With the opening line pinned
@@ -1823,6 +1840,47 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
   /* 38px chips beside a 26px heading crowd the title on a narrow column. */
   .head-icon { width: 34px; height: 34px; }
   .head-icon svg { width: 18px; height: 18px; }
+
+  /* ----------------------------------------------------------------------
+     首页 hero。实测在 390x844 上它自己就有 934px——比整块屏幕还高。
+     ---------------------------------------------------------------------- */
+
+  /* 标志和「优活」同一行，副标题独占一整行。
+     并排全部三者时标题块只剩 228px，副标题被挤成两行且断在「低认知 / 负担」——
+     一个把词组从中间劈开的换行。而把标志单独放一行又白花 62px。
+
+     `display: contents` 把 h1/h2 从包装 div 里"提"出来，成为网格的直接子项，于是
+     不动 HTML 就能让它们各就各位（桌面端仍用原来的并排布局）。 */
+  .hero-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+  }
+  /* `:not(.hero-mark)` 不是防御性写法——标志本身就是一个 div，少了这个否定条件
+     它也会被 `display: contents` 抹掉盒子，实测高度直接变成 0。 */
+  .hero-head > div:not(.hero-mark) { display: contents; }
+  .hero-mark { grid-row: 1; grid-column: 1; }
+  .hero-head h1 { grid-row: 1; grid-column: 2; }
+  .hero-head h2 { grid-row: 2; grid-column: 1 / -1; }
+
+  /* 九个关键词占了 202px、堆成七行——一屏的四分之一给了一堆没有层次的名词。
+     它是标签条不是导航，所以改成单行横向滚动：高度 202 -> 44px。
+     右侧渐隐是在说"右边还有"，否则横向可滚动这件事在触屏上没有任何提示。 */
+  .innovation-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    /* 负外边距 + 内边距：滚动条两端贴到卡片边缘，而不是在中间突兀地截断。 */
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .innovation-strip::-webkit-scrollbar { display: none; }
+  .innovation-strip > span { flex: 0 0 auto; }
 
   /* ----------------------------------------------------------------------
      Bottom tab bar.
