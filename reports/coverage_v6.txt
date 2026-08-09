@@ -18,7 +18,7 @@ backend\youhuo\memory_vault.py           92      2    98%
 backend\youhuo\models.py                204      0   100%
 backend\youhuo\orchestration.py         157      4    97%
 backend\youhuo\privacy.py                78     17    78%
-backend\youhuo\security.py              176     10    94%
+backend\youhuo\security.py              181     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
 backend\youhuo\services.py              174     20    89%
 backend\youhuo\teach_back.py            119     11    91%
@@ -39,4 +39,4 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7615    699    91%
+TOTAL                                  7620    699    91%

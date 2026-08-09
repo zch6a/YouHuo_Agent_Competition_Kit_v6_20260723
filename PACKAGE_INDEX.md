@@ -55,7 +55,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：705项自动化测试；
+- `backend/tests/`：902项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -63,10 +63,11 @@
 - `run_chaos_v5.py`：400个Saga成功/失败补偿场景；
 - `run_load_v6.py`：5,000请求、100并发真实Uvicorn回环负载；
 - `run_http_smoke_v6.py`：v6真实HTTP闭环；
-- `check_browser_js.py`：按真实加载方式（script/module）校验前端脚本；
+- `check_browser_js.py`：按真实加载方式（script/module）**解析**前端脚本。只解析、不执行——它对运行时错误是盲的，必须与下一条配对使用；
+- `check_page_runtime.py`：六个页面在真实浏览器里加载，再把每一页上每个可见可用的按钮**逐个按过**（当前 41 个），断言无未捕获异常、无 `console.error`、无同源 4xx/5xx、无原生对话框。加这一条的直接原因是 `care.js` / `trust.js` 曾在第一条语句就抛 `ReferenceError`，两页所有按钮全是死的，而只解析的检查一直是绿的；
 - `check_speech_text.mjs`：29项朗读文本规范化断言；
 - `check_contrast.py`：6个页面×明暗两模式的 WCAG AA、**非文字（图标）对比度 1.4.11** 与触控尺寸审计；
-- `check_arkts.py`：鸿蒙端九类静态检查，其中 `@kit.*` 符号归属按公开 OpenHarmony SDK 的 1159 个符号逐个核对；
+- `check_arkts.py`：鸿蒙端十一类静态检查。`@kit.*` 符号归属按公开 OpenHarmony SDK 的 1159 个符号逐个核对；另含**页面可达性**（任何 `.ets` 不得既未登记为路由页面、又不被任何文件引入）、登记页面必须有 `@Entry`、禁用已废弃的 `router`；
 - `shoot_pages.py`：七种视口（含折叠屏内外屏、平板）× 明暗两模式的真机尺寸截图；
 - `verify_features_v6.py` / `run_feature_audit.py`：130项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
 - `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）；
@@ -90,9 +91,11 @@
 
 ## 发布统计
 
-- FastAPI OpenAPI路径：99个；
+- FastAPI OpenAPI路径：99个；OpenAPI 操作覆盖：103/103；
 - 小艺Skill：13个；
-- 自动化测试：705项；逐功能验收：130项；
-- 核心Python语句覆盖率：90%。
+- 自动化测试：902项；逐功能验收：130项；
+- 页面运行时闸门：6个页面、41个控件逐个按过；
+- 核心Python语句覆盖率：91%。
 
-`MANIFEST.sha256` 与包内文件计数需在重新打包时用同一脚本重算，本轮改动后尚未重新生成。
+以上全部是 `verify_all` 单次运行的实测输出，不是估计值。`MANIFEST.sha256` 由
+`backend/scripts/make_release.py` 在打包时按 `git ls-files` 重算。
