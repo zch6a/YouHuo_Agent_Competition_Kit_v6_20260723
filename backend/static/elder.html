@@ -65,7 +65,10 @@
             <button data-text="提醒我明天上午九点复诊">演示提醒</button>
           </div>
           <div class="controls">
-            <input id="text" aria-label="对优活说" placeholder="也可以打字：帮我挂明天下午的骨科号" />
+            <!-- 短。原来是「也可以打字：帮我挂明天下午的骨科号」，在 390px 宽的屏幕上
+                 从「下午」就被截断了——一个被截断的例句既没教会任何事，又让输入框
+                 看起来像是坏的。 -->
+            <input id="text" aria-label="对优活说" placeholder="也可以打字" />
             <button id="send">发送</button>
           </div>
           <!-- The sheet is reachable by a real labelled button, not only by a

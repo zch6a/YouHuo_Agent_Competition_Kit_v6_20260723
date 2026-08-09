@@ -1607,6 +1607,64 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
     margin-bottom: 0;
   }
 
+  /* ----------------------------------------------------------------------
+     One card, not three.
+
+     Measured on the conversation screen at 390px, the chain from the screen
+     edge to a line of text was:
+
+       main.shell   16px padding                       -> 358
+       .panel.stage white, 18px radius, shadow, 20px   -> 318
+       #chat        grey,  18px radius,          13px  -> 290
+       .bubble      white, 18px radius, shadow,  20px  -> 231
+
+     Three concentric rounded rectangles, and 41% of the screen spent on chrome
+     before a single character. Nested cards are also the clearest "this is a
+     web page" signal there is: an app screen has a background and content on
+     it, not a card inside a card inside a card.
+
+     So on a phone the stage and the chat list stop being cards — they are
+     layout containers, and they say so. The bubble keeps the white fill, the
+     radius and the shadow, because it is the one thing here that genuinely is
+     an object. Text width goes 231 -> ~300px.
+     ---------------------------------------------------------------------- */
+  .elder-layout > .stage {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .elder-layout > .stage::before { content: none; }   /* the card's top hairline */
+
+  #chat {
+    background: none;
+    border-radius: 0;
+    /* Gutter on the scroller, not on the bubbles. Putting it on `#chat > *`
+       makes every bubble full-bleed with inner padding, so they run edge to
+       edge and lose their shape — the bubble is the one object here and it
+       needs to look like one. */
+    padding: 0 var(--space-4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Conversations grow upward from the composer. With the opening line pinned
+     to the top there is a 250px void between it and the microphone, and the
+     screen reads as empty rather than as ready.
+     `margin-top: auto` on the first child rather than `justify-content:
+     flex-end` on the container: the latter clips the top of the content once
+     it overflows, which is a well-known flexbox scrolling bug and would hide
+     the beginning of a long answer. */
+  #chat > *:first-child { margin-top: auto; }
+
+  /* Edge to edge. The gutter now lives on the things inside, so the bubbles and
+     the composer line up with the app bar instead of with a card edge. */
+  main.shell.app-frame { padding-left: 0; padding-right: 0; }
+  .app-bar,
+  .role-header,
+  .composer { padding-left: var(--space-4); padding-right: var(--space-4); }
+
   /* The conversation takes whatever the fixed furniture leaves, and scrolls. */
   #chat {
     flex: 1;
