@@ -1848,16 +1848,23 @@ body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease
      the thumb mid-tap, which reads as a misfire. */
   .tab:active svg { transform: scale(.88); }
 
-  /* The 首页 tab does what this link did, from a better place. */
-  .back-link { display: none; }
+  /* The 首页 tab does what this link did, from a better place — but ONLY on the
+     pages that actually have a tab bar.
+     The conversation screen deliberately has no tab bar (see above), so hiding
+     its back link left a 78-year-old with no way out of that screen at all.
+     Scoped to `:not(.app-frame)`, which is exactly "has a tab bar". */
+  main.shell:not(.app-frame) .back-link { display: none; }
 }
 
 /* Installed to the home screen there is no browser UI to lean on, so the app
    supplies its own top inset. */
 @media (display-mode: standalone), (display-mode: minimal-ui) {
   .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
-  /* A back link to a page the user cannot see the URL of is just confusing. */
-  .back-link { display: none; }
+  /* A back link to a page the user cannot see the URL of is just confusing —
+     but only where there is another way out. Same scoping as the ≤760px rule:
+     the conversation screen has no tab bar, so hiding its back link would leave
+     it with no exit at all. */
+  main.shell:not(.app-frame) .back-link { display: none; }
 }
 
 /* On a wide viewport the extras are the sidebar they have always been: none of

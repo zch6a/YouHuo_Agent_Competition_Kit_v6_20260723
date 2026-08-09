@@ -101,6 +101,33 @@ def test_tab_icons_are_decorative_not_announced(page: str, _: str):
         assert 'aria-hidden="true"' in svg, "标签栏里的图标必须 aria-hidden"
 
 
+def test_every_screen_has_some_way_out():
+    """没有标签栏的那一屏，返回链接就不能藏。
+
+    这条测试是被一次真实的死路换来的：底部标签栏取代了「← 返回首页」，于是
+    `.back-link { display: none }` 一刀切地藏掉了所有返回链接——包括老人端，
+    而老人端**故意没有**标签栏。结果是手机上那一屏没有任何出口，而落在里面的
+    正是最没办法自己绕出去的那位用户。
+    """
+    for page in STATIC.glob("*.html"):
+        html = page.read_text(encoding="utf-8")
+        if "class=\"tabbar\"" in html:
+            continue          # 有标签栏，返回链接可以藏
+        if "back-link" not in html:
+            continue          # 本来就没有返回链接的页面不在讨论范围
+        assert "app-frame" in html, (
+            f"{page.name} 没有标签栏，它的返回链接必须可见；"
+            "而隐藏规则限定在 :not(.app-frame)，所以这一页必须带 app-frame"
+        )
+    # 隐藏规则本身必须是限定过的，不能是一刀切。
+    assert "main.shell:not(.app-frame) .back-link" in CSS, (
+        "返回链接的隐藏规则没有限定范围——没有标签栏的屏幕会变成死路"
+    )
+    assert not re.search(r"^\s*\.back-link\s*\{\s*display:\s*none", CSS, re.M), (
+        "存在一条一刀切隐藏 .back-link 的规则"
+    )
+
+
 def test_the_conversation_screen_has_no_tab_bar():
     html = (STATIC / "elder.html").read_text(encoding="utf-8")
     assert 'class="tabbar"' not in html, (
