@@ -1,4 +1,4 @@
-﻿# 优活 Agent v6.0 交付索引
+# 优活 Agent v6.0 交付索引
 
 ## 首先查看
 
@@ -58,7 +58,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：902项自动化测试；
+- `backend/tests/`：939项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -96,7 +96,7 @@
 
 - FastAPI OpenAPI路径：99个；OpenAPI 操作覆盖：103/103；
 - 小艺Skill：13个；
-- 自动化测试：902项；逐功能验收：130项；
+- 自动化测试：939项；逐功能验收：130项；
 - 页面运行时闸门：6个页面、41个控件逐个按过；
 - 核心Python语句覆盖率：91%。
 
