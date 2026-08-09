@@ -44,7 +44,9 @@
 
 - `harmonyos/.../FinalistWalkthroughPage.ets`：v6决赛导览ArkTS页面；
 - `CoreSpeechAdapter.ets`、`PushSafetyAdapter.ets`、`DistributedProfileAdapter.ets`、`AgentCompanionAdapter.ets`：官方能力接入边界，不冒充已联调；
-- `xiaoyi/plugin_openapi_v6.generated.json`：由当前FastAPI生成，94个路径；
+- `harmonyos/.../services/AudioCapture.ets`：16kHz/单声道/16bit PCM 采集，参数逐个对过 SDK 声明；
+- `harmonyos/.../services/SpeechInput.ets`：端侧语音识别接入；全工程唯一引用 Core Speech Kit 的文件（该 kit 不在公开 SDK 中，无法离线核实，已单独隔离）；
+- `xiaoyi/plugin_openapi_v6.generated.json`：由当前FastAPI生成，99个路径；
 - `xiaoyi/workflows/youhuo_workflow.json`：平台中立v6工作流蓝图；
 - `xiaoyi/skills/*/SKILL.md`：13个可组合Skill；
 - `xiaoyi/a2a/agent_card.json`：Agent能力声明；
@@ -52,7 +54,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：634项自动化测试；
+- `backend/tests/`：635项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -62,7 +64,9 @@
 - `run_http_smoke_v6.py`：v6真实HTTP闭环；
 - `check_browser_js.py`：按真实加载方式（script/module）校验前端脚本；
 - `check_speech_text.mjs`：29项朗读文本规范化断言；
-- `check_contrast.py`：6个页面×明暗两模式的 WCAG AA 与触控尺寸审计；
+- `check_contrast.py`：6个页面×明暗两模式的 WCAG AA、**非文字（图标）对比度 1.4.11** 与触控尺寸审计；
+- `check_arkts.py`：鸿蒙端九类静态检查，其中 `@kit.*` 符号归属按公开 OpenHarmony SDK 的 1159 个符号逐个核对；
+- `shoot_pages.py`：七种视口（含折叠屏内外屏、平板）× 明暗两模式的真机尺寸截图；
 - `verify_features_v6.py` / `run_feature_audit.py`：130项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
 - `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）；
 - `verify_all.*`：确定性日常回归；
@@ -85,9 +89,9 @@
 
 ## 发布统计
 
-- FastAPI OpenAPI路径：94个；
+- FastAPI OpenAPI路径：99个；
 - 小艺Skill：13个；
-- 自动化测试：634项；逐功能验收：130项；
+- 自动化测试：635项；逐功能验收：130项；
 - 核心Python语句覆盖率：90%。
 
 `MANIFEST.sha256` 与包内文件计数需在重新打包时用同一脚本重算，本轮改动后尚未重新生成。

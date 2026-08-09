@@ -81,7 +81,7 @@
 - 双色身份光效系统：#4A90D9/#F5A623、蓝紫呼吸光、橙黄倾听脉冲、约1秒淡入淡出与模式切换语音播报；
 - `/judge` 五分钟评委导览；
 - HarmonyOS决赛导览页，以及Core Speech、Push、跨设备档案和端A2A适配边界；
-- 13个小艺Skill、v6工作流、A2A Agent Card和89路径OpenAPI；
+- 13个小艺Skill、v6工作流、A2A Agent Card和99路径OpenAPI；
 - VoiceBench-v6：800条合成ASR候选测试；
 - v6新增500,000项确定性性质断言。
 
@@ -240,7 +240,7 @@ curl -L -o ohos-sdk.tar.gz \
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           634项自动化测试
+backend/tests/           635项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -296,7 +296,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、634项测试与覆盖率、130项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、635项测试与覆盖率、130项逐功能验收、12个页面/模式无障碍、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -312,7 +312,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**634/634通过**；
+- pytest：**635/635通过**；
 - 逐功能端到端验收：**130/130通过**，OpenAPI 操作覆盖 **103/103**；
 - 核心Python语句覆盖率：**90%**；
 - ElderBench：**34/34、120/120、300/300通过**；
@@ -321,7 +321,7 @@ python -m pip install -r requirements.txt
 - v5回归性质断言：**1,000,000/1,000,000通过**；
 - Saga故障恢复：**400/400场景、1,400/1,400断言通过**；
 - 真实Uvicorn回环：**5,000/5,000请求成功，100并发**；
-- OpenAPI：**94个路径**；小艺Skill：**13个**。
+- OpenAPI：**99个路径**；小艺Skill：**13个**。
 
 准确解释见 `reports/TEST_REPORT.md`。合成文本和软件断言不是老人用户实验，也不代表真实医院、支付、语音或鸿蒙设备调用。
 
