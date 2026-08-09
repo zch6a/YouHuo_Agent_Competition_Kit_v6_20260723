@@ -188,10 +188,20 @@ def main() -> int:
             print("FAIL contrast_v6: server did not start")
             return 1
 
+        # 每轮一个全新 profile，这一条不是可选项。
+        #
+        # 这个应用注册了 service worker 来缓存外壳，那正是它的用途。用持久
+        # --user-data-dir，那个 worker 会跨轮存活并供应**上一次构建**的 HTML。
+        # 样式表从一个 style.css 拆成四层的那一轮，它就骗过了这个检查：缓存里的旧
+        # HTML 仍然引着已经删掉的 style.css，于是页面一条样式都没加载，报出来是
+        # 满屏"对比度 1<4.5"——看起来像配色崩了，实际是在量一个不存在的版本。
+        # shoot_pages.py 早就为同一件事付过代价，这里当时没跟上。
+        profile = Path(os.environ.get("TEMP", "/tmp")) / "youhuo-contrast"
+        shutil.rmtree(profile, ignore_errors=True)
         browser_proc = subprocess.Popen(
             [chrome, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
              f"--remote-debugging-port={DEVTOOLS_PORT}", "--remote-allow-origins=*",
-             f"--user-data-dir={os.environ.get('TEMP', '/tmp')}/youhuo-contrast", "about:blank"],
+             f"--user-data-dir={profile}", "about:blank"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         ws_url = None

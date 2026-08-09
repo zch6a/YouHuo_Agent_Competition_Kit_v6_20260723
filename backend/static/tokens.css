@@ -1,0 +1,219 @@
+/* 设计令牌：颜色、间距、圆角、阴影、字阶、动效。
+ *
+ * 这一层只声明自定义属性，不产生任何一条可见规则。深色模式的覆写也在这里——它同样
+ * 只换值，不换结构。
+ *
+ * 四层的加载顺序（tokens -> base -> components -> pages）就是层叠顺序，六个页面都必须
+ * 按这个顺序引，见 backend/tests/test_stylesheet_layers.py。
+ */
+/* ==========================================================================
+   优活 Agent v6 — design system
+   All styling lives in this file: the app ships a strict CSP (style-src 'self'),
+   so no inline <style> blocks and no style="" attributes are allowed.
+   No web fonts either (font-src falls back to 'self'), so the type stack is
+   built from high-quality system Chinese faces.
+   ========================================================================== */
+
+:root {
+  /* --- brand: design §4.1 dual-role identity ------------------------------ */
+  --youhuo-blue: #4A90D9;
+  --youhuo-blue-deep: #2F6FB5;
+  /* 强调色的"墨水"版本：专门给文字和图标用，与渐变用的 -deep 分开。
+     两者不能是同一个令牌——-deep 同时是按钮/麦克风渐变的暗端，把它整体提亮会让
+     那些控件变浅；而在深色模式下不提亮，文字和图标就读不出来。实测 #2F6FB5 在
+     深色表面上只有 2.77–3.66:1，小字号要求 4.5。 */
+  --youhuo-blue-ink: var(--youhuo-blue-deep);
+  --youhuo-violet: #7B61D9;
+  --wuyou-orange: #F5A623;
+  --wuyou-orange-deep: #D8860B;
+  --wuyou-orange-ink: #9E5D00;   /* 白底上 5.22:1；#D8860B 只有 2.86:1，做文字不够 */
+  --wuyou-yellow: #FFD466;
+
+  /* Role accent is swapped by [data-mode] and inherited by every component. */
+  --role-accent: var(--youhuo-blue);
+  --role-accent-deep: var(--youhuo-blue-deep);
+  --role-accent-2: var(--youhuo-violet);
+  --role-tint: #e9f2fd;
+  --role-glow: rgba(74, 144, 217, .32);
+
+  /* --- neutrals ----------------------------------------------------------- */
+  --bg: #f4f6fb;
+  --bg-mesh-1: rgba(74, 144, 217, .16);
+  --bg-mesh-2: rgba(123, 97, 217, .13);
+  --bg-mesh-3: rgba(245, 166, 35, .11);
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --surface-3: #eef2f9;
+  --surface-inset: #f2f5fa;
+  --line: #e3e8f1;
+  --line-strong: #cfd7e6;
+  --ink: #0f1729;
+  --ink-2: #3f4b64;
+  /* Muted text still has to clear WCAG AA 4.5:1 on --surface and --surface-2;
+     the previous #6d7a92 measured 4.33 and 4.11. */
+  --ink-3: #59657d;
+  --ink-invert: #ffffff;
+
+  --ok: #1f8a51;
+  --ok-bg: #e8f7ee;
+  --warn: #b8710a;
+  --warn-bg: #fff4e0;
+  --danger: #c02a35;
+  --danger-bg: #fdeaec;
+
+  /* --- shape and depth ---------------------------------------------------- */
+  /* Tightened from 12/16/22/28/34. Magic UI, shadcn and COSS all sit on a ~10px
+     base with ±4px steps; 28px cards read as a consumer toy, and next to 17px
+     body text the curve visibly eats the corner of the content. Kept a little
+     looser than 10px because this product is warm rather than technical, and
+     because large touch targets carry bigger corners better. */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 20px;
+  --r-2xl: 26px;
+  /* Four-stop ladders instead of two. A real object casts a tight contact
+     shadow AND a wide ambient one; two stops always reads as either a hard
+     drop-shadow or a grey smudge. The near stops are almost opaque and tiny,
+     the far stops wide and very faint — that ratio is what makes a card look
+     like it is sitting on the page rather than pasted onto it. */
+  --shadow-1:
+    0 1px 1px rgba(16, 24, 44, .04),
+    0 2px 4px rgba(16, 24, 44, .04),
+    0 4px 10px rgba(16, 24, 44, .03);
+  --shadow-2:
+    0 1px 1px rgba(16, 24, 44, .05),
+    0 3px 6px rgba(16, 24, 44, .05),
+    0 8px 18px rgba(16, 24, 44, .05),
+    0 20px 44px rgba(16, 24, 44, .05);
+  --shadow-3:
+    0 1px 2px rgba(16, 24, 44, .06),
+    0 4px 10px rgba(16, 24, 44, .06),
+    0 14px 32px rgba(16, 24, 44, .07),
+    0 34px 76px rgba(16, 24, 44, .08);
+  /* A hairline that is darker at the bottom than the top, the way a lit surface
+     actually is. Applied as an inset ring so it never affects layout. */
+  --ring-hairline:
+    inset 0 1px 0 rgba(255, 255, 255, .7),
+    inset 0 -1px 0 rgba(16, 24, 44, .05);
+  --ring: 0 0 0 4px color-mix(in srgb, var(--role-accent) 22%, transparent);
+
+  /* --- spacing: 4px base, so margins and padding share one rhythm ---------
+     Sizes were previously chosen per component, which is why panels that sit
+     side by side did not line up. Everything below is a multiple of 4. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- type scale ---------------------------------------------------------
+     Fluid, and deliberately starting high: this product is read by people with
+     presbyopia, so the smallest token here (--text-sm) is still 15px, and body
+     copy is 17px before --elder-font-scale multiplies it. Light weights are
+     never used — thin strokes are the first thing to disappear for aging eyes. */
+  --text-xs: 0.8125rem;                              /* 13px, metadata only */
+  --text-sm: 0.9375rem;                              /* 15px */
+  --text-base: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --text-lg: clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem);
+  --text-xl: clamp(1.1875rem, 1.1rem + 0.4vw, 1.375rem);
+  --text-2xl: clamp(1.375rem, 1.25rem + 0.6vw, 1.75rem);
+  --text-3xl: clamp(1.75rem, 1.5rem + 1vw, 2.25rem);
+
+  /* Chinese needs looser leading than Latin at the same size: the glyphs are
+     denser and full-width punctuation carries no visual descender. */
+  --lh-tight: 1.25;
+  --lh-snug: 1.45;
+  --lh-base: 1.7;
+  --lh-loose: 1.85;
+
+  /* --- motion -------------------------------------------------------------
+     These numbers are borrowed, not guessed. Two of the most respected mobile
+     motion implementations independently land in the same place:
+
+       gorhom/react-native-bottom-sheet  stiffness 1000, damping 500, mass 3,
+                                         overshootClamping: true, ~250ms
+                                         → damping ratio ≈ 4.6, i.e. heavily
+                                           overdamped with overshoot switched off
+       ibelick/motion-primitives         bounce: 0, duration: 0.2, easeInOut
+
+     Reanimated's *generic* default is stiffness 100 / damping 10 → ratio 0.5,
+     which visibly bounces — and the sheet library deliberately overrides it.
+     So the house style here is: no overshoot, 200–250ms, decelerating. That is
+     also the only defensible choice for this audience, because bounce reads as
+     instability to someone with vestibular sensitivity, and an overshooting
+     control is a control that moves away from the finger chasing it.
+
+     An overdamped clamped spring has no cubic-bezier with y > 1; .22,1,.36,1 is
+     that curve — fast departure, long settle, never past the target. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-sheet: 250ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+
+  /* Bottom tab bar height, excluding the safe-area inset. Declared here because
+     two rules must agree on it — the bar's own min-height and the page padding
+     that keeps the last card out from under it. When those two drifted apart
+     before (for a bar that did not even exist) the result was 100px of content
+     clipped off the bottom of a screen. 56px keeps a 24px glyph, a 13px label
+     and the gap between them above the 48px touch floor. */
+  --tabbar-h: 56px;
+
+  --mode-fade: 1s;
+  --elder-font-scale: 1.25;
+
+  color-scheme: light;
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "MiSans", "Source Han Sans SC",
+    "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 强调色的墨水版本在深色下必须**提亮**，不能沿用浅色模式的深色变体。
+       浅色模式的 deep 是给白底用的；实测 #2F6FB5 在 #0b1020 / #141b2e / #202a41
+       上分别只有 3.66 / 3.31 / 2.77——小字号要 4.5，图标按 WCAG 1.4.11 要 3.0，
+       三个表面上没有一个达标。这一处漏了很久，因为对比度审计只测文字，而这个
+       颜色主要用在**图标**上：一个 1.7:1 的图标能安静地通过全部 12 项检查。
+       取值与鸿蒙端 resources/dark 完全一致，两端不该有两套深色配色。 */
+    --youhuo-blue-ink: #8FC0F0;    /* 7.47–9.89:1 */
+    --wuyou-orange-ink: #F0B856;   /* 7.96–10.54:1 */
+    --bg: #0b1020;
+    --bg-mesh-1: rgba(74, 144, 217, .22);
+    --bg-mesh-2: rgba(123, 97, 217, .20);
+    --bg-mesh-3: rgba(245, 166, 35, .12);
+    --surface: #141b2e;
+    --surface-2: #1a2337;
+    --surface-3: #202a41;
+    --surface-inset: #101728;
+    --line: #26314a;
+    --line-strong: #35415e;
+    --ink: #eef2fa;
+    --ink-2: #b3bdd1;
+    --ink-3: #8d99b2;
+    --role-tint: #17253c;
+    --ok: #4fd08a;
+    --ok-bg: #12301f;
+    --warn: #f0b354;
+    --warn-bg: #33260e;
+    --danger: #ff8c93;
+    --danger-bg: #35161a;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, .32), 0 14px 34px rgba(0, 0, 0, .38);
+    --shadow-3: 0 6px 14px rgba(0, 0, 0, .36), 0 30px 70px rgba(0, 0, 0, .46);
+    color-scheme: dark;
+  }
+}
+

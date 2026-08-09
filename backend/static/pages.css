@@ -1,0 +1,814 @@
+/* 页面层：首页 hero、证据条、评委导览，以及**全部响应式覆写**。
+ *
+ * 响应式那一段必须留在最后，而且是所有四个文件里的最后。媒体查询不增加特异性，
+ * 写在被它覆写的组件之前就会静默输掉层叠——这是原文件里就写明的约束，拆分后它
+ * 变成了"pages.css 必须最后引"。
+ */
+/* --------------------------------------------------------------------------
+   Landing hero
+   -------------------------------------------------------------------------- */
+
+.hero-head { display: flex; align-items: center; gap: 20px; margin-bottom: 6px; }
+.hero-head h1 { margin: 0; }
+.hero-head h2 { margin: 6px 0 0; }
+.hero-mark {
+  width: 84px; height: 84px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 26px;
+  font-size: 42px; font-weight: 800; line-height: 1;
+  color: #fff;
+  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-violet));
+  box-shadow: 0 14px 34px rgba(74, 144, 217, .34), 0 1px 0 rgba(255, 255, 255, .4) inset;
+}
+
+.hero-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr)); gap: 12px; margin: 22px 0 4px; }
+.role-tile {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.role-tile.youhuo {
+  border-color: color-mix(in srgb, var(--youhuo-blue) 34%, transparent);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface)), var(--surface-2));
+}
+.role-tile.companion {
+  border-color: color-mix(in srgb, var(--wuyou-orange) 38%, transparent);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--wuyou-orange) 12%, var(--surface)), var(--surface-2));
+}
+.role-tile > div { display: grid; gap: 3px; }
+.role-tile strong { font-size: 17px; color: var(--ink); }
+.role-tile span { font-size: 14px; color: var(--ink-3); line-height: 1.6; }
+.role-quote { font-style: italic; color: var(--ink-2) !important; font-weight: 650; }
+.role-swatch {
+  width: 46px; height: 46px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 15px;
+  font-size: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.card-icon {
+  display: grid; place-items: center;
+  width: 50px; height: 50px;
+  flex: 0 0 auto;
+  border-radius: 15px;
+  margin-bottom: 14px;
+  /* -ink 而不是 -deep：深色模式下 -deep 在这个底色上只有 2.68:1（WCAG 1.4.11
+     要求 3.0），图标几乎看不见。 */
+  color: var(--youhuo-blue-ink);
+  background: color-mix(in srgb, var(--youhuo-blue) 13%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
+  transition: background .22s ease, color .22s ease;
+}
+.card:hover .card-icon { background: color-mix(in srgb, var(--youhuo-blue) 22%, var(--surface-2)); }
+.card-cta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 16px;
+  padding: 11px 20px;
+  border-radius: var(--r-md);
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  background: linear-gradient(180deg, var(--youhuo-blue), var(--youhuo-blue-deep));
+  box-shadow: 0 6px 18px rgba(74, 144, 217, .3);
+  transition: transform .18s ease;
+}
+.card.featured:hover .card-cta { transform: translateX(3px); }
+
+.card.featured {
+  grid-column: span 6;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 28px;
+  background: linear-gradient(130deg, color-mix(in srgb, var(--youhuo-blue) 16%, var(--surface)) 0%, color-mix(in srgb, var(--youhuo-violet) 9%, var(--surface)) 48%, var(--surface) 100%);
+  border-color: color-mix(in srgb, var(--youhuo-blue) 32%, transparent);
+}
+.card.featured::before { opacity: 1; }
+.featured-body { flex: 1 1 auto; display: flex; align-items: flex-start; gap: 20px; }
+.featured-body .card-icon { margin-bottom: 0; width: 56px; height: 56px; }
+.featured-body .eyebrow { margin-bottom: 6px; }
+.card.featured h2 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 6px; }
+.card.featured p { margin: 0; }
+.card.featured .card-cta { flex: 0 0 auto; margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   Landing page evidence strip
+   -------------------------------------------------------------------------- */
+
+.innovation-strip { display: flex; flex-wrap: wrap; gap: 9px; margin: 22px 0 4px; }
+.innovation-strip span {
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 24%, transparent);
+  font-weight: 750;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+}
+/* In dark mode --ink is near-white, so the blue cast has to come from a light
+   stop of the ramp rather than the deep one. */
+@media (prefers-color-scheme: dark) {
+  .innovation-strip span { color: color-mix(in srgb, var(--youhuo-blue) 30%, var(--ink)); }
+}
+.evidence { margin-top: 24px; }
+.evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); gap: 12px; }
+.evidence-grid div {
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  display: grid;
+  gap: 6px;
+  background: var(--surface-2);
+}
+.evidence-grid strong { font-size: 17px; }
+.evidence-grid span { color: var(--ink-3); font-size: 14px; line-height: 1.6; }
+
+/* --------------------------------------------------------------------------
+   Judge walkthrough
+   -------------------------------------------------------------------------- */
+
+.judge-shell { max-width: 1140px; }
+.judge-header { align-items: flex-start; padding: 22px 0 6px; }
+.judge-header h1 { max-width: 900px; font-size: clamp(30px, 5vw, 56px); }
+
+.score-ribbon { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
+.score-ribbon div {
+  min-height: 100px;
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+}
+.score-ribbon strong {
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(140deg, var(--youhuo-blue-deep), var(--youhuo-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: 14px; }
+
+.timeline { display: grid; gap: 18px; margin-top: 20px; }
+.demo-step {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 22px;
+  border: 1px solid var(--line);
+  transition: transform .22s cubic-bezier(.2,.8,.3,1), border-color .22s ease, box-shadow .22s ease;
+}
+.demo-step.active {
+  border-color: color-mix(in srgb, var(--youhuo-blue) 46%, transparent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-3);
+}
+.step-index {
+  width: 70px; height: 70px;
+  display: grid; place-items: center;
+  border-radius: 22px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(150deg, var(--youhuo-blue-deep), #17356f);
+  box-shadow: 0 10px 24px rgba(23, 53, 111, .28);
+}
+.demo-step pre {
+  background: #0d1526;
+  color: #d6e4ff;
+  border-color: #1d2b46;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.glass-card { display: grid; gap: 10px; margin-top: 14px; }
+.glass-card > div {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 16px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  line-height: 1.62;
+}
+.glass-card strong { color: color-mix(in srgb, var(--youhuo-blue-deep) 88%, var(--ink)); }
+
+.evidence-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: 12px; margin-top: 14px; }
+.evidence-mini { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; background: var(--surface-2); }
+.evidence-mini h3 { margin: 0 0 8px; }
+.evidence-mini ul { padding-left: 20px; line-height: 1.6; color: var(--ink-2); font-size: 14px; }
+
+.final-claim {
+  margin-top: 26px;
+  border: 0;
+  color: #fff;
+  background: linear-gradient(140deg, #14224a 0%, #24509f 52%, #4a3f9e 100%);
+  box-shadow: var(--shadow-3);
+}
+.final-claim .eyebrow { color: #b9d0ff; }
+.final-claim h2 { color: #fff; font-size: clamp(21px, 3.4vw, 34px); line-height: 1.4; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.button-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 52px;
+  padding: 13px 22px;
+  border-radius: var(--r-md);
+  color: #14224a;
+  background: #fff;
+  text-decoration: none;
+  font-weight: 800;
+  transition: transform .18s ease;
+}
+.button-link:hover { transform: translateY(-2px); }
+.button-link.secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid rgba(255, 255, 255, .38);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1040px) {
+  .elder-layout { grid-template-columns: 1fr; }
+  .rail { position: static; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+}
+@media (max-width: 900px) {
+  .score-ribbon { grid-template-columns: repeat(2, 1fr); }
+  .card.span-3, .card.span-2 { grid-column: span 3; }
+  .card.featured { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 720px) {
+  .card.span-3, .card.span-2 { grid-column: span 6; }
+  .hero-head { gap: 14px; }
+  .hero-mark { width: 62px; height: 62px; border-radius: 20px; font-size: 30px; }
+  .grid, .dashboard-grid { grid-template-columns: 1fr; }
+  .preview-columns { grid-template-columns: 1fr; }
+  .demo-step { grid-template-columns: 1fr; }
+  .step-index { width: 56px; height: 56px; border-radius: 17px; font-size: 20px; }
+  .reliance-row, .glass-card > div, .log-item, .digest-row { grid-template-columns: 1fr; gap: 4px; }
+  .calendar-entry { grid-template-columns: 56px 1fr; }
+  .calendar-entry .status-chip { grid-column: 2; justify-self: start; }
+  .mic-dial { width: 176px; height: 176px; }
+  .mic-big { width: 138px; height: 138px; font-size: 50px; }
+  .mic-big svg { width: 52px; height: 52px; }
+  .bubble { max-width: 94%; }
+  .chat { padding: 13px; }
+  .entry-btn { font-size: 16px; gap: 8px; }
+  .topbar { gap: 10px; }
+  .badge { padding: 9px 13px; font-size: 14px; }
+  .profile-tools { gap: 10px; }
+}
+
+/* Honour the OS motion preference: the halo and rings stop, colours remain. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ==========================================================================
+   Responsive overrides — deliberately LAST in the file.
+   A media query adds no specificity, so anything here written above the
+   component it overrides would silently lose the cascade. That is exactly
+   what happened when this block sat near the top: `.elder-layout` is
+   declared further down with `display: grid`, so the phone app frame never
+   applied to the one screen it mattered most on.
+   ========================================================================== */
+
+@media (max-width: 760px) {
+  /* One column, full-bleed cards, and a header that stays put — the three
+     things that make a browser page read as an app screen. */
+  /* No bottom padding: the extras are a fixed sheet now, so reserving room for
+     them below the fold just makes the page scroll for nothing. */
+  .shell, .shell-wide { max-width: 100%; padding-top: var(--space-3); padding-bottom: 0; }
+
+  .app-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-top: max(var(--space-2), env(safe-area-inset-top));
+    /* Frosted, so content scrolling underneath stays legible. */
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* The rail is a desktop sidebar; on a phone it is simply the rest of the
+     screen, stacked. */
+  .rail { display: grid; gap: var(--space-4); }
+  .panel, .hero, .card { border-radius: var(--r-lg); }
+
+  /* Clear the home gesture area so the last card is not sitting under the
+     thumb bar. This used to reserve `--space-16 + 44px` for a fixed bottom bar;
+     there is no fixed bottom bar (grep: nothing is position:fixed here but the
+     halo, the sheet and its backdrop), and on the elder screen those 100px of
+     phantom furniture were the entire overflow the frame then had to clip. */
+  /* Clear the tab bar and the home gesture area, or the last card sits under
+     them and can never be scrolled into view. `--tabbar-h` is declared once
+     below and used here so the two cannot drift apart.
+
+     Note this padding used to exist for a bottom bar that did not exist yet:
+     it reserved `--space-16 + 44px` against nothing (grep found no fixed bottom
+     furniture at all), and on the elder screen those phantom pixels were the
+     whole overflow the frame then had to clip. Now there is a real bar. */
+  main.shell:not(.app-frame) {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-5));
+  }
+  /* The frame cannot take that as page padding — it would push itself past its
+     own clamp and get clipped. It reserves the inset inside the frame instead,
+     in the stage height below, so the composer clears the home indicator. */
+  main.shell.app-frame { padding-bottom: 0; }
+
+  /* ----------------------------------------------------------------------
+     The app frame.
+     Before this, the elder screen was one 2500px column on an 844px phone:
+     chat, microphone, composer, four rail cards and the settings, stacked.
+     Scroll down to read an answer and the microphone was gone — the primary
+     action of a voice product left the screen. An app screen does not scroll
+     as a whole; a *region* inside it scrolls while the bar and the composer
+     stay put. That is the difference this block makes, and it is why the
+     layout is fixed to the viewport rather than merely styled.
+
+     First attempt pinned the *whole page* to the viewport and put the rail
+     inside that frame too. The arithmetic does not work on a phone: role header
+     200 + microphone 217 + composer 157 = 574px, and the rail claimed another
+     354px of an 844px screen, so the conversation — the actual product — was
+     crushed to a 50px sliver showing the tail of one sentence.
+
+     So the frame is the *conversation screen*, not the document. The stage is
+     exactly one viewport tall with the composer at its foot, and the extras sit
+     in a sheet over it. First screen is a complete app screen; nothing is
+     crushed; nothing important needs scrolling to reach.
+     ---------------------------------------------------------------------- */
+
+  /* Block, not grid: the backdrop and the sheet are both position:fixed now, so
+     a grid here still reserves row tracks and gaps for children that are no
+     longer in flow. */
+  .elder-layout { display: block; }
+
+  /* Clamp the document to the screen — for the conversation screen ONLY, hence
+     the explicit `.app-frame` opt-in that only elder.html carries.
+
+     This rule used to read `main.shell { ... }`. Every page shares that class,
+     so the clamp landed on index/family/care/trust/judge too — long scrolling
+     documents with nothing height-fixed inside them. Measured at 390x844:
+     index lost 2157px, family 2016, judge 1964, care 1444, trust 1223. On a
+     phone the entire page below the first screen simply did not exist.
+
+     It survived every gate I had. Full-page screenshots grow the emulated
+     viewport, and 100dvh grows with it, so the clip never appeared in an image;
+     the contrast audit reads computed colours, which are unaffected by being
+     clipped out of view. test_mobile_reachability.py now measures it directly. */
+  main.shell.app-frame { max-height: 100svh; max-height: 100dvh; overflow: hidden; }
+
+  .elder-layout > .stage {
+    /* `height`, not `min-height`. With a minimum, the furniture's natural size
+       wins and the screen overflows by whatever it needs (measured: 795px of
+       content into 754px of room). With a fixed height the conversation is the
+       thing that gives, which is correct — it is the scrollable region. */
+    /* Installed to the home screen there is no browser chrome under the
+       composer, so the home indicator would sit on top of the send button.
+       Reserved here rather than as page padding: see .app-frame above. In a
+       browser tab the inset resolves to 0 and nothing changes. */
+    height: calc(100svh - 98px - env(safe-area-inset-bottom));
+    height: calc(100dvh - 98px - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+
+  /* ----------------------------------------------------------------------
+     One card, not three.
+
+     Measured on the conversation screen at 390px, the chain from the screen
+     edge to a line of text was:
+
+       main.shell   16px padding                       -> 358
+       .panel.stage white, 18px radius, shadow, 20px   -> 318
+       #chat        grey,  18px radius,          13px  -> 290
+       .bubble      white, 18px radius, shadow,  20px  -> 231
+
+     Three concentric rounded rectangles, and 41% of the screen spent on chrome
+     before a single character. Nested cards are also the clearest "this is a
+     web page" signal there is: an app screen has a background and content on
+     it, not a card inside a card inside a card.
+
+     So on a phone the stage and the chat list stop being cards — they are
+     layout containers, and they say so. The bubble keeps the white fill, the
+     radius and the shadow, because it is the one thing here that genuinely is
+     an object. Text width goes 231 -> ~300px.
+     ---------------------------------------------------------------------- */
+  .elder-layout > .stage {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .elder-layout > .stage::before { content: none; }   /* the card's top hairline */
+
+  #chat {
+    background: none;
+    /* 边框和背景、圆角要一起去掉。只去掉后两者会留下一个几乎看不见的方框——
+       在窄屏上被贴边掩盖，在展开的折叠屏上就露出来了。 */
+    border: 0;
+    border-radius: 0;
+    /* Gutter on the scroller, not on the bubbles. Putting it on `#chat > *`
+       makes every bubble full-bleed with inner padding, so they run edge to
+       edge and lose their shape — the bubble is the one object here and it
+       needs to look like one. */
+    padding: 0 var(--space-4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* An unfolded Mate X is 720px wide and still gets this layout — the fold
+     crosses the 760px breakpoint. At that width a bubble at 93% is ~670px, i.e.
+     a 40-character line of Chinese; the eye loses the start of the next line.
+     Cap the conversation at a readable measure and centre it, so unfolding the
+     phone gives more *margin* rather than longer lines. */
+  @media (min-width: 600px) {
+    /* 收窄的是**整根栏**，加在 stage 上，于是角色头、对话、麦克风和输入框共用
+       同一条左边线。分别给每个元素加 max-width + margin:auto 会让它们各自居中，
+       结果是角色头居中、气泡靠左，两条对不齐的边。
+       用内边距而不是给气泡加 margin:auto 还有一个原因：后者会把每个气泡也居中，
+       "老人说的靠右、优活说的靠左"这条区分就没了。 */
+    .elder-layout > .stage { padding-inline: calc((100% - 560px) / 2); }
+  }
+
+  /* Conversations grow upward from the composer. With the opening line pinned
+     to the top there is a 250px void between it and the microphone, and the
+     screen reads as empty rather than as ready.
+     `margin-top: auto` on the first child rather than `justify-content:
+     flex-end` on the container: the latter clips the top of the content once
+     it overflows, which is a well-known flexbox scrolling bug and would hide
+     the beginning of a long answer. */
+  #chat > *:first-child { margin-top: auto; }
+
+  /* Edge to edge. The gutter now lives on the things inside, so the bubbles and
+     the composer line up with the app bar instead of with a card edge. */
+  main.shell.app-frame { padding-left: 0; padding-right: 0; }
+  .app-bar,
+  .role-header,
+  .composer { padding-left: var(--space-4); padding-right: var(--space-4); }
+
+  /* The conversation takes whatever the fixed furniture leaves, and scrolls. */
+  #chat {
+    flex: 1;
+    /* Must be able to shrink: it is the region that absorbs the difference
+       between the screen and the fixed furniture. A minimum here would push the
+       composer off the bottom on a short phone. */
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    /* A line of Chinese cut through the middle of its glyphs reads as a broken
+       layout. Fading the edge says "there is more" instead, which is what the
+       clipping actually means.
+       **Both** ends, not just the bottom: now that the conversation stacks
+       upward from the composer, a long message overflows at the *top*. On an
+       iPhone SE the opening line was hard-cut mid-glyph at the top edge while
+       the only fade sat at the bottom, where nothing was being clipped. */
+    mask-image: linear-gradient(to bottom, transparent 0, #000 18px,
+                                #000 calc(100% - 18px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px,
+                                        #000 calc(100% - 18px), transparent);
+  }
+
+  /* Fixed furniture: never shrinks, always at the foot of the screen. */
+  .mic-stage, .composer { flex-shrink: 0; }
+  .composer { padding-bottom: var(--space-2); }
+
+  /* 217px of microphone is a desktop hero, not a phone control. Still far above
+     the 48px touch floor, and still the largest thing on the screen. */
+  .mic-stage { margin: var(--space-4) 0 var(--space-2); gap: var(--space-2); }
+  /* 圈层容器是**固定 200x200** 的，只缩里面的按钮，这一块的高度纹丝不动——
+     实测 iPhone SE 上 .mic-stage 仍占 213px，而整屏只有 667px。两个都要缩。
+     圈层比按钮大 40px，正好容下两道呼吸圈。 */
+  .mic-dial { width: 156px; height: 156px; }
+  .mic-big { width: 116px; height: 116px; }
+  .mic-big svg { width: 46px; height: 46px; }
+
+  /* The role header is an identity banner; on a phone it should not cost a
+     quarter of the screen the conversation needs. */
+  .role-header { margin-bottom: var(--space-2); }
+  .role-icon { width: 46px; height: 46px; }
+  #agentTitle { font-size: var(--text-xl); }
+
+  /* ----------------------------------------------------------------------
+     Bottom sheet. Everything that is not the conversation lives here, so the
+     conversation gets the whole screen instead of a third of it.
+     ---------------------------------------------------------------------- */
+  .sheet-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-2);
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(9, 14, 28, .42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-sheet) var(--ease-out);
+  }
+  .sheet-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+  .rail.sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* The sidebar version of .rail is sticky with a `top`, and that `top`
+       survives into position:fixed where it beats `bottom` — which left ~100px
+       of the closed sheet visible at the foot of the screen. */
+    top: auto;
+    z-index: 51;
+    max-height: 86svh;
+    max-height: 86dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    background: var(--surface-2);
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    box-shadow: var(--shadow-3);
+    padding: 0 var(--space-4) max(var(--space-6), env(safe-area-inset-bottom));
+    /* Closed by default, moved rather than hidden: the panel stays in the
+       layout so the contrast audit can still measure these controls. */
+    transform: translate3d(0, 100%, 0);
+    /* 250ms overdamped, matching gorhom/bottom-sheet. See the motion tokens. */
+    transition: transform var(--dur-sheet) var(--ease-out);
+    will-change: transform;
+  }
+  .rail.sheet.is-open { transform: translate3d(0, 0, 0); }
+
+  /* Full-width grab area: a 20px hairline is a target only a mouse can hit. */
+  .sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-3) 0 var(--space-2);
+    margin-bottom: var(--space-1);
+    background: var(--surface-2);
+    border: 0;
+    border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+    box-shadow: none;
+    cursor: grab;
+    touch-action: none;              /* the drag is ours, not the scroller's */
+  }
+  .sheet-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-strong);
+  }
+
+  /* No scrolling behind an open sheet. */
+  body.sheet-open { overflow: hidden; }
+
+  /* A pulsing glow around the entire screen edge is the worst possible motion
+     for someone with vestibular sensitivity: it fills the peripheral field,
+     which is exactly where motion sensitivity lives. On a phone the screen edge
+     is also only a few millimetres from the thumb. The state is already legible
+     from the mic's own rings and the mode badge, so the full-screen layer is
+     reduced to a still tint here and the movement stays local to the control. */
+  .role-halo::before, .role-halo::after { animation: none !important; }
+  body[data-activity="listening"] .role-halo { opacity: .7; }
+
+  /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
+     row of prime real estate directly under the microphone. */
+  .quick { display: none; }
+
+  /* ----------------------------------------------------------------------
+     短屏。iPhone SE 是 667px 高，比 iPhone 14 少 177px——而固定家具（角色头 +
+     麦克风 + 输入区 + Sheet 触发器）一点没少，全部差额由对话区独自承担。结果是
+     开场白只剩两行、还被从顶部切开。
+     这里从家具上各匀一点回来给对话，而不是把字缩小：这一位用户看不清小字，
+     缩字是把问题从"看不全"换成"看不清"。
+     ---------------------------------------------------------------------- */
+  @media (max-height: 700px) {
+    .mic-dial { width: 132px; height: 132px; }
+    .mic-big { width: 96px; height: 96px; }
+    .mic-big svg { width: 38px; height: 38px; }
+    /* 状态行在短屏上是空的居多，先把它的保留高度收掉。 */
+    .status-line { min-height: 0; margin-top: var(--space-1); }
+    .mic-stage { margin: var(--space-2) 0 var(--space-1); }
+    .role-icon { width: 38px; height: 38px; }
+    .role-header { margin-bottom: var(--space-1); }
+    #agentTitle { font-size: var(--text-lg); }
+  }
+
+  /* ----------------------------------------------------------------------
+     Page headers, compacted.
+
+     Measured on /care at 390x844: eyebrow + title + a two-line lead cost 380px
+     before a single piece of content — 45% of the screen spent telling someone
+     which page they are already looking at. The desktop `clamp(28px, 5vw, 48px)`
+     bottoms out at 28px, but 5vw of a phone is 19.5px, so the clamp never
+     engages and the title lands at its 28px floor next to 17px body text.
+
+     Nothing is hidden. The eyebrow is a version stamp for a judge and drops to
+     11px; the title takes a size that still leads the page at 26px; the lead
+     keeps every word at a tighter measure. Roughly 150px comes back, which on
+     this page is the difference between seeing one card and seeing two.
+     ---------------------------------------------------------------------- */
+  .eyebrow { font-size: 11px; letter-spacing: .12em; margin-bottom: 6px; }
+  .care-title, .topbar h1 { font-size: 26px; line-height: 1.2; margin-bottom: 6px; }
+  .lead { font-size: 16px; line-height: 1.62; }
+  .topbar { margin-bottom: var(--space-4); }
+
+  /* space-between on a wrapped flex row leaves the action buttons stranded on
+     their own line with a gap above them; stacked is what it already looked
+     like, minus the accident. */
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  /* 38px chips beside a 26px heading crowd the title on a narrow column. */
+  .head-icon { width: 34px; height: 34px; }
+  .head-icon svg { width: 18px; height: 18px; }
+
+  /* ----------------------------------------------------------------------
+     首页 hero。实测在 390x844 上它自己就有 934px——比整块屏幕还高。
+     ---------------------------------------------------------------------- */
+
+  /* 标志和「优活」同一行，副标题独占一整行。
+     并排全部三者时标题块只剩 228px，副标题被挤成两行且断在「低认知 / 负担」——
+     一个把词组从中间劈开的换行。而把标志单独放一行又白花 62px。
+
+     `display: contents` 把 h1/h2 从包装 div 里"提"出来，成为网格的直接子项，于是
+     不动 HTML 就能让它们各就各位（桌面端仍用原来的并排布局）。 */
+  .hero-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
+  }
+  /* `:not(.hero-mark)` 不是防御性写法——标志本身就是一个 div，少了这个否定条件
+     它也会被 `display: contents` 抹掉盒子，实测高度直接变成 0。 */
+  .hero-head > div:not(.hero-mark) { display: contents; }
+  .hero-mark { grid-row: 1; grid-column: 1; }
+  .hero-head h1 { grid-row: 1; grid-column: 2; }
+  .hero-head h2 { grid-row: 2; grid-column: 1 / -1; }
+
+  /* 九个关键词占了 202px、堆成七行——一屏的四分之一给了一堆没有层次的名词。
+     它是标签条不是导航，所以改成单行横向滚动：高度 202 -> 44px。
+     右侧渐隐是在说"右边还有"，否则横向可滚动这件事在触屏上没有任何提示。 */
+  .innovation-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    /* 负外边距 + 内边距：滚动条两端贴到卡片边缘，而不是在中间突兀地截断。 */
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .innovation-strip::-webkit-scrollbar { display: none; }
+  .innovation-strip > span { flex: 0 0 auto; }
+
+  /* ----------------------------------------------------------------------
+     Bottom tab bar.
+
+     Every console page navigated with a top-left "← 返回首页" link. That is a
+     web page's model of location — "you arrived from somewhere, here is the way
+     back". An app's model is "these are the places you can be, and this is the
+     one you are in": persistent, at the bottom where the thumb already rests,
+     with the current section marked. Of everything on these screens this is the
+     change that decides whether they read as an application or as documentation
+     with a stylesheet, so it comes before any amount of shadow work.
+
+     Five destinations, which is also the practical ceiling — past five the
+     labels stop fitting at 390px and the targets fall under the touch floor.
+     The current tab is marked in the markup with aria-current, not by script:
+     a nav that needs JS to say where you are shows the wrong tab on first paint
+     and lies outright if the script fails.
+     ---------------------------------------------------------------------- */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    /* The bar itself sits above the home indicator; the inset is padding so the
+       frosted background still bleeds to the physical edge of the screen. */
+    padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: saturate(1.5) blur(18px);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    border-top: 1px solid var(--line);
+  }
+
+  .tab {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    min-height: var(--tabbar-h);
+    /* 13px, and only just enough — a tab label is the one place where a shorter
+       word beats a smaller size, which is why these are all two characters. */
+    font-size: var(--text-xs);
+    font-weight: 650;
+    line-height: 1;
+    letter-spacing: .01em;
+    color: var(--ink-2);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-base) var(--ease-out);
+  }
+
+  /* The whole tab is the target, not the glyph: 78x56 at 390px wide, against a
+     48px floor. Icon-only tabs would be smaller *and* unlabelled. */
+  .tab svg {
+    width: 24px;
+    height: 24px;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  .tab.is-current { color: var(--role-ink); }
+
+  /* A 3px cap above the current tab. Colour alone is never the only channel —
+     the icon changes weight and the indicator appears, so the state survives
+     both a monochrome screen and the most common colour deficiencies. */
+  .tab.is-current::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 22px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: currentColor;
+  }
+  .tab.is-current svg { stroke-width: 2.3; }
+
+  /* Press feedback on the glyph only. Moving the label would shift text under
+     the thumb mid-tap, which reads as a misfire. */
+  .tab:active svg { transform: scale(.88); }
+
+  /* The 首页 tab does what this link did, from a better place — but ONLY on the
+     pages that actually have a tab bar.
+     The conversation screen deliberately has no tab bar (see above), so hiding
+     its back link left a 78-year-old with no way out of that screen at all.
+     Scoped to `:not(.app-frame)`, which is exactly "has a tab bar". */
+  main.shell:not(.app-frame) .back-link { display: none; }
+}
+
+/* Installed to the home screen there is no browser UI to lean on, so the app
+   supplies its own top inset. */
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  .app-bar { padding-top: max(var(--space-4), env(safe-area-inset-top)); }
+  /* A back link to a page the user cannot see the URL of is just confusing —
+     but only where there is another way out. Same scoping as the ≤760px rule:
+     the conversation screen has no tab bar, so hiding its back link would leave
+     it with no exit at all. */
+  main.shell:not(.app-frame) .back-link { display: none; }
+}
+
+/* On a wide viewport the extras are the sidebar they have always been: none of
+   the sheet chrome applies, and the trigger has nothing to trigger. */
+@media (min-width: 761px) {
+  .sheet-trigger, .sheet-handle, .sheet-backdrop { display: none; }
+  .rail.sheet { position: static; transform: none; max-height: none; overflow: visible; }
+
+  /* A thumb bar pinned to the bottom of a 1440px window is a phone affordance
+     stranded on a desktop; with a mouse and a visible URL the back link is the
+     right model. Hidden rather than removed from the markup so the two layouts
+     stay one document — and so the tab order is identical in both. */
+  .tabbar { display: none; }
+}

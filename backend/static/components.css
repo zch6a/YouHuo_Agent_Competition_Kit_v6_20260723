@@ -1,0 +1,939 @@
+/* 组件层：卡片、按钮、提示、结构化结果、对话气泡、老人端构图、家属端部件。
+ *
+ * 跨页面复用的东西都在这里。里面那个 `@supports (color: oklch(...))` 块仍然覆写
+ * `:root` 令牌——它必须排在 tokens.css 之后，位置和拆分前一致。
+ */
+/* --------------------------------------------------------------------------
+   Surfaces
+   -------------------------------------------------------------------------- */
+
+.panel, .hero, .card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  /* Ambient shadow plus the lit hairline. The 1px white inset along the top is
+     the single cheapest trick that makes a surface read as raised rather than
+     drawn, and it is why product UIs look "solid" while flat cards look printed. */
+  box-shadow: var(--shadow-2), var(--ring-hairline);
+}
+
+/* Tinted surfaces are derived in OKLCH rather than sRGB. Mixing a colour toward
+   white in sRGB drags it through a grey mid-point, which is exactly why pale
+   blue panels look dusty; OKLCH is perceptually uniform, so a 96%-light tint of
+   the brand blue stays recognisably blue and stays clean. Magic UI derives its
+   colours the same way. */
+@supports (color: oklch(from #fff l c h)) {
+  :root {
+    --role-tint: oklch(from var(--role-accent) 0.965 calc(c * 0.42) h);
+    --surface-2: oklch(from var(--role-accent) 0.985 calc(c * 0.14) h);
+    --surface-3: oklch(from var(--role-accent) 0.962 calc(c * 0.20) h);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --role-tint: oklch(from var(--role-accent) 0.30 calc(c * 0.55) h);
+      --surface-2: oklch(from var(--role-accent) 0.235 calc(c * 0.22) h);
+      --surface-3: oklch(from var(--role-accent) 0.275 calc(c * 0.26) h);
+    }
+  }
+}
+.panel { padding: clamp(18px, 2.4vw, 28px); }
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(26px, 4vw, 52px);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-3);
+  background:
+    linear-gradient(168deg, color-mix(in srgb, var(--role-accent) 8%, var(--surface)) 0%, var(--surface) 46%);
+}
+/* Thin luminous rule along the top edge of the hero. */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet) 46%, var(--wuyou-orange));
+}
+.hero h1 {
+  background: linear-gradient(120deg, var(--ink) 22%, var(--youhuo-blue-deep) 62%, var(--youhuo-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero h2 { color: var(--ink-2); font-weight: 700; font-size: clamp(18px, 2.2vw, 26px); }
+
+/* Six-column bed so the cards fall into a deliberate 1 / 2 / 3 rhythm. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.card {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform .22s cubic-bezier(.2, .7, .3, 1), box-shadow .22s ease, border-color .22s ease;
+}
+.card.span-3 { grid-column: span 3; }
+.card.span-2 { grid-column: span 2; }
+.card p { flex: 1 1 auto; }
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet));
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.card:hover, .card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in srgb, var(--youhuo-blue) 42%, var(--line));
+}
+.card:hover::before, .card:focus-visible::before { opacity: 1; }
+.card h2 { font-size: 21px; margin-bottom: 8px; }
+.card p { margin: 0; font-size: 15px; }
+
+.mode-youhuo { background: linear-gradient(165deg, color-mix(in srgb, var(--youhuo-blue) 11%, var(--surface)), var(--surface) 62%); }
+.mode-companion { background: linear-gradient(165deg, color-mix(in srgb, var(--wuyou-orange) 13%, var(--surface)), var(--surface) 62%); }
+
+/* --------------------------------------------------------------------------
+   Top bar, badges, chips
+   -------------------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+/* Text on tinted chips keeps only a hue cast: mostly --ink so it clears the
+   WCAG AA 4.5:1 floor. Measured on this page, not eyeballed. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 750;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+  background: color-mix(in srgb, var(--youhuo-blue) 15%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--youhuo-blue) 34%, transparent);
+  transition: background var(--mode-fade) ease, color var(--mode-fade) ease, border-color var(--mode-fade) ease;
+}
+.badge.orange {
+  color: color-mix(in srgb, var(--wuyou-orange-deep) 26%, var(--ink));
+  background: color-mix(in srgb, var(--wuyou-orange) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--wuyou-orange) 40%, transparent);
+}
+.status-dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--youhuo-blue);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
+  transition: background var(--mode-fade) ease, box-shadow var(--mode-fade) ease;
+}
+.orange .status-dot {
+  background: var(--wuyou-orange);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wuyou-orange) 26%, transparent);
+}
+
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 11px 17px; border-radius: var(--r-sm);
+  background: var(--surface); border: 1px solid var(--line);
+  text-decoration: none; font-weight: 750; color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.back-link:hover { transform: translateX(-2px); border-color: var(--line-strong); }
+.topbar-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.topbar-actions button { padding: 11px 17px; font-size: 15px; }
+
+/* --------------------------------------------------------------------------
+   Controls
+   -------------------------------------------------------------------------- */
+
+input, textarea, button, select { font: inherit; font-family: inherit; }
+
+input, textarea, select {
+  width: 100%;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--surface);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+input::placeholder, textarea::placeholder { color: var(--ink-3); }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--role-accent);
+  box-shadow: var(--ring);
+}
+textarea { line-height: 1.6; resize: vertical; }
+
+button {
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 750;
+  font-size: var(--text-base);
+  line-height: var(--lh-snug);
+  /* Chinese button labels are short and dense; a hair of tracking stops
+     two-character labels like 发送 from looking cramped. */
+  letter-spacing: .01em;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--role-accent) 92%, #fff) 0%, var(--role-accent-deep) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .28) inset, var(--shadow-1);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    filter var(--dur-base) var(--ease-out);
+}
+button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, var(--shadow-2); }
+button:active:not(:disabled) { transform: translateY(0); filter: brightness(.96); }
+button.secondary {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-1);
+}
+button.secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--role-accent); }
+button.danger {
+  background: linear-gradient(180deg, #d8434e, #a81f2a);
+  border-color: transparent;
+  color: #fff;
+}
+button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+label { display: grid; gap: 7px; margin-bottom: 15px; font-weight: 700; color: var(--ink-2); font-size: 15px; }
+
+/* Accessibility floor: large targets and an unmistakable focus ring.
+   48px rather than the 44px in Apple's HIG — the extra 4px matters for tremor
+   and for reading glasses, and nothing on these pages is dense enough to need
+   the space back. */
+a, button, input, textarea, select { min-height: 48px; }
+
+/* The single authoritative focus ring. --ink rather than the role accent: this
+   has to stay visible on tinted, accented and inverted surfaces alike, and
+   maximum contrast beats matching the brand. The accent halo underneath gives
+   it a designed edge without costing contrast. */
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--role-accent) 20%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Notices
+   -------------------------------------------------------------------------- */
+
+.notice {
+  padding: 14px 18px;
+  border-left: 4px solid var(--warn);
+  background: var(--warn-bg);
+  color: color-mix(in srgb, var(--warn) 72%, var(--ink));
+  border-radius: var(--r-sm);
+  font-weight: 600;
+  line-height: 1.62;
+}
+.notice.good { border-left-color: var(--ok); background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 68%, var(--ink)); }
+.notice.warning { border-left-color: var(--warn); background: var(--warn-bg); }
+/* "waiting for a human" is a normal step, not an alarm. */
+.notice.info {
+  border-left-color: var(--youhuo-blue);
+  background: color-mix(in srgb, var(--youhuo-blue) 10%, var(--surface));
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 82%, var(--ink));
+}
+
+/* Output panes stay out of the layout until a demo actually writes to them. */
+pre:empty { display: none; }
+
+/* --------------------------------------------------------------------------
+   Structured results
+   ..........................................................................
+   可信实验室六张卡的输出曾经全是 <pre> 里的原始 JSON，照护中心七张里有六张也是。
+   那些字段正是这个项目最想讲的东西——"系统拒绝了什么、为什么拒绝"——但用 JSON
+   讲出来，等于要求评委现场读一遍后端契约。渲染逻辑在 common.js 的 renderResult。
+   -------------------------------------------------------------------------- */
+.result:empty { display: none; }
+.result {
+  margin-top: var(--space-3);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.result-group + .result-group { margin-top: var(--space-2); }
+/* 标签列定宽，值列自适应：一列对齐的键值比参差的两栏好扫。10ch 容得下"被剥离的字段"。 */
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(6.5em, max-content) 1fr;
+  gap: var(--space-2) var(--space-3);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.result-row:first-child { border-top: 0; }
+.result-row > strong { color: var(--ink-3); font-weight: 600; font-size: 14px; }
+.result-row > div { min-width: 0; overflow-wrap: anywhere; }
+/* 嵌套一层就缩进并淡化边框，不再往下继续缩，否则深层结构会被挤成一条线。 */
+.result-row .result-group {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+}
+.result-list { margin: 0; padding-left: 1.15em; }
+.result-list li { margin: 2px 0; }
+.result-raw { margin-top: var(--space-3); }
+.result-raw > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-3);
+  /* 触控下限：折叠开关也是可点区域。 */
+  padding: 8px 0;
+  min-height: 24px;
+}
+.result-raw > summary:hover { color: var(--ink-2); }
+.result-raw pre { margin-top: var(--space-2); }
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Cascadia Code", "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  background: var(--surface-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Layout helpers
+   -------------------------------------------------------------------------- */
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-top: 22px; align-items: start; }
+.feature-panel { display: flex; flex-direction: column; gap: 11px; }
+
+/* ------------------------------------------------------------------------
+   生活日报（核心创新点 ②）。
+   结论在最前，而且比其它任何东西都大。一份把结论埋在第四行的日报，子女读两次就
+   不会再读第三次了——而这个产品的价值恰恰在于它被持续读下去。
+   ------------------------------------------------------------------------ */
+.report-verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+  font-size: 19px;
+  line-height: 1.5;
+}
+.report-badge {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 750;
+  font-size: 15px;
+  /* 默认中性；下面按结论着色。颜色不是唯一通道——徽标里写的就是结论本身。 */
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.report-verdict.good .report-badge { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 72%, var(--ink)); }
+.report-verdict.warn .report-badge { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
+.report-verdict.bad  .report-badge { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 72%, var(--ink)); }
+
+.report-section { margin-top: var(--space-4); }
+.report-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: 16px;
+}
+.pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+.pill.good { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 72%, var(--ink)); }
+.pill.warn { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
+.pill.bad  { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 72%, var(--ink)); }
+
+/* ------------------------------------------------------------------------
+   Card heading icon chip.
+   A stack of six bare <h2>s on white is a document outline: to find
+   "用药与库存安全" you read four headings first. A chip gives each card a
+   silhouette and a colour, so the eye lands on the right card before any word
+   is read. The heading becomes a flex row rather than the chip being floated,
+   because a Chinese heading that wraps to two lines must align its second line
+   to the text, not tuck under the icon.
+   ------------------------------------------------------------------------ */
+/* NOT `.card-icon` — that name is index.html's 50x50 card component chip,
+   declared further down this file. At equal specificity the later rule wins, so
+   every declaration here was silently overridden (chips came out 50px with a
+   15px radius) and the mobile override was shrinking index's real cards too. */
+h2:has(> .head-icon) {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.head-icon {
+  /* inline-grid, not grid: the flex row above depends on :has(), and where that
+     is unsupported a block-level chip would knock the heading text onto its own
+     line. Inline it simply sits before the text, which is the correct fallback
+     rather than a broken one. */
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -0.28em;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  /* Tinted from the page's own role accent, so the chips re-colour with the
+     mode instead of hard-coding a palette that then drifts. */
+  background: var(--role-tint);
+  color: var(--role-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--role-accent) 16%, transparent);
+}
+.feature-panel button { align-self: flex-start; }
+.feature-panel pre { max-height: 320px; overflow: auto; }
+.capability-card { background: var(--surface-2); }
+.task-list { display: grid; gap: 10px; margin-top: 10px; }
+
+.task {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 11px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  transition: border-color .18s ease, transform .18s ease;
+}
+.task:hover { border-color: var(--line-strong); }
+.task strong { display: block; font-size: 18px; margin-bottom: 5px; color: var(--ink); }
+.task > div { color: var(--ink-2); font-size: 15px; line-height: 1.68; }
+.task button { margin-top: 11px; padding: 10px 16px; font-size: 15px; }
+
+.care-title { font-size: clamp(28px, 5vw, 48px); margin-bottom: 8px; }
+
+/* --------------------------------------------------------------------------
+   Design §4.1 — dual-role identity light system
+   -------------------------------------------------------------------------- */
+
+body[data-mode="youhuo"] {
+  --role-accent: var(--youhuo-blue);
+  --role-accent-deep: var(--youhuo-blue-deep);
+  --role-ink: var(--youhuo-blue-ink);
+  --role-accent-2: var(--youhuo-violet);
+  --role-glow: rgba(74, 144, 217, .32);
+}
+body[data-mode="companion"] {
+  --role-accent: var(--wuyou-orange);
+  --role-accent-deep: var(--wuyou-orange-deep);
+  --role-ink: var(--wuyou-orange-ink);
+  --role-accent-2: var(--wuyou-yellow);
+  --role-glow: rgba(245, 166, 35, .34);
+}
+body[data-mode="companion"] {
+  --bg-mesh-1: rgba(245, 166, 35, .17);
+  --bg-mesh-2: rgba(255, 212, 102, .15);
+  --bg-mesh-3: rgba(216, 134, 11, .10);
+}
+
+/* Screen-edge breathing glow: blue→violet while working, orange→yellow while listening. */
+.role-halo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--role-accent) 26%, transparent);
+  opacity: .45;
+  transition: box-shadow var(--mode-fade) ease, opacity var(--mode-fade) ease;
+}
+/* The glow used to animate `box-shadow` blur radius across the whole viewport.
+   Blur radius is not a compositor property: every frame re-rasterised a
+   full-screen shadow, which is precisely the animation an entry-level Android
+   cannot hold at 60fps — and entry-level Android is what this audience owns.
+   The colour layers are now static and only `opacity` animates, which the
+   compositor handles on its own thread. Same look, no per-frame repaint. */
+.role-halo::before,
+.role-halo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: opacity;
+}
+.role-halo::before {
+  box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-violet) 66%, transparent);
+}
+.role-halo::after {
+  box-shadow: inset 0 0 60px 16px color-mix(in srgb, var(--wuyou-yellow) 74%, transparent);
+}
+body[data-activity="processing"] .role-halo::before {
+  animation: halo-fade 3.4s var(--ease-in-out) infinite;
+}
+body[data-activity="listening"] .role-halo::after {
+  animation: halo-fade 1.9s var(--ease-in-out) infinite;
+}
+@keyframes halo-fade {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: .8; }
+}
+
+/* Role header: icon + name + opening line carry the mode without relying on colour. */
+.role-header { display: flex; align-items: center; gap: 16px; margin-bottom: 4px; }
+.role-icon {
+  width: 68px; height: 68px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 22px;
+  font-size: 32px; line-height: 1;
+  color: #fff;
+  background: linear-gradient(150deg, var(--role-accent), var(--role-accent-2));
+  box-shadow: 0 10px 26px var(--role-glow), 0 1px 0 rgba(255, 255, 255, .35) inset;
+  transition: background var(--mode-fade) ease, box-shadow var(--mode-fade) ease;
+}
+/* Both role glyphs ship in the markup; CSS reveals the one matching the mode,
+   so no innerHTML is needed to swap them. */
+.role-icon svg { display: none; }
+body[data-mode="youhuo"] .role-icon .icon-youhuo { display: block; }
+body[data-mode="companion"] .role-icon .icon-companion { display: block; }
+.role-header h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); }
+.role-opening { margin: 4px 0 0; color: var(--ink-2); font-size: 17px; font-weight: 600; }
+.mode-fade { transition: opacity calc(var(--mode-fade) * .5) ease; }
+.mode-fade.switching { opacity: 0; }
+
+/* --------------------------------------------------------------------------
+   Chat
+   -------------------------------------------------------------------------- */
+
+.chat {
+  min-height: 240px;
+  max-height: 52vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  margin-top: 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface-inset);
+  border: 1px solid var(--line);
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+.bubble {
+  max-width: 84%;
+  padding: var(--space-4) var(--space-5);
+  font-size: calc(20px * var(--elder-font-scale) / 1.25);
+  /* Looser than the 1.6 it replaces: this is the one place on the page where
+     someone reads several lines of Chinese in a row. */
+  line-height: var(--lh-loose);
+  box-shadow: var(--shadow-1);
+  animation: bubble-in var(--dur-slow) var(--ease-out) both;
+}
+@keyframes bubble-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.bubble.user {
+  align-self: flex-end;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--role-accent) 94%, #fff), var(--role-accent-deep));
+  border-radius: var(--r-lg) var(--r-lg) 6px var(--r-lg);
+}
+.bubble.user .meta { color: rgba(255, 255, 255, .82); }
+.bubble.agent {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 6px;
+  color: var(--ink);
+}
+.bubble .meta { font-size: 13px; margin-top: 8px; }
+
+.controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 16px; }
+.quick { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.quick button {
+  background: color-mix(in srgb, var(--role-accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--role-accent-deep) 28%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--role-accent) 28%, transparent);
+  box-shadow: none;
+  padding: 11px 16px;
+  font-size: 15px;
+}
+.quick button:hover:not(:disabled) { background: color-mix(in srgb, var(--role-accent) 20%, var(--surface)); }
+
+/* --------------------------------------------------------------------------
+   Elder console composition: conversation is the stage, everything else is a
+   quieter rail. Collapses to one column on phones.
+   -------------------------------------------------------------------------- */
+
+.shell-wide { max-width: 1240px; }
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.app-bar .back-link { gap: 8px; padding-left: 13px; }
+
+.elder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+.stage {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(20px, 2.6vw, 32px);
+  background:
+    radial-gradient(120% 70% at 50% 118%, color-mix(in srgb, var(--role-accent) 10%, transparent), transparent 70%),
+    var(--surface);
+  transition: background var(--mode-fade) ease;
+}
+/* Hairline of role colour along the top edge of the hero card. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
+  transition: background var(--mode-fade) ease;
+}
+.rail { display: grid; gap: 16px; position: sticky; top: 18px; }
+.rail-card { padding: 20px; }
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rail-head h2 { margin: 0; font-size: 19px; }
+.rail-note { font-size: 13px; color: var(--ink-3); }
+button.block { width: 100%; margin-top: 12px; }
+.log-panel { margin-top: 18px; }
+
+.role-titles { min-width: 0; }
+.composer { margin-top: 4px; }
+.status-line { min-height: 22px; margin-top: 10px; }
+
+/* Empty states read as an invitation, not a dead end. */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 26px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--ink-3);
+  text-align: center;
+  font-size: 15px;
+}
+.empty-state svg { color: color-mix(in srgb, var(--role-accent) 55%, var(--ink-3)); }
+.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 750; }
+
+/* --------------------------------------------------------------------------
+   Design §4.4 — large central microphone
+   -------------------------------------------------------------------------- */
+
+.mic-stage { display: grid; place-items: center; gap: 12px; margin: 26px 0 8px; }
+.mic-dial { position: relative; display: grid; place-items: center; width: 200px; height: 200px; }
+/* Concentric rings that only animate while the microphone is listening. */
+.mic-dial::before, .mic-dial::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--role-accent) 30%, transparent);
+  inset: 12px;
+  opacity: .55;
+  transition: border-color var(--mode-fade) ease;
+}
+.mic-dial::after { inset: 0; opacity: .3; }
+body[data-activity="listening"] .mic-dial::before { animation: ring-out 1.9s ease-out infinite; }
+body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease-out .6s infinite; }
+@keyframes ring-out {
+  0% { transform: scale(.82); opacity: .7; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+.mic-big {
+  position: relative;
+  width: 156px; height: 156px;
+  border-radius: 50%;
+  font-size: 58px; line-height: 1;
+  padding: 0;
+  color: #fff;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--role-accent) 96%, #fff), var(--role-accent-deep));
+  box-shadow: 0 18px 44px var(--role-glow), 0 2px 0 rgba(255, 255, 255, .4) inset;
+  transition: background var(--mode-fade) ease, transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .2s ease;
+}
+.mic-big:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 22px 54px var(--role-glow), 0 2px 0 rgba(255,255,255,.42) inset; }
+.mic-big:active:not(:disabled) { transform: scale(.98); }
+.mic-hint { font-size: 17px; font-weight: 750; color: var(--ink-2); }
+.mic { min-width: 58px; font-size: 22px; }
+
+.home-entries { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 10px; margin-top: 18px; }
+.entry-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 60px;
+  font-size: 17px;
+}
+.entry-btn svg { flex: 0 0 auto; color: var(--role-accent); transition: color var(--mode-fade) ease; }
+
+/* --------------------------------------------------------------------------
+   Elder preferences and trust pills
+   -------------------------------------------------------------------------- */
+
+.profile-tools {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  margin-top: 16px; padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.profile-tools label { margin: 0; display: flex; align-items: center; gap: 9px; font-size: 14px; }
+.profile-tools select { width: auto; min-width: 108px; padding: 9px 12px; font-size: 15px; border-radius: var(--r-sm); }
+.profile-tools button { padding: 10px 16px; font-size: 15px; }
+/* In the narrow rail the two settings read better as aligned rows. */
+.rail .profile-tools { display: grid; gap: 10px; }
+.rail .profile-tools label { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 12px; }
+.rail .profile-tools select { width: 100%; min-width: 0; }
+
+.trust-line { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.trust-pill {
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: color-mix(in srgb, var(--ok) 38%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--ok) 26%, transparent);
+  padding: 6px 13px;
+  font-size: 14px;
+  font-weight: 750;
+}
+/* Whether a language model is advising the semantic layer is a fact about the
+   deployment, not a promise, so it gets a neutral rather than a green chip. */
+.trust-pill.neutral {
+  background: color-mix(in srgb, var(--youhuo-blue) 11%, var(--surface));
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
+  border-color: color-mix(in srgb, var(--youhuo-blue) 26%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Plain-language status chips (design §4.4 / §4.5)
+   -------------------------------------------------------------------------- */
+
+.status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 13px; border-radius: 999px;
+  font-size: 14px; font-weight: 750;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.status-chip.done { background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 40%, var(--ink)); border-color: color-mix(in srgb, var(--ok) 26%, transparent); }
+.status-chip.confirm { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 40%, var(--ink)); border-color: color-mix(in srgb, var(--warn) 28%, transparent); }
+.status-chip.todo { background: color-mix(in srgb, var(--youhuo-blue) 12%, var(--surface)); color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink)); border-color: color-mix(in srgb, var(--youhuo-blue) 26%, transparent); }
+.status-chip.relay { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 42%, var(--ink)); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.status-chip.cancelled { background: var(--surface-3); color: var(--ink-3); border-color: var(--line); }
+
+/* --------------------------------------------------------------------------
+   Design §4.3 — glass-box reliance card and safe action preview
+   -------------------------------------------------------------------------- */
+
+.reliance-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 18px;
+  border: 1px solid color-mix(in srgb, var(--role-accent) 34%, var(--line));
+  border-radius: var(--r-xl);
+  padding: 22px;
+  background: linear-gradient(168deg, color-mix(in srgb, var(--role-accent) 7%, var(--surface)), var(--surface) 52%);
+  box-shadow: var(--shadow-2);
+  animation: bubble-in .3s cubic-bezier(.2,.8,.3,1) both;
+}
+.reliance-card::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 4px;
+  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
+}
+.reliance-card h3 { margin: 4px 0 14px; font-size: 22px; }
+.reliance-row {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--ink);
+}
+.reliance-row:first-of-type { border-top: 0; }
+.reliance-row strong { color: var(--ink-3); font-weight: 750; font-size: 15px; }
+.reliance-card ul { margin: 6px 0 0; padding-left: 20px; line-height: 1.68; color: var(--ink-2); }
+.reliance-card .notice { margin-top: 14px; }
+
+.preview-details { margin-top: 12px; }
+.preview-details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--ink-2);
+  min-height: 44px;
+}
+.preview-details > summary::-webkit-details-marker { display: none; }
+.preview-details > summary::after { content: "▾"; font-size: 12px; color: var(--ink-3); }
+.preview-details[open] > summary::after { content: "▴"; }
+.preview-details > summary:hover { border-color: var(--role-accent); }
+.preview-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.preview-columns section {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 15px 17px;
+  background: var(--surface);
+}
+.preview-columns h4 { margin: 0 0 8px; font-size: 16px; }
+.preview-columns section:first-child h4 { color: color-mix(in srgb, var(--ok) 74%, var(--ink)); }
+.preview-columns section:last-child h4 { color: color-mix(in srgb, var(--danger) 76%, var(--ink)); }
+.preview-columns ul { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.7; color: var(--ink-2); }
+
+/* --------------------------------------------------------------------------
+   Elder activity log (design §4.4)
+   -------------------------------------------------------------------------- */
+
+.log-list { display: grid; gap: 9px; margin-top: 14px; }
+.log-item {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.log-item time { display: block; color: var(--ink-3); font-size: 13px; margin-top: 2px; }
+.log-item .who { font-weight: 800; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
+
+/* --------------------------------------------------------------------------
+   Family day-grouped calendar (design §4.5)
+   -------------------------------------------------------------------------- */
+
+.calendar-day {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 15px 17px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+}
+.calendar-day > h3 { margin: 0 0 10px; font-size: 17px; color: var(--ink-2); letter-spacing: .01em; }
+.calendar-day.today {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--youhuo-blue) 9%, var(--surface)), var(--surface-2));
+  border-color: color-mix(in srgb, var(--youhuo-blue) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--youhuo-blue) 12%, transparent);
+}
+.calendar-day.today > h3 { color: var(--youhuo-blue-deep); }
+.calendar-entry {
+  display: grid;
+  grid-template-columns: 62px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+}
+.calendar-day .calendar-entry:first-of-type { border-top: 0; }
+.calendar-entry time { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Family console overview strip. */
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.metric {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
+}
+.metric-label { font-size: 13px; color: var(--ink-3); font-weight: 700; }
+.metric strong {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.metric.alert { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-bg); }
+.metric.alert strong { color: color-mix(in srgb, var(--warn) 76%, var(--ink)); }
+.metric.good strong { color: color-mix(in srgb, var(--ok) 72%, var(--ink)); font-size: 22px; }
+.metric.bad strong { color: color-mix(in srgb, var(--danger) 78%, var(--ink)); font-size: 22px; }
+
+/* Redacted companion digest table. */
+.digest { margin-top: 10px; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.digest-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 14px;
+  padding: 12px 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  background: var(--surface);
+}
+.digest-row:nth-child(even) { background: var(--surface-2); }
+.digest-row strong { color: var(--ink-3); font-weight: 750; }
+
+/* Compact audit rows: a long chain reads better as a dense timeline than as cards. */
+.audit-row {
+  padding: 11px 14px;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 4px;
+  background: linear-gradient(90deg, var(--surface-2), transparent 70%);
+}
+.audit-row + .audit-row { border-top: 1px solid var(--line); }
+.audit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.audit-head code {
+  font-family: "Cascadia Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--youhuo-blue-deep) 86%, var(--ink));
+}
+.audit-head time { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.audit-row .meta { margin-top: 2px; font-size: 13px; }
+

@@ -1,8 +1,26 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from youhuo.models import ChatRequest
+
+STATIC = Path(__file__).resolve().parents[2] / "backend" / "static"
+
+#: 样式表的四层，加载顺序即层叠顺序。pages 必须最后——媒体查询不增加特异性，
+#: 响应式覆写写在被它覆写的组件之前就会静默输掉层叠。
+STYLESHEET_LAYERS = ("tokens.css", "base.css", "components.css", "pages.css")
+
+
+def read_stylesheet() -> str:
+    """按加载顺序拼出整张样式表。
+
+    `style.css` 拆成四层之前，这些断言直接读那一个文件。拆分只改了文件边界，没有
+    改任何一条声明，所以断言的对象仍然应该是"整张样式表"，而不是某一层。
+    """
+    return "".join(
+        (STATIC / name).read_text(encoding="utf-8") for name in STYLESHEET_LAYERS
+    )
 
 #: A bare "确认办理" no longer settles a bill: payment confirmation is gated on a
 #: verified teach-back of the amount (see youhuo/teach_back.py). Tests that use

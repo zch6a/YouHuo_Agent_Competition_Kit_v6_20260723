@@ -1,0 +1,145 @@
+/* 基础层：reset、手机外壳、版式。
+ *
+ * 元素选择器和全局规则，不含任何组件类。
+ */
+* { box-sizing: border-box; }
+
+/* Grid items default to min-width:auto, so a long placeholder or an unbreakable
+   token can push a track past the viewport. Every grid in this file wants the
+   track to shrink instead. */
+.controls > *, .home-entries > *, .calendar-entry > *, .reliance-row > *,
+.log-item > *, .digest-row > *, .glass-card > * > *, .grid > *,
+.dashboard-grid > *, .cards > *, .evidence-grid > *, .hero-roles > *,
+.preview-columns > *, .score-ribbon > *, .demo-step > * { min-width: 0; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  position: relative;
+  overflow-x: hidden;
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+  /* Chinese line breaking: `strict` stops a line from beginning with 、。」etc,
+     which is the single most obvious sign of untypeset CJK text. `allow-end`
+     lets full-width punctuation hang into the margin so the right edge reads as
+     straight instead of visibly ragged. */
+  line-break: strict;
+  hanging-punctuation: allow-end;
+}
+
+/* Long unbreakable tokens (ids, URLs, tokens shown in the trust lab) must wrap
+   rather than push a card wide, but ordinary Chinese must not break mid-word. */
+p, li, td, .bubble, .meta, .rail-note { overflow-wrap: break-word; }
+
+/* Headings set as a block read better ragged-balanced than ragged-right; the
+   difference is most visible on the two- and three-line Chinese titles. */
+h1, h2, h3, .hero-title, .rail-head h2 { text-wrap: balance; }
+/* Avoid a single word alone on the last line of body copy. */
+p, .bubble, .rail-note, .trust-line { text-wrap: pretty; }
+
+::selection {
+  background: color-mix(in srgb, var(--role-accent) 26%, transparent);
+  color: var(--ink);
+}
+
+/* ==========================================================================
+   Phone app shell
+   The delivered product is a HarmonyOS app; this web build is the same product
+   on a phone browser, and installed to the home screen it runs with no browser
+   chrome at all. The rules below are what separate "a responsive page" from
+   "an app": real safe areas, a viewport that does not jump when the URL bar
+   hides, no text auto-inflation, no 300ms tap delay, and no accidental
+   selection or callout when a shaky finger presses a little too long.
+   ========================================================================== */
+
+html {
+  /* iOS inflates text in landscape unless told not to; on a page whose whole
+     point is a controlled type scale that is not a favour. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  /* dvh follows the URL bar as it collapses; svh is the safe floor for
+     browsers without dvh. Both beat 100vh, which is taller than the visible
+     area on every mobile browser and pushes the composer off-screen. */
+  min-height: 100svh;
+  min-height: 100dvh;
+  /* Stop the whole page rubber-banding when a scrollable list hits its end. */
+  overscroll-behavior-y: none;
+}
+
+/* Touch affordances. The grey flash and the long-press callout both read as
+   "web page"; an app has its own pressed state, which buttons already define. */
+a, button, .entry-btn, .quick button, .mic-big, .bottom-nav a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button, .mic-big, .bottom-nav a { -webkit-user-select: none; user-select: none; }
+
+/* Reach under the notch and the home bar. Padding rather than margin so the
+   backgrounds still bleed to the physical edges. */
+.shell {
+  padding-left: max(var(--space-4), env(safe-area-inset-left));
+  padding-right: max(var(--space-4), env(safe-area-inset-right));
+}
+
+
+/* Soft gradient mesh behind everything; purely decorative. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -10% auto -10%;
+  height: 90vh;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52vw 42vh at 12% 0%, var(--bg-mesh-1), transparent 62%),
+    radial-gradient(46vw 40vh at 88% 6%, var(--bg-mesh-2), transparent 60%),
+    radial-gradient(40vw 34vh at 60% 34%, var(--bg-mesh-3), transparent 64%);
+  filter: blur(6px);
+  transition: background var(--mode-fade) ease;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 40px);
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
+
+h1, h2, h3, h4 {
+  line-height: 1.18;
+  letter-spacing: -.015em;
+  font-weight: 800;
+  color: var(--ink);
+}
+h1 { margin: 0 0 14px; font-size: clamp(32px, 5.4vw, 60px); }
+h2 { margin: 0 0 12px; font-size: clamp(21px, 2.6vw, 28px); }
+h3 { margin: 0 0 8px; font-size: 19px; }
+p { line-height: 1.72; color: var(--ink-2); margin: 0 0 12px; }
+a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underline-offset: 3px; }
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  /* Mostly ink with a hue cast, so small uppercase text still clears 4.5:1. */
+  color: color-mix(in srgb, var(--role-accent-deep) 34%, var(--ink));
+  margin: 0 0 10px;
+}
+.lead { max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); color: var(--ink-2); }
+.meta { font-size: 14px; color: var(--ink-3); margin-top: 5px; line-height: 1.6; }
+/* 生活日报里"这条会推送给您"的那一行（family.js renderDailyReport）。它写的是
+   `meta bad`，而 .bad 此前只在 .pill / .report-verdict / .metric 下有规则，于是这
+   一行和普通说明文字长得一模一样——最需要家属注意的那条反而最不显眼。 */
+.meta.bad { color: color-mix(in srgb, var(--danger) 78%, var(--ink)); font-weight: 600; }
+

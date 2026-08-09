@@ -205,6 +205,31 @@ def collect(events: list[dict], page: str) -> list[str]:
     return problems
 
 
+def check_sprite_icons(tab: "CDP", page: str, failures: list[str]) -> None:
+    """标签栏图标引用的是外部 sprite，必须确认它真的画出来了。
+
+    这五个图标此前在五个 HTML 里逐字复制，改成 `<use href="/static/icons/tabs.svg#…">`
+    之后，一旦那个文件丢了、改名了或者被 CSP 拦下，页面**不会报错**：`<svg>` 盒子
+    还在、宽高还是 24×24、computed color 也照样正确，只是里面什么都没有。截图上是
+    一排空白，而对比度检查读的是计算色，它会说一切正常。
+
+    `getBBox()` 是唯一说实话的量：外部引用没解析时它是 0×0。
+    （注意别用 `use.instanceRoot`——它在现代 Chrome 里已被移除，一律返回 null，
+    拿它判断会把"渲染正常"报成"全是空的"。这个坑刚踩过。）
+    """
+    raw = tab.send("Runtime.evaluate", expression=(
+        "JSON.stringify([...document.querySelectorAll('.tabbar .tab use')].map(u => {"
+        "  try { const b = u.getBBox(); return Math.round(b.width); } catch (e) { return 0; }"
+        "}))"
+    ), returnByValue=True)["result"].get("value", "[]")
+    widths = json.loads(raw)
+    if not widths:
+        return          # 这一页没有标签栏（老人端）
+    empty = [i for i, w in enumerate(widths) if not w]
+    if empty:
+        failures.append(f"{page}  标签栏第 {empty} 个图标是空的：外部 sprite 没有解析")
+
+
 def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     """把这一页上每个按钮都按一遍，每按一次收一次网。
 
@@ -324,6 +349,7 @@ def main() -> int:
                 tab.send("Page.navigate", url=BASE + page)
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
+                check_sprite_icons(tab, page, failures)
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
             finally:

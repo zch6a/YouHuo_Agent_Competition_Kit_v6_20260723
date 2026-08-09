@@ -27,6 +27,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+from .helpers import read_stylesheet
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,7 +49,7 @@ def test_only_the_conversation_screen_opts_into_the_frame():
     再往后看 400 个字符——把 bug 原样放回去时这个测试没抓住，因为 `main.shell`
     的首次出现在文件的另一处。规则文本已经在手里了，就不该再去猜它在哪。
     """
-    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    css = read_stylesheet()
     for selector, body in re.findall(r"([^\n{}]*?)\s*\{([^{}]*)\}", css):
         if "overflow: hidden" not in body or "max-height" not in body:
             continue
@@ -62,7 +64,7 @@ def test_only_the_conversation_screen_opts_into_the_frame():
 
 
 def test_scrolling_pages_clear_the_home_gesture_area():
-    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    css = read_stylesheet()
     assert "main.shell:not(.app-frame)" in css, (
         "滚动页面的底部留白必须排除定高框架，否则框架会把自己顶出裁剪线"
     )
@@ -74,7 +76,7 @@ def test_stylesheet_has_no_unclosed_comments():
     浏览器的错误恢复会把它当成选择器前缀一路吃到下一个 `{`，于是紧跟着的那条规则
     被整条丢掉——不报错，不告警，只是静静地不生效。
     """
-    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    css = read_stylesheet()
     stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     assert "*/" not in stripped, "有多余的 `*/`：某个注释块提前结束了，后面的正文成了裸 CSS"
     assert "/*" not in stripped, "有未闭合的 `/*`"

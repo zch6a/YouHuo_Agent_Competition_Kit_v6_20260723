@@ -17,7 +17,10 @@
   <meta name="apple-mobile-web-app-title" content="优活" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>优活 Agent v6 决赛原型</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <link rel="stylesheet" href="/static/base.css" />
+  <link rel="stylesheet" href="/static/components.css" />
+  <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo">
@@ -129,11 +132,11 @@
       </div>
     </section>
     <nav class="tabbar" aria-label="主要分区">
-      <a href="/" class="tab is-current" aria-current="page"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg><span>首页</span></a>
-      <a href="/family" class="tab"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 21a8 8 0 0 0-16 0" /> <circle cx="10" cy="8" r="5" /> <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg><span>家人</span></a>
-      <a href="/care" class="tab"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.414 14.414C21 12.828 22 11.5 22 9.5a5.5 5.5 0 0 0-9.591-3.676.6.6 0 0 1-.818.001A5.5 5.5 0 0 0 2 9.5c0 2.3 1.5 4 3 5.5l5.535 5.362a2 2 0 0 0 2.879.052 2.12 2.12 0 0 0-.004-3 2.124 2.124 0 1 0 3-3 2.124 2.124 0 0 0 3.004 0 2 2 0 0 0 0-2.828l-1.881-1.882a2.41 2.41 0 0 0-3.409 0l-1.71 1.71a2 2 0 0 1-2.828 0 2 2 0 0 1 0-2.828l2.823-2.762" /></svg><span>照护</span></a>
-      <a href="/trust" class="tab"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /></svg><span>可信</span></a>
-      <a href="/judge" class="tab"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" /> <circle cx="12" cy="8" r="6" /></svg><span>评委</span></a>
+      <a href="/" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg><span>首页</span></a>
+      <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-family" /></svg><span>家人</span></a>
+      <a href="/care" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
+      <a href="/trust" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-trust" /></svg><span>可信</span></a>
+      <a href="/judge" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-judge" /></svg><span>评委</span></a>
     </nav>
   </main>
 </body>

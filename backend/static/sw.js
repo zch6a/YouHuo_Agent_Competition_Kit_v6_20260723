@@ -27,8 +27,14 @@ const SHELL = [
   '/care',
   '/trust',
   '/judge',
-  '/static/style.css',
+  // 样式表拆成了四层，加载顺序即层叠顺序；漏缓存其中任何一层，离线时的页面都会
+  // 少掉一整段规则，而且看起来只是"样式坏了"。
+  '/static/tokens.css',
+  '/static/base.css',
+  '/static/components.css',
+  '/static/pages.css',
   '/static/identity.js',
+  '/static/common.js',
   '/static/elder.js',
   '/static/family.js',
   '/static/care.js',
@@ -37,6 +43,8 @@ const SHELL = [
   '/static/speech.js',
   '/static/sheet.js',
   '/static/register-sw.js',
+  // 标签栏图标的外部 sprite。不缓存它，离线时五个标签会变成一排空白——而且不报错。
+  '/static/icons/tabs.svg',
   '/static/icons/icon-192.png',
   '/static/icons/apple-touch-icon.png',
   '/static/manifest.webmanifest',

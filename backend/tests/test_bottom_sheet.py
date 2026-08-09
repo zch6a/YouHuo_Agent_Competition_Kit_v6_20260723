@@ -20,12 +20,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .helpers import read_stylesheet
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "backend" / "static"
 HTML = (STATIC / "elder.html").read_text(encoding="utf-8")
-CSS = (STATIC / "style.css").read_text(encoding="utf-8")
+CSS = read_stylesheet()
 JS = (STATIC / "sheet.js").read_text(encoding="utf-8")
 
 

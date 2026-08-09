@@ -20,11 +20,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .helpers import read_stylesheet
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "backend" / "static"
-CSS = (STATIC / "style.css").read_text(encoding="utf-8")
+CSS = read_stylesheet()
 
 # (页面文件, 该页在标签栏里应当高亮的 href)
 PAGES = [

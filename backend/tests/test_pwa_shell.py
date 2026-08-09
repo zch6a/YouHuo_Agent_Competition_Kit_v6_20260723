@@ -21,6 +21,8 @@ from fastapi.testclient import TestClient
 
 from youhuo.api import create_app
 
+from .helpers import read_stylesheet
+
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "backend" / "static"
 PAGES = ["index.html", "elder.html", "family.html", "care.html", "trust.html", "judge.html"]
@@ -92,7 +94,8 @@ MUST_BYPASS_CACHE = [
 ]
 MUST_BE_CACHEABLE = [
     "/", "/elder", "/family", "/care", "/trust", "/judge",
-    "/static/style.css", "/static/elder.js", "/static/manifest.webmanifest",
+    "/static/tokens.css", "/static/base.css", "/static/components.css", "/static/pages.css",
+    "/static/elder.js", "/static/common.js", "/static/manifest.webmanifest",
     "/static/icons/icon-192.png",
 ]
 
@@ -185,6 +188,56 @@ def test_demo_output_is_not_raw_json(page):
     assert 'class="result"' in source, f"{page} 没有使用结构化结果容器"
 
 
+@pytest.mark.parametrize("page", PAGES)
+def test_stylesheet_layers_load_in_cascade_order(page):
+    """四层的加载顺序就是层叠顺序，而且 pages 必须最后。
+
+    这不是风格问题。响应式覆写全在 pages.css 里，而媒体查询**不增加特异性**——
+    把它排在被它覆写的组件之前，那些覆写会静默输掉层叠，页面在手机上悄悄变回桌面
+    布局。原文件里那句"Responsive overrides — deliberately LAST in the file"就是
+    这个意思；拆成四个文件之后，那条约束的执行者从"往下写"变成了"按序引"。
+    """
+    source = (STATIC / page).read_text(encoding="utf-8")
+    found = re.findall(r'href="/static/(tokens|base|components|pages)\.css"', source)
+    assert found == ["tokens", "base", "components", "pages"], f"{page} 的层序是 {found}"
+    assert "style.css" not in source, f"{page} 还引着已经拆掉的 style.css"
+
+
+@pytest.mark.parametrize(
+    "asset", sorted(p.name for p in STATIC.glob("*.css")) + sorted(p.name for p in STATIC.glob("*.js"))
+)
+def test_no_byte_order_mark_anywhere(asset):
+    """U+FEFF 在 CSS 里不是空白，是非法字符。
+
+    原来的 style.css 开头有一个 BOM——在开头浏览器容忍。拆成四层时它跟着第一块走，
+    落在了新加的文件头注释**之后**，于是变成文件中段的一个非法 token：CSS 的错误
+    恢复把紧随其后的构造整个丢掉，`:root` 整块失效，`var(--ink)` 退化成初始值黑色。
+
+    逐字节拼接检查发现不了这件事：四份拼起来和原文件完全一致，变的只是 BOM 在单个
+    文件里的位置。是对比度检查读到 rgb(0,0,0) 才暴露的，而这一条把它钉住。
+
+    JS 一并查：Windows PowerShell 5.1 的 `Set-Content -Encoding UTF8` 默认就写 BOM，
+    这个仓库已经被它写坏过一个 color.json 和一次 git 提交标题。
+    """
+    raw = (STATIC / asset).read_bytes()
+    assert not raw.startswith(b"\xef\xbb\xbf"), f"{asset} 以 BOM 开头"
+    assert "﻿" not in raw.decode("utf-8"), f"{asset} 内部含有 U+FEFF"
+
+
+def test_no_declaration_was_lost_in_the_split():
+    """拆分只改文件边界，不改内容：声明总数必须和拆分前一致。
+
+    拆分时是按行切的，并逐字节验证过四份拼回去等于原文件。这条测试守的是之后——
+    任何一层被整段删掉或截断，这里都会掉下来。
+    """
+    css = read_stylesheet()
+    assert css.count("{") == css.count("}"), "花括号不配对，某一层被截断了"
+    # 拆分当时的实测值。改样式时这个数会变，跟着改；它的作用是让"整层消失"这种
+    # 事故立刻可见，而不是慢慢发现某个页面少了一块。
+    assert css.count(":root") >= 4, "令牌层丢了"
+    assert "@media (max-width: 760px)" in css, "响应式那一大段不见了"
+
+
 def test_service_worker_bails_out_before_responding():
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
     # 直接放行，而不是先缓存再过滤。
@@ -243,7 +296,7 @@ def test_csp_is_still_strict(client):
 
 
 def test_stylesheet_uses_safe_areas_and_dynamic_viewport():
-    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    css = read_stylesheet()
     assert "env(safe-area-inset-bottom)" in css, "底部栏会压在手势条上"
     assert "env(safe-area-inset-top)" in css
     assert "100dvh" in css, "100vh 在移动浏览器上高于可见区域"
@@ -253,5 +306,5 @@ def test_stylesheet_uses_safe_areas_and_dynamic_viewport():
 
 def test_reduced_motion_is_still_respected():
     """Motion sensitivity is common in this audience; the shell must not undo it."""
-    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    css = read_stylesheet()
     assert "prefers-reduced-motion" in css
