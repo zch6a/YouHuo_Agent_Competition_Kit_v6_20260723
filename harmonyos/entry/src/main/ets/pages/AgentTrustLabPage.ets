@@ -1,10 +1,16 @@
-import { router } from '@kit.ArkUI';
-import { ApiClient } from '../services/ApiClient';
+/**
+ * 可信 Agent 实验室 —— 「可信」标签页的第二节。
+ *
+ * 原先是 @Entry 独立页面，但全工程没有任何一处 push 到它。改成可嵌入组件，由
+ * TrustTab 的分段切换承载。
+ */
 
-@Entry
+import { ApiClient } from '../services/ApiClient';
+import { Dim } from '../theme/Theme';
+
 @Component
-struct AgentTrustLabPage {
-  @State result: string = '点击下方按钮验证 可信 Agent 能力。';
+export struct AgentTrustLabPage {
+  @State result: string = '点击下方按钮验证可信 Agent 能力。';
   @State busy: boolean = false;
 
   private async testVoiceConsensus(): Promise<void> {
@@ -36,33 +42,40 @@ struct AgentTrustLabPage {
   }
 
   build() {
-    Column({ space: 18 }) {
-      Row() {
-        Button('返回').onClick(() => router.back())
-        Text('可信 Agent 实验室').fontSize(30).fontWeight(FontWeight.Bold).margin({ left: 16 })
-      }.width('100%')
-
+    Column({ space: Dim.SPACE_4 }) {
       Text('演示语音共识、目的绑定、可恢复任务和能力边界。高风险动作不会因模型一句话被放行。')
-        .fontSize(20).lineHeight(31)
+        .fontSize(Dim.TEXT_BODY)
+        .lineHeight(30)
+        .fontColor($r('app.color.ink_2'))
 
-      Row({ space: 12 }) {
-        Button('测试语音冲突').enabled(!this.busy).onClick(() => this.testVoiceConsensus())
-        Button('查看能力真值').enabled(!this.busy).onClick(() => this.loadTruth())
+      Row({ space: Dim.SPACE_3 }) {
+        Button('测试语音冲突')
+          .constraintSize({ minHeight: Dim.TOUCH_MIN })
+          .enabled(!this.busy)
+          .onClick(() => this.testVoiceConsensus())
+        Button('查看能力真值')
+          .constraintSize({ minHeight: Dim.TOUCH_MIN })
+          .enabled(!this.busy)
+          .onClick(() => this.loadTruth())
       }.width('100%')
 
       Scroll() {
         Text(this.result)
-          .fontSize(20)
+          .fontSize(Dim.TEXT_BODY)
           .lineHeight(32)
-          .padding(18)
+          .padding(Dim.SPACE_4)
           .width('100%')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(16)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .borderRadius(Dim.RADIUS_LG)
       }.layoutWeight(1).width('100%')
 
       Text('说明：当前 ArkTS 工程是接入壳；需在 DevEco Studio 对齐 API 26、签名并真机验证。')
-        .fontSize(16).fontColor('#555555')
+        .fontSize(Dim.TEXT_SM)
+        .fontColor($r('app.color.ink_3'))
     }
-    .padding(20).width('100%').height('100%').backgroundColor('#F3F7FF')
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .height('100%')
   }
 }

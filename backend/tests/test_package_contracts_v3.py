@@ -41,10 +41,18 @@ def test_mcp_manifest_disables_high_risk_execution() -> None:
     assert high["requires_human_confirmation"] is True
 
 
-def test_harmonyos_trust_center_registered() -> None:
-    pages = json.loads((ROOT / "harmonyos/entry/src/main/resources/base/profile/main_pages.json").read_text(encoding="utf-8"))
-    assert "pages/TrustCenterPage" in pages["src"]
-    assert (ROOT / "harmonyos/entry/src/main/ets/pages/TrustCenterPage.ets").is_file()
+def test_harmonyos_trust_center_is_reachable() -> None:
+    """信任中心必须在 App 里够得着，而不是"登记在一个 JSON 里"。
+
+    这条原先断言 "pages/TrustCenterPage" in main_pages.json。它一直是绿的，而那段
+    时间里这个页面全工程无人 import——「可信」标签挂的是两行占位文字，评委点进去
+    什么也没有。登记表只说明文件存在过。
+    """
+    page = ROOT / "harmonyos/entry/src/main/ets/pages/TrustCenterPage.ets"
+    assert page.is_file()
+    index = (ROOT / "harmonyos/entry/src/main/ets/pages/Index.ets").read_text(encoding="utf-8")
+    assert "from './TrustCenterPage'" in index, "Index 没有引入信任中心"
+    assert "TrustCenterPage()" in index, "信任中心被引入了却没有被渲染"
 
 
 def test_competition_description_stays_under_800_chinese_chars_roughly() -> None:

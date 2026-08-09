@@ -42,8 +42,9 @@
 
 ## 鸿蒙与小艺
 
-- `harmonyos/.../FinalistWalkthroughPage.ets`：v6决赛导览ArkTS页面；
-- `CoreSpeechAdapter.ets`、`PushSafetyAdapter.ets`、`DistributedProfileAdapter.ets`、`AgentCompanionAdapter.ets`：官方能力接入边界，不冒充已联调；
+- `harmonyos/.../pages/Index.ets`：四标签宿主。`main_pages.json` 只登记它一个路由页面，其余页面都是被它引入并渲染的 `@Component`；全工程已不再使用废弃的 `router`；
+- `harmonyos/.../FinalistWalkthroughPage.ets`：v6决赛导览，现为「可信」标签页的第三节（此前登记在册但无人引用，真机上到不了）；
+- **尚未接入的官方能力不再用桩代码表示。** 早前的五个 `*Adapter.ets` 已删除：共 119 行、零 `@kit.` 引用、无人 import，其中 `CoreSpeechAdapter` 永远回调空候选数组，与真正在用的 `SpeechInput.ets` 结论相反。Account Kit、Push Kit、Location Kit、Map Kit 目前均未接入，写在 `harmonyos/README.md` 的待办里；
 - `harmonyos/.../services/AudioCapture.ets`：16kHz/单声道/16bit PCM 采集，参数逐个对过 SDK 声明；
 - `harmonyos/.../services/SpeechInput.ets`：端侧语音识别接入；全工程唯一引用 Core Speech Kit 的文件（该 kit 不在公开 SDK 中，无法离线核实，已单独隔离）；
 - `xiaoyi/plugin_openapi_v6.generated.json`：由当前FastAPI生成，99个路径；

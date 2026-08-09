@@ -7,6 +7,11 @@ import { MessageItem, MessageSource } from '../model/MessageSource';
 import { ChatBubble } from '../components/ChatBubble';
 import { MicButton } from '../components/MicButton';
 import { Dim, Motion } from '../theme/Theme';
+import { FamilyPage } from './FamilyPage';
+import { CareHubPage } from './CareHubPage';
+import { TrustCenterPage } from './TrustCenterPage';
+import { AgentTrustLabPage } from './AgentTrustLabPage';
+import { FinalistWalkthroughPage } from './FinalistWalkthroughPage';
 
 /**
  * 老人端会话屏。
@@ -309,11 +314,11 @@ struct Index {
       }.tabBar(this.TabItem(0, '对话', $r('sys.symbol.mic')))
 
       TabContent() {
-        FamilyTab()
+        FamilyPage()
       }.tabBar(this.TabItem(1, '家人', $r('sys.symbol.person')))
 
       TabContent() {
-        CareTab()
+        CareHubPage()
       }.tabBar(this.TabItem(2, '照护', $r('sys.symbol.bell')))
 
       TabContent() {
@@ -356,49 +361,54 @@ struct Index {
   }
 }
 
-/** 占位分区，保持标签栏四格结构完整；各自的实现在同目录的对应页面里。 */
-@Component
-struct FamilyTab {
-  build() {
-    PlaceholderScreen({ title: '家属协同台', hint: '创建待办、查看进度、在支付与身份环节接力确认。' })
-  }
-}
-
-@Component
-struct CareTab {
-  build() {
-    PlaceholderScreen({ title: '全景照护中心', hint: '循环事务、健康档案、用药安全与位置围栏。' })
-  }
-}
-
+/**
+ * 「可信」标签页：三节内容用分段切换，而不是三个够不着的路由页面。
+ *
+ * 这三节此前都是写好的 @Entry 页面，登记在 main_pages.json 里，却没有任何一处
+ * push 到它们——`ApiClient` 21 个 public 方法里有 16 个因此在运行时永远发不出去。
+ */
 @Component
 struct TrustTab {
-  build() {
-    PlaceholderScreen({ title: '可信智能体实验室', hint: '语音共识、目的绑定、可恢复 Saga 与完成证明。' })
+  @State section: number = 0;
+
+  @Builder
+  private SegmentButton(index: number, label: string) {
+    Button(label)
+      .layoutWeight(1)
+      .constraintSize({ minHeight: Dim.TOUCH_MIN })
+      .backgroundColor(this.section === index
+        ? $r('app.color.youhuo_blue') : $r('app.color.surface'))
+      .fontColor(this.section === index
+        ? $r('app.color.ink_invert') : $r('app.color.ink_2'))
+      .fontWeight(this.section === index ? FontWeight.Bold : FontWeight.Medium)
+      .onClick(() => { this.section = index; })
   }
-}
-
-@Component
-struct PlaceholderScreen {
-  @Prop title: string;
-  @Prop hint: string;
 
   build() {
-    Column({ space: Dim.SPACE_3 }) {
-      Text(this.title)
+    Column({ space: Dim.SPACE_4 }) {
+      Text('可信智能体实验室')
         .fontSize(Dim.TEXT_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
-      Text(this.hint)
-        .fontSize(Dim.TEXT_BODY)
-        .lineHeight(30)
-        .fontColor($r('app.color.ink_2'))
-        .textAlign(TextAlign.Center)
+
+      Row({ space: Dim.SPACE_2 }) {
+        this.SegmentButton(0, '工具治理')
+        this.SegmentButton(1, '实验室')
+        this.SegmentButton(2, '决赛导览')
+      }.width('100%')
+
+      if (this.section === 0) {
+        TrustCenterPage()
+      } else if (this.section === 1) {
+        AgentTrustLabPage()
+      } else {
+        FinalistWalkthroughPage()
+      }
     }
+    .alignItems(HorizontalAlign.Start)
+    .padding(Dim.SPACE_5)
     .width('100%')
     .height('100%')
-    .padding(Dim.SPACE_6)
-    .justifyContent(FlexAlign.Center)
     .backgroundColor($r('app.color.bg'))
   }
 }

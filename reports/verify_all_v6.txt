@@ -4,61 +4,64 @@ START openapi_v6
 {"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 99, "version": "6.0.0"}
 PASS openapi_v6
 START pytest_v6
-........................................................................ [ 10%]
-........................................................................ [ 20%]
-........................................................................ [ 30%]
-........................................................................ [ 40%]
-........................................................................ [ 51%]
-........................................................................ [ 61%]
-........................................................................ [ 71%]
-........................................................................ [ 81%]
-........................................................................ [ 91%]
-.........................................................                [100%]
-705 passed in 95.47s (0:01:35)
+........................................................................ [  8%]
+........................................................................ [ 16%]
+........................................................................ [ 24%]
+........................................................................ [ 32%]
+........................................................................ [ 41%]
+........................................................................ [ 49%]
+........................................................................ [ 57%]
+........................................................................ [ 65%]
+........................................................................ [ 74%]
+........................................................................ [ 82%]
+........................................................................ [ 90%]
+........................................................................ [ 98%]
+.........                                                                [100%]
+873 passed in 81.61s (0:01:21)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
 ---------------------------------------------------------
 backend\youhuo\__init__.py                1      0   100%
 backend\youhuo\api.py                   330     58    82%
-backend\youhuo\baseline.py              133      2    98%
+backend\youhuo\baseline.py              164      8    95%
 backend\youhuo\baseline_api.py           77      7    91%
 backend\youhuo\baseline_models.py        97      2    98%
 backend\youhuo\baseline_services.py     219     16    93%
-backend\youhuo\baseline_store.py        160     20    88%
+backend\youhuo\baseline_store.py        160     18    89%
 backend\youhuo\care_voice.py            166     15    91%
 backend\youhuo\companion.py              63      0   100%
 backend\youhuo\database.py              338     26    92%
-backend\youhuo\document_guard.py         86      0   100%
+backend\youhuo\document_guard.py        179      6    97%
 backend\youhuo\elderbench.py             97      7    93%
 backend\youhuo\engine.py                846     66    92%
 backend\youhuo\llm.py                    38     17    55%
 backend\youhuo\memory_vault.py           92      2    98%
 backend\youhuo\models.py                204      0   100%
 backend\youhuo\orchestration.py         157      4    97%
-backend\youhuo\privacy.py                71     17    76%
-backend\youhuo\security.py              120     11    91%
+backend\youhuo\privacy.py                78     17    78%
+backend\youhuo\security.py              176     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
 backend\youhuo\services.py              174     20    89%
-backend\youhuo\teach_back.py            119     12    90%
+backend\youhuo\teach_back.py            119     11    91%
 backend\youhuo\tool_registry.py          85     11    87%
 backend\youhuo\tts.py                    99     50    49%
-backend\youhuo\utils.py                 116     16    86%
+backend\youhuo\utils.py                 120     17    86%
 backend\youhuo\v3_models.py              14      0   100%
 backend\youhuo\v4_api.py                326     51    84%
-backend\youhuo\v4_models.py             475     15    97%
+backend\youhuo\v4_models.py             483     15    97%
 backend\youhuo\v4_services.py           287     22    92%
 backend\youhuo\v4_store.py              394     34    91%
 backend\youhuo\v5_api.py                194     35    82%
 backend\youhuo\v5_models.py             319      1    99%
-backend\youhuo\v5_services.py           339     27    92%
+backend\youhuo\v5_services.py           381     27    93%
 backend\youhuo\v5_store.py              304     49    84%
 backend\youhuo\v6_api.py                145     26    82%
 backend\youhuo\v6_models.py             237      0   100%
-backend\youhuo\v6_services.py           321     49    85%
+backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7372    690    91%
+TOTAL                                  7615    699    91%
 PASS coverage_v6
 {
   "total": 34,
@@ -339,6 +342,9 @@ START browser_javascript_v6
   ok trust.js [script]
 PASS browser_javascript_v6: 10 file(s)
 PASS speech_text_v6: 29 项朗读文本断言通过
+START page_runtime_v6
+OK page_runtime: 6 个页面加载后无异常、无 console.error、无失败请求
+PASS page_runtime_v6
 START arkts_v6
 PASS check_arkts: 23 个 .ets 文件，20 个颜色令牌，已按 SDK 核对 1159 个 kit 符号
 PASS arkts_v6

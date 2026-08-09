@@ -305,6 +305,91 @@ def test_the_tab_bar_cannot_be_swiped_between():
     assert ".scrollable(false)" in read("pages/Index.ets")
 
 
+# --- 标签页背后必须真的有东西 -----------------------------------------------
+
+
+def test_every_tab_shows_a_real_screen():
+    """四个标签里有三个曾经只是两行占位文字。
+
+    `FamilyPage` / `CareHubPage` / `TrustCenterPage` 都是接了真 ApiClient 的完整
+    实现，也都规规矩矩登记在 main_pages.json 里，但全工程没有任何一处 import 或
+    push 到它们——标签栏挂的是 `PlaceholderScreen`。评委点开第二个标签看到的就是
+    那两行。所有静态检查、35 项 ArkTS 测试和 130 项功能验收当时全是绿的：没有一条
+    在问"点开这个标签能看到什么"。
+    """
+    index = _code(read("pages/Index.ets"))
+    assert "PlaceholderScreen" not in index, "标签页里还挂着占位屏"
+    for screen in ("FamilyPage", "CareHubPage", "TrustTab"):
+        assert f"{screen}()" in index, f"标签栏没有渲染 {screen}"
+
+
+def test_no_page_is_written_but_unreachable():
+    """写好了却到不了的页面，是交付包里一份看起来完整的死代码。
+
+    到得了只有两种方式：作为 @Entry 被路由加载，或者从入口顺着 import 走到并被渲染。
+
+    引入了却从不渲染同样不算到得了：`import { X }` 而没有一处 `X()`，那个页面在
+    真机上仍然不存在，只是死代码多了一行 import 而已。
+    """
+    registered = {
+        f"{name.split('/')[-1]}.ets"
+        for name in json.loads(
+            (HM / "resources/base/profile/main_pages.json").read_text(encoding="utf-8")
+        )["src"]
+    }
+    reachable = _reachable_from_entry()
+    rendered = "\n".join(_code(path.read_text(encoding="utf-8")) for path in reachable)
+    unreachable = [
+        path.name
+        for path in (ETS / "pages").glob("*.ets")
+        if path.name not in registered
+        and not (path.resolve() in reachable and f"{path.stem}()" in rendered)
+    ]
+    assert not unreachable, f"这些页面运行时到不了：{unreachable}"
+
+
+def _reachable_from_entry() -> set[Path]:
+    """从真正会被加载的两个根出发，顺 import 能走到的全部 .ets。
+
+    必须是**传递闭包**，不能只问"某个文件里出现过"。那批死页面自己就调用着
+    ApiClient，一条"全仓搜一下"的断言在它们完全不可达的时候照样是绿的——那正是
+    这个工程曾经的状态。够得着的定义只能从入口算起。
+    """
+    roots = [ETS / "entryability" / "EntryAbility.ets", ETS / "pages" / "Index.ets"]
+    seen: set[Path] = set()
+    stack = list(roots)
+    while stack:
+        current = stack.pop().resolve()
+        if current in seen or not current.is_file():
+            continue
+        seen.add(current)
+        for rel in re.findall(r"from\s+'(\.[^']+)'", current.read_text(encoding="utf-8")):
+            stack.append((current.parent / rel).with_suffix(".ets"))
+    return seen
+
+
+def test_every_api_client_method_is_reachable_from_a_screen():
+    """ApiClient 曾有 21 个 public 方法，其中 16 个在运行时永远发不出去。
+
+    它们只被那批从入口走不到的页面调用。一个后端接口有 ArkTS 客户端方法、有测试、
+    有 OpenAPI 条目，却没有任何一条真机路径能触发——这在交付材料里看起来是"已接入"。
+    """
+    api_path = (ETS / "services" / "ApiClient.ets").resolve()
+    reachable = _reachable_from_entry()
+    assert api_path in reachable, "ApiClient 自己都不在入口可达集里"
+    callers = "\n".join(
+        _code(path.read_text(encoding="utf-8")) for path in reachable if path != api_path
+    )
+    declared = set(re.findall(
+        r"^\s*(?:public\s+)?static\s+(?:async\s+)?(\w+)\s*\(", _code(api_path.read_text(encoding="utf-8")), re.M))
+    #: elderId() 只在 ApiClient 内部用（9 处），不需要界面调用。
+    #: resetIdentity() 确实没有任何调用方——留着是为了让访客沙箱可以被重置，
+    #: 这一点在 PACKAGE_INDEX 里如实写明，不假装它接进了界面。
+    exempt = {"elderId", "resetIdentity"}
+    unused = sorted(name for name in declared - exempt if f"ApiClient.{name}(" not in callers)
+    assert not unused, f"这些 ApiClient 方法没有任何界面能触发：{unused}"
+
+
 # --- 隔离：公网演示的正确性 -------------------------------------------------
 
 

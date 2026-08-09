@@ -11,7 +11,7 @@
     "workflow_truth_warning": true,
     "skill_count": true,
     "skill_policy_sections": true,
-    "harmonyos_v6_page_registered": true,
+    "harmonyos_v6_page_reachable": true,
     "generic_high_risk_disabled": true,
     "voicebench_passed": true,
     "mass_v6_passed": true,

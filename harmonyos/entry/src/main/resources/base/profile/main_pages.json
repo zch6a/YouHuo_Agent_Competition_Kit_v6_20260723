@@ -1,12 +1,5 @@
 {
   "src": [
-    "pages/Index",
-    "pages/FamilyPage",
-    "pages/TrustCenterPage",
-    "pages/CareHubPage",
-    "pages/HealthArchivePage",
-    "pages/SafetyPage",
-    "pages/AgentTrustLabPage",
-    "pages/FinalistWalkthroughPage"
+    "pages/Index"
   ]
 }

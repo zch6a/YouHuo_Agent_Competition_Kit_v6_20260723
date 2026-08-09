@@ -203,12 +203,62 @@ def main() -> int:
                 line = code[: match.start()].count("\n") + 1
                 problems.append(f"{rel}:{line} import 指向不存在的文件 {match.group(1)}")
 
-    # 6. 登记的页面必须存在
+    # 6. 登记的页面必须存在，而且必须是 @Entry
     pages_file = RES / "base" / "profile" / "main_pages.json"
+    registered: set[str] = set()
     if pages_file.is_file():
         for page in json.loads(pages_file.read_text(encoding="utf-8"))["src"]:
-            if not (ETS_ROOT / f"{page}.ets").is_file():
+            page_path = ETS_ROOT / f"{page}.ets"
+            if not page_path.is_file():
                 problems.append(f"main_pages.json 登记了不存在的页面 {page}")
+                continue
+            registered.add(page_path.resolve().as_posix())
+            # 登记表里的条目是**路由目标**。没有 @Entry 的组件不能被 router 加载，
+            # 跳过去就是白屏。本项目一度有三个这样的条目
+            # （CareHubPage / SafetyPage / HealthArchivePage）。
+            if not re.search(r"^\s*@Entry\b", page_path.read_text(encoding="utf-8"), re.M):
+                problems.append(f"main_pages.json 登记的 {page} 没有 @Entry，跳转会白屏")
+
+    # 10. 页面必须够得着
+    #
+    # 这一条是被一次真实失误换来的：FamilyPage / CareHubPage / TrustCenterPage /
+    # AgentTrustLabPage / FinalistWalkthroughPage 五个页面都是接了真 ApiClient 的
+    # 完整实现，也都规规矩矩登记在 main_pages.json 里，但全工程没有任何一处 import
+    # 或 push 到它们——标签栏挂的是占位文字。后果是 ApiClient 21 个 public 方法里
+    # 有 16 个在运行时永远发不出去，而所有静态检查、所有测试都是绿的。
+    #
+    # "登记了"不等于"到得了"。够得着只有两种方式：作为 @Entry 被路由加载，或者被
+    # 别的 .ets 引入渲染。两样都不占，它就是交付包里一份看起来完整的死代码。
+    imported: set[str] = set()
+    for path in sources:
+        for match in re.finditer(r"from\s+'(\.[^']+)'", path.read_text(encoding="utf-8")):
+            target = (path.parent / match.group(1)).resolve()
+            imported.add(target.with_suffix(".ets").as_posix())
+    #: entryability 是系统加载的入口，不由任何 .ets 引入。
+    ENTRY_DIRS = {"entryability"}
+    for path in sources:
+        if path.parent.name in ENTRY_DIRS:
+            continue
+        key = path.resolve().as_posix()
+        if key in registered or key in imported:
+            continue
+        problems.append(
+            f"{path.relative_to(HM).as_posix()} 既没登记为路由页面，也没有被任何文件引入——运行时到不了"
+        )
+
+    # 11. 已废弃的 router
+    #
+    # `@ohos.router` 自 API 18 起废弃，官方替代是 Navigation/NavPathStack。这个工程
+    # 里它还带来一个具体问题：标签页内部的 `router.back()` 会去弹一个并不存在的返回栈。
+    for path in sources:
+        # 注释里会提到 router 作为反例（本文件下面几个页面的文件头就是），先去掉注释
+        # 再匹配——否则这道检查会被自己的说明文字点亮。同样的坑本项目在 CSS 注释检查
+        # 和 ArkTS 检查上各踩过一次。
+        body = path.read_text(encoding="utf-8")
+        body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        body = re.sub(r"//[^\n]*", "", body)
+        if re.search(r"\brouter\s*\.", body):
+            problems.append(f"{path.relative_to(HM).as_posix()} 仍在使用已废弃的 router")
 
     if problems:
         print(f"FAIL check_arkts: {len(problems)} 个问题")

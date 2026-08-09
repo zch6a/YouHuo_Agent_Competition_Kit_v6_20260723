@@ -39,10 +39,13 @@ def main() -> int:
         "backend/youhuo/v6_models.py", "backend/youhuo/v6_services.py", "backend/youhuo/v6_store.py", "backend/youhuo/v6_api.py",
         "backend/static/judge.html", "backend/static/judge.js",
         "harmonyos/entry/src/main/ets/pages/FinalistWalkthroughPage.ets",
-        "harmonyos/entry/src/main/ets/services/CoreSpeechAdapter.ets",
-        "harmonyos/entry/src/main/ets/services/PushSafetyAdapter.ets",
-        "harmonyos/entry/src/main/ets/services/DistributedProfileAdapter.ets",
-        "harmonyos/entry/src/main/ets/services/AgentCompanionAdapter.ets",
+        # 这里原先还要求四个 *Adapter.ets 存在。它们零 `@kit.` 引用、无人 import，
+        # 其中 CoreSpeechAdapter 的 startNBestRecognition 永远返回空候选数组，却与
+        # 真正在用的 SpeechInput.ets 并存——一份看起来像已接入、实际是空壳的代码。
+        # 已删除。真实接入的三个文件在下面，它们才是"接了 SDK"这句话的证据。
+        "harmonyos/entry/src/main/ets/services/AudioCapture.ets",
+        "harmonyos/entry/src/main/ets/services/SpeechInput.ets",
+        "harmonyos/entry/src/main/ets/services/Haptics.ets",
         "xiaoyi/plugin_openapi_v6.generated.json", "xiaoyi/workflows/youhuo_workflow.json",
         "xiaoyi/skills/youhuo-cognitive-load/SKILL.md", "xiaoyi/skills/youhuo-reliance-card/SKILL.md",
         "xiaoyi/skills/youhuo-safe-preview/SKILL.md",
@@ -88,8 +91,16 @@ def main() -> int:
         "policy" in p.read_text(encoding="utf-8").lower() for p in skill_paths
     )
 
-    pages = parsed["harmonyos/entry/src/main/resources/base/profile/main_pages.json"]["src"]
-    checks["harmonyos_v6_page_registered"] = "pages/FinalistWalkthroughPage" in pages
+    # 决赛导览必须**在 App 里够得着**，而不是"登记在某个 JSON 里"。
+    #
+    # 这一条原先断言的是 "pages/FinalistWalkthroughPage" in main_pages.json，一直是
+    # 绿的；而那段时间里全工程没有任何一处 import 或 push 到这个页面，评委在真机上
+    # 永远走不到它。登记表只说明文件存在过，不说明有人能到达。改为断言它被 Index
+    # 引入并渲染——也就是标签栏里真的有这一节。
+    index_source = (ROOT / "harmonyos/entry/src/main/ets/pages/Index.ets").read_text(encoding="utf-8")
+    checks["harmonyos_v6_page_reachable"] = (
+        "FinalistWalkthroughPage" in index_source and "FinalistWalkthroughPage()" in index_source
+    )
 
     manifest = parsed["mcp/tool_manifest.json"]
     high = [item for item in manifest["tools"] if item["name"] in {"youhuo.execute_high_risk", "youhuo.open_break_glass"}]

@@ -20,7 +20,8 @@ def main() -> int:
         "harmonyos/entry/src/main/ets/pages/CareHubPage.ets",
         "harmonyos/entry/src/main/ets/pages/HealthArchivePage.ets",
         "harmonyos/entry/src/main/ets/pages/SafetyPage.ets",
-        "harmonyos/entry/src/main/ets/services/LocationSafetyAdapter.ets",
+        # LocationSafetyAdapter.ets 已删除：16 行、零 `@kit.` 引用、无人 import，
+        # 只有一个经纬度范围判断。围栏判定的真实实现在后端 LocationSafety。
         "xiaoyi/plugin_openapi_v4.generated.json",
         "xiaoyi/skills/youhuo-emotion-pause/SKILL.md",
         "xiaoyi/skills/youhuo-health-guard/SKILL.md",
