@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -488,11 +488,35 @@ class SafetyPolicyUpdate(StrictModel):
         return self
 
 
+#: 允许设备时钟往前偏多少。真机时钟会漂，卡死在"不得晚于此刻"会拒掉正常心跳；
+#: 但放开到无限，一条心跳就能把无交互预警永久关掉（见下）。
+CLOCK_SKEW_ALLOWANCE = timedelta(minutes=5)
+
+
 class ActivityHeartbeatRequest(StrictModel):
     elder_id: str = Field(min_length=1, max_length=128)
     occurred_at: datetime
     kind: str = Field(default="interaction", min_length=1, max_length=40)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def reject_future_activity(cls, value: datetime) -> datetime:
+        """活动心跳不能来自未来。
+
+        `evaluate_inactivity` 取的是 `ORDER BY occurred_at DESC LIMIT 1`，然后算
+        `(now - last)`。一条未来时间戳会让这个差值一直是负数，于是
+        `inactive_minutes >= threshold` 永远为假——**这位老人的无交互预警从此不再
+        触发**，而且界面上没有任何迹象，看起来只是"一直很正常"。
+
+        演示播种那边已经因为同一个原因加了 `if moment > horizon: continue`；但那只
+        堵住了一个写入者。这张表的另一个写入口是这个公开端点，任何客户端 POST 一条
+        2099 年的心跳就能关掉报警。检测逻辑严过写入逻辑是没有意义的。
+        """
+        moment = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        if moment > datetime.now(UTC) + CLOCK_SKEW_ALLOWANCE:
+            raise ValueError("occurred_at 不能是未来时间")
+        return value
 
 
 class InactivityEvaluationRequest(StrictModel):

@@ -9,14 +9,34 @@
  * Served from / rather than /static/ so its scope covers the whole app.
  */
 
-const VERSION = 'youhuo-shell-v1';
+//: 版本号必须随本文件的缓存策略一起变。
+//:
+//: 上一版把 /v7/* 当成外壳缓存了下来，那些条目此刻还躺在已安装设备的 v1 缓存里。
+//: activate 只删除 key 不等于 VERSION 的缓存——不改这个字符串，被污染的条目就会
+//: 一直留着，改了 isApi() 也救不回已经装好的那批。
+const VERSION = 'youhuo-shell-v2';
 
+//: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
+//:
+//: 上一版只列了 elder 一条路线，family/care/trust/judge/index 及其脚本都不在里面，
+//: 断网时那四页直接白屏——而这是一个明确以"移动数据下也能用"为目标的 worker。
 const SHELL = [
+  '/',
   '/elder',
+  '/family',
+  '/care',
+  '/trust',
+  '/judge',
   '/static/style.css',
   '/static/identity.js',
   '/static/elder.js',
+  '/static/family.js',
+  '/static/care.js',
+  '/static/trust.js',
+  '/static/judge.js',
   '/static/speech.js',
+  '/static/sheet.js',
+  '/static/register-sw.js',
   '/static/icons/icon-192.png',
   '/static/icons/apple-touch-icon.png',
   '/static/manifest.webmanifest',
@@ -39,9 +59,18 @@ self.addEventListener('activate', event => {
   );
 });
 
-/** Anything that reads or writes real state must always go to the network. */
+/** Anything that reads or writes real state must always go to the network.
+ *
+ * Version-agnostic on purpose. This used to list v2/v4/v5/v6 by hand, and when
+ * /v7/* was added — 生活基线、生活日报、关怀动作、环境采样, i.e. the entire
+ * personalised-baseline surface — it fell through to the shell cache. That is
+ * precisely the "stale copy of authoritative state" failure the comment at the
+ * top of this file says must never happen: a family member could have been
+ * shown yesterday's 日报 and told nothing was unusual. Matching /v\d+/ means a
+ * future version cannot reintroduce the bug by being forgotten here.
+ */
 function isApi(url) {
-  return /^\/(v2|v4|v5|v6|health|ping|docs|openapi)/.test(url.pathname);
+  return /^\/(v\d+|health|ping|docs|redoc|openapi)(\/|$|\.)/.test(url.pathname);
 }
 
 self.addEventListener('fetch', event => {

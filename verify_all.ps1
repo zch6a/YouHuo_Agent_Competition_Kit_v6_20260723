@@ -2,6 +2,11 @@ $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
 $env:PYTHONPATH = Join-Path $Root "backend"
+# 这个脚本里全是裸 `python`。机器上装了 Miniconda，它在 PATH 里排在前面且没有本项目
+# 的依赖，于是整套验证会以 ModuleNotFoundError 收场，而失败原因看起来像代码坏了。
+# 项目自带的 .venv 在就用它，别让调用方每次手动前置 PATH。
+$Venv = Join-Path $Root ".venv/Scripts"
+if (Test-Path $Venv) { $env:Path = "$Venv;$env:Path" }
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "reports") | Out-Null
 # SQLite WAL mode leaves -wal/-shm sidecars holding committed rows. Deleting only
 # the .db lets a previous run replay into the "clean" database, and deleting the
@@ -23,6 +28,11 @@ $Log = Join-Path $Root "reports/verify_all_v6.txt"
   python backend/scripts/validate_contracts_v6.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
   Write-Host "START feature_audit_v6"; python backend/scripts/run_feature_audit.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS feature_audit_v6"
   Write-Host "START browser_javascript_v6"; python backend/scripts/check_browser_js.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
+  # 上一行只解析、不执行（`node --check`），所以它对运行时错误是全盲的：care.js 和
+  # trust.js 的 `const state = { …, elderId: state.elderId }` 语法完全合法，运行时
+  # 却在第一条语句就抛 ReferenceError，两个页面上每个按钮都是死的，而它一直是绿的。
+  # 下面这一行把页面真的加载起来再问浏览器有没有抛东西。两个都要留着。
+  Write-Host "START page_runtime_v6"; python backend/scripts/check_page_runtime.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS page_runtime_v6"
   Write-Host "START arkts_v6"; python backend/scripts/check_arkts.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS arkts_v6"
   Write-Host "START accessibility_v6"; python backend/scripts/check_contrast.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS accessibility_v6"
   Remove-Item -Force -ErrorAction SilentlyContinue data/youhuo.db, data/youhuo.db-wal, data/youhuo.db-shm, data/youhuo.db.audit.key

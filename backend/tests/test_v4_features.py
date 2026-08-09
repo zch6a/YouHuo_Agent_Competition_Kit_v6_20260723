@@ -266,6 +266,61 @@ def test_geofence_ambiguous_boundary_does_not_alert():
     assert result.alert_created is False
 
 
+def test_a_future_heartbeat_is_rejected(tmp_path):
+    """一条未来的心跳能永久关掉无交互预警，所以写入侧必须拒绝它。
+
+    `evaluate_inactivity` 算的是 `now - last`。last 在未来，这个差值恒为负，
+    `inactive_minutes >= threshold` 永远不成立——报警从此不再触发，而界面上只会
+    显示"一直很正常"。
+    """
+    app = create_app(tmp_path / 'future.db', demo_mode=True)
+    with TestClient(app) as client:
+        elder = login(client, 'elder-demo')
+        far_future = (datetime.now(UTC) + timedelta(days=365)).isoformat()
+        response = client.post('/v4/safety/heartbeat', headers=elder, json={
+            'elder_id': 'elder-demo', 'occurred_at': far_future, 'kind': 'voice',
+        })
+        assert response.status_code == 422, response.text
+
+        # 但设备时钟允许小幅前偏，否则真机上正常的心跳会被拒。
+        skewed = (datetime.now(UTC) + timedelta(minutes=2)).isoformat()
+        accepted = client.post('/v4/safety/heartbeat', headers=elder, json={
+            'elder_id': 'elder-demo', 'occurred_at': skewed, 'kind': 'voice',
+        })
+        assert accepted.status_code in (200, 201), accepted.text
+
+
+def test_inactivity_alert_survives_a_future_row_already_in_the_table(tmp_path):
+    """读的一侧也要自己站得住，不能假设写进来的都是干净的。
+
+    写入校验挡不住那条规则生效之前就已经落库的行。这是一条安全告警，它不该因为
+    库里有一条脏数据就永远沉默。
+    """
+    app = create_app(tmp_path / 'poisoned.db', demo_mode=True)
+    with TestClient(app) as client:
+        elder = login(client, 'elder-demo')
+        family = login(client, 'daughter-demo')
+        client.put('/v4/safety/policy', headers=family, json={
+            'elder_id': 'elder-demo', 'inactivity_minutes': 60, 'home_lat': 39.9042,
+            'home_lon': 116.3974, 'geofence_radius_m': 1000, 'notify_community': False,
+        })
+        now = datetime.now(UTC)
+        client.post('/v4/safety/heartbeat', headers=elder, json={
+            'elder_id': 'elder-demo', 'occurred_at': (now - timedelta(hours=5)).isoformat(),
+            'kind': 'voice',
+        })
+        # 绕过模型，直接往表里塞一条未来记录——模拟修复前留下的数据。
+        app.state.v4_store.add_activity(
+            'fam-demo', 'elder-demo', 'voice', now + timedelta(days=30), {},
+        )
+        result = client.post('/v4/safety/inactivity/evaluate', headers=family,
+                             json={'now': now.isoformat()})
+        assert result.status_code == 200, result.text
+        row = next(r for r in result.json() if r['elder_id'] == 'elder-demo')
+        assert row['alert_created'] is True, row
+        assert row['inactive_minutes'] is not None and row['inactive_minutes'] > 0, row
+
+
 def test_inactivity_sos_poi_and_devices(tmp_path):
     app = create_app(tmp_path / 'safety.db', demo_mode=True)
     with TestClient(app) as client:

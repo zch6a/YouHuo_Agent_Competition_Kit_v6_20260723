@@ -1,8 +1,9 @@
 'use strict';
 
 const state = { elderToken: '', familyToken: '', systemToken: '', saga: null, sagaRole: 'system',
-  // Resolved in bootstrap() from identity.js; see the note in that file.
-  elderId: state.elderId, daughterId: state.daughterId, systemId: state.systemId };
+  // Resolved in bootstrap() from identity.js; see the note in that file. The
+  // literals below are only the fallback for when identity.js is unavailable.
+  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo' };
 const byId = (id) => document.getElementById(id);
 const pretty = (value) => JSON.stringify(value, null, 2);
 

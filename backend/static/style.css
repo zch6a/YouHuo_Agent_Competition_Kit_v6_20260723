@@ -345,6 +345,10 @@ a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underlin
 }
 .lead { max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); color: var(--ink-2); }
 .meta { font-size: 14px; color: var(--ink-3); margin-top: 5px; line-height: 1.6; }
+/* 生活日报里"这条会推送给您"的那一行（family.js renderDailyReport）。它写的是
+   `meta bad`，而 .bad 此前只在 .pill / .report-verdict / .metric 下有规则，于是这
+   一行和普通说明文字长得一模一样——最需要家属注意的那条反而最不显眼。 */
+.meta.bad { color: color-mix(in srgb, var(--danger) 78%, var(--ink)); font-weight: 600; }
 
 /* --------------------------------------------------------------------------
    Surfaces

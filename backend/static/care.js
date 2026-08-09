@@ -2,8 +2,10 @@
 
 const state = { elderToken: '', familyToken: '',
   // Resolved in bootstrap() from identity.js: on a public deployment each
-  // browser owns an isolated demo household, so these are not fixed.
-  elderId: state.elderId, daughterId: state.daughterId, systemId: state.systemId };
+  // browser owns an isolated demo household, so these are not fixed. The
+  // literals below are only the fallback for when identity.js is unavailable,
+  // and they match the SHARED household in that file.
+  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo' };
 const byId = (id) => document.getElementById(id);
 
 function pretty(value) {

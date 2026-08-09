@@ -931,9 +931,17 @@ class V4FeatureStore:
         policies = self.conn.execute("SELECT * FROM safety_policies_v4 WHERE family_id=?", (family_id,)).fetchall()
         results: list[dict[str, Any]] = []
         for policy in policies:
+            # `occurred_at<=now` 不是多余的。这里算的是 `now - last`，一条未来时间戳
+            # 会让它恒为负，`inactive_minutes >= threshold` 就永远不成立——这位老人的
+            # 无交互预警被永久静音，而且界面上看起来只是"一直很正常"。
+            #
+            # 写入侧现在已经拒绝未来的心跳（v4_models.ActivityHeartbeatRequest），但
+            # 库里可能还留着那条规则生效之前写进去的行，而且这是一条安全告警：读的
+            # 一侧也必须自己站得住，不能依赖"写进来的都是干净的"。
             row = self.conn.execute(
-                "SELECT occurred_at FROM activity_events_v4 WHERE elder_id=? ORDER BY occurred_at DESC LIMIT 1",
-                (policy["elder_id"],),
+                "SELECT occurred_at FROM activity_events_v4 WHERE elder_id=? AND occurred_at<=?"
+                " ORDER BY occurred_at DESC LIMIT 1",
+                (policy["elder_id"], iso(now)),
             ).fetchone()
             last = datetime.fromisoformat(row["occurred_at"]) if row else None
             inactive_minutes = (now - last).total_seconds() / 60 if last else float("inf")

@@ -20,6 +20,10 @@ rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.
   echo "START contracts_v6"; python backend/scripts/validate_contracts_v6.py; echo "PASS contracts_v6"
   echo "START feature_audit_v6"; python backend/scripts/run_feature_audit.py; echo "PASS feature_audit_v6"
   echo "START browser_javascript_v6"; python backend/scripts/check_browser_js.py
+  # 上一行只解析、不执行（`node --check`），对运行时错误是全盲的：care.js/trust.js 的
+  # `const state = { …, elderId: state.elderId }` 语法合法，运行时第一条语句就抛
+  # ReferenceError，两页所有按钮全死，而它一直是绿的。下面这行把页面真的加载起来。
+  echo "START page_runtime_v6"; python backend/scripts/check_page_runtime.py; echo "PASS page_runtime_v6"
   echo "START arkts_v6"; python backend/scripts/check_arkts.py
   echo "START accessibility_v6"; python backend/scripts/check_contrast.py
   rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.key

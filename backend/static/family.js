@@ -356,7 +356,7 @@ function renderDailyReport(envelope) {
   if (report.suggested_for_family.length) {
     report.suggested_for_family.forEach(text => line(advice, text));
   } else {
-    line(advice, '今天不用您操心。', 'good');
+    line(advice, '今天不用您操心。', 'notice good');
   }
   dailyEl.appendChild(advice);
 

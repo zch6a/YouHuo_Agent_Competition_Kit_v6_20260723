@@ -79,14 +79,68 @@ def test_every_icon_file_is_reachable_over_http(client):
 # --- the cache must never hold authoritative state ------------------------
 
 
-def test_service_worker_refuses_to_cache_api_responses():
+#: 必须永远走网络的路径，和必须能进外壳缓存的路径。
+#:
+#: `/v7/*` 单列出来是有来由的：它是生活基线、生活日报、关怀动作和环境采样，也就是
+#: 整个个性化基线面。它曾经因为不在 isApi() 的手写版本号列表里而落进
+#: stale-while-revalidate ——家属可能被展示昨天的日报，然后被告知一切正常。
+MUST_BYPASS_CACHE = [
+    "/v2/auth/demo", "/v4/routines", "/v5/actions/authorize", "/v6/tasks/x/glass-box",
+    "/v7/baseline/elder-demo", "/v7/daily-report/elder-demo", "/v7/care/elder-demo",
+    "/v7/environment/samples", "/v8/anything-a-future-version-adds",
+    "/health", "/ping", "/docs", "/openapi.json",
+]
+MUST_BE_CACHEABLE = [
+    "/", "/elder", "/family", "/care", "/trust", "/judge",
+    "/static/style.css", "/static/elder.js", "/static/manifest.webmanifest",
+    "/static/icons/icon-192.png",
+]
+
+
+def _is_api_matcher():
+    """把 sw.js 里 isApi() 真正用的那条正则取出来。
+
+    上一版这个测试写的是 `for prefix in ("v2", "v4", …): assert prefix in source`
+    ——全文子串匹配。它无法区分"API 判定覆盖了 /v7"和"文件里某处出现过 v7 这两个
+    字符"，事实上 `VERSION = 'youhuo-shell-v2'` 一个字符串就能让 "v2" 那一条永远
+    通过。断言这个函数的**行为**，不是它的源码长什么样。
+    """
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
-    # The guard exists and covers every state-bearing prefix.
-    assert "isApi" in source
-    for prefix in ("v2", "v4", "v5", "v6", "health"):
-        assert prefix in source, f"sw.js 的 API 判定没有覆盖 /{prefix}"
-    # And it bails out before responding, rather than caching then filtering.
+    assert re.search(r"function isApi\(url\)", source), "sw.js 里找不到 isApi()"
+    body = re.search(r"function isApi\(url\)\s*\{(.*?)\n\}", source, re.S)
+    assert body, "isApi() 的函数体解析不出来"
+    literal = re.search(r"/(\^.*?)/\.test\(url\.pathname\)", body.group(1))
+    assert literal, "isApi() 不再是一条对 url.pathname 的正则判定，这个测试需要跟着改"
+    # 这条正则在 JS 和 Python 下语义相同（只有字符类、交替和锚点）。
+    return re.compile(literal.group(1))
+
+
+@pytest.mark.parametrize("path", MUST_BYPASS_CACHE)
+def test_service_worker_never_caches_authoritative_state(path):
+    assert _is_api_matcher().search(path), f"sw.js 会把 {path} 存进外壳缓存"
+
+
+@pytest.mark.parametrize("path", MUST_BE_CACHEABLE)
+def test_service_worker_still_caches_the_shell(path):
+    assert not _is_api_matcher().search(path), f"{path} 被误判成 API，外壳缓存会失效"
+
+
+def test_service_worker_bails_out_before_responding():
+    source = (STATIC / "sw.js").read_text(encoding="utf-8")
+    # 直接放行，而不是先缓存再过滤。
     assert re.search(r"if \(isApi\(url\)\) return;", source), "必须在 respondWith 之前直接放行"
+
+
+def test_shell_covers_every_page_not_just_the_elder_route():
+    """外壳只列 elder 一条路线时，断网下另外四页直接白屏。"""
+    source = (STATIC / "sw.js").read_text(encoding="utf-8")
+    shell = re.search(r"const SHELL = \[(.*?)\];", source, re.S)
+    assert shell, "sw.js 里找不到 SHELL"
+    listed = set(re.findall(r"'([^']+)'", shell.group(1)))
+    for route in ("/", "/elder", "/family", "/care", "/trust", "/judge"):
+        assert route in listed, f"外壳没有包含 {route}，断网时这一页会白屏"
+    for asset in ("/static/family.js", "/static/care.js", "/static/trust.js", "/static/judge.js"):
+        assert asset in listed, f"外壳缓存了页面却没缓存它的脚本：{asset}"
 
 
 def test_service_worker_only_handles_get_and_same_origin():

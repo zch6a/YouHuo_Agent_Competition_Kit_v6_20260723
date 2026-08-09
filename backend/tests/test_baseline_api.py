@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from youhuo.api import create_app
+from youhuo.baseline_store import DEFAULT_TIMEZONE, _zone
 from youhuo.database import DemoIdentities
 
 
@@ -33,6 +34,36 @@ def token(client: TestClient, actor_id: str) -> dict[str, str]:
 
 
 IDS = DemoIdentities.for_suffix("demo")
+
+
+def local_today_at(hours: int, minutes: int) -> datetime | None:
+    """今天本地时间的某个钟点，**前提是它已经过去**；还没到就返回 None。
+
+    这批用例原先直接写死"今天 02:10""今天 06:30"。在凌晨跑，那些时刻还没发生，
+    提交上去就是一条未来的活动记录——写入侧现在会拒（422），而在加这道校验之前，
+    它会被照单收下，然后把这位老人的无交互预警永久关掉，因为
+    `evaluate_inactivity` 算的 `now - last` 从此恒为负。
+
+    也就是说：这几条测试每天有一段窗口不是"偶尔抖动"，是真的在制造脏数据。
+    """
+    zone = _zone(DEFAULT_TIMEZONE)
+    now_local = datetime.now(UTC).astimezone(zone)
+    midnight = datetime.combine(now_local.date(), datetime.min.time(), tzinfo=zone)
+    moment = midnight + timedelta(hours=hours, minutes=minutes)
+    # 留一点余量，避免正好卡在边界上和服务端的 now 抢跑。
+    return moment if moment <= now_local - timedelta(minutes=1) else None
+
+
+def elapsed_fraction_today(fraction: float) -> datetime:
+    """今天已经过去的那一段里的某个位置。任何时刻调用都落在过去。
+
+    截到整分钟：观测文本是 HH:MM，带秒的时刻会被四舍五入到相邻的那一分钟，
+    断言就会因为一分钟的差跳红。
+    """
+    zone = _zone(DEFAULT_TIMEZONE)
+    now_local = datetime.now(UTC).astimezone(zone)
+    midnight = datetime.combine(now_local.date(), datetime.min.time(), tzinfo=zone)
+    return (midnight + (now_local - midnight) * fraction).replace(second=0, microsecond=0)
 
 
 @pytest.fixture()
@@ -188,14 +219,11 @@ def test_a_local_morning_lands_in_the_local_day(client, elder_auth):
     于是"平常起床时间"学成了前一天深夜。这类错误不报错，只会给出很有说服力的
     错误结论，而这份结论会被发给子女。
     """
-    from youhuo.baseline_store import DEFAULT_TIMEZONE, _zone
-
-    zone = _zone(DEFAULT_TIMEZONE)
-    today_local = datetime.now(UTC).astimezone(zone).date()
-    # 北京时间今天早上 6:30，一个完全正常的起床时刻。
-    local_wake = datetime.combine(today_local, datetime.min.time(), tzinfo=zone) + timedelta(
-        hours=6, minutes=30
-    )
+    # 北京时间今天早上 6:30，一个完全正常的起床时刻——如果那个点还没到（凌晨跑），
+    # 就退到今天已经过去的那一段里去。要验的性质与具体钟点无关：本地时刻写进去，
+    # 读出来必须是同一个本地时刻。按 UTC 分天的话，它要么落进昨天、要么差 8 小时。
+    normal_hour = local_today_at(6, 30)
+    local_wake = normal_hour or elapsed_fraction_today(0.5)
     response = client.post(
         "/v4/safety/heartbeat",
         headers=elder_auth,
@@ -207,10 +235,12 @@ def test_a_local_morning_lands_in_the_local_day(client, elder_auth):
     body = client.get(f"/v7/baseline/{IDS.elder_id}", headers=elder_auth).json()
     wake = next(d for d in body["deviations"] if d["channel"] == "wake")
     assert wake["observed_text"] is not None, "本地早上的活动没有落进本地的今天"
-    assert wake["observed_text"].startswith("06:"), (
-        f"起床时刻按本地读应当是 06:30 前后，实际 {wake['observed_text']}"
+    assert wake["observed_text"] == local_wake.strftime("%H:%M"), (
+        f"起床时刻按本地读应当是 {local_wake.strftime('%H:%M')}，实际 {wake['observed_text']}"
     )
-    assert wake["verdict"] == "typical", wake["explanation"]
+    if normal_hour is not None:
+        # 6:30 相对 6:05 的常态是正常的；只有在真用上 6:30 时这条才成立。
+        assert wake["verdict"] == "typical", wake["explanation"]
 
 
 def test_the_seeded_baseline_is_a_plausible_local_routine(client, elder_auth):
@@ -285,13 +315,9 @@ def test_an_unusually_early_waking_shows_up_in_todays_report(client, elder_auth,
     走的是真实链路：心跳事件 → 按本地时区分天 → 推导观测 → 与他自己的常态比 →
     日报。中间没有任何一步是为测试特设的。
     """
-    from youhuo.baseline_store import DEFAULT_TIMEZONE, _zone
-
-    zone = _zone(DEFAULT_TIMEZONE)
-    today = datetime.now(UTC).astimezone(zone).date()
-    early = datetime.combine(today, datetime.min.time(), tzinfo=zone) + timedelta(
-        hours=2, minutes=10
-    )
+    # 2:10 还没到就退到今天已经过去的那一段的前半——凌晨跑的时候，任何过去时刻
+    # 相对 6:05 的常态都算"过早"，要验的信号一样成立。
+    early = local_today_at(2, 10) or elapsed_fraction_today(0.4)
     response = client.post(
         "/v4/safety/heartbeat",
         headers=elder_auth,
@@ -311,22 +337,42 @@ def test_an_unusually_early_waking_shows_up_in_todays_report(client, elder_auth,
 
 
 def test_a_later_event_does_not_overwrite_the_morning(client, elder_auth):
-    """人已经起来了，中午再动一次不该被当成"今天很晚才起"。"""
+    """人已经起来了，晚些再动一次不该被当成"今天很晚才起"。
+
+    两个时刻都从"今天本地时间已经过去的那一段"里取，而不是写死中午。
+
+    写死中午的版本每天有一段窗口必然失败：播种对今天只铺到此刻为止，凌晨跑的时候
+    今天的 06:05 起床点还没到，基线里今天本就没有起床记录，那条中午的心跳理所当然
+    成了当天第一次活动——测试红了，产品却是对的。而且凌晨提交的"今天中午"本身就是
+    一条未来记录，现在写入侧已经会拒。这个用例的前提得由它自己建立。
+    """
     from youhuo.baseline_store import DEFAULT_TIMEZONE, _zone
 
     zone = _zone(DEFAULT_TIMEZONE)
-    today = datetime.now(UTC).astimezone(zone).date()
-    noon = datetime.combine(today, datetime.min.time(), tzinfo=zone) + timedelta(hours=12)
-    before = client.get(f"/v7/baseline/{IDS.elder_id}", headers=elder_auth).json()
-    observed_before = next(d for d in before["deviations"] if d["channel"] == "wake")["observed_text"]
+    now_local = datetime.now(UTC).astimezone(zone)
+    midnight = datetime.combine(now_local.date(), datetime.min.time(), tzinfo=zone)
+    elapsed = now_local - midnight
+    if elapsed < timedelta(minutes=10):
+        pytest.skip("本地时间刚过午夜，今天还没有足够长的一段过去时间可取")
+    first = midnight + elapsed * 0.25
+    later = midnight + elapsed * 0.75
 
-    client.post("/v4/safety/heartbeat", headers=elder_auth,
-                json={"elder_id": IDS.elder_id, "kind": "interaction",
-                      "occurred_at": noon.astimezone(UTC).isoformat()})
+    def wake_text() -> str | None:
+        body = client.get(f"/v7/baseline/{IDS.elder_id}", headers=elder_auth).json()
+        return next(d for d in body["deviations"] if d["channel"] == "wake")["observed_text"]
 
-    after = client.get(f"/v7/baseline/{IDS.elder_id}", headers=elder_auth).json()
-    observed_after = next(d for d in after["deviations"] if d["channel"] == "wake")["observed_text"]
-    assert observed_before == observed_after
+    def heartbeat(moment: datetime) -> None:
+        response = client.post("/v4/safety/heartbeat", headers=elder_auth,
+                               json={"elder_id": IDS.elder_id, "kind": "interaction",
+                                     "occurred_at": moment.astimezone(UTC).isoformat()})
+        assert response.status_code in (200, 201), response.text
+
+    heartbeat(first)
+    observed_before = wake_text()
+    assert observed_before is not None, "前提没建立：今天应该已经有过一次活动"
+
+    heartbeat(later)
+    assert wake_text() == observed_before
 
 
 def test_the_seed_never_writes_events_in_the_future(client, elder_auth):
