@@ -90,6 +90,33 @@ AUDIT_JS = r"""
     if (r < need) problems.push({text: text.slice(0, 20), cls: el.className.toString().slice(0, 30),
                                  size: Math.round(size), ratio: Math.round(r * 100) / 100, need});
   }
+  // --- 非文字对比度（WCAG 1.4.11，3:1）---------------------------------
+  //
+  // 这一段是被一个真实缺陷换来的：深色模式下卡片图标的墨色是 #2F6FB5——浅色模式
+  // 的值，从没为深色重定义过——在深色表面上只有 1.7–3.3:1，肉眼几乎看不见。
+  // 而它**通过了全部 12 项检查**，因为上面那段只测文字。一个只测文字的对比度
+  // 审计，对一个到处是图标的界面来说，是一张有洞的安全网。
+  const icons = [];
+  for (const svg of document.querySelectorAll('svg')) {
+    const box = svg.getBoundingClientRect();
+    if (box.width < 10 || box.height < 10) continue;      // 装饰性细线不算
+    const cs = getComputedStyle(svg);
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+    // 看得见的"墨"是描边；没有描边时才是填充。
+    const inkStr = (cs.stroke && cs.stroke !== 'none') ? cs.stroke : cs.fill;
+    if (!inkStr || /rgba\(0, 0, 0, 0\)|transparent|none/.test(inkStr)) continue;
+    const bg = bgOf(svg.parentElement || svg);
+    if (bg === null) continue;
+    const r = ratio(toRGB(inkStr), bg);
+    if (r < 3.0) {
+      const host = svg.closest('[class]');
+      icons.push({
+        cls: host ? host.className.toString().slice(0, 34) : '?',
+        ink: inkStr, ratio: Math.round(r * 100) / 100,
+      });
+    }
+  }
+
   const targets = [];
   for (const el of document.querySelectorAll('button, a, select, input')) {
     const b = el.getBoundingClientRect();
@@ -98,7 +125,7 @@ AUDIT_JS = r"""
     }
     if (!accessibleName(el)) targets.push({el: el.tagName + (el.id ? '#' + el.id : ''), unlabeled: true});
   }
-  return JSON.stringify({contrast: problems, targets});
+  return JSON.stringify({contrast: problems, icons, targets});
 })()
 """
 
@@ -200,11 +227,16 @@ def main() -> int:
                                   awaitPromise=True, returnByValue=True)
                 payload = json.loads(result["result"]["value"])
                 bad = payload["contrast"]
+                icons = payload.get("icons", [])
                 targets = payload["targets"]
                 label = f"{page} [{mode}]"
-                if bad or targets:
+                if bad or icons or targets:
                     for item in bad:
                         failures.append(f"{label} 对比度 {item['ratio']}<{item['need']} “{item['text']}” .{item['cls']}")
+                    for item in icons:
+                        failures.append(
+                            f"{label} 图标对比度 {item['ratio']}<3.0 ink={item['ink']} .{item['cls']}"
+                        )
                     for item in targets:
                         failures.append(f"{label} 触控/标签 {item}")
                 else:

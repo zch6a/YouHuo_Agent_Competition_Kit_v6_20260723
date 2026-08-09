@@ -82,7 +82,10 @@ def find_chrome() -> str | None:
 def main() -> int:
     base = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8041"
     out_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "shots")
-    only = sys.argv[3:] or None
+    args = sys.argv[3:]
+    # `dark` / `light` 作为一个可选的位置参数混在设备名里，用完就从设备列表里摘掉。
+    scheme = next((a for a in args if a in ("dark", "light")), None)
+    only = [a for a in args if a not in ("dark", "light")] or None
     out_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -146,6 +149,13 @@ def main() -> int:
                 try:
                     tab.send("Page.enable")
                     tab.send("Runtime.enable")
+                    # 深色模式必须能真的看一眼。对比度审计读的是计算出来的颜色，
+                    # 12/12 通过只说明色值达标，不说明看起来是对的——一个背景没
+                    # 跟着换、或者一处写死的白底，色值检查全都发现不了。
+                    if scheme:
+                        tab.send("Emulation.setEmulatedMedia", features=[
+                            {"name": "prefers-color-scheme", "value": scheme}
+                        ])
                     # mobile=True so `width=device-width` and the safe-area /
                     # touch media queries behave as they do on a real handset.
                     tab.send("Emulation.setDeviceMetricsOverride", width=width, height=height,
@@ -158,6 +168,8 @@ def main() -> int:
                         "sh:document.documentElement.scrollHeight})"
                     ), returnByValue=True)["result"]["value"]
                     stem = f"{device}{page.replace('/', '-') or '-home'}"
+                    if scheme:
+                        stem = f"{stem}-{scheme}"
                     # The first screen alone, which is what decides whether the
                     # app screen is complete without scrolling. Judging that from
                     # a 2400px full-page capture is impossible.
