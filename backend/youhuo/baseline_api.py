@@ -7,13 +7,15 @@
     GET  /v7/care/{elder_id}          ①③ 基于基线与环境的关怀动作
     GET  /v7/daily-report/{elder_id}  ②④ 给子女的生活日报，含推送决定
 
-权限沿用既有规则：老人只能看自己的，家属只能看本家庭的。日报是家属侧视图，但老人
-本人也能看——一份关于自己的报告不让本人看，与这个项目"过程透明"的立场相悖。
+权限：**只有老人和家属两种身份**能访问，老人只能看自己的，家属只能看本家庭的。
+日报是家属侧视图，但老人本人也能看——一份关于自己的报告不让本人看，与这个项目
+"过程透明"的立场相悖。SYSTEM 身份被显式拒绝：它存在的意义是审计归属，不是一个
+可以代表任何人读数据的账号。
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -46,6 +48,34 @@ def _local_today(now: datetime) -> date:
     "昨天"，而日报在早上七点打开时会说"今天还没有记录"。
     """
     return now.astimezone(_zone(DEFAULT_TIMEZONE)).date()
+
+
+#: 可以回看多久。基线窗口本身只有 30 天，再往前查不到任何东西。
+MAX_LOOKBACK_DAYS = 365
+
+
+def _validated_day(day: date | None, today: date) -> date:
+    """把 `day` 收进一个合理区间。
+
+    不做这件事的后果是 500 而不是 400：`observations()` 里要算
+    `today + timedelta(days=2)` 和 `today - timedelta(days=31)`，再送进
+    `iso()` 做 `astimezone(UTC)`。`day=9999-12-31` 溢出、`day=0001-01-01` 也溢出，
+    三个 GET 端点同时崩，而 `day` 就写在公开的 `/openapi.json` 里。前端把参数拼错
+    一次（`?day=a&day=b` 时 FastAPI 取最后一个）同样能触发。
+    """
+    if day is None:
+        return today
+    if day > today:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能查询未来的日期。",
+        )
+    if day < today - timedelta(days=MAX_LOOKBACK_DAYS):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"最多回看 {MAX_LOOKBACK_DAYS} 天。",
+        )
+    return day
 from .models import ActorRole, AuthContext
 
 
@@ -80,6 +110,12 @@ def build_baseline_router(
     router = APIRouter(prefix="/v7", tags=["v7 个性化基线与生活日报"])
 
     def require_elder_access(actor: AuthContext, elder_id: str) -> None:
+        # 白名单，不是黑名单。原来只对 ELDER 做主体收敛，于是第三种角色 SYSTEM
+        # 落进下面那条家庭检查后一路放行——`POST /v2/auth/demo {"actor_id":
+        # "system-demo"}` 拿到的 token 能读整份生活日报、也能写环境读数。
+        # SYSTEM 存在的意义是审计归属，不是一个可以代表任何人读数据的身份。
+        if actor.role not in (ActorRole.ELDER, ActorRole.FAMILY):
+            raise HTTPException(status_code=403, detail="该身份不能访问生活基线数据。")
         if actor.role == ActorRole.ELDER and actor.actor_id != elder_id:
             raise HTTPException(status_code=403, detail="只能访问自己的生活基线数据。")
         if not db.actor_in_family(elder_id, actor.family_id, ActorRole.ELDER.value):
@@ -143,23 +179,23 @@ def build_baseline_router(
     @router.get("/baseline/{elder_id}", response_model=BaselineSnapshot)
     def get_baseline(
         elder_id: str,
-        day: date | None = Query(default=None, description="默认今天（UTC）"),
+        day: date | None = Query(default=None, description="默认今天（老人所在时区）"),
         actor: AuthContext = Depends(current_actor),
     ) -> BaselineSnapshot:
         """这位老人**自己的**常态，以及今天偏离了多少。"""
         require_elder_access(actor, elder_id)
-        return _snapshot(actor, elder_id, day or _local_today(utcnow()))
+        return _snapshot(actor, elder_id, _validated_day(day, _local_today(utcnow())))
 
     @router.get("/care/{elder_id}", response_model=CareAction)
     def get_care(
         elder_id: str,
-        day: date | None = Query(default=None),
+        day: date | None = Query(default=None, description="默认今天（老人所在时区）"),
         actor: AuthContext = Depends(current_actor),
     ) -> CareAction:
         """基于基线与此刻环境生成的关怀动作：说什么、要不要调日程、灯光建议。"""
         require_elder_access(actor, elder_id)
         now = utcnow()
-        snapshot = _snapshot(actor, elder_id, day or _local_today(now))
+        snapshot = _snapshot(actor, elder_id, _validated_day(day, _local_today(now)))
         return CareComposer.compose(
             snapshot=snapshot,
             environment=_environment(actor, elder_id, now),
@@ -169,13 +205,13 @@ def build_baseline_router(
     @router.get("/daily-report/{elder_id}", response_model=DailyReportEnvelope)
     def get_daily_report(
         elder_id: str,
-        day: date | None = Query(default=None),
+        day: date | None = Query(default=None, description="默认今天（老人所在时区）"),
         actor: AuthContext = Depends(current_actor),
     ) -> DailyReportEnvelope:
         """给子女的生活日报，以及"现在要不要打扰您"的决定。"""
         require_elder_access(actor, elder_id)
         now = utcnow()
-        target = day or _local_today(now)
+        target = _validated_day(day, _local_today(now))
         snapshot = _snapshot(actor, elder_id, target)
         errands = errand_facts(actor.family_id, elder_id, target)
         report = DailyReportBuilder.build(

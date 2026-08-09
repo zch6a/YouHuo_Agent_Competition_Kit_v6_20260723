@@ -28,9 +28,9 @@ class SafetyPolicy:
     _emergency_patterns = (
         r"胸(口)?[^。！]{0,8}(疼|痛|闷)",
         r"喘不上气|呼吸困难|不能呼吸",
-        r"摔倒[^。！]{0,10}(起不来|不能动)",
         r"我迷路了|找不到家",
-        r"救命|快救我",
+        # 「救命恩人」「救命钱」「救命稻草」是成语，不是求救。
+        r"救命(?!恩|钱|稻草|之恩)|快救我",
         r"有人闯进|有人撬门",
         r"煤气[^。！]{0,8}(漏|味)|燃气泄漏",
         r"着火|起火",
@@ -42,10 +42,39 @@ class SafetyPolicy:
     #: surface the elder actually talks to was the strictest. It now fires on a
     #: bare report and relies on the guards below to stay quiet otherwise.
     _fall_patterns = (
-        r"摔(倒|了|着|伤)",
-        r"跌倒|滑倒|绊倒",
-        r"摔了一跤|跌了一跤",
-        r"站不起来|爬不起来|起不了身",
+        # 「到」不是错别字，是中文 ASR 把「倒」听错时最常见的写法。原来只认「倒」，
+        # 于是「我摔到了」这句最普通的求救整条漏掉。
+        r"(摔|跌|滑|绊|栽)(倒|到)",
+        r"摔(了|着|伤|疼|坏|得|趴|的)",
+        r"(摔|跌)跤|(摔|跌|栽)了?[个一]?[大]?跟头|(摔|跌)了一?跤",
+        r"(摔|跌|滚)下(来|去|楼梯|台阶|床|椅子)",
+        # 只描述结果、不含「摔」字的求救——老人报跌倒最常用的其实是这一类。
+        r"(趴|躺|倒|坐|跪)在?地(上|下)",
+        r"(起|爬|站)不(来|动|起来)",
+        r"起不了身|动弹不得|下不来床",
+        # 原本在 _emergency_patterns 里，绕过了下面两道守卫，于是
+        # 「我怕摔倒了起不来」被当成正在发生的紧急情况。挪进来受同样的约束。
+        r"摔倒[^。！]{0,10}(起不来|不能动)",
+    )
+    #: 摔东西不是摔跤。
+    _object_fall = (
+        r"(把|将)[^，。！？]{0,10}(摔|扔)|"
+        r"(碗|杯子?|盘子?|碟|锅|手机|遥控器|眼镜|拐杖|花瓶|盆|东西)[^，。！？]{0,4}摔"
+    )
+    #: 「跌倒」出现在名词性词组里说的是话题，不是事件。这类词紧跟在动词**之后**
+    #: （跌倒风险、跌倒讲座），位置敏感的守卫看不见它们，所以单列一条按相邻判断。
+    _fall_as_topic = (
+        r"(跌倒|摔倒)(风险|讲座|评估|培训|宣传|知识|须知|预防|问题)|"
+        r"防(止|范)?(跌倒|摔倒)"
+    )
+    #: 第三人称主语：别人摔倒不是这位老人摔倒。第一人称出现时以第一人称为准。
+    #:
+    #: 「我」后面紧跟亲属称谓时是**领属**不是主语——「我孙子摔倒了」说的是孙子。
+    #: 少了这个否定前瞻，第三人称守卫会被一个"我"字轻易关掉。
+    _first_person = r"我(?!孙|儿|女|老伴|外孙|家)|俺|自己"
+    _other_person = (
+        r"孙(子|女)|外孙|儿子|女儿|老伴|邻居|楼(上|下)|老(王|李|张|刘|陈)|"
+        r"别人|那个人|电视|新闻|同事|病友|护士|医生说"
     )
     #: Recounting an old fall is a story, not a call for help. Do not page family.
     _past_narrative = (
@@ -54,8 +83,13 @@ class SafetyPolicy:
         r"出院|康复|好利索|养好了"
     )
     #: Worrying about falling is the opposite of having fallen.
+    #:
+    #: 「小心」「注意」被移出去了：「我不小心摔倒了」是老人报告跌倒**最自然**的说法，
+    #: 把它当成假设，等于把最常见的一句真实求救静音。
+    #: 「别」「不要」留下，但和其余一样只在**动词之前**才算假设——见 `_guarded_hit`。
     _hypothetical = (
-        r"怕|担心|万一|要是|如果|别|不要|避免|以防|小心|注意|会不会|容易"
+        r"怕|担心|万一|要是|如果|假如|别|不要|避免|以防|会不会|容易|"
+        r"防(止|范)|风险|讲座|评估|培训|宣传|梦见|万一"
     )
     _scam_patterns = (
         r"银行卡密码",
@@ -80,14 +114,16 @@ class SafetyPolicy:
     @classmethod
     def detect_safety_signal(cls, text: str) -> SafetySignal | None:
         normalized = unicodedata.normalize("NFKC", text)
-        for pattern in cls._emergency_patterns:
-            if re.search(pattern, normalized, flags=re.I):
-                return SafetySignal(
-                    category="emergency",
-                    severity=4,
-                    message="我听到您可能遇到了紧急情况。我会立即提醒家人；如果有生命危险，请尽快联系当地急救服务。",
-                    notify_family=True,
-                )
+        # 紧急模式原来是整句直接匹配，跳过了下面那两道守卫，于是
+        # 「我怕着火，睡前都检查一遍」「电视剧里那人昏倒了」都会真的惊动家属。
+        # 现在与跌倒判定走同一套子句 + 位置敏感的守卫。
+        if cls._guarded_hit(normalized, cls._emergency_patterns):
+            return SafetySignal(
+                category="emergency",
+                severity=4,
+                message="我听到您可能遇到了紧急情况。我会立即提醒家人；如果有生命危险，请尽快联系当地急救服务。",
+                notify_family=True,
+            )
         if cls._is_present_fall(normalized):
             return SafetySignal(
                 category="emergency",
@@ -121,13 +157,66 @@ class SafetyPolicy:
         # story even though it contains "现在", while "刚才摔倒了，上个月也摔过"
         # reports a fall happening now in its first clause.
         for clause in re.split(r"[，。！？；,.!?;\s]+", normalized):
-            if not any(re.search(pattern, clause) for pattern in cls._fall_patterns):
+            hit = cls._first_match(clause, cls._fall_patterns)
+            if hit is None:
                 continue
-            if re.search(cls._hypothetical, clause):
+            # 摔的是碗还是人。
+            if re.search(cls._object_fall, clause):
                 continue
-            if re.search(cls._past_narrative, clause):
+            # 「跌倒风险评估」「防跌倒讲座」说的是话题，不是这位老人刚摔了。
+            if re.search(cls._fall_as_topic, clause):
+                continue
+            # 第三人称主语——除非同一子句里出现第一人称，那就以第一人称为准
+            # （"我扶邻居的时候我也摔倒了"）。
+            if not re.search(cls._first_person, clause) and re.search(cls._other_person, clause):
+                continue
+            # **位置敏感**：只有出现在跌倒动词**之前**的指示词才算假设或回忆。
+            #
+            # 原来是整句包含即否决，代价是把最自然的几句真实求救静音了：
+            #   「我不小心摔倒了」——「小心」在词表里
+            #   「我摔倒了怕站不起来」——「怕」在词表里，而这句比裸「我摔倒了」更急
+            #   「我摔倒了别告诉我儿子」——「别」在词表里
+            # 中文里假设和回忆的标记几乎总在动词前（怕摔、万一摔、去年摔），
+            # 动词后出现的是后果和请求，不是假设。
+            if cls._marker_before(clause, cls._hypothetical, hit):
+                continue
+            if cls._marker_before(clause, cls._past_narrative, hit):
                 continue
             return True
+        return False
+
+    @classmethod
+    def _guarded_hit(cls, normalized: str, patterns: tuple[str, ...]) -> bool:
+        """子句级 + 位置敏感的匹配，供紧急模式与跌倒判定共用。"""
+        for clause in re.split(r"[，。！？；,.!?;\s]+", normalized):
+            hit = cls._first_match(clause, patterns)
+            if hit is None:
+                continue
+            if not re.search(cls._first_person, clause) and re.search(cls._other_person, clause):
+                continue
+            if cls._marker_before(clause, cls._hypothetical, hit):
+                continue
+            if cls._marker_before(clause, cls._past_narrative, hit):
+                continue
+            return True
+        return False
+
+    @staticmethod
+    def _first_match(clause: str, patterns: tuple[str, ...]) -> int | None:
+        """最靠前的一个命中位置；没有命中返回 None。"""
+        positions = [
+            match.start()
+            for pattern in patterns
+            if (match := re.search(pattern, clause)) is not None
+        ]
+        return min(positions) if positions else None
+
+    @staticmethod
+    def _marker_before(clause: str, marker: str, verb_at: int) -> bool:
+        """指示词是否出现在动词之前。"""
+        for match in re.finditer(marker, clause):
+            if match.start() < verb_at:
+                return True
         return False
 
     @classmethod

@@ -7,10 +7,10 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .baseline import Channel, Verdict
 
@@ -40,6 +40,35 @@ class EnvironmentSample(StrictModel):
     lux: float | None = Field(default=None, ge=0.0, le=200000.0)
     occurred_at: datetime
     source: str = Field(default="unknown", min_length=1, max_length=64)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def within_a_sane_window(cls, value: datetime) -> datetime:
+        """读数必须落在"最近 7 天到 5 分钟后"之间。
+
+        温湿度光照三项都有 `ge/le`，唯独时间戳原来什么约束都没有，而它恰恰是三者里
+        后果最重的一个：
+
+        * `latest_environment` 按 `occurred_at DESC LIMIT 1` 取"此刻"，
+        * `EnvironmentReader.read` 用 `now - occurred_at > FRESH` 判过期，未来时间戳
+          的差是**负数**，永远通过新鲜度检查。
+
+        两者叠加，一条 9999 年的读数会永久排在最前、永久"新鲜"，此后所有真实读数都
+        再也顶不掉它。这不是理论攻击：`care.js` 上报用的是**客户端时钟**，演示机或
+        鸿蒙设备时钟走快，就会把这户人家的环境读数钉死，而且不会自愈、日志里也看不
+        出异常。
+
+        顺带堵掉一个 500：`iso()` 会做 `astimezone(UTC)`，`0001-01-01T00:00:00+08:00`
+        换算后落到 0000 年直接 OverflowError——而 +08:00 正是本项目的默认时区，
+        不是刻意构造的极端值。Pydantic 拦不住它，因为**换算前**这个值是合法的。
+        """
+        now = datetime.now(UTC)
+        moment = value if value.tzinfo else value.replace(tzinfo=UTC)
+        if moment > now + timedelta(minutes=5):
+            raise ValueError("读数时间不能超过当前时间 5 分钟——请检查上报设备的时钟。")
+        if moment < now - timedelta(days=7):
+            raise ValueError("读数时间过旧（超过 7 天），不作为当前环境。")
+        return value
 
 
 class EnvironmentComfort(StrEnum):

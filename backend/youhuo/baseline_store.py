@@ -83,13 +83,17 @@ class BaselineStore:
         return sample_id
 
     def latest_environment(self, *, family_id: str, elder_id: str) -> EnvironmentSample | None:
+        # `occurred_at <= now` 是第二道防线。契约层已经拒收未来时间戳，但这一条查询
+        # 决定了"此刻的环境是什么"，一旦库里因为任何原因（历史数据、直接写库、时钟
+        # 回拨）存在一条未来读数，它会永久排在最前并永久盖住真实读数。取"不晚于现在
+        # 的最新一条"在语义上也更准确。
         with self.db._lock:
             row = self.conn.execute(
                 """SELECT elder_id,temperature_c,humidity_pct,lux,occurred_at,source
                    FROM environment_samples_v7
-                   WHERE family_id=? AND elder_id=?
+                   WHERE family_id=? AND elder_id=? AND occurred_at<=?
                    ORDER BY occurred_at DESC LIMIT 1""",
-                (family_id, elder_id),
+                (family_id, elder_id, iso(utcnow())),
             ).fetchone()
         if row is None:
             return None

@@ -4634,10 +4634,10 @@
                   "type": "null"
                 }
               ],
-              "description": "默认今天（UTC）",
+              "description": "默认今天（老人所在时区）",
               "title": "Day"
             },
-            "description": "默认今天（UTC）"
+            "description": "默认今天（老人所在时区）"
           }
         ],
         "responses": {
@@ -4701,8 +4701,10 @@
                   "type": "null"
                 }
               ],
+              "description": "默认今天（老人所在时区）",
               "title": "Day"
-            }
+            },
+            "description": "默认今天（老人所在时区）"
           }
         ],
         "responses": {
@@ -4766,8 +4768,10 @@
                   "type": "null"
                 }
               ],
+              "description": "默认今天（老人所在时区）",
               "title": "Day"
-            }
+            },
+            "description": "默认今天（老人所在时区）"
           }
         ],
         "responses": {

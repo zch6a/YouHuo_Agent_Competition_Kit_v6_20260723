@@ -248,7 +248,10 @@ class EnvironmentReader:
     def read(cls, sample: EnvironmentSample | None, *, now: datetime) -> EnvironmentReading:
         if sample is None:
             return EnvironmentReading(None, (EnvironmentComfort.UNKNOWN,), None)
-        if now - sample.occurred_at > cls.FRESH:
+        # 用**绝对值**。带符号的差让未来时间戳得到一个负数，于是永远"新鲜"——
+        # 一条 9999 年的读数会永久盖住所有真实读数。时间戳偏离此刻太远，无论朝哪个
+        # 方向，都不能代表"现在屋里什么样"。
+        if abs(now - sample.occurred_at) > cls.FRESH:
             return EnvironmentReading(
                 sample,
                 (EnvironmentComfort.UNKNOWN,),
