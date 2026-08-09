@@ -19,7 +19,7 @@ function api(path, options = {}) {
 }
 
 function showJSON(id, data) {
-  document.querySelector(id).textContent = JSON.stringify(data, null, 2);
+  window.YouHuo.renderResult(document.querySelector(id), data);
 }
 
 function activate(step) {

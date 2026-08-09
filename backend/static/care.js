@@ -4,8 +4,10 @@
 const {api, byId, pretty} = window.YouHuo;
 const state = {elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
+// 结构化渲染 + 折叠的原始响应，见 common.js。这七张卡里有六张原先直接把
+// JSON.stringify 塞进 <pre>。
 function setOutput(id, value) {
-  byId(id).textContent = typeof value === 'string' ? value : pretty(value);
+  window.YouHuo.renderResult(id, value);
 }
 
 async function bootstrap() {

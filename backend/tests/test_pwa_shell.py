@@ -170,6 +170,21 @@ def test_only_one_file_owns_the_request_layer(script):
     assert "Bearer" not in source, f"{script} 又自己拼 Authorization 头"
 
 
+@pytest.mark.parametrize("page", ["care.html", "trust.html", "judge.html"])
+def test_demo_output_is_not_raw_json(page):
+    """评委看到的不该是一屏 JSON。
+
+    可信实验室六张卡的输出曾经**全是** `<pre>` 里的 `JSON.stringify`，照护中心七张
+    里有六张也是。那些字段恰恰是这个项目最想讲的东西——"系统拒绝了什么、为什么
+    拒绝"——但用 JSON 讲出来，等于要求评委现场读一遍后端契约。
+
+    原始响应没有删，收在每张卡的 `<details>` 里；这条只禁止把它当成第一眼的呈现。
+    """
+    source = (STATIC / page).read_text(encoding="utf-8")
+    assert "<pre id=" not in source, f"{page} 里还有直接当输出容器用的 <pre>"
+    assert 'class="result"' in source, f"{page} 没有使用结构化结果容器"
+
+
 def test_service_worker_bails_out_before_responding():
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
     # 直接放行，而不是先缓存再过滤。

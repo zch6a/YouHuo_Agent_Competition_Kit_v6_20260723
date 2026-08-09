@@ -145,5 +145,125 @@
     return cachedToken(role);
   }
 
-  window.YouHuo = {ready, login, api, forget, token, byId, pretty, VERDICT, verdictOf};
+  // --- 结果渲染 ------------------------------------------------------------
+  //
+  // 可信实验室六张卡的输出曾经**全是** `<pre>` 里的原始 JSON，照护中心七张里有六张
+  // 也是。评委点开按钮，看到的是一屏 `{"decision": "clarify", "stripped_fields": [...]}`。
+  // 那些字段本身就是这个项目最想讲的东西——"系统拒绝了什么、为什么拒绝"——但用
+  // JSON 讲出来，等于要求评委现场读一遍后端契约。
+  //
+  // 原始 JSON 不删，收进可展开区：证据要留着，只是不该是第一眼看到的东西。
+
+  //: 后端字段名 -> 中文标签。查不到就原样显示键名——宁可露出 `foo_bar`，也不要
+  //: 悄悄把一个没预料到的字段藏起来。
+  const FIELD_LABEL = {
+    decision: '判定', reasons: '理由', stripped_fields: '被剥离的字段',
+    status: '状态', message: '说明', semantic_intent: '语义意图',
+    intent: '意图', mode: '交互模式', headline: '结论',
+    task_id: '任务号', risk_level: '风险等级', requires_family_approval: '需家属确认',
+    requires_elder_confirmation: '需老人复述确认', reversible: '可撤销',
+    approved: '已批准', verdict: '判定', overall: '总体判定',
+    speak_text: '播报', visible_options: '本轮可见选项', require_teach_back: '需要复述确认',
+    name: '名称', purpose: '用途', authorization: '授权决定',
+    candidates: '候选', confidence: '置信度', engine: '识别引擎',
+    advance_notified: '提前提醒', notified: '到期提醒', escalated: '升级家属',
+    inside_home_area: '在安全范围内', alert_created: '已产生告警',
+    family_notified: '已通知家属', community_escalation_prepared: '已准备社区升级',
+    steps: '步骤', current_step_index: '当前步骤', version: '版本',
+    implemented_and_tested: '已实现并测试', not_implemented: '尚未实现',
+    privacy_guarantee: '隐私承诺', privacy_note: '隐私说明',
+    allowed_arguments: '允许通过的参数', required_confirmations: '还需要什么',
+    policy_version: '策略版本', decision_digest: '决定摘要', purpose_bound: '目的绑定',
+    elder_id: '老人', bill_id: '账单号', amount_cents: '金额（分）',
+    expires_at: '有效期至', scopes: '授权范围', granted: '已授权',
+    conflict: '冲突', resolution: '处理方式', winner: '采用',
+  };
+
+  //: 值本身就是结论的字段，用色块显示而不是一行小字。
+  const TONE_BY_VALUE = {
+    allow: 'good', clarify: 'warn', deny: 'bad', blocked: 'bad',
+    ok: 'good', success: 'good', failed: 'bad', error: 'bad',
+    typical: 'good', notice: 'warn', marked: 'bad', unknown: 'warn', pending: '',
+  };
+
+  function labelFor(key) {
+    return FIELD_LABEL[key] || key;
+  }
+
+  function scalarText(value) {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'boolean') return value ? '是' : '否';
+    return String(value);
+  }
+
+  function valueNode(value) {
+    if (Array.isArray(value)) {
+      if (!value.length) return document.createTextNode('（无）');
+      if (value.every((item) => item === null || typeof item !== 'object')) {
+        const list = document.createElement('ul');
+        list.className = 'result-list';
+        value.forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = scalarText(item);
+          list.appendChild(li);
+        });
+        return list;
+      }
+      const wrap = document.createElement('div');
+      value.forEach((item) => wrap.appendChild(objectNode(item)));
+      return wrap;
+    }
+    if (value && typeof value === 'object') return objectNode(value);
+
+    const tone = TONE_BY_VALUE[String(value)];
+    if (tone !== undefined) {
+      const pill = document.createElement('span');
+      pill.className = `pill ${tone}`;
+      pill.textContent = scalarText(value);
+      return pill;
+    }
+    return document.createTextNode(scalarText(value));
+  }
+
+  function objectNode(value) {
+    const box = document.createElement('div');
+    box.className = 'result-group';
+    Object.entries(value).forEach(([key, item]) => {
+      const row = document.createElement('div');
+      row.className = 'result-row';
+      const label = document.createElement('strong');
+      label.textContent = labelFor(key);
+      const cell = document.createElement('div');
+      cell.appendChild(valueNode(item));
+      row.append(label, cell);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  /** 把一个响应渲染进容器：先结构化，再折叠一份原始 JSON。 */
+  function renderResult(host, value) {
+    const el = typeof host === 'string' ? byId(host) : host;
+    if (!el) return;
+    el.replaceChildren();
+    if (typeof value === 'string') {
+      el.textContent = value;
+      return;
+    }
+    el.appendChild(valueNode(value));
+
+    const raw = document.createElement('details');
+    raw.className = 'result-raw';
+    const summary = document.createElement('summary');
+    summary.textContent = '原始响应';
+    const body = document.createElement('pre');
+    body.textContent = pretty(value);
+    raw.append(summary, body);
+    el.appendChild(raw);
+  }
+
+  window.YouHuo = {
+    ready, login, api, forget, token,
+    byId, pretty, VERDICT, verdictOf, renderResult,
+  };
 })();

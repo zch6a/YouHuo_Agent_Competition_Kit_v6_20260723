@@ -9,7 +9,9 @@ const {api, byId, pretty} = window.YouHuo;
 const state = {saga: null, sagaRole: 'system',
   elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
-function output(id, value) { byId(id).textContent = typeof value === 'string' ? value : pretty(value); }
+// 六张卡的输出原先全是 <pre> 里的原始 JSON。这一页讲的恰恰是"系统拒绝了什么、
+// 为什么拒绝"，用 JSON 讲等于要求评委现场读一遍后端契约。见 common.js。
+function output(id, value) { window.YouHuo.renderResult(id, value); }
 
 async function bootstrap() {
   try {

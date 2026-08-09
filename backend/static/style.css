@@ -610,6 +610,52 @@ a, button, input, textarea, select { min-height: 48px; }
 /* Output panes stay out of the layout until a demo actually writes to them. */
 pre:empty { display: none; }
 
+/* --------------------------------------------------------------------------
+   Structured results
+   ..........................................................................
+   可信实验室六张卡的输出曾经全是 <pre> 里的原始 JSON，照护中心七张里有六张也是。
+   那些字段正是这个项目最想讲的东西——"系统拒绝了什么、为什么拒绝"——但用 JSON
+   讲出来，等于要求评委现场读一遍后端契约。渲染逻辑在 common.js 的 renderResult。
+   -------------------------------------------------------------------------- */
+.result:empty { display: none; }
+.result {
+  margin-top: var(--space-3);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.result-group + .result-group { margin-top: var(--space-2); }
+/* 标签列定宽，值列自适应：一列对齐的键值比参差的两栏好扫。10ch 容得下"被剥离的字段"。 */
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(6.5em, max-content) 1fr;
+  gap: var(--space-2) var(--space-3);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.result-row:first-child { border-top: 0; }
+.result-row > strong { color: var(--ink-3); font-weight: 600; font-size: 14px; }
+.result-row > div { min-width: 0; overflow-wrap: anywhere; }
+/* 嵌套一层就缩进并淡化边框，不再往下继续缩，否则深层结构会被挤成一条线。 */
+.result-row .result-group {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+}
+.result-list { margin: 0; padding-left: 1.15em; }
+.result-list li { margin: 2px 0; }
+.result-raw { margin-top: var(--space-3); }
+.result-raw > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-3);
+  /* 触控下限：折叠开关也是可点区域。 */
+  padding: 8px 0;
+  min-height: 24px;
+}
+.result-raw > summary:hover { color: var(--ink-2); }
+.result-raw pre { margin-top: var(--space-2); }
+
 pre {
   white-space: pre-wrap;
   word-break: break-word;
