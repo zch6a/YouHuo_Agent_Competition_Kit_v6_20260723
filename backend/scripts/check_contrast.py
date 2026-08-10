@@ -233,6 +233,17 @@ def main() -> int:
                              features=[{"name": "prefers-color-scheme", "value": "dark"}])
                 tab.send("Page.navigate", url=BASE + page)
                 time.sleep(2.5)
+                # 查之前先把所有折叠层展开。
+                #
+                # 收起来的 `<details>` 里，内容对渲染和对读屏都是不存在的，于是标签
+                # 探针把里面的控件报成"无标签"——那是在评判用户此刻碰不到的元素。
+                # 但**跳过**它们是更糟的答案：那等于"折叠一段内容"就能让它退出无障碍
+                # 检查，而给页面减负正是这一轮反复用的手法（老人端的设置、家人端日报
+                # 的分项、每个结果卡里的原始响应）。所以是展开，不是跳过。
+                tab.send("Runtime.evaluate", expression=(
+                    "document.querySelectorAll('details').forEach(d => d.open = true);"
+                ))
+                time.sleep(0.4)
                 result = tab.send("Runtime.evaluate", expression=AUDIT_JS,
                                   awaitPromise=True, returnByValue=True)
                 payload = json.loads(result["result"]["value"])

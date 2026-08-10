@@ -159,8 +159,18 @@
           <p class="rail-note">这些只念记录，不做医学判断。</p>
         </section>
 
+        <!-- 设置默认收起。
+             实测：抽屉内容 1582px、窗口 726px，2.2 个抽屉高；而这一张 437px，占 28%，
+             却是里面最不常用的东西——语速和字号设一次就不再动。收起来之后抽屉降到
+             约 1.6 个抽屉高。
+
+             **刻意没有给老人端加分区控件**（家人端、照护页、可信页都加了）。那三页
+             加分区是因为它们各有 6~12 块权重相同的内容，人得自己找；老人端只有一个
+             主动作，一位老人多一次"先选一个分区"的决定，比多滚一下更贵。分区是解那
+             一类问题的，不是这一类。 -->
         <section class="panel rail-card">
-          <div class="rail-head"><h2>看得清、听得懂</h2></div>
+          <details class="rail-fold">
+          <summary><h2>看得清、听得懂</h2></summary>
           <div class="profile-tools" aria-label="适老交互设置">
             <label>语速
               <select id="speechRate">
@@ -185,6 +195,7 @@
             <span class="trust-pill">高风险需要复述</span>
             <span class="trust-pill">不会自动扣款</span>
           </div>
+          </details>
         </section>
       </aside>
     </div>

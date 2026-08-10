@@ -62,19 +62,44 @@ CLICK_SETTLE_SECONDS = 1.6
 #: 收集到的错误会张冠李戴。真正做事的按钮一个都不放过，包括 SOS 和限时破窗：
 #: 它们是这个产品的安全路径，正因为危险才更需要每轮都真的走一遍。演示库是每次
 #: 新建的临时文件，点坏了也只坏它自己。
-SKIP_SELECTORS = "a, [data-sheet-open], [data-sheet-close], .back-link, .tab"
+SKIP_SELECTORS = "a, .back-link, .tab"
 
 #: 会换掉整屏内容的控件，留到最后按。
 #:
 #: `/family` 的分区按钮排在 DOM 前面，"按第一个没按过的"会先把它们按完，最后停在
 #: "我的"那一分区——其余三个分区里的按钮从头到尾没有可见过，而检查照样报"全部
 #: 按过"。规则因此是两级的：先把此刻屏幕上的按干净，再换一屏。
-DEFER_SELECTORS = ".seg"
+#:
+#: 抽屉的开合按钮从 SKIP 挪到这里。它们原先在跳过名单上，理由写的是"会导航走"——
+#: 但它们不导航，只是开合一个 `<aside>`。后果是老人端抽屉里那**十几个真控件**
+#: （`#saveProfile`、`#repeatLast`、`#stepBack`、`#companionEntry`、`#logEntry`、
+#: 四个「问问看」、两个 `<select>`…）从头到尾一次都没有被按过：抽屉是关着的，
+#: 它们 `offsetParent === null`，遍历直接跳过，而检查照样报"全部按过"。
+#: 老人端恰好是这个产品的主界面。
+DEFER_SELECTORS = ".seg, summary, [data-sheet-open]"
+
+#: 会把东西**收起来**的控件，全页最后按。
+#:
+#: 抽屉的关闭按钮在 DOM 里排在抽屉内容之前（它是抽屉顶上那个把手）。和分区按钮、
+#: `<summary>` 放在同一档的话，它会先被按到，把抽屉关上——于是里面的 `<summary>`
+#: 再也点不开，`#saveProfile` 报"没被按到"。实测就是这样。
+#: 所以是三档：先按此刻屏幕上的，再按会**展开**东西的，最后才按会**收起**的。
+CLOSER_SELECTORS = "[data-sheet-close]"
 
 #: 单页点击遍历的次数上限。按下一个按钮可能让另一批按钮**出现**——页内分区、
 #: 抽屉、条件渲染都会——所以遍历是"按一个再找一次"，没有固定名单。这个上限只是
 #: 防止两个按钮互相召唤对方转不出去；正常页面在 20 次以内就找不到新的了。
 MAX_PRESSES = 60
+
+#: 每一页必须被按到的控件（按 id 匹配点击遍历记下的标签）。
+#:
+#: 这不是再数一遍按钮，是钉住那些**只在某个折叠层里才存在**的控件真的被展开过：
+#: 老人端抽屉里的保存与记录、家人端和照护页分区里的入口。数字本身证明不了这件事
+#: ——58 和 60 都像是对的。
+REQUIRED_PRESSES = {
+    "/elder": ("#saveProfile", "#repeatLast", "#companionEntry", "#logEntry"),
+    "/family": ("#scheduler",),
+}
 
 
 class CDP:
@@ -300,16 +325,13 @@ def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> 
     尺寸。给底部标签栏加 `min-width: 1200px`，scrollWidth 纹丝不动，而右边两个标签
     已经出界、永远点不到。所以探针逐个元素量右边缘。
     """
-    tab.send("Emulation.setDeviceMetricsOverride",
-             width=PHONE[0], height=PHONE[1], deviceScaleFactor=1, mobile=True)
-    tab.drain(1.2)
+    # 视口在 main() 里 navigate 之前就设成手机了，整页一直保持——这里不再切换。
+    # 原先是"临时切到手机、量完就清掉"，于是后面的点击遍历跑在桌面宽度上。
     raw = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
                    returnByValue=True)["result"].get("value")
     # 无障碍那几条也在手机视口下查：横滚带只在窄屏才真的溢出，桌面宽度下它一条
     # 内容都不隐藏，检查会永远是绿的。
     check_accessibility(tab, page, failures)
-    tab.send("Emulation.clearDeviceMetricsOverride")
-    tab.drain(0.6)
     if not raw:
         return
     box = json.loads(raw)
@@ -459,16 +481,45 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     相比每次点击 1.6 秒的收网时间可以忽略，换来的是这个数字不再是假的。
     """
     tab.send("Runtime.evaluate", expression="window.__pressed = new WeakSet();")
+    seen: list[str] = []
     pressed = 0
     while pressed < MAX_PRESSES:
         label = tab.send("Runtime.evaluate", expression=(
             "(() => {"
             f"  const skip = new Set(document.querySelectorAll('{SKIP_SELECTORS}'));"
             f"  const defer = new Set(document.querySelectorAll('{DEFER_SELECTORS}'));"
-            "   const ready = [...document.querySelectorAll('button')]"
-            "     .filter(b => !skip.has(b) && !b.disabled && b.offsetParent !== null"
-            "               && !window.__pressed.has(b));"
-            "   const el = ready.find(b => !defer.has(b)) || ready.find(b => defer.has(b));"
+            f"  const closer = new Set(document.querySelectorAll('{CLOSER_SELECTORS}'));"
+            # 判据是「用户此刻按得到吗」，不是「它在文档里吗」。
+            #
+            # 原先是 `offsetParent !== null`，那只对 display:none 和 position:fixed
+            # 为假。老人端的底部抽屉是 transform 移出屏幕的，关着的时候里面十几个
+            # 按钮的 offsetParent 照样不是 null——于是遍历一直在按用户按不到的东西，
+            # 而"抽屉开合按钮在不在跳过名单里"对结果毫无影响（变异测出来的：把它们
+            # 放回跳过名单，那四个只在抽屉里的控件照样报被按过）。
+            #
+            # 现在的做法就是用户的做法：滚到它跟前，在它中心点做一次命中测试。移出
+            # 屏幕的抽屉滚不过去，命中测试落空，正确地被排除；屏外下方的正常内容滚
+            # 一下就到，照常入选。
+            "   const usable = b => {"
+            "     if (skip.has(b) || b.disabled || window.__pressed.has(b)) return false;"
+            "     const s = getComputedStyle(b);"
+            "     if (s.visibility === 'hidden' || parseFloat(s.opacity) < 0.05) return false;"
+            "     b.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});"
+            "     const r = b.getBoundingClientRect();"
+            "     if (r.width < 1 || r.height < 1) return false;"
+            "     const x = r.left + r.width / 2, y = r.top + r.height / 2;"
+            "     if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;"
+            "     const hit = document.elementFromPoint(x, y);"
+            "     return !!hit && (hit === b || b.contains(hit) || hit.contains(b));"
+            "   };"
+            # `<summary>` 也要点。它不是 `<button>`，此前完全不在遍历范围里——于是
+            # 每一个 `<details>` 背后的东西都没被按过：老人端收起来的设置、家人端
+            # 生活日报的分项、每个结果卡里那份「原始响应」。折叠一段内容因此等于
+            # 让它退出检查，而这正是我这几轮反复用来给页面减负的手法。
+            "   const all = [...document.querySelectorAll('button, summary')];"
+            "   const el = all.find(b => !defer.has(b) && !closer.has(b) && usable(b))"
+            "           || all.find(b => defer.has(b) && usable(b))"
+            "           || all.find(b => closer.has(b) && usable(b));"
             "   if (!el) return null;"
             "   window.__pressed.add(el);"
             "   window.__next = el;"
@@ -481,9 +532,21 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
         tab.send("Runtime.evaluate", expression="window.__next.click()")
         tab.drain(CLICK_SETTLE_SECONDS)
         failures.extend(collect(tab.events, f"{page} 点击「{label}」"))
+        seen.append(label)
         pressed += 1
     else:
         failures.append(f"{page}  点击遍历到达 {MAX_PRESSES} 次上限还没停——可能有两个按钮在互相召唤")
+
+    # 抽屉背后那一层必须真的被按到。
+    #
+    # 抽屉的开合按钮曾经在跳过名单上（理由写的是"会导航走"，但它们不导航），于是
+    # 老人端抽屉里那十几个真控件从来没被按过：抽屉关着，它们 offsetParent 是 null，
+    # 遍历直接跳过，而检查照样报"全部按过"。数字本身看不出这件事——58 和 60 都像是
+    # 对的。所以这里点名要求几个只存在于抽屉里的 id 出现在按过的名单上。
+    required = REQUIRED_PRESSES.get(page, ())
+    missing = [want for want in required if not any(want in label for label in seen)]
+    if missing:
+        failures.append(f"{page}  这些控件没有被按到（抽屉/分区没被真的打开？）：{missing}")
     return pressed
 
 
@@ -571,6 +634,15 @@ def main() -> int:
                 tab.send("Log.enable")
                 tab.send("Network.enable")
                 tab.send("Page.enable")
+                # 整页都在手机视口下跑，而不是只在溢出探针那一小段里临时切一下。
+                #
+                # 此前 `press_every_control` 跑在 headless 默认的桌面宽度上——一个
+                # 手机适老应用，被按的是一个没人会拿到的布局。差别不是理论上的：
+                # 老人端的 `.rail.sheet` 在宽屏是常驻侧栏、在手机才是抽屉，标签栏在
+                # 桌面宽度是 `display: none`。也就是说"每个按钮都按过"说的是另一套
+                # 界面。在 navigate **之前**设置，媒体查询才能从加载那一刻就生效。
+                tab.send("Emulation.setDeviceMetricsOverride",
+                         width=PHONE[0], height=PHONE[1], deviceScaleFactor=1, mobile=True)
                 tab.send("Page.navigate", url=BASE + page)
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
