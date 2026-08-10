@@ -289,6 +289,9 @@
 
 .judge-shell { max-width: 1140px; }
 .judge-header { align-items: flex-start; padding: 22px 0 6px; }
+/* `.topbar` 是 `flex-wrap: wrap`，返回链接因此换到第二行，然后被拉成一整条通栏白块，
+   比标题还显眼。实测在评委页上就是这样。 */
+.topbar > .back-link { flex: 0 0 auto; align-self: flex-start; white-space: nowrap; }
 .judge-header h1 { max-width: 900px; font-size: clamp(30px, 5vw, 56px); }
 
 .score-ribbon { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
@@ -400,7 +403,20 @@
   .rail { position: static; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 }
 @media (max-width: 900px) {
-  .score-ribbon { grid-template-columns: repeat(2, 1fr); }
+  /* 保持四列，但压扁。
+   *
+   * 原先在这里换成 2×2：四张 100px 高的卡加圆角加阴影，在 390px 下占掉整整一屏——
+   * 评委打开这一页，第一屏是四个评分权重数字，产品一个字都还没出现。这一页确实是
+   * 给评委的，评分维度也确实该写，但它是一行注脚，不是开场。 */
+  .score-ribbon { grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0; }
+  .score-ribbon div {
+    min-height: 0;
+    padding: 10px 4px;
+    border-radius: var(--r-md);
+    box-shadow: none;
+  }
+  .score-ribbon strong { font-size: 22px; }
+  .score-ribbon span { font-size: 12px; }
 }
 /* 单列收拢。
  *

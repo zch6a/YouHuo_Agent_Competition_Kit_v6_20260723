@@ -322,6 +322,53 @@ def test_every_section_button_has_a_panel_to_show(page, least):
     assert len(open_panels) == 1, f"{page} 默认展开的分区不是一个：{len(open_panels)}"
 
 
+@pytest.mark.parametrize(
+    "page", ["index.html", "elder.html", "family.html", "care.html", "trust.html", "judge.html"]
+)
+def test_no_page_labels_itself_with_all_caps_english(page):
+    """`.eyebrow` 里不许是一串大写英文加版本号。
+
+    六个页面里有五个曾经这样开场：`C4-AI · HARMONYOS AGENT INNOVATION · V6.0`、
+    `YOUHUO FAMILY CONSOLE · V6.0`、`YOUHUO CARE HUB · V4.0`、
+    `YOUHUO TRUST LAB · V5.0`、`YOUHUO FINALIST WALKTHROUGH · V6.0`，加上评委页末尾
+    一个 `ONE SENTENCE`。这些是产品自我介绍的位置，而它被赛事元数据占了——一个中文
+    用户看到的第一行字，读不出任何意思。
+
+    `.eyebrow` 本身是有用的：它现在承载每一步的论点（「老人表达不标准，也不能让系统
+    猜」）。所以这一条不禁 `.eyebrow`，只禁"纯大写 ASCII"这一种内容。
+    """
+    source = (STATIC / page).read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    offenders = [
+        text.strip() for text in re.findall(r'class="eyebrow"[^>]*>(.*?)<', source, re.S)
+        if text.strip() and re.fullmatch(r"[A-Z0-9 ·.·\-–—/&+]+", text.strip())
+    ]
+    assert not offenders, f"{page} 用一串大写英文介绍自己：{offenders}"
+
+
+def test_judge_steps_report_failures_where_the_user_clicked():
+    """每一步失败时，错误要写进那一步自己的输出区，不只是页面顶部的状态行。
+
+    原先五个处理器都是 `.catch(e => statusEl.textContent = e.message)`。状态行在页面
+    顶部，而评委的眼睛在他刚点的那个按钮上——于是一次失败的观感是"点了没反应"。
+
+    顺带把 `.onclick =` 换成 `addEventListener`：这五个按钮写在 judge.html 里，
+    `.onclick` 是覆盖而不是叠加，哪天有人再挂一件事，先挂的那件会无声消失。
+    （elder.js / family.js 里剩下的 `.onclick` 是在刚 createElement 的按钮上赋值，
+    那里没有既有处理器可覆盖，不算同一件事。）
+    """
+    js = (STATIC / "judge.js").read_text(encoding="utf-8")
+    body = re.sub(r"//.*", "", js)
+    assert ".onclick" not in body, "judge.js 又用回了 .onclick ="
+    assert body.count("addEventListener('click'") >= 1, "五个步骤没有一个挂上 click"
+    # 五个步骤各自的输出区都要出现在错误分支所在的那张表里。
+    for out in ["#demoVoiceOut", "#demoLoadOut", "#demoPreviewOut", "#glassCard", "#evidenceBoard"]:
+        assert out in body, f"{out} 没有被登记为失败时的落点"
+    handler = re.search(r"STEPS\.forEach\(.*?\}\);", body, re.S)
+    assert handler, "找不到统一的步骤绑定"
+    assert "out.textContent" in handler.group(0), "失败时没有写进这一步自己的输出区"
+
+
 def test_every_trust_promise_points_at_something_that_proves_it():
     """四条底线的「→」必须落在这一页真实存在的分区上。
 

@@ -71,7 +71,12 @@ async function runPreview() {
       ], user_confirmed:true, family_approvals:1, reversible:true
     })
   });
-  showJSON('#demoPreviewOut', {决策:data.authorization.decision, 剥离字段:data.authorization.stripped_fields, 说明:data.plain_summary, 不会做:data.will_not_do, 人工确认:data.required_humans});
+  // 可选链：这一页是给评委看的，响应少一个字段不该变成一屏 TypeError。
+  // `authorization` 缺失时下面的 statusEl 仍会写出结论，而结论此时是假的——所以
+  // 决策取不到就明说取不到。
+  const auth = data.authorization || {};
+  showJSON('#demoPreviewOut', {决策:auth.decision ?? '（响应里没有 authorization）', 剥离字段:auth.stripped_fields, 说明:data.plain_summary, 不会做:data.will_not_do, 人工确认:data.required_humans});
+  if (!auth.decision) throw new Error('预演响应缺少授权决策，不能当作通过');
   statusEl.textContent = '通过：文档金额与越权执行字段均未进入真实工具参数。';
 }
 
@@ -119,10 +124,28 @@ async function runBoard() {
   statusEl.textContent = '证据板已加载：明确区分已实现、待真机验证和禁止宣传的内容。';
 }
 
-document.querySelector('#demoVoice').onclick = () => runVoice().catch(e => statusEl.textContent=e.message);
-document.querySelector('#demoLoad').onclick = () => runLoad().catch(e => statusEl.textContent=e.message);
-document.querySelector('#demoPreview').onclick = () => runPreview().catch(e => statusEl.textContent=e.message);
-document.querySelector('#demoCard').onclick = () => runCard().catch(e => statusEl.textContent=e.message);
-document.querySelector('#demoBoard').onclick = () => runBoard().catch(e => statusEl.textContent=e.message);
+// `addEventListener` 而不是 `.onclick =`。
+//
+// 区别只在**已经存在于 HTML 里**的元素上要紧：`.onclick` 是覆盖而不是叠加，哪天有人
+// 再给同一个按钮挂一件事，先挂的那件会无声消失。这五个按钮正是写在 judge.html 里的。
+// （elder.js 和 family.js 里剩下的四处 `.onclick` 是在刚 createElement 出来的按钮上
+// 赋值，那里没有既有处理器可覆盖，是安全的简写，不动。）
+//
+// 失败时同时写进状态行**和**这一步自己的输出区。原先只写状态行——那一行在页面顶部，
+// 而评委的眼睛在他刚点的那个按钮上，于是"点了没反应"。
+const STEPS = [
+  ['#demoVoice', runVoice, '#demoVoiceOut'],
+  ['#demoLoad', runLoad, '#demoLoadOut'],
+  ['#demoPreview', runPreview, '#demoPreviewOut'],
+  ['#demoCard', runCard, '#glassCard'],
+  ['#demoBoard', runBoard, '#evidenceBoard'],
+];
+STEPS.forEach(([selector, run, outSelector]) => {
+  document.querySelector(selector).addEventListener('click', () => run().catch(e => {
+    statusEl.textContent = e.message;
+    const out = document.querySelector(outSelector);
+    if (out) { out.replaceChildren(); out.textContent = e.message; }
+  }));
+});
 
 login().then(()=>{statusEl.textContent='演示环境已就绪。建议按01→05顺序点击。';}).catch(e=>{statusEl.textContent=e.message;});
