@@ -31,6 +31,26 @@ function smallNumber(value) {
     if (rest < 10) return `${DIGITS[hundreds]}百零${DIGITS[rest]}`;
     return `${DIGITS[hundreds]}百${smallNumber(rest)}`;
   }
+  // 千位以上继续读成中文，不退回裸数字。
+  //
+  // 这里原先是 `return String(n)`，于是 1200.00元 念成"1200块"——而这个模块存在的
+  // 全部理由就是不让裸数字进合成器。失守的偏偏是最大的金额。更糟的是 7 位以上会被
+  // 后面那条"号码逐位念"的规则接手：1000000.00元 变成"一零零零零零零块"。
+  const thousands = Math.floor(n / 1000);
+  const under = n % 1000;
+  if (n < 10000) {
+    const head = `${smallNumber(thousands)}千`;
+    if (!under) return head;
+    // 零在中文数字里是位缺失的标记："一千零五" 不等于 "一千五"（后者是 1500）。
+    return under < 100 ? `${head}零${smallNumber(under)}` : `${head}${smallNumber(under)}`;
+  }
+  const wan = Math.floor(n / 10000);
+  const belowWan = n % 10000;
+  if (n < 100000000) {
+    const head = `${smallNumber(wan)}万`;
+    if (!belowWan) return head;
+    return belowWan < 1000 ? `${head}零${smallNumber(belowWan)}` : `${head}${smallNumber(belowWan)}`;
+  }
   return String(n);
 }
 
@@ -68,15 +88,27 @@ function spokenDate(year, month, day, today = new Date()) {
 
 /** 126.50元 -> 一百二十六块五毛; 68.00元 -> 六十八块. */
 function spokenMoney(amount) {
-  const [yuanPart, centPart = ''] = String(amount).split('.');
+  const raw = String(amount).trim();
+  // 负号不能丢。
+  //
+  // 原先的 money 正则和这个函数都不处理符号位，于是 "-68.40 元" 念成"六十八块四毛"
+  // ——老人听到的是一个正数。退款、冲正、余额为负都会走到这里，而这个模块的存在
+  // 就是为了让钱这件事听清楚。
+  const negative = raw.startsWith('-') || raw.startsWith('−');
+  const [yuanPart, centPart = ''] = raw.replace(/^[-−]/, '').split('.');
   const yuan = Number(yuanPart);
   const cents = Number((centPart + '00').slice(0, 2));
   const jiao = Math.floor(cents / 10);
   const fen = cents % 10;
-  let out = `${smallNumber(yuan)}块`;
+  // 不足一块就不说"零块"：中文里 0.50 元就是"五毛"，"零块五毛"没人这么讲。
+  let out = yuan === 0 && cents ? '' : `${smallNumber(yuan)}块`;
+  // 角为 0 而分不为 0 时"零"不能省：9.05 念成"九块五分"会被听成九块五（= 9.50）。
+  // 而这正好落在复述确认链上——老人重复她听到的数，后端判 mismatch，然后应用把
+  // 自己说错的账算在她头上（"您说的是 9.5 元，账单是 9.05 元"）。
   if (jiao) out += `${smallNumber(jiao)}毛`;
+  else if (fen) out += '零';
   if (fen) out += `${smallNumber(fen)}分`;
-  return out;
+  return negative ? `负${out}` : out;
 }
 
 /** Digit by digit, the way phone numbers and ids are said: 1111 -> 一一一一. */
@@ -122,7 +154,8 @@ export function speakableText(text, today = new Date()) {
   // 14:00 on its own
   out = out.replace(/(?<!\d)(\d{1,2}):(\d{2})(?::\d{2})?(?!\d)/g, (_, h, mi) => spokenTime(h, mi));
   // 126.50元 / 68元
-  out = out.replace(/(\d+(?:\.\d{1,2})?)\s*元/g, (_, amount) => spokenMoney(amount));
+  // 符号位要一起吃进来，否则 spokenMoney 拿到的是去掉负号的数，"-68.40 元" 念成正数。
+  out = out.replace(/([-−]?\d+(?:\.\d{1,2})?)\s*元/g, (_, amount) => spokenMoney(amount));
   // 35% -> 百分之三十五
   out = out.replace(/(\d+(?:\.\d+)?)\s*%/g, (_, n) => `百分之${n}`);
   for (const [pattern, replacer] of UNITS) out = out.replace(pattern, replacer);

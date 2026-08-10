@@ -41,6 +41,29 @@
   }
 
   async function provision() {
+    // 跨标签页只允许一个在开通。
+    //
+    // 第 75 行的注释写着"memoised so five concurrent callers do not seed five
+    // households"，但那个 memo 是 **document 级**的。两个标签页同时冷启动（干净
+    // profile 下同时打开 /elder 和 /family，或者恢复上次的双标签会话，或者"装到主屏的
+    // PWA + 浏览器标签"并存），各自 readCached() 得到 null、各自 POST /v2/auth/visitor，
+    // 服务端跑两遍 seed_demo，得到**两个不同的 family_id**。localStorage 后写覆盖先写，
+    // 而两个标签页的内存常量与 sessionStorage 令牌各自指向自己那一个。
+    //
+    // 后果不是"多了一个家庭"这么轻：女儿在家属端批准的高风险动作写进家庭 B，老人端在
+    // 家庭 A，`require_family_approval` 的接力永远等不到——表现是"点了批准，老人端
+    // 没反应"，而家属端的待办列表恒为空。换库之后 renew() 走同一条路，N 个标签页就
+    // 开 N 个新家庭，且每个 reset() 都作废上一个标签页刚建好的那个。
+    //
+    // Web Locks 在这个应用支持的所有浏览器上都有；没有它的环境退回"临界区前后各查
+    // 一次缓存"，仍能收窄窗口。
+    if (navigator.locks?.request) {
+      return navigator.locks.request('youhuo-visitor-provision', () => provisionOnce());
+    }
+    return provisionOnce();
+  }
+
+  async function provisionOnce() {
     const cached = readCached();
     if (cached) return cached;
     let response;
@@ -50,6 +73,11 @@
       return SHARED;               // offline or blocked: stay usable
     }
     if (!response.ok) return SHARED;
+    // 拿到锁之前另一个标签页可能已经写好了（无 Web Locks 的降级路径）。
+    // 那就用它的，把自己刚开的这一个丢掉——两个标签页在同一个家庭里，比各自正确
+    // 但互相看不见重要得多。
+    const raced = readCached();
+    if (raced) return raced;
     const data = await response.json();
     const identity = {
       elderId: data.elder_id,

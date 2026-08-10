@@ -792,12 +792,36 @@ if (SR) {
   mic.title = '当前浏览器不支持语音识别，请使用下方输入框';
 }
 
-addBubble('您好，我是优活。您可以直接说“帮我挂号”“查一下水费”或“调用无忧伴”。我会一次只问一件事。', 'agent');
-promptHistory.push({
-  text: '您好，我是优活。您可以直接说“帮我挂号”“查一下水费”或“调用无忧伴”。我会一次只问一件事。',
-  speak: '您好，我是优活。您可以直接说帮我挂号、查一下水费，或者调用无忧伴。',
-  rate: null,
-});
+// manifest 的快捷方式承诺的事，这里要真的做到。
+//
+// `manifest.webmanifest` 里有一条「找无忧伴聊聊」指向 `/elder?mode=companion`——长按
+// 主屏图标就能直接进陪伴模式。而**全站没有任何地方读这个参数**（grep 过
+// searchParams / location.search，唯一命中在 landing.js，读的是别的键）：点它落到普通
+// 首页，和主图标毫无区别。快捷方式承诺了一个不存在的功能。
+//
+// `setMode()` 本来就在，只差有人调用它。不播报：用户是主动选的这条路，不需要再被告知
+// 一次自己刚做的选择。
+{
+  const wanted = new URLSearchParams(location.search).get('mode');
+  if (wanted && ROLES[wanted]) setMode(wanted, {announce: false});
+}
+
+//: 开场那一句气泡按模式走。从「找无忧伴聊聊」进来的人要听到无忧伴说话，而不是优活
+//: 报一遍办事菜单——那正是她刚刚选择**不要**的东西。
+const GREETING = {
+  youhuo: {
+    text: '您好，我是优活。您可以直接说“帮我挂号”“查一下水费”或“调用无忧伴”。我会一次只问一件事。',
+    speak: '您好，我是优活。您可以直接说帮我挂号、查一下水费，或者调用无忧伴。',
+  },
+  companion: {
+    text: '我在这儿呢。想聊什么都行，不着急，慢慢说。',
+    speak: '我在这儿呢。想聊什么都行，不着急，慢慢说。',
+  },
+};
+
+const greeting = GREETING[currentMode] || GREETING.youhuo;
+addBubble(greeting.text, 'agent');
+promptHistory.push({text: greeting.text, speak: greeting.speak, rate: null});
 // Chrome populates the voice list asynchronously; re-pick once it arrives.
 if ('speechSynthesis' in window) {
   window.speechSynthesis.addEventListener('voiceschanged', () => {

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import struct
+import urllib.parse
 from pathlib import Path
 
 import pytest
@@ -393,6 +394,59 @@ def test_no_page_labels_itself_with_all_caps_english(page):
         and len(line.strip().split()) >= 2
     ]
     assert not offenders, f"{page} 用一串大写英文介绍自己：{offenders}"
+
+
+def test_every_manifest_shortcut_actually_does_something():
+    """manifest 里的快捷方式必须真的做到它承诺的事。
+
+    「找无忧伴聊聊」指向 `/elder?mode=companion`——长按主屏图标直接进陪伴模式。而
+    全站曾经**没有任何地方读这个参数**：点它落到普通首页，和主图标毫无区别。
+    快捷方式承诺了一个不存在的功能，而这是评委最可能顺手试的一个入口。
+
+    这一条查的是"参数有人读"，读得对不对由 `probe_shortcut` 在真浏览器里验（模式
+    切换是运行时行为，静态文件里看不出差别）。
+    """
+    manifest = json.loads((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"))
+    shortcuts = manifest.get("shortcuts", [])
+    assert shortcuts, "manifest 没有快捷方式"
+    scripts = "\n".join(
+        (STATIC / name).read_text(encoding="utf-8")
+        for name in ("elder.js", "family.js", "landing.js", "common.js")
+    )
+    for item in shortcuts:
+        query = urllib.parse.urlparse(item["url"]).query
+        for key in urllib.parse.parse_qs(query):
+            assert f"'{key}'" in scripts or f'"{key}"' in scripts, (
+                f"快捷方式「{item['name']}」带的参数 {key}= 全站没有人读——"
+                "它承诺了一个不存在的功能"
+            )
+
+
+def test_visitor_provisioning_is_serialised_across_tabs():
+    """开通访客家庭必须跨标签页互斥。
+
+    `provision()` 的 memo 是 document 级的。两个标签页同时冷启动，各自 POST
+    /v2/auth/visitor，服务端得到**两个不同的 family_id**；localStorage 后写覆盖先写，
+    而两个标签页的内存常量和 sessionStorage 令牌各自指向自己那一个。后果不是"多了
+    一个家庭"：女儿在家属端批准的高风险动作写进家庭 B，老人端在家庭 A，家庭接力
+    永远等不到——表现是"点了批准，老人端没反应"。
+
+    这条只查**形状**：锁在不在、降级路径在不在。"两个标签页真的落在同一个家庭"
+    是运行时性质，由 `check_page_runtime.py` 的 `check_multi_tab_identity` 真开两个
+    标签页验——变异测过：把 `if (navigator.locks?.request)` 改成 `if (false)`，
+    子串断言照样绿（`navigator.locks` 在这个文件里出现两次），只有跑起来才看得出。
+    """
+    source = (STATIC / "identity.js").read_text(encoding="utf-8")
+    body = re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", source, flags=re.S))
+    guard = re.search(r"if \(navigator\.locks\??\.?\w*\)?", body)
+    assert guard, "开通没有跨标签页互斥的入口"
+    assert "navigator.locks.request(" in body, "拿到了判断却没有真的申请锁"
+    # 降级路径也要在：拿到锁之后必须再查一次缓存，否则无 Web Locks 的环境照旧双开。
+    once = re.search(r"async function provisionOnce\(.*?\n\}", body, re.S)
+    assert once, "provisionOnce 不见了"
+    assert once.group(0).count("readCached()") >= 2, (
+        "开通之后没有再查一次缓存——另一个标签页刚写好的身份会被覆盖"
+    )
 
 
 def test_the_today_line_counts_only_today():

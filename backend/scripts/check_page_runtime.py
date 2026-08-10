@@ -479,6 +479,76 @@ def check_identity_self_heal(tab: "CDP", page: str, failures: list[str]) -> None
         failures.append(f"{page}  身份换过之后生活日报仍然打不开：{state['daily'][:40]}")
 
 
+def check_multi_tab_identity(browser: "CDP", ws_host: str, websocket, failures: list[str]) -> None:
+    """两个标签页同时冷启动，必须落在同一个家庭。
+
+    `provision()` 的记忆化是 **document 级**的：两个标签页各自 `readCached()` 得到
+    null、各自 POST /v2/auth/visitor，服务端跑两遍 seed_demo，得到两个不同的
+    `family_id`。localStorage 后写覆盖先写，而两个标签页的内存常量和 sessionStorage
+    令牌各自指向自己那一个。
+
+    后果不是"多了一个家庭"这么轻：女儿在家属端批准的高风险动作写进家庭 B，老人端
+    在家庭 A，`require_family_approval` 的接力永远等不到——表现是"点了批准，老人端
+    没反应"，而家属端的待办列表恒为空。
+
+    这条**必须跑起来**。静态断言只能查"代码里有没有 navigator.locks"，而变异测过：
+    把 `if (navigator.locks?.request)` 改成 `if (false)`，那个子串断言照样绿——
+    `navigator.locks` 在那个文件里出现两次。
+    """
+    tabs = []
+    try:
+        for _ in range(2):
+            target = browser.send("Target.createTarget", url="about:blank")["targetId"]
+            with urllib.request.urlopen(f"{ws_host}/json/list", timeout=5) as reply:
+                listing = json.loads(reply.read())
+            tab = CDP(
+                next(t["webSocketDebuggerUrl"] for t in listing if t["id"] == target), websocket
+            )
+            tab.send("Page.enable")
+            tabs.append((target, tab))
+
+        # 必须是**真的**冷启动。
+        #
+        # 这个检查跑在 /elder 之后，浏览器 profile 里已经有一份开通好的身份了——
+        # 不清掉的话两个标签页都直接读缓存、必然一致，这条检查就是空过的。
+        # 先在其中一个标签页里打开同源页面并清空存储，再让两个一起冷启动。
+        first = tabs[0][1]
+        first.send("Page.navigate", url=f"{BASE}/ping")
+        first.drain(1.0)
+        first.send("Runtime.evaluate", expression=(
+            "try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}"
+        ))
+
+        # 尽可能同时导航，让两次开通真的重叠。
+        for _, tab in tabs:
+            tab.send("Page.navigate", url=f"{BASE}/elder")
+        for _, tab in tabs:
+            tab.drain(SETTLE_SECONDS)
+        # 读**这个 document 内存里**的身份，不是 localStorage。
+        #
+        # 两个标签页同源，localStorage 是同一份——后写覆盖先写，所以从存储里读永远
+        # 一致，这个检查就永远绿。第一版就是这么写的，变异（把锁禁掉）没被抓到。
+        # 真正分叉的是每个标签页自己 await 到的那个 identity：家属端用它拼请求，
+        # 老人端用它拼另一个，两者不同就是那条"点了批准老人端没反应"的根因。
+        families = [
+            tab.send("Runtime.evaluate", returnByValue=True, awaitPromise=True, expression=(
+                "window.YouHuoIdentity.ready().then(id => id.familyId || null)"
+            ))["result"].get("value")
+            for _, tab in tabs
+        ]
+        if None in families:
+            failures.append(f"多标签页身份：有标签页没有开通到身份（{families}）")
+        elif families[0] != families[1]:
+            failures.append(
+                f"多标签页身份：两个标签页落在**不同**家庭（{families}）"
+                "——家属端的批准会写进另一个家庭，老人端永远等不到"
+            )
+    finally:
+        for target, tab in tabs:
+            tab.close()
+            browser.send("Target.closeTarget", targetId=target)
+
+
 def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     """把这一页上每个按钮都按一遍，每按一次收一次网。
 
@@ -685,6 +755,12 @@ def main() -> int:
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
                 check_identity_self_heal(tab, page, failures)
+                if page == "/elder":
+                    # 放在 /elder 之后、用同一个浏览器：此时 localStorage 已经有身份了，
+                    # 所以这个检查自己会先清掉它，模拟真正的冷启动。
+                    check_multi_tab_identity(
+                        browser, f"http://127.0.0.1:{DEVTOOLS_PORT}", websocket, failures
+                    )
             finally:
                 tab.close()
                 browser.send("Target.closeTarget", targetId=target)
