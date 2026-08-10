@@ -64,6 +64,18 @@ CLICK_SETTLE_SECONDS = 1.6
 #: 新建的临时文件，点坏了也只坏它自己。
 SKIP_SELECTORS = "a, [data-sheet-open], [data-sheet-close], .back-link, .tab"
 
+#: 会换掉整屏内容的控件，留到最后按。
+#:
+#: `/family` 的分区按钮排在 DOM 前面，"按第一个没按过的"会先把它们按完，最后停在
+#: "我的"那一分区——其余三个分区里的按钮从头到尾没有可见过，而检查照样报"全部
+#: 按过"。规则因此是两级的：先把此刻屏幕上的按干净，再换一屏。
+DEFER_SELECTORS = ".seg"
+
+#: 单页点击遍历的次数上限。按下一个按钮可能让另一批按钮**出现**——页内分区、
+#: 抽屉、条件渲染都会——所以遍历是"按一个再找一次"，没有固定名单。这个上限只是
+#: 防止两个按钮互相召唤对方转不出去；正常页面在 20 次以内就找不到新的了。
+MAX_PRESSES = 60
+
 
 class CDP:
     """会把事件留下来的 CDP 连接。
@@ -373,6 +385,59 @@ def check_glass_box(tab: "CDP", page: str, failures: list[str]) -> None:
         failures.append(f"{page}  高风险任务没有带出玻璃盒信任卡（relianceHost 是空的）")
 
 
+def check_identity_self_heal(tab: "CDP", page: str, failures: list[str]) -> None:
+    """把一个服务器不认识的身份种进浏览器，看这一页能不能自己走出来。
+
+    这是公开演示地址上真实会发生的事：访客身份是在**某一个**数据库里开通的，
+    存在 localStorage 里。重新部署、重置演示数据、换台机器跑，那个 family_id
+    就没了。此前的表现是每次打开都 401，刷新多少次都一样——`reset()` 写好了
+    却没人调用，身份 promise 又是记忆化的——除非用户自己去清网站数据。
+
+    这一条必须在浏览器里跑，不能查源码。"common.js 里有 renew 字样"证明不了
+    这条路径通：第一版改完之后令牌确实换了，日报却还在报"老人账户不属于当前
+    家庭"，因为页面早就把旧身份里的 ELDER_ID 取走了。查字符串会说它已经修好。
+
+    只在一页上跑：这是 common.js 的行为，六页共用同一份，跑六遍只是慢六倍。
+    """
+    if page != "/family":
+        return
+    tab.send("Runtime.evaluate", awaitPromise=True, expression=(
+        "(async () => {"
+        "  localStorage.setItem('youhuo_visitor_identity_v1', JSON.stringify({"
+        "    elderId:'elder-vDEAD', daughterId:'daughter-vDEAD', sonId:'son-vDEAD',"
+        "    systemId:'system-vDEAD', familyId:'fam-vDEAD',"
+        "    elderToken:'bogus', familyToken:'bogus', isolated:true}));"
+        "  sessionStorage.clear();"
+        "})()"
+    ))
+    tab.events.clear()
+    tab.send("Page.navigate", url=BASE + page)
+    tab.drain(SETTLE_SECONDS + 3.0)      # 自愈中间要多走一次整页重载
+    healed = tab.send("Runtime.evaluate", returnByValue=True, expression=(
+        "(() => {"
+        "  const notice = document.querySelector('#familyNotice');"
+        "  const shouting = notice && !notice.hidden ? notice.textContent : '';"
+        "  const stale = JSON.parse(localStorage.getItem("
+        "    'youhuo_visitor_identity_v1') || '{}').familyId === 'fam-vDEAD';"
+        "  const metric = (document.querySelector('#mActive') || {}).textContent;"
+        # 日报走的是另一条路：它用的是页面在**加载时**从身份里取走的 ELDER_ID。
+        # 只换令牌不重载，这一路会单独失败成"老人账户不属于当前家庭"，而上面三个
+        # 判据全是绿的——闸门第一版就漏了它。
+        "  const daily = (document.querySelector('#dailyReport') || {}).textContent || '';"
+        "  return JSON.stringify({shouting, stale, metric, daily});"
+        "})()"
+    ))["result"].get("value", "{}")
+    state = json.loads(healed)
+    if state["stale"]:
+        failures.append(f"{page}  服务器不认识的身份没有被换掉，这个浏览器再也进不来了")
+    if state["shouting"]:
+        failures.append(f"{page}  身份换过之后仍在报错：{state['shouting']}")
+    if state["metric"] in ("–", "", None):
+        failures.append(f"{page}  身份换过之后数据没有回来（进行中仍是「{state['metric']}」）")
+    if "失败" in state["daily"] or "不属于" in state["daily"]:
+        failures.append(f"{page}  身份换过之后生活日报仍然打不开：{state['daily'][:40]}")
+
+
 def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     """把这一页上每个按钮都按一遍，每按一次收一次网。
 
@@ -383,26 +448,43 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
 
     逐个按、逐个收网，是为了让报错能指到具体哪个按钮；一次点完再收，只会得到一堆
     不知道属于谁的异常。
-    """
-    count = tab.send("Runtime.evaluate", expression=(
-        "(() => {"
-        f"  const skip = new Set(document.querySelectorAll('{SKIP_SELECTORS}'));"
-        "   window.__probe = [...document.querySelectorAll('button')]"
-        "     .filter(el => !skip.has(el) && !el.disabled && el.offsetParent !== null);"
-        "   return window.__probe.length;"
-        "})()"
-    ), returnByValue=True)["result"].get("value", 0)
 
-    for index in range(int(count)):
+    **每按一个就重新找一次**，不是开局快照一份名单按到底。`/family` 的四个页内
+    分区里有三个默认 `hidden`，开局快照只看得见"今天"那一屏的按钮——而检查照样
+    会报"全部按过"。分轮快照也不够：一轮结束时只有最后点开的那个分区是展开的，
+    中途短暂露过面的按钮（比如"待办"里的表单提交）依旧一次都没被按到。
+    实测就是这样——分轮拿到 47，一次性拿到 46，而正确答案是 48。
+
+    每次只问"还有哪个可见的没按过"，按掉它，再问一次。多花几十次 Runtime.evaluate，
+    相比每次点击 1.6 秒的收网时间可以忽略，换来的是这个数字不再是假的。
+    """
+    tab.send("Runtime.evaluate", expression="window.__pressed = new WeakSet();")
+    pressed = 0
+    while pressed < MAX_PRESSES:
         label = tab.send("Runtime.evaluate", expression=(
-            f"(window.__probe[{index}].textContent || '').trim().slice(0, 20)"
-            f" + '#' + (window.__probe[{index}].id || '{index}')"
-        ), returnByValue=True)["result"].get("value", str(index))
+            "(() => {"
+            f"  const skip = new Set(document.querySelectorAll('{SKIP_SELECTORS}'));"
+            f"  const defer = new Set(document.querySelectorAll('{DEFER_SELECTORS}'));"
+            "   const ready = [...document.querySelectorAll('button')]"
+            "     .filter(b => !skip.has(b) && !b.disabled && b.offsetParent !== null"
+            "               && !window.__pressed.has(b));"
+            "   const el = ready.find(b => !defer.has(b)) || ready.find(b => defer.has(b));"
+            "   if (!el) return null;"
+            "   window.__pressed.add(el);"
+            "   window.__next = el;"
+            "   return (el.textContent || '').trim().slice(0, 20) + '#' + (el.id || '?');"
+            "})()"
+        ), returnByValue=True)["result"].get("value")
+        if not label:
+            break
         tab.events.clear()
-        tab.send("Runtime.evaluate", expression=f"window.__probe[{index}].click()")
+        tab.send("Runtime.evaluate", expression="window.__next.click()")
         tab.drain(CLICK_SETTLE_SECONDS)
         failures.extend(collect(tab.events, f"{page} 点击「{label}」"))
-    return int(count)
+        pressed += 1
+    else:
+        failures.append(f"{page}  点击遍历到达 {MAX_PRESSES} 次上限还没停——可能有两个按钮在互相召唤")
+    return pressed
 
 
 def main() -> int:
@@ -499,6 +581,7 @@ def main() -> int:
                 failures.extend(collect(tab.events, f"{page} 玻璃盒"))
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
+                check_identity_self_heal(tab, page, failures)
             finally:
                 tab.close()
                 browser.send("Target.closeTarget", targetId=target)

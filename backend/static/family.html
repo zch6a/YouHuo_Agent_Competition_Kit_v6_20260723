@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="优活" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>优活子女端</title>
+  <title>优活家人端</title>
   <link rel="stylesheet" href="/static/tokens.css" />
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
@@ -24,73 +24,81 @@
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar">
-  <main id="main" class="shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">YOUHUO FAMILY CONSOLE · V6.0</p>
-        <h1 class="care-title">家属协同台</h1>
-        <p class="lead">创建待办、查看任务进行到哪一步、在支付与身份环节接力确认。陪伴聊天原文不会出现在这里。</p>
+  <main id="main" class="shell family-app">
+    <header class="fam-head">
+      <div class="fam-head-text">
+        <h1>家里今天</h1>
+        <p id="famUpdated" class="fam-updated">正在加载……</p>
       </div>
-      <div class="topbar-actions">
-        <a href="/" class="back-link">← 返回首页</a>
-        <button id="scheduler" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1" /> <path d="M16 2v3" /> <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /> <path d="M3 9h5.859" /> <path d="M8 2v3" /> <circle cx="16" cy="16" r="6" /></svg><span>演示提醒调度</span></button>
-        <button id="refresh" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg><span>刷新</span></button>
-      </div>
+      <button id="refresh" class="secondary fam-refresh"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg><span>刷新</span></button>
     </header>
+
     <!-- 操作结果条。这里原先用 alert()：在装到主屏的 PWA 里那是一个带域名的系统
          灰框，会冻住整页，而且读屏软件读不到。aria-live 让它对读屏可见。 -->
     <p id="familyNotice" class="notice good" role="status" aria-live="polite" hidden></p>
-    <!-- 生活日报排在最前：子女打开这一页想知道的第一件事就是"我爸今天怎么样"，
-         把它放在任务列表下面，等于让人先读完待办再找答案。 -->
-    <section class="panel report-panel" aria-label="生活日报">
-      <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4" /> <path d="M16 2v4" /> <rect width="18" height="18" x="3" y="4" rx="2" /> <path d="M3 10h18" /> <path d="M8 14h.01" /> <path d="M12 14h.01" /> <path d="M16 14h.01" /> <path d="M8 18h.01" /> <path d="M12 18h.01" /> <path d="M16 18h.01" /></svg></span><span>今日生活日报</span></h2>
-      <p class="meta">与他<strong>自己</strong>的常态对比，不是和别人比，也不是和一条统一规则比。</p>
+
+    <!-- 分区是页内的，不换路由：切换零延迟，service worker 外壳、start_url 和
+         六条路由全部不动。当前分区写进 URL 的 hash，刷新后还在原地。 -->
+    <nav class="segmented" aria-label="家人分区">
+      <button type="button" class="seg is-current" data-section="today" aria-current="true">今天</button>
+      <button type="button" class="seg" data-section="todo">待办</button>
+      <button type="button" class="seg" data-section="trend">趋势</button>
+      <button type="button" class="seg" data-section="mine">我的</button>
+    </nav>
+
+    <!-- 今天：这一页存在的理由。打开它的人想知道三件事——他今天怎么样、有没有
+         需要我拍板的、今天还有什么。别的都往后排。 -->
+    <section class="family-section" data-panel="today" aria-label="今天">
+      <h2 class="section-head">今天怎么样</h2>
       <div id="dailyReport" aria-live="polite">正在生成……</div>
+      <section class="metric-row" aria-label="今日概览">
+        <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
+        <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
+        <div class="metric"><span class="metric-label">今天到期</span><strong id="mToday">–</strong></div>
+      </section>
+      <h2 class="section-head">需要您处理</h2>
+      <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
+      <div id="tasks"></div>
     </section>
 
-    <section class="metric-row" aria-label="今日概览">
-      <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
-      <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
-      <div class="metric"><span class="metric-label">今天到期</span><strong id="mToday">–</strong></div>
-      <div class="metric"><span class="metric-label">审计链</span><strong id="mChain">–</strong></div>
+    <section class="family-section" data-panel="todo" aria-label="待办" hidden>
+      <h2 class="section-head">按日期</h2>
+      <div id="calendar"></div>
+      <h2 class="section-head">给他添一件事</h2>
+      <form id="reminderForm">
+        <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历" /></label>
+        <label>时间<input id="reminderDue" type="datetime-local" required /></label>
+        <label>到期后多少分钟没确认就通知我<input id="escalation" type="number" min="5" max="1440" value="30" /></label>
+        <button type="submit"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13v8" /> <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /> <path d="m8 17 4-4 4 4" /></svg><span>同步到他的手机</span></button>
+      </form>
+      <p class="section-note">添好之后，会在提前一天、提前半天和提前一小时各提醒他一次。</p>
+      <h2 class="section-head">通知</h2>
+      <div id="notices"></div>
     </section>
 
-    <section class="grid">
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v3" /> <path d="M16 2v3" /> <rect x="3" y="3" width="18" height="18" rx="2" /> <path d="M3 9h18" /> <path d="M8 13h.01" /> <path d="M12 13h.01" /> <path d="M16 13h.01" /> <path d="M8 17h.01" /> <path d="M12 17h.01" /> <path d="M16 17h.01" /></svg></span><span>待办日历</span></h2>
-        <p class="meta">按日期排列，先看最近的一天。</p>
-        <div id="calendar"></div>
-      </div>
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5h8" /> <path d="M13 12h8" /> <path d="M13 19h8" /> <path d="m3 17 2 2 4-4" /> <path d="m3 7 2 2 4-4" /></svg></span><span>任务进度与接力确认</span></h2>
-        <p class="meta">支付、身份认证和超时事项会在这里请求您接力。</p>
-        <div id="tasks"></div>
-      </div>
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 18h6" /> <path d="M16 2v3" /> <path d="M19 15v6" /> <path d="M21 11.5V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h8.3" /> <path d="M3 9h18" /> <path d="M8 2v3" /></svg></span><span>给老人新增待办</span></h2>
-        <form id="reminderForm">
-          <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历" /></label>
-          <label>时间<input id="reminderDue" type="datetime-local" required /></label>
-          <label>到期后多少分钟未确认则提醒家属<input id="escalation" type="number" min="5" max="1440" value="30" /></label>
-          <button type="submit"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13v8" /> <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /> <path d="m8 17 4-4 4 4" /></svg><span>同步到老人端</span></button>
-        </form>
-        <p class="meta">创建后系统会在T-24小时、T-12小时和T-1小时提前提醒老人。</p>
-      </div>
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg></span><span>家属通知</span></h2>
-        <div id="notices"></div>
-      </div>
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" /> <path d="M2 6h4" /> <path d="M2 10h4" /> <path d="M2 14h4" /> <path d="M2 18h4" /> <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" /></svg></span><span>陪伴周报（已脱敏）</span></h2>
-        <p class="meta">无忧伴的聊天原文不会展示给家属，这里只有汇总后的风险摘要。</p>
-        <div id="weekly"></div>
-      </div>
-      <div class="panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.8V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M9 17v-2a2 2 0 0 0-4 0v2" /> <rect width="8" height="5" x="3" y="17" rx="1" /></svg></span><span>防篡改操作日志</span></h2>
-        <div id="chain" class="notice"></div>
-        <div id="audit"></div>
-      </div>
+    <section class="family-section" data-panel="trend" aria-label="趋势" hidden>
+      <h2 class="section-head">这一周</h2>
+      <p class="section-note">和他<strong>自己</strong>的常态比，不和别人比。聊天原文不会出现在这里，只有汇总。</p>
+      <div id="weekly"></div>
     </section>
+
+    <section class="family-section" data-panel="mine" aria-label="我的" hidden>
+      <h2 class="section-head">做过的事</h2>
+      <div class="metric-row metric-row-one" aria-label="记录状态">
+        <div class="metric"><span class="metric-label">记录</span><strong id="mChain">–</strong></div>
+      </div>
+      <p id="chain" class="notice"></p>
+      <div id="audit"></div>
+      <p class="section-note">这里是给家人看的说法。逐条的原始记录、校验算法和证明过程在<a href="/trust">可信中心</a>。</p>
+      <h2 class="section-head">其他</h2>
+      <div class="fam-links">
+        <a href="/care" class="fam-link">照护档案</a>
+        <a href="/trust" class="fam-link">可信中心</a>
+      </div>
+      <button id="scheduler" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1" /> <path d="M16 2v3" /> <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /> <path d="M3 9h5.859" /> <path d="M8 2v3" /> <circle cx="16" cy="16" r="6" /></svg><span>立即检查到期待办</span></button>
+      <p class="section-note">这件事平时每分钟自动做一次，这里可以手动催一下。</p>
+    </section>
+
     <nav class="tabbar" aria-label="主要分区">
       <a href="/" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg><span>首页</span></a>
       <a href="/family" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-family" /></svg><span>家人</span></a>

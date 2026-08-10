@@ -202,6 +202,29 @@ def main() -> int:
                              deviceScaleFactor=dsf, mobile=device != "desktop")
                     tab.send("Page.navigate", url=base + page)
                     time.sleep(3.0)          # settle fonts, layout and first paint
+                    # 先确认拍到的是我们的页面。
+                    #
+                    # 服务没起的时候这个脚本会拍下 42 张 Chrome 的
+                    # ERR_CONNECTION_REFUSED 错误页，然后报告"42 张截图，无横向溢出"
+                    # ——错误页当然不溢出，上面什么都没有。溢出探针量的是"这一页有没有
+                    # 超宽"，不是"这一页是不是这个应用"，于是它一路绿到底，而目录里
+                    # 躺着 42 张看起来像成功的图。
+                    #
+                    # 判据是"我们的设计令牌真的生效了"，不是"有没有某个 id"——六个
+                    # 页面的骨架不一样（只有两页有 `main#main`），拿骨架当判据会把三个
+                    # 好页面判成加载失败。令牌解析得出来，说明四层 CSS 真的挂上了。
+                    ok = tab.send("Runtime.evaluate", returnByValue=True, expression=(
+                        "document.title.includes('优活') && !!getComputedStyle("
+                        "document.documentElement).getPropertyValue('--ink').trim()"
+                    ))["result"].get("value")
+                    if not ok:
+                        title = tab.send("Runtime.evaluate", returnByValue=True,
+                                         expression="document.title")["result"].get("value")
+                        overflow.append(
+                            f"{device}{page} 加载的不是优活页面（标题「{title}」）"
+                            f"——{base} 上有服务在跑吗？"
+                        )
+                        continue
                     measured = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
                                         returnByValue=True)["result"]["value"]
                     # 量到了就要判。

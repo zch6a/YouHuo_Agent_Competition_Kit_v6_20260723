@@ -55,6 +55,16 @@
     return `youhuo_token_${role}`;
   }
 
+  // 一个标签页只换一次身份。换完要重载，而重载之后如果还是 401，那就是服务器
+  // 真的有问题——再换一次只会变成刷新循环，把一个"加载失败"变成一个打不开的页面。
+  const RENEW_FLAG = 'youhuo_identity_renewed';
+  function renewedThisSession() {
+    try { return !!sessionStorage.getItem(RENEW_FLAG); } catch (_) { return false; }
+  }
+  function markRenewed() {
+    try { sessionStorage.setItem(RENEW_FLAG, '1'); } catch (_) { /* 隐私模式 */ }
+  }
+
   function cachedToken(role) {
     if (tokens.has(role)) return tokens.get(role);
     const stored = sessionStorage.getItem(cacheKey(role));
@@ -107,9 +117,31 @@
 
     let response = await send(cachedToken(role) || await login(role));
     if (response.status === 401) {
-      // 只重放一次。重放本身再 401，就是真的没权限，不该转圈。
+      // 第一次 401：令牌过期了。丢掉重登一次。
       forget(role);
       response = await send(await login(role));
+    }
+    if (response.status === 401 && window.YouHuoIdentity && window.YouHuoIdentity.renew
+        && !renewedThisSession()) {
+      // 还是 401：不是令牌过期，是**身份本身**服务器不认了——这个浏览器缓存的
+      // 访客家庭是在换掉之前的那一个库里开通的。换个身份再来一次，只来这一次。
+      //
+      // 不加这一步，任何一次重新部署或重置演示数据，都会把每一个回访的人永久挡在
+      // 门外：`identityPromise` 和 identity.js 的 `pending` 都是记忆化的，同一次
+      // 加载里再问也还是那个死身份，刷新多少次都一样。写好的 `reset()` 从来没有
+      // 人调用过。
+      markRenewed();
+      forget(role);
+      identityPromise = null;
+      await window.YouHuoIdentity.renew();
+      // 整页重来，不是只换个令牌接着跑。
+      //
+      // 每个页面在加载时就从身份里取走了一批常量——`ELDER_ID`、`FAMILY_ID`、
+      // 各处拼好的 URL。换身份只换令牌的话，那些常量还指着上一个家庭，请求能
+      // 通过鉴权却拿不到东西："老人账户不属于当前家庭"。实测就是这样。
+      // 这条路径一个浏览器一辈子最多走一次，重载是最省事也最不会漏的做法。
+      location.reload();
+      await new Promise(() => {});   // 重载途中别让调用方继续往下跑
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {

@@ -112,6 +112,107 @@
 }
 
 /* --------------------------------------------------------------------------
+   家人端
+   重构前这一页在 390px 下是 11121px——28 屏，12 张权重相同的白卡，其中 4 张
+   写着"暂无"。它不是产品页，是一个 admin dashboard：把后端有的东西各开一个
+   面板铺出来，让人自己找。
+
+   现在一级只回答三件事——他今天怎么样、有没有要我拍板的、今天还有什么——
+   其余降到页内分区。分区不是新路由：切换零往返，六条路由和 service worker
+   外壳都不动。
+
+   刻意**不**用 .panel：四个分区里如果每段还各自套一张卡，就只是把 12 张卡
+   叠成 4 组卡。分段之间用标题和间距分隔，卡片留给真正要被当作一个对象来
+   点、来处理的东西（任务、待办、通知）。
+   -------------------------------------------------------------------------- */
+
+.fam-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.fam-head h1 { font-size: clamp(26px, 5vw, 34px); line-height: var(--lh-tight); margin: 0; }
+.fam-updated { margin: 4px 0 0; font-size: 14px; color: var(--ink-3); }
+.fam-refresh { flex: none; }
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--space-5);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.seg {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--r-md) - 5px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 650;
+}
+/* 当前分区不只靠颜色：底色、边框和字重同时变，色觉障碍下仍然分得出。 */
+.seg.is-current {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.family-section > :first-child { margin-top: 0; }
+.section-head {
+  margin: var(--space-6) 0 var(--space-2);
+  font-size: 19px;
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  color: var(--ink);
+}
+.family-section > .section-head:first-child { margin-top: 0; }
+.section-note { margin: 0 0 var(--space-3); font-size: 14px; color: var(--ink-3); line-height: var(--lh-snug); }
+
+.metric-row-one { grid-template-columns: 1fr; }
+
+/* 生活日报的分项：有事自动展开，没事收着。summary 要够大能点，且不能只靠
+   三角形告诉人它可以点——加一条边框和足够的内边距。 */
+.report-more { margin: var(--space-3) 0 0; }
+.report-more > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.report-more[open] > summary { margin-bottom: var(--space-2); }
+
+.fam-links { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); }
+.fam-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
    Judge walkthrough
    -------------------------------------------------------------------------- */
 

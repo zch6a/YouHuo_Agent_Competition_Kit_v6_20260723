@@ -248,7 +248,7 @@ _ENGINEERING_WORDS = [
 ]
 
 
-@pytest.mark.parametrize("page", ["index.html", "elder.html"])
+@pytest.mark.parametrize("page", ["index.html", "elder.html", "family.html"])
 def test_no_demo_scaffolding_on_the_consumer_first_screen(page):
     """按钮上的字必须是用户想做的事，不是"这是一个演示"。
 
@@ -268,12 +268,78 @@ def test_no_demo_scaffolding_on_the_consumer_first_screen(page):
     assert not offenders, f"{page} 的按钮上还有演示脚手架：{offenders}"
 
 
-@pytest.mark.parametrize("page", ["index.html", "elder.html"])
+@pytest.mark.parametrize("page", ["index.html", "elder.html", "family.html"])
 def test_no_engineering_vocabulary_in_the_consumer_pages(page):
     source = (STATIC / page).read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
     found = [word for word in _ENGINEERING_WORDS if word in source]
     assert not found, f"{page} 出现了工程术语：{found}"
+
+
+def test_the_family_page_never_prints_a_raw_event_code():
+    """家属看到的是"谁做了什么"，不是一条能 grep 的日志。
+
+    `/family` 的操作记录原先直接把审计事件码和执行者 id 印出来：
+    `FAMILY_APPROVED_AND_EXECUTED`、`system-vc8693dfcd970`、`DEMO_LOGIN`。那是
+    工程标识，属于可信中心，不属于一个来看爸爸今天怎么样的人。
+
+    这一条钉的是**渲染代码**而不是页面文本：事件码是运行时才从接口来的，静态
+    HTML 里根本不会出现，只查 HTML 等于什么都没查。所以查的是"family.js 有没有
+    把 event_type / actor_id 直接写进 textContent"。
+    """
+    js = (STATIC / "family.js").read_text(encoding="utf-8")
+    body = re.sub(r"//.*", "", js)
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    assert "actorName(" in body and "auditLabel(" in body, "翻译层不见了"
+    # 把三种**正当**用法先剪掉：翻译函数的入参，和查表的下标。剩下的每一处
+    # `.event_type` / `.actor_id` 都是原始码在往界面上走。
+    body = re.sub(r"\b(?:actorName|auditLabel)\([^()]*\)", "«译»", body)
+    body = re.sub(r"\b[A-Z_]+\[[^\]]*\.event_type\]", "«查表»", body)
+    leaks = re.findall(r".{0,40}\.(?:event_type|actor_id).{0,20}", body)
+    assert not leaks, f"家人端把原始事件码印给了家属：{leaks}"
+
+
+def test_every_family_section_button_has_a_panel_to_show():
+    """页内分区：四个按钮，四块内容，一一对应。
+
+    分区靠 `hidden` 切换。一个按不出任何东西的分区按钮不会报错、不会在截图里
+    露馅——它只会让人点一下，然后什么也没发生。
+    """
+    source = (STATIC / "family.html").read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    sections = re.findall(r'class="seg[^"]*"[^>]*data-section="([a-z]+)"', source)
+    sections += re.findall(r'data-section="([a-z]+)"[^>]*class="seg[^"]*"', source)
+    panels = re.findall(r'data-panel="([a-z]+)"', source)
+    assert len(sections) >= 4, f"分区按钮少于四个：{sections}"
+    assert sorted(set(sections)) == sorted(set(panels)), f"按钮 {sections} 与内容 {panels} 对不上"
+    # 恰好一个分区默认展开，否则首屏会同时铺开两段。
+    open_panels = [p for p in re.findall(r"<section[^>]*data-panel=[^>]*>", source) if "hidden" not in p]
+    assert len(open_panels) == 1, f"默认展开的分区不是一个：{len(open_panels)}"
+
+
+def test_a_failed_family_load_lands_somewhere_visible():
+    """加载失败不能写进一个默认折叠起来的地方。
+
+    这个 catch 罩着四个并发请求加一次登录，原先统一写进 `#chain`——那是"记录
+    完好"的位置，日历加载失败会显示成记录出了问题。分区改版之后 `#chain` 默认
+    是折叠的，再写那里，整条失败就彻底没人看得见了。
+    """
+    js = (STATIC / "family.js").read_text(encoding="utf-8")
+    # 先切到 load() 里面再找 catch。直接在整份文件上找"第一个 catch (e)"会命中
+    # approve() 的那个——测试于是永远绿，而它以为自己在守 load()。
+    start = js.index("async function load()")
+    load_body = js[start:js.index("\n}\n", start)]
+    catch = re.search(r"\}\s*catch\s*\(e\)\s*\{(.*)", load_body, re.S)
+    assert catch, "load() 的 catch 分支不见了"
+    assert "notify(" in catch.group(1), "加载失败没有走 #familyNotice"
+    assert "chainEl" not in catch.group(1), "加载失败又写回了折叠区里的 #chain"
+
+    html = (STATIC / "family.html").read_text(encoding="utf-8")
+    notice = re.search(r'<p id="familyNotice"[^>]*>', html)
+    assert notice, "#familyNotice 不见了"
+    assert 'aria-live' in notice.group(0), "#familyNotice 没有 aria-live"
+    # 它必须在任何 data-panel 分区之外，否则一样会被折叠掉。
+    assert html.index('id="familyNotice"') < html.index("data-panel="), "#familyNotice 被放进了某个分区里"
 
 
 def test_the_elder_first_screen_says_what_today_holds():

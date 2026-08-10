@@ -76,6 +76,47 @@ const calendarEl = document.querySelector('#calendar');
 const noticesEl = document.querySelector('#notices');
 const weeklyEl = document.querySelector('#weekly');
 const dailyEl = document.querySelector('#dailyReport');
+const updatedEl = document.querySelector('#famUpdated');
+
+// 审计事件的类型码是给工程和评委看的：`FAMILY_APPROVED_AND_EXECUTED`、
+// `system-vc8693dfcd970`。这一页原先把它们原样印出来给家属看。家属要的是
+// "谁，做了什么，什么时候"，不是一条能 grep 的日志。
+//
+// 有近百种事件码，逐个翻译既写不全也会过期，所以是"认识的说人话，不认识的按
+// 前缀归类"。**不保留原始码做兜底**——兜底成原始码，等于这层翻译在遇到新事件
+// 时自动失效，而那正是它该起作用的时候。逐条原文在 /trust，那里才是它的地方。
+const AUDIT_VISIBLE = 8;
+const AUDIT_LABEL = {
+  SESSION_CREATED: '登录了', DEMO_LOGIN: '登录了', DEMO_SEEDED: '准备了演示数据',
+  TASK_CREATED: '开始办一件事', TASK_EXECUTED: '办完了一件事', TASK_CANCELLED: '取消了一件事',
+  TASK_EXPLANATION_VIEWED: '看了办事经过', TASK_PROOF_GENERATED: '生成了回执',
+  TASK_SLOT_CORRECTED: '更正了信息', ELDER_CONFIRMED: '确认了',
+  FAMILY_APPROVAL_RECORDED: '点了同意', FAMILY_APPROVED_AND_EXECUTED: '同意后办好了',
+  FAMILY_APPROVED_EXECUTION_FAILED: '同意了但没办成', FAMILY_REJECTED: '拒绝了',
+  FAMILY_REMINDER_CREATED: '添了一件待办', REMINDER_CREATED: '添了一件待办',
+  REMINDER_COMPLETE: '完成了一件待办', REMINDER_ACKNOWLEDGE: '知道了这件待办',
+  REMINDER_CANCELLED: '取消了一件待办', PAYMENT_REQUEST_CREATED: '生成了缴费单',
+  SOS_TRIGGERED: '按了紧急求助', MEDICATION_DOSE_RECORDED: '记了一次吃药',
+  TEACH_BACK_VERIFIED: '复述确认通过', TEACH_BACK_REJECTED: '复述没对上',
+};
+const AUDIT_CATEGORY = [
+  ['REMINDER_', '动了待办'], ['MEDICATION_', '动了用药'], ['ROUTINE_', '动了日常安排'],
+  ['FAMILY_', '做了家人这边的操作'], ['TASK_', '办事时留下一条记录'], ['SAGA_', '办事时留下一条记录'],
+  ['SOS_', '触发了安全提醒'], ['SAFETY_', '触发了安全提醒'], ['BREAK_GLASS_', '用了紧急查看'],
+  ['PRIVACY_', '动了隐私设置'], ['MEMORY_', '动了记忆'], ['CONTACT_', '动了联系人'],
+  ['DEVICE_', '动了设备'], ['DOCUMENT_', '看了一份材料'], ['MEDICAL_', '看了一份材料'],
+];
+function auditLabel(type) {
+  if (AUDIT_LABEL[type]) return AUDIT_LABEL[type];
+  const hit = AUDIT_CATEGORY.find(([prefix]) => String(type).startsWith(prefix));
+  return hit ? hit[1] : '留下一条记录';
+}
+function actorName(actorId) {
+  const id = String(actorId || '');
+  if (id.startsWith('elder')) return '他';
+  if (id.startsWith('fam')) return '家人';
+  return '优活';
+}
 
 // 身份、登录、401 重放和令牌缓存都在 common.js 里。
 async function resolveIdentity() {
@@ -306,22 +347,41 @@ function renderDailyReport(envelope) {
   alertRow.textContent = (alert.push ? '⚠ 已推送提醒：' : '未打扰您：') + alert.reason;
   dailyEl.appendChild(alertRow);
 
-  // 3. 分项，每一项都带他自己的常态。
-  report.sections.forEach(section => {
-    if (!section.lines.length) return;
-    const block = document.createElement('div');
-    block.className = 'report-section';
-    const title = document.createElement('h3');
-    const [sword, stone] = verdictOf(section.verdict);
-    title.textContent = section.title;
-    const tag = document.createElement('span');
-    tag.className = `pill ${stone}`;
-    tag.textContent = sword;
-    title.appendChild(tag);
-    block.appendChild(title);
-    section.lines.forEach(text => line(block, text));
-    dailyEl.appendChild(block);
-  });
+  // 3. 分项，每一项都带他自己的常态——但默认收起来。
+  //
+  //    这几项原先全部平铺，于是在"还不好说"那一态下，同一句"只有 N 天的记录，
+  //    不足 7 天，还不能说这是他的常态"会连着出现五遍，把首屏整个吃掉，"需要
+  //    您处理"被挤到两屏以下。而那一态恰恰是新装用户和评委最先看到的。
+  //
+  //    有事的时候自动展开，没事的时候收起来：一句话的结论已经在上面了，细节
+  //    是给想追问的人准备的，不是给每个人都读一遍的。
+  const shown = report.sections.filter(section => section.lines.length);
+  if (shown.length) {
+    // 只有 warn / bad 才值得替家属打开。`pending`（还不好说）和 `typical`
+    // （和平常一样）都不是，尤其 pending——那正是刷屏的那一态。
+    const worth = shown.some(section => ['warn', 'bad'].includes(verdictOf(section.verdict)[1]));
+    const more = document.createElement('details');
+    more.className = 'report-more';
+    more.open = worth;
+    const summary = document.createElement('summary');
+    summary.textContent = worth ? '有几项想让您看一眼' : '作息、活动、用药的细节';
+    more.appendChild(summary);
+    shown.forEach(section => {
+      const block = document.createElement('div');
+      block.className = 'report-section';
+      const title = document.createElement('h3');
+      const [sword, stone] = verdictOf(section.verdict);
+      title.textContent = section.title;
+      const tag = document.createElement('span');
+      tag.className = `pill ${stone}`;
+      tag.textContent = sword;
+      title.appendChild(tag);
+      block.appendChild(title);
+      section.lines.forEach(text => line(block, text));
+      more.appendChild(block);
+    });
+    dailyEl.appendChild(more);
+  }
 
   // 4. 今天该办的事。
   const errands = report.errands;
@@ -349,7 +409,9 @@ function renderDailyReport(envelope) {
   dailyEl.appendChild(advice);
 
   if (report.environment_note) line(dailyEl, report.environment_note, 'meta');
-  line(dailyEl, report.privacy_note, 'notice good');
+  // 隐私声明是一条每天都一样的脚注，原先用 `.notice good` 渲染成一整块绿框，
+  // 和"今天不用您操心"抢同一级视觉权重。承诺要一直写着，但它不是今天的新闻。
+  line(dailyEl, report.privacy_note, 'meta');
 }
 
 async function loadDailyReport() {
@@ -370,26 +432,28 @@ async function load() {
     tasks.forEach(t => tasksEl.appendChild(fmtTask(t)));
     if (!tasks.length) tasksEl.textContent = '暂无任务';
 
-    chainEl.textContent = audit.chain_valid ? '✓ HMAC审计链校验通过' : '⚠ 审计链校验失败';
+    chainEl.textContent = audit.chain_valid
+      ? `这 ${audit.events.length} 条记录从头到尾没有被改过。`
+      : '记录对不上了，请到可信中心看详情。';
     chainEl.classList.toggle('good', audit.chain_valid);
+    chainEl.classList.toggle('bad', !audit.chain_valid);
     auditEl.replaceChildren();
-    audit.events.slice().reverse().forEach(e => {
+    audit.events.slice().reverse().slice(0, AUDIT_VISIBLE).forEach(e => {
       const row = document.createElement('div');
       row.className = 'audit-row';
-      const head = document.createElement('div');
-      head.className = 'audit-head';
-      const type = document.createElement('code');
-      type.textContent = e.event_type;
+      const what = document.createElement('span');
+      what.className = 'audit-what';
+      what.textContent = `${actorName(e.actor_id)}${auditLabel(e.event_type)}`;
       const when = document.createElement('time');
       when.dateTime = e.created_at;
-      when.textContent = new Date(e.created_at).toLocaleString('zh-CN', {hour12: false});
-      head.append(type, when);
-      const actor = document.createElement('div');
-      actor.className = 'meta';
-      actor.textContent = `执行者：${e.actor_id}`;
-      row.append(head, actor);
+      when.textContent = new Date(e.created_at).toLocaleString('zh-CN', {hour12: false, dateStyle: undefined, timeStyle: undefined});
+      row.append(what, when);
       auditEl.appendChild(row);
     });
+    if (audit.events.length > AUDIT_VISIBLE) {
+      line(auditEl, `另有 ${audit.events.length - AUDIT_VISIBLE} 条更早的记录。`, 'meta');
+    }
+    updatedEl.textContent = `最后更新 ${new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit', hour12: false})}`;
 
     renderCalendar(reminders);
     renderMetrics(tasks, reminders, audit.chain_valid);
@@ -399,17 +463,45 @@ async function load() {
       const div = document.createElement('div');
       div.className = 'task';
       const title = document.createElement('strong');
-      title.textContent = NOTICE_TITLE[n.event_type] || n.event_type;
+      // 兜底不能是原始事件码：那等于这层翻译在遇到没登记过的类型时自动失效，
+      // 而那正是它该起作用的时候。下面 n.message 本来就是给人读的一句话。
+      title.textContent = NOTICE_TITLE[n.event_type] || '来自优活的消息';
       div.appendChild(title);
       line(div, n.message);
       line(div, new Date(n.created_at).toLocaleString('zh-CN', {hour12: false}), 'meta');
       noticesEl.appendChild(div);
     });
     if (!notices.length) noticesEl.textContent = '暂无通知';
-  } catch (e) { chainEl.textContent = `加载失败：${e.message}`; }
+  } catch (e) {
+    // 这条 catch 罩着四个并发请求加一次登录。它原先写进 #chain——那是"记录完好"
+    // 的位置，日历加载失败会显示成记录出了问题。分区改版之后 #chain 默认还是折叠
+    // 的，再写那里就等于整条失败无人可见。写进 #familyNotice：它一直在屏幕上，
+    // 而且带 aria-live。
+    notify(`没能取到最新情况：${e.message}`, 'bad');
+    updatedEl.textContent = '暂时没连上';
+  }
   loadWeekly();
   loadDailyReport();
 }
+
+// 页内分区。刻意不换路由：六条路由、service worker 外壳清单、manifest 的
+// start_url 全部不动，而且切换没有网络往返——这一页在地铁上也要能翻。
+// 当前分区写进 hash，刷新之后还在原地；家属点开一条通知回来时不会被扔回"今天"。
+const segs = [...document.querySelectorAll('.seg')];
+const panels = [...document.querySelectorAll('[data-panel]')];
+function showSection(name, pushHash) {
+  const target = panels.some(p => p.dataset.panel === name) ? name : 'today';
+  panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
+  segs.forEach(s => {
+    const on = s.dataset.section === target;
+    s.classList.toggle('is-current', on);
+    if (on) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
+  });
+  if (pushHash) history.replaceState(null, '', `#${target}`);
+}
+segs.forEach(s => s.addEventListener('click', () => showSection(s.dataset.section, true)));
+window.addEventListener('hashchange', () => showSection(location.hash.slice(1), false));
+showSection(location.hash.slice(1) || 'today', false);
 
 document.querySelector('#refresh').addEventListener('click', load);
 document.querySelector('#scheduler').addEventListener('click', runScheduler);

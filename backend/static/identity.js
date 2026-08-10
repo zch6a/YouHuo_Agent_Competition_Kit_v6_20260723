@@ -73,7 +73,7 @@
 
   // Started eagerly so the first page render is not waiting on a round trip,
   // and memoised so five concurrent callers do not seed five households.
-  const pending = provision();
+  let pending = provision();
 
   window.YouHuoIdentity = {
     ready: () => pending,
@@ -82,6 +82,23 @@
       try {
         localStorage.removeItem(STORAGE_KEY);
       } catch (_) { /* nothing to clear */ }
+    },
+    /** 服务器已经不认识这个身份了——扔掉，当场重开一个。
+     *
+     * 缓存的访客家庭是在**某一个**数据库里开通的。库换掉之后（重新部署、重置
+     * 演示数据、换台机器跑），那个 family_id 就不存在了，登录每次都 401，而这里
+     * 原先没有任何出路：`reset()` 写好了却没有人调用，`pending` 又是记忆化的，
+     * 同一次加载里再问还是那个死身份。回访的人只会看到"访问令牌无效或已过期"，
+     * 刷新多少次都一样，除非自己去清网站数据——不会有人这么做。
+     *
+     * 承重的是 `reset()`；重新开通这一步在"换完就整页重载"的路径下是冗余的
+     * （变异测过：只留 reset 也能自愈）。留着是因为这个方法不该假设调用方一定
+     * 会重载。
+     */
+    renew() {
+      this.reset();
+      pending = provision();
+      return pending;
     },
   };
 })();
