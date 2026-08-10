@@ -93,17 +93,36 @@ def test_the_visual_and_the_accessible_current_state_agree(page: str, expected: 
 
 @pytest.mark.parametrize("page,_", PAGES)
 def test_no_tab_is_icon_only(page: str, _: str):
+    """每个标签都要有可见文字。
+
+    原先用 `re.findall(r"<a href=.*?</a>")` 取标签，要求 `href` **紧跟** `<a`。
+    把标签写成 `<a class="tab" href="/">`（属性顺序完全合法）就一条都匹配不到，
+    for 体一次都不执行——纯图标标签栏可以直接通过。所以先断言数量。
+    """
     markup = bar(page)
-    for anchor in re.findall(r"<a href=.*?</a>", markup, re.S):
-        label = re.search(r"<span>([^<]+)</span>", anchor)
+    anchors = re.findall(r"<a\b[^>]*>.*?</a>", markup, re.S)
+    assert len(anchors) == len(EXPECTED_HREFS), (
+        f"{page} 只解析出 {len(anchors)} 个标签（应有 {len(EXPECTED_HREFS)} 个）"
+        "——属性顺序变了吗？"
+    )
+    for anchor in anchors:
+        label = re.search(r"<span[^>]*>([^<]+)</span>", anchor)
         assert label and label.group(1).strip(), f"{page} 有一个只有图标、没有文字的标签"
         assert "<svg" in anchor, f"{page} 的标签「{label.group(1)}」缺图标"
 
 
 @pytest.mark.parametrize("page,_", PAGES)
 def test_tab_icons_are_decorative_not_announced(page: str, _: str):
-    """文字才是标签的名字；读屏软件再念一遍图形是纯噪音。"""
-    for svg in re.findall(r"<svg[^>]*>", bar(page)):
+    """文字才是标签的名字；读屏软件再念一遍图形是纯噪音。
+
+    这条同样可以整条空转：把 `<svg>` 全删掉（图标改成 CSS 背景），`re.findall`
+    返回空列表，循环不执行。断言"至少有这么多个图标"是必需的。
+    """
+    svgs = re.findall(r"<svg[^>]*>", bar(page))
+    assert len(svgs) == len(EXPECTED_HREFS), (
+        f"{page} 的标签栏里有 {len(svgs)} 个图标，应有 {len(EXPECTED_HREFS)} 个"
+    )
+    for svg in svgs:
         assert 'aria-hidden="true"' in svg, "标签栏里的图标必须 aria-hidden"
 
 
@@ -142,10 +161,29 @@ def test_every_screen_has_some_way_out():
     而老人端**故意没有**标签栏。结果是手机上那一屏没有任何出口，而落在里面的
     正是最没办法自己绕出去的那位用户。
     """
+    checked = 0
     for page in STATIC.glob("*.html"):
         html = page.read_text(encoding="utf-8")
+        checked += 1
+        # 「这一页没有返回链接」不是"不在讨论范围"，那正是这条测试要抓的事。
+        #
+        # 原先是 `if "back-link" not in html: continue`——把 elder.html 的返回链接整个
+        # 删掉，这条测试通过。而它的 docstring 写的是"老人端**故意没有**标签栏，一刀切
+        # 藏掉返回链接等于让最没办法自己绕出去的那位用户没有出口"。判据把"出口不存在"
+        # 归成了"不适用"，恰好放过了它存在的唯一理由。
+        #
+        # 现在的规则：每一页都必须有**至少一个**离开这一页的办法——标签栏，或者返回
+        # 链接。index.html 是角色选择页，它本身就是出口，两个身份入口即是。
+        exits = []
+        if "back-link" in html:
+            exits.append("back-link")
+        if 'class="tabbar"' in html:
+            exits.append("tabbar")
+        if page.name == "index.html":
+            exits.append("role-chooser")     # 它自己就是首页，两个入口即出口
+        assert exits, f"{page.name} 没有任何离开这一页的办法"
         if "back-link" not in html:
-            continue          # 本来就没有返回链接的页面不在讨论范围
+            continue          # 只有标签栏的页面，下面那条隐藏规则的讨论对它无意义
         # 隐藏规则现在锚在 body[data-nav="tabbar"] 上，而不是"不是 app-frame 的页面"。
         # 换判据是因为 trust 和 judge 退出了标签栏：按旧规则它们会既没有标签栏、
         # 返回链接又在手机上被藏掉，正好又造出一条死路——而这条测试当初就是被一条
@@ -159,13 +197,32 @@ def test_every_screen_has_some_way_out():
         assert 'class="tabbar"' not in html, (
             f"{page.name} 有标签栏却没标 data-nav，返回链接不会被藏，两条导航并存"
         )
+    assert checked >= 6, f"只检查了 {checked} 个页面——glob 还找得到它们吗？"
     # 隐藏规则本身必须是限定过的，不能是一刀切。
     assert 'body[data-nav="tabbar"] .back-link' in CSS, (
         "返回链接的隐藏规则没有限定范围——没有标签栏的屏幕会变成死路"
     )
-    assert not re.search(r"^\s*\.back-link\s*\{\s*display:\s*none", CSS, re.M), (
-        "存在一条一刀切隐藏 .back-link 的规则"
-    )
+    # 一刀切隐藏的形态不止一种。原正则要求 `.back-link` 后**紧跟** `{`、`display` 后
+    # **没有空格**、而且只认 `display: none`。实测三条绕过：
+    #   .back-link, .app-bar { display: none; }        逗号选择器
+    #   .back-link { display : none; }                 冒号前有空格（合法 CSS）
+    #   .back-link{visibility:hidden;position:absolute;left:-9999px}   换一种藏法
+    # 现在按规则块解析：找出所有选择器里含 .back-link 且不带 [data-nav] 限定的规则，
+    # 检查它有没有把元素藏起来（display/visibility/移出屏幕都算）。
+    stripped = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    blanket = []
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", stripped):
+        selector = " ".join(selector.split())
+        if ".back-link" not in selector or "data-nav" in selector:
+            continue
+        hides = (
+            re.search(r"display\s*:\s*none", body)
+            or re.search(r"visibility\s*:\s*hidden", body)
+            or re.search(r"(?:left|right)\s*:\s*-\d{4,}px", body)
+        )
+        if hides:
+            blanket.append(selector)
+    assert not blanket, f"这些规则一刀切地藏掉了返回链接：{blanket}"
 
 
 def test_the_conversation_screen_has_no_tab_bar():
@@ -180,9 +237,26 @@ def test_the_conversation_screen_has_no_tab_bar():
 
 
 def test_the_bar_is_only_a_phone_affordance():
+    """宽屏上不该出现拇指栏。
+
+    原判据是"这个 media 块里同时出现 `.tabbar` 和 `display: none` 两个子串"——它们
+    可以在**不同的规则**里。实测反例：块内写 `.tabbar { min-width: 1200px; }` 加
+    `.sheet-trigger { display: none; }`，两个子串都在，测试通过，而桌面上标签栏可见
+    且宽 1200px——正好是 `shoot_pages.py` 注释里记着的那个溢出事故。
+    现在要求的是 `.tabbar` **自己那条规则**里有 `display: none`。
+    """
     wide = CSS[CSS.index("@media (min-width: 761px) {") :]
     wide = wide[: wide.index("\n}")]
-    assert ".tabbar" in wide and "display: none" in wide, "宽屏不该出现拇指栏"
+    rules = [
+        (" ".join(sel.split()), body)
+        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", wide)
+    ]
+    hidden = [
+        sel for sel, body in rules
+        if re.search(r"(?<![-\w])\.tabbar(?![-\w])", sel)
+        and re.search(r"display\s*:\s*none", body)
+    ]
+    assert hidden, f"宽屏不该出现拇指栏；这个块里 .tabbar 的规则是：{[s for s, _ in rules if '.tabbar' in s]}"
 
 
 def test_the_bar_clears_the_home_gesture_area():
@@ -198,12 +272,45 @@ def test_the_bar_height_is_a_single_token():
     这两个数字上一次各写各的时候，结果是一屏内容底部被裁掉 100px。
     """
     assert "--tabbar-h:" in CSS, "栏高应当是一个令牌"
-    assert CSS.count("var(--tabbar-h)") >= 2, "栏高和让位留白都必须引用这个令牌"
+    # `count >= 2` 不够：两处都可以在别的地方。实测反例——把两处 `var(--tabbar-h)` 都
+    # 挪进 `.tab`，让位留白硬写 `padding-bottom: 100px`，计数照样是 2，而那个 100px
+    # 正是这条测试要防的那次"一屏内容底部被裁掉 100px"。
+    # 现在分别要求：标签栏**自己**的高度用它，且**给栏让位的那条内边距**也用它。
+    stripped = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    rules = [
+        (" ".join(sel.split()), body)
+        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", stripped)
+    ]
+    # 高度可以写在 `.tabbar` 上，也可以写在 `.tab` 上（每格撑起整条栏）——那是实现
+    # 细节。真正会坏的是**这两个数字脱钩**，所以下面那条"让位留白"才是承重的断言。
+    bar_height = [
+        sel for sel, body in rules
+        if re.search(r"(?<![-\w])\.tab(?:bar)?(?![-\w])", sel)
+        and re.search(r"(?:min-)?height\s*:[^;]*var\(--tabbar-h\)", body)
+    ]
+    assert bar_height, "标签栏的高度没有引用 --tabbar-h"
+    spacer = [
+        sel for sel, body in rules
+        if re.search(r"padding-bottom\s*:[^;]*var\(--tabbar-h\)", body)
+    ]
+    assert spacer, "给标签栏让位的那条内边距没有引用 --tabbar-h——两个数字又各写各的了"
 
 
 def test_the_current_tab_is_not_signalled_by_colour_alone():
-    """色觉障碍和单色屏下，只靠颜色的状态就是没有状态。"""
-    assert ".tab.is-current::before" in CSS, "当前项需要一个非颜色的标记（指示条）"
-    assert re.search(r"\.tab\.is-current svg \{[^}]*stroke-width", CSS), (
+    """色觉障碍和单色屏下，只靠颜色的状态就是没有状态。
+
+    选择器存在不等于指示条存在。实测反例：
+    `.tab.is-current::before { display: none; content: ""; }` —— 子串在，指示条没了。
+    所以要看那条规则的**内容**：它必须真的画出一个有尺寸的东西。
+    """
+    stripped = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+    marker = re.search(r"\.tab\.is-current::before\s*\{([^}]*)\}", stripped)
+    assert marker, "当前项需要一个非颜色的标记（指示条）"
+    body = marker.group(1)
+    assert not re.search(r"display\s*:\s*none", body), "指示条被 display:none 关掉了"
+    assert re.search(r"(?:width|height|inset|inline-size|block-size)\s*:", body), (
+        "指示条没有尺寸，画不出任何东西"
+    )
+    assert re.search(r"\.tab\.is-current svg \{[^}]*stroke-width", stripped), (
         "当前项的图标应当同时变粗，作为第三条通道"
     )
