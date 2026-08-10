@@ -484,24 +484,8 @@ async function load() {
   loadDailyReport();
 }
 
-// 页内分区。刻意不换路由：六条路由、service worker 外壳清单、manifest 的
-// start_url 全部不动，而且切换没有网络往返——这一页在地铁上也要能翻。
-// 当前分区写进 hash，刷新之后还在原地；家属点开一条通知回来时不会被扔回"今天"。
-const segs = [...document.querySelectorAll('.seg')];
-const panels = [...document.querySelectorAll('[data-panel]')];
-function showSection(name, pushHash) {
-  const target = panels.some(p => p.dataset.panel === name) ? name : 'today';
-  panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
-  segs.forEach(s => {
-    const on = s.dataset.section === target;
-    s.classList.toggle('is-current', on);
-    if (on) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
-  });
-  if (pushHash) history.replaceState(null, '', `#${target}`);
-}
-segs.forEach(s => s.addEventListener('click', () => showSection(s.dataset.section, true)));
-window.addEventListener('hashchange', () => showSection(location.hash.slice(1), false));
-showSection(location.hash.slice(1) || 'today', false);
+// 页内分区的实现在 common.js，照护页用的是同一套。
+window.YouHuo.initSections('today');
 
 document.querySelector('#refresh').addEventListener('click', load);
 document.querySelector('#scheduler').addEventListener('click', runScheduler);

@@ -281,4 +281,8 @@ byId('capabilitiesDemo').addEventListener('click', async () => {
   }
 });
 
+// 页内分区，与家人端同一套实现（common.js）。这一页原先是七张全展开的卡并排铺，
+// 十三个按钮一次全摆在眼前，没有先后。
+window.YouHuo.initSections('today');
+
 bootstrap();

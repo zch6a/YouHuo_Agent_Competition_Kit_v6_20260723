@@ -131,7 +131,13 @@ def test_v4_care_page_is_served(tmp_path):
     with TestClient(app) as client:
         response = client.get('/care')
         assert response.status_code == 200
-        assert '全景照护中心' in response.text
+        # 钉 <h1>，不钉 <title>。
+        #
+        # 这一条原先断言 `'全景照护中心' in response.text`。照护页重构之后 h1 改成了
+        # 「照护中心」，而这条测试**照样绿**——因为 `<title>` 里还留着旧字样。它于是
+        # 在校验一个浏览器标签页标题，而不是用户在页面上看得见的任何东西。
+        import re
+        assert re.search(r"<h1[^>]*>照护中心</h1>", response.text), '照护页没有渲染它自己的主标题'
         assert '/static/care.js' in response.text
 
 

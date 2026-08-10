@@ -166,7 +166,7 @@
   font-weight: 800;
 }
 
-.family-section > :first-child { margin-top: 0; }
+.page-section > :first-child { margin-top: 0; }
 .section-head {
   margin: var(--space-6) 0 var(--space-2);
   font-size: 19px;
@@ -174,10 +174,20 @@
   line-height: var(--lh-tight);
   color: var(--ink);
 }
-.family-section > .section-head:first-child { margin-top: 0; }
+.page-section > .section-head:first-child { margin-top: 0; }
 .section-note { margin: 0 0 var(--space-3); font-size: 14px; color: var(--ink-3); line-height: var(--lh-snug); }
 
 .metric-row-one { grid-template-columns: 1fr; }
+
+/* 照护页的会话状态：一行字，不是一块横幅。字重和字号都降下来，颜色保留——
+   它失败的时候要能一眼看见，成功的时候不该是首屏最重的东西。 */
+.care-status {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: var(--lh-snug);
+}
 
 /* 生活日报的分项：有事自动展开，没事收着。summary 要够大能点，且不能只靠
    三角形告诉人它可以点——加一条边框和足够的内边距。 */

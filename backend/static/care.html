@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="优活" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>优活 v4 全景照护中心</title>
+  <title>优活照护中心</title>
   <link rel="stylesheet" href="/static/tokens.css" />
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
@@ -25,36 +25,60 @@
 </head>
 <body data-mode="youhuo" data-nav="tabbar">
   <main class="shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">YOUHUO CARE HUB · V4.0</p>
-        <h1 class="care-title">全景照护中心</h1>
-        <p class="lead">循环事务、情绪隐私周报、实物记忆、健康档案、用药管理、位置安全与跨设备协同。</p>
+    <header class="fam-head">
+      <div class="fam-head-text">
+        <h1>照护中心</h1>
+        <p class="fam-updated">这一页是能力演示：每个按钮都会真的调用后端，结果就是它真实的样子。</p>
       </div>
       <a class="back-link" href="/">← 返回首页</a>
     </header>
 
-    <section class="panel notice good" aria-live="polite" id="status">正在建立老人端与家属端演示会话……</section>
+    <!-- 会话状态。原先是 `.panel.notice.good`——首屏最重的一块绿框，而它说的只是
+         "就绪了"。它必须一直在（失败的时候必须看得见），但成功态不该抢走整屏权重。 -->
+    <p class="notice good care-status" aria-live="polite" id="status">正在建立老人端与家属端演示会话……</p>
 
-    <section class="dashboard-grid" aria-label="核心功能演示">
+    <nav class="segmented" aria-label="照护分区">
+      <button type="button" class="seg is-current" data-section="today" aria-current="true">今天</button>
+      <button type="button" class="seg" data-section="daily">日常</button>
+      <button type="button" class="seg" data-section="body">身心</button>
+      <button type="button" class="seg" data-section="safety">安全</button>
+      <button type="button" class="seg" data-section="more">进度</button>
+    </nav>
+
+    <section class="page-section" data-panel="today" aria-label="他今天怎么样">
+      <h2 class="section-head">他今天怎么样</h2>
+      <p class="section-note">先建立他自己的常态，再谈今天是不是不一样。</p>
       <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /> <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" /> <path d="M17.599 6.5a3 3 0 0 0 .399-1.375" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M19.938 10.5a4 4 0 0 1 .585.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M19.967 17.484A4 4 0 0 1 18 18" /></svg></span><span>个性化基线（千人千面）</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /> <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /> <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" /> <path d="M17.599 6.5a3 3 0 0 0 .399-1.375" /> <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" /> <path d="M3.477 10.896a4 4 0 0 1 .585-.396" /> <path d="M19.938 10.5a4 4 0 0 1 .585.396" /> <path d="M6 18a4 4 0 0 1-1.967-.516" /> <path d="M19.967 17.484A4 4 0 0 1 18 18" /></svg></span><span>个性化基线（千人千面）</span></h3>
         <p>不用统一规则评价老人，而是学他<strong>自己</strong>的生活规律：老人 A 每天上午散步，老人 B 每天上午在家读书，同一个「今天没出门」对两个人是两个结论。基线由已有事件流推导，老人不需要多做任何事，也不需要摄像头。</p>
         <button id="baselineDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="m19 9-5 5-4-4-3 3" /></svg><span>看他自己的常态与今天</span></button>
         <button id="coldRoomDemo" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20" /> <path d="M12 2v20" /> <path d="m20 16-4-4 4-4" /> <path d="m4 8 4 4-4 4" /> <path d="m16 4-4 4-4-4" /> <path d="m8 20 4-4 4 4" /></svg><span>上报「屋里 13.5℃」看关怀语变化</span></button>
         <button id="lateWakeDemo" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <polyline points="12 6 12 12 16 14" /></svg><span>模拟「今天 11:20 才起」看偏离</span></button>
         <div id="baselineOutput" aria-live="polite"></div>
       </article>
+    </section>
+    <section class="page-section" data-panel="daily" aria-label="日常与用药" hidden>
+      <h2 class="section-head">日常与用药</h2>
+      <p class="section-note">每月固定的事，和吃进嘴里的东西。</p>
       <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg></span><span>循环事务与月报</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg></span><span>循环事务与月报</span></h3>
         <p>创建每月固定事项，幂等生成提醒；月报不包含无忧伴聊天原文。</p>
         <button id="routineDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg><span>创建并物化“每月交水费”</span></button>
         <button class="secondary" id="monthlyReport"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" /></svg><span>查看本月隐私月报</span></button>
         <div class="result" id="routineOutput" aria-live="polite"></div>
       </article>
-
+      <article class="panel feature-panel">
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg></span><span>用药与库存安全</span></h3>
+        <p>有限规则集只用于演示，未发现规则不代表安全；真实版必须由医生或药师复核。</p>
+        <button id="interactionDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg><span>检查“华法林 + 阿司匹林”</span></button>
+        <div class="result" id="interactionOutput" aria-live="polite"></div>
+      </article>
+    </section>
+    <section class="page-section" data-panel="body" aria-label="心情与身体" hidden>
+      <h2 class="section-head">心情与身体</h2>
+      <p class="section-note">情绪只留类别与趋势，报告只做整理不做诊断。</p>
       <article class="panel feature-panel mode-companion">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h2a2 2 0 0 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16" /> <path d="m14.45 13.39 5.05-4.694C20.196 8 21 6.85 21 5.75a2.75 2.75 0 0 0-4.797-1.837.276.276 0 0 1-.406 0A2.75 2.75 0 0 0 11 5.75c0 1.2.802 2.248 1.5 2.946L16 11.95" /> <path d="m2 15 6 6" /> <path d="m7 20 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a1 1 0 0 0-2.75-2.91" /></svg></span><span>情绪优先任务锁</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h2a2 2 0 0 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16" /> <path d="m14.45 13.39 5.05-4.694C20.196 8 21 6.85 21 5.75a2.75 2.75 0 0 0-4.797-1.837.276.276 0 0 1-.406 0A2.75 2.75 0 0 0 11 5.75c0 1.2.802 2.248 1.5 2.946L16 11.95" /> <path d="m2 15 6 6" /> <path d="m7 20 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a1 1 0 0 0-2.75-2.91" /></svg></span><span>情绪优先任务锁</span></h3>
         <p>只保存情绪类别与趋势，不把聊天原文推给家属；高风险表达转人工。</p>
         <!-- 读屏软件念一个没有名字的 textarea 只会说"编辑框"。这一段是要输进去被
              分析的原话，名字必须说清楚它是什么。 -->
@@ -63,34 +87,32 @@
         <button id="emotionDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /> <path d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" /></svg><span>分析并生成隐私信号</span></button>
         <div class="result" id="emotionOutput" aria-live="polite"></div>
       </article>
-
       <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg></span><span>体检报告与健康时间线</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg></span><span>体检报告与健康时间线</span></h3>
         <p>整理日期、指标和医学术语，不诊断；复查日期经确认后进入待办。</p>
         <label for="medicalText">体检报告原文（只做术语整理，不做诊断）</label>
         <textarea id="medicalText" rows="4">体检日期2026年7月20日。血压138/86 mmHg，发现结节。建议2026年8月20日复查。</textarea>
         <button id="medicalDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /></svg><span>安全解读并归档</span></button>
         <div class="result" id="medicalOutput" aria-live="polite"></div>
       </article>
-
+    </section>
+    <section class="page-section" data-panel="safety" aria-label="安全" hidden>
+      <h2 class="section-head">安全</h2>
+      <p class="section-note">精度不足时不自动报警；位置按最小必要留存。</p>
       <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg></span><span>用药与库存安全</span></h2>
-        <p>有限规则集只用于演示，未发现规则不代表安全；真实版必须由医生或药师复核。</p>
-        <button id="interactionDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg><span>检查“华法林 + 阿司匹林”</span></button>
-        <div class="result" id="interactionOutput" aria-live="polite"></div>
-      </article>
-
-      <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0" /> <circle cx="12" cy="8" r="2" /> <path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712" /></svg></span><span>位置围栏与一键求助</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0" /> <circle cx="12" cy="8" r="2" /> <path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712" /></svg></span><span>位置围栏与一键求助</span></h3>
         <p>精度不足时不自动报警；位置按最小必要原则留存。</p>
         <button id="locationInside"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></svg><span>测试家庭范围内</span></button>
         <button class="secondary" id="locationOutside"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.75 7.09a3 3 0 0 1 2.16 2.16" /> <path d="M17.072 17.072c-1.634 2.17-3.527 3.912-4.471 4.727a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 1.432-4.568" /> <path d="m2 2 20 20" /> <path d="M8.475 2.818A8 8 0 0 1 20 10c0 1.183-.31 2.377-.81 3.533" /> <path d="M9.13 9.13a3 3 0 0 0 3.74 3.74" /></svg><span>测试超出范围</span></button>
         <button class="danger" id="sosDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18v-6a5 5 0 1 1 10 0v6" /> <path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z" /> <path d="M21 12h1" /> <path d="M18.5 4.5 18 5" /> <path d="M2 12h1" /> <path d="M12 2v1" /> <path d="m4.929 4.929.707.707" /> <path d="M12 12v6" /></svg><span>模拟老人主动呼救</span></button>
         <div class="result" id="locationOutput" aria-live="polite"></div>
       </article>
-
+    </section>
+    <section class="page-section" data-panel="more" aria-label="这些能力到哪一步了" hidden>
+      <h2 class="section-head">这些能力到哪一步了</h2>
+      <p class="section-note">已实现、沙箱闭环、演示适配，还是仍需真机验证。</p>
       <article class="panel feature-panel">
-        <h2><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="m9 14 2 2 4-4" /></svg></span><span>能力真实性清单</span></h2>
+        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="m9 14 2 2 4-4" /></svg></span><span>能力真实性清单</span></h3>
         <p>明确区分已实现、沙箱闭环、演示适配与仍需真机或正式接口验证的能力。</p>
         <button id="capabilitiesDemo">加载能力矩阵</button>
         <div id="capabilityList" class="task-list" aria-live="polite"></div>

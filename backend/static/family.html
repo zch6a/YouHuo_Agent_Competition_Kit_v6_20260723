@@ -48,7 +48,7 @@
 
     <!-- 今天：这一页存在的理由。打开它的人想知道三件事——他今天怎么样、有没有
          需要我拍板的、今天还有什么。别的都往后排。 -->
-    <section class="family-section" data-panel="today" aria-label="今天">
+    <section class="page-section" data-panel="today" aria-label="今天">
       <h2 class="section-head">今天怎么样</h2>
       <div id="dailyReport" aria-live="polite">正在生成……</div>
       <section class="metric-row" aria-label="今日概览">
@@ -61,7 +61,7 @@
       <div id="tasks"></div>
     </section>
 
-    <section class="family-section" data-panel="todo" aria-label="待办" hidden>
+    <section class="page-section" data-panel="todo" aria-label="待办" hidden>
       <h2 class="section-head">按日期</h2>
       <div id="calendar"></div>
       <h2 class="section-head">给他添一件事</h2>
@@ -76,13 +76,13 @@
       <div id="notices"></div>
     </section>
 
-    <section class="family-section" data-panel="trend" aria-label="趋势" hidden>
+    <section class="page-section" data-panel="trend" aria-label="趋势" hidden>
       <h2 class="section-head">这一周</h2>
       <p class="section-note">和他<strong>自己</strong>的常态比，不和别人比。聊天原文不会出现在这里，只有汇总。</p>
       <div id="weekly"></div>
     </section>
 
-    <section class="family-section" data-panel="mine" aria-label="我的" hidden>
+    <section class="page-section" data-panel="mine" aria-label="我的" hidden>
       <h2 class="section-head">做过的事</h2>
       <div class="metric-row metric-row-one" aria-label="记录状态">
         <div class="metric"><span class="metric-label">记录</span><strong id="mChain">–</strong></div>

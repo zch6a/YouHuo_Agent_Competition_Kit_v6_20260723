@@ -299,22 +299,47 @@ def test_the_family_page_never_prints_a_raw_event_code():
     assert not leaks, f"家人端把原始事件码印给了家属：{leaks}"
 
 
-def test_every_family_section_button_has_a_panel_to_show():
-    """页内分区：四个按钮，四块内容，一一对应。
+@pytest.mark.parametrize("page,least", [("family.html", 4), ("care.html", 5)])
+def test_every_section_button_has_a_panel_to_show(page, least):
+    """页内分区：几个按钮，几块内容，一一对应。
 
     分区靠 `hidden` 切换。一个按不出任何东西的分区按钮不会报错、不会在截图里
     露馅——它只会让人点一下，然后什么也没发生。
+
+    两页参数化而不是各写一份：它们共用 common.js 的 `initSections`，也共用
+    `check_page_runtime` 里"`.seg` 会换屏、留到最后按"那条规则。哪天有人给第三页
+    加分区却换了一套类名，那条规则会静默漏掉它，而检查照样报绿。
     """
-    source = (STATIC / "family.html").read_text(encoding="utf-8")
+    source = (STATIC / page).read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
     sections = re.findall(r'class="seg[^"]*"[^>]*data-section="([a-z]+)"', source)
     sections += re.findall(r'data-section="([a-z]+)"[^>]*class="seg[^"]*"', source)
     panels = re.findall(r'data-panel="([a-z]+)"', source)
-    assert len(sections) >= 4, f"分区按钮少于四个：{sections}"
+    assert len(sections) >= least, f"{page} 的分区按钮少于 {least} 个：{sections}"
     assert sorted(set(sections)) == sorted(set(panels)), f"按钮 {sections} 与内容 {panels} 对不上"
     # 恰好一个分区默认展开，否则首屏会同时铺开两段。
     open_panels = [p for p in re.findall(r"<section[^>]*data-panel=[^>]*>", source) if "hidden" not in p]
-    assert len(open_panels) == 1, f"默认展开的分区不是一个：{len(open_panels)}"
+    assert len(open_panels) == 1, f"{page} 默认展开的分区不是一个：{len(open_panels)}"
+
+
+def test_care_cards_sit_below_their_section_heading():
+    """分区标题是 h2，卡片标题必须降到 h3。
+
+    照护页原先是七张平铺卡，每张的标题是 h2——那时它们确实是平级的。加上分区之后
+    分区标题成了 h2，如果卡片还是 h2，读屏软件读到的是两个平级标题，而它们现在是
+    包含关系：听的人不知道这张卡属于哪一段。
+
+    `check_page_runtime` 的标题层级检查只查"有没有跳级"（h1 → h3 会报），查不出
+    "该嵌套的却是平级"——那一种在层级上完全合法。
+    """
+    source = (STATIC / "care.html").read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    for card in re.findall(r'<article class="panel feature-panel.*?</article>', source, re.S):
+        assert "<h2" not in card, f"照护页有卡片仍在用 h2：{card[:90]}"
+        assert "<h3" in card, f"照护页有卡片没有标题：{card[:90]}"
+    # 每个分区恰好一个 h2（它自己的标题）。
+    for panel in re.findall(r'<section class="page-section".*?\n    </section>', source, re.S):
+        assert panel.count("<h2") == 1, f"分区里的 h2 不是一个：{panel[:90]}"
 
 
 def test_a_failed_family_load_lands_somewhere_visible():

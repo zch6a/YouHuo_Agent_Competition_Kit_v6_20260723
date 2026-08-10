@@ -294,8 +294,41 @@
     el.appendChild(raw);
   }
 
+  // --- 页内分区 --------------------------------------------------------------
+  //
+  // 一页装了太多东西的时候，答案是把它切成几段、一次只显示一段，而不是加一个路由。
+  // 不加路由是有意的：六条路由、service worker 的外壳清单、manifest 的 start_url
+  // 全都不用动，切换也没有网络往返——这个应用要在地铁上能翻。
+  //
+  // 放在 common.js 而不是各页自己写一份：家人端和照护页用的是同一套 DOM 约定
+  // （`.seg[data-section]` 配 `[data-panel]`），而 `check_page_runtime` 的点击遍历
+  // 认的也是 `.seg` 这个类——它靠这个类知道"这个按钮会换掉整屏，留到最后再按"。
+  // 第二个页面另起一套类名，那道规则就会漏掉它，而检查照样报绿。
+  function initSections(fallback) {
+    const segs = [...document.querySelectorAll('.seg')];
+    const panels = [...document.querySelectorAll('[data-panel]')];
+    if (!segs.length || !panels.length) return;
+    const first = fallback || panels[0].dataset.panel;
+
+    function show(name, writeHash) {
+      const target = panels.some(p => p.dataset.panel === name) ? name : first;
+      panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
+      segs.forEach(s => {
+        const on = s.dataset.section === target;
+        s.classList.toggle('is-current', on);
+        if (on) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
+      });
+      if (writeHash) history.replaceState(null, '', `#${target}`);
+    }
+
+    segs.forEach(s => s.addEventListener('click', () => show(s.dataset.section, true)));
+    // 当前分区写进 hash：刷新之后还在原地，从一条通知点回来也不会被扔回第一屏。
+    window.addEventListener('hashchange', () => show(location.hash.slice(1), false));
+    show(location.hash.slice(1) || first, false);
+  }
+
   window.YouHuo = {
     ready, login, api, forget, token,
-    byId, pretty, VERDICT, verdictOf, renderResult,
+    byId, pretty, VERDICT, verdictOf, renderResult, initSections,
   };
 })();
