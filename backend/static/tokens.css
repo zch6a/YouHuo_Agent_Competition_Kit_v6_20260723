@@ -1,10 +1,13 @@
 /* 设计令牌：颜色、间距、圆角、阴影、字阶、动效。
  *
- * 这一层只声明自定义属性，不产生任何一条可见规则。深色模式的覆写也在这里——它同样
- * 只换值，不换结构。
+ * 这一层主要声明自定义属性。末尾有一小段 `:root` 上的可见声明（字体栈、
+ * color-scheme、字形渲染）——它们本该在 base 层，留在这里是因为字体栈必须在任何
+ * 元素规则之前落地。除此之外不产生可见规则。深色模式的覆写也在这里，只换值不换结构。
  *
  * 四层的加载顺序（tokens -> base -> components -> pages）就是层叠顺序，六个页面都必须
- * 按这个顺序引，见 backend/tests/test_stylesheet_layers.py。
+ * 按这个顺序引。守卫是 `backend/tests/test_pwa_shell.py::
+ * test_stylesheet_layers_load_in_cascade_order`——上一版这里写的是
+ * `test_stylesheet_layers.py`，那个文件从来不存在，是一条指向空处的引用。
  */
 /* ==========================================================================
    优活 Agent v6 — design system
@@ -35,6 +38,10 @@
   --role-accent-2: var(--youhuo-violet);
   --role-tint: #e9f2fd;
   --role-glow: rgba(74, 144, 217, .32);
+  /* --role-ink 此前只在 components.css 的 body[data-mode=…] 里出现，`:root` 没有
+     兜底值。它被 `.head-icon` 和 `.tab.is-current` 消费——任何一页漏写或写错
+     `data-mode`，那两处颜色就静默退化成 inherit。补上默认值（= 优活模式）。 */
+  --role-ink: var(--youhuo-blue-ink);
 
   /* --- neutrals ----------------------------------------------------------- */
   --bg: #f4f6fb;

@@ -251,10 +251,16 @@
   .card.span-3, .card.span-2 { grid-column: span 3; }
   .card.featured { flex-direction: column; align-items: flex-start; }
 }
+/* 单列收拢。
+ *
+ * 这个块里曾有五条声明**永远不可达**：`.mic-dial`、`.mic-big`、`.mic-big svg`、
+ * `.hero-head { gap }` 和 `.chat { padding }`。任何匹配 ≤720px 的视口也匹配 ≤760px，
+ * 而那个块写在后面、特异性相同，于是后者全胜；`.chat` 那条更是被 `#chat`（id）压死。
+ * 有人写下它们、以为在调小屏尺寸，实际一次都没有应用过。已删除——尺寸统一由 760
+ * 那一块负责，一处可改。 */
 @media (max-width: 720px) {
   .card.span-3, .card.span-2 { grid-column: span 6; }
-  .hero-head { gap: 14px; }
-  .hero-mark { width: 62px; height: 62px; border-radius: 20px; font-size: 30px; }
+  .hero-mark { width: 62px; height: 62px; border-radius: var(--r-xl); font-size: 30px; }
   .grid, .dashboard-grid { grid-template-columns: 1fr; }
   .preview-columns { grid-template-columns: 1fr; }
   .demo-step { grid-template-columns: 1fr; }
@@ -262,11 +268,7 @@
   .reliance-row, .glass-card > div, .log-item, .digest-row { grid-template-columns: 1fr; gap: 4px; }
   .calendar-entry { grid-template-columns: 56px 1fr; }
   .calendar-entry .status-chip { grid-column: 2; justify-self: start; }
-  .mic-dial { width: 176px; height: 176px; }
-  .mic-big { width: 138px; height: 138px; font-size: 50px; }
-  .mic-big svg { width: 52px; height: 52px; }
   .bubble { max-width: 94%; }
-  .chat { padding: 13px; }
   .entry-btn { font-size: 16px; gap: 8px; }
   .topbar { gap: 10px; }
   .badge { padding: 9px 13px; font-size: 14px; }

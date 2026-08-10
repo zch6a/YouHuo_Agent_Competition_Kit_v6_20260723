@@ -35,7 +35,7 @@ p, li, td, .bubble, .meta, .rail-note { overflow-wrap: break-word; }
 
 /* Headings set as a block read better ragged-balanced than ragged-right; the
    difference is most visible on the two- and three-line Chinese titles. */
-h1, h2, h3, .hero-title, .rail-head h2 { text-wrap: balance; }
+h1, h2, h3, .rail-head h2 { text-wrap: balance; }
 /* Avoid a single word alone on the last line of body copy. */
 p, .bubble, .rail-note, .trust-line { text-wrap: pretty; }
 
@@ -73,19 +73,11 @@ body {
 
 /* Touch affordances. The grey flash and the long-press callout both read as
    "web page"; an app has its own pressed state, which buttons already define. */
-a, button, .entry-btn, .quick button, .mic-big, .bottom-nav a {
+a, button, .entry-btn, .quick button, .mic-big {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-button, .mic-big, .bottom-nav a { -webkit-user-select: none; user-select: none; }
-
-/* Reach under the notch and the home bar. Padding rather than margin so the
-   backgrounds still bleed to the physical edges. */
-.shell {
-  padding-left: max(var(--space-4), env(safe-area-inset-left));
-  padding-right: max(var(--space-4), env(safe-area-inset-right));
-}
-
+button, .mic-big { -webkit-user-select: none; user-select: none; }
 
 /* Soft gradient mesh behind everything; purely decorative. */
 body::before {
@@ -103,12 +95,20 @@ body::before {
   transition: background var(--mode-fade) ease;
 }
 
+/* 外壳。左右内边距要伸到刘海和挖孔底下去，所以取"设计间距"与"安全区"的较大者。
+ *
+ * 这里原本是**两条** `.shell` 规则：上面一条设 padding-left/right 带
+ * `env(safe-area-inset-*)`，二十行之后另一条又用 `padding` 简写覆盖四边。同等
+ * 特异性、后者胜出，于是那两行安全区内边距**从未在任何视口下生效过**。声明在、
+ * 注释也解释了它为什么必要，但它一次都没有跑起来。合成一条。 */
 .shell {
   position: relative;
   z-index: 1;
   max-width: 1080px;
   margin: 0 auto;
-  padding: clamp(16px, 3vw, 40px);
+  padding-block: clamp(16px, 3vw, 40px);
+  padding-left: max(clamp(16px, 3vw, 40px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 3vw, 40px), env(safe-area-inset-right));
 }
 
 /* --------------------------------------------------------------------------

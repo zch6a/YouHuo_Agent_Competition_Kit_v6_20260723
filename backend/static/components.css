@@ -102,7 +102,6 @@
 .card h2 { font-size: 21px; margin-bottom: 8px; }
 .card p { margin: 0; font-size: 15px; }
 
-.mode-youhuo { background: linear-gradient(165deg, color-mix(in srgb, var(--youhuo-blue) 11%, var(--surface)), var(--surface) 62%); }
 .mode-companion { background: linear-gradient(165deg, color-mix(in srgb, var(--wuyou-orange) 13%, var(--surface)), var(--surface) 62%); }
 
 /* --------------------------------------------------------------------------
@@ -212,10 +211,30 @@ button.secondary {
   box-shadow: var(--shadow-1);
 }
 button.secondary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--role-accent); }
+/* 危险动作。颜色必须从 --danger 派生，不能写死。
+ *
+ * 这里原本是 `linear-gradient(180deg, #d8434e, #a81f2a)`——两个字面量，绕开了
+ * --danger（浅色 #c02a35 / 深色 #ff8c93）。后果是：深色模式下全站唯一一个不跟随
+ * 主题的语义色，恰好是"拒绝""删除""破窗"这类不可逆操作的按钮。 */
+/* 危险动作。颜色必须从 --danger 派生，不能写死。
+ *
+ * 原本是 `linear-gradient(180deg, #d8434e, #a81f2a)`——两个字面量，绕开了 --danger
+ * （浅色 #c02a35 / 深色 #ff8c93）。后果是深色模式下全站唯一一个不跟随主题的语义色，
+ * 而它恰好是"拒绝""删除""破窗"这类不可逆操作的按钮。
+ *
+ * 改成描边填充式而不是继续用实心渐变：深色下 --danger 是浅粉，白字压上去对比度更差。
+ * 底用 --danger-bg、字和边框用 --danger，两种模式下都是"同色系深字配浅底"，对比度
+ * 由令牌本身保证。顺带也符合这一轮"少用重色块和阴影"的方向——不可逆操作靠边框和
+ * 颜色语义识别，不靠喊。 */
 button.danger {
-  background: linear-gradient(180deg, #d8434e, #a81f2a);
-  border-color: transparent;
-  color: #fff;
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow: none;
+}
+button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, var(--danger-bg));
+  border-color: var(--danger);
 }
 button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 
