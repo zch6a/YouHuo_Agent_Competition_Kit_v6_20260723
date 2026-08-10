@@ -49,6 +49,11 @@
           </div>
         </div>
 
+        <!-- 今天。首屏此前没有这一行——老人打开应用看不到"今天有什么事"，得先点开
+             底部抽屉才知道。这是这一屏最该有的一句话，所以它在麦克风之前。
+             由 elder.js 的 loadReminders() 填，没有待办时整行隐藏。 -->
+        <p id="todayLine" class="today-line" hidden></p>
+
         <div id="chat" class="chat" aria-live="polite"></div>
         <div id="relianceHost"></div>
 
@@ -62,10 +67,14 @@
         </div>
 
         <div class="composer">
-          <div class="quick">
-            <button data-text="帮我挂明天下午两点第一医院骨科王医生的号">演示挂号</button>
-            <button data-text="帮我交水费">演示缴费</button>
-            <button data-text="提醒我明天上午九点复诊">演示提醒</button>
+          <!-- 这三个按钮此前的标签是「演示挂号」「演示缴费」「演示提醒」——演示脚手架
+               留在了产品首屏上。而同一个文件下面抽屉里那四个反而是对的写法（「我今天
+               吃药了吗」），是老人真会说的话。
+               统一成后者：按钮上的字就是它替你说出口的那句话，按下去等于开口。 -->
+          <div class="quick" aria-label="常说的话">
+            <button data-text="我今天有什么事">今天有什么事</button>
+            <button data-text="帮我交水费">交水费</button>
+            <button data-text="帮我挂个号">挂号</button>
           </div>
           <div class="controls">
             <!-- 短。原来是「也可以打字：帮我挂明天下午的骨科号」，在 390px 宽的屏幕上

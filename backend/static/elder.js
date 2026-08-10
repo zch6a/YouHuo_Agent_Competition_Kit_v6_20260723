@@ -498,10 +498,35 @@ function rankReminders(reminders) {
   return showAllReminders ? openFirst : openFirst.slice(0, 3);
 }
 
+/** 首屏那一行「今天」。
+ *
+ * 这一屏此前不告诉老人今天有什么事——那句话藏在底部抽屉里，要点开才看得到。而
+ * "今天有几件事、下一件是什么"恰恰是她打开这个应用最先想知道的东西，所以它排在
+ * 麦克风之前。
+ *
+ * 只说未完成的。已完成的待办出现在"今天还有 3 件事"里，会让人白紧张一次。
+ */
+function renderTodayLine(reminders) {
+  const line = document.getElementById('todayLine');
+  if (!line) return;
+  const open = reminders
+    .filter(r => !['completed', 'cancelled'].includes(r.status))
+    .sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
+  if (!open.length) {
+    line.textContent = '今天没有要办的事。';
+    line.hidden = false;
+    return;
+  }
+  const next = open[0];
+  line.textContent = `今天有 ${open.length} 件事 · 下一件 ${friendlyTime(next.due_at)} ${next.title}`;
+  line.hidden = false;
+}
+
 async function loadReminders() {
   if (!remindersEl) return;
   try {
     const reminders = await api('/v2/reminders?limit=50');
+    renderTodayLine(reminders);
     remindersEl.replaceChildren();
     const visible = rankReminders(reminders);
     visible.forEach(r => {

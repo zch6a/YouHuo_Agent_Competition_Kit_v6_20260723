@@ -89,6 +89,28 @@
   text-decoration: none;
 }
 .landing-demo a:hover { color: var(--ink-2); text-decoration: underline; }
+
+/* --------------------------------------------------------------------------
+   老人端首屏的「今天」
+   ..........................................................................
+   这一屏此前不告诉老人今天有什么事——那句话藏在底部抽屉里，要点开才看得到。而
+   "今天有几件事、下一件是什么"恰恰是她打开这个应用最先想知道的，所以它排在麦克风
+   之前。不做成卡片：它是一行字，加个盒子只会让它和别的东西争权重。
+   字号跟着 --elder-font-scale 走，与对话气泡同一套机制。
+   -------------------------------------------------------------------------- */
+
+.today-line {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: calc(17px * var(--elder-font-scale) / 1.25);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+  font-weight: 650;
+}
+
 /* --------------------------------------------------------------------------
    Judge walkthrough
    -------------------------------------------------------------------------- */
@@ -560,9 +582,17 @@
   .role-halo::before, .role-halo::after { animation: none !important; }
   body[data-activity="listening"] .role-halo { opacity: .7; }
 
-  /* The demo shortcuts are for a judge, not for 王奶奶; on a phone they cost a
-     row of prime real estate directly under the microphone. */
-  .quick { display: none; }
+  /* 这一行以前在手机上是 `display: none`，注释写着"演示快捷方式是给评委的，不是给
+     王奶奶的"。那个判断在当时是对的——三个按钮的标签是「演示挂号」「演示缴费」
+     「演示提醒」，确实是脚手架，藏起来比留着强。
+     但正确的做法是改掉它们而不是藏起来：现在按钮上的字就是它替你说出口的那句话
+     （「今天有什么事」「交水费」「挂号」）。对一位不知道该怎么开口的老人，这三个
+     词恰恰是这一屏最有用的东西——而"不知道说什么"正是语音产品最常见的卡点。
+     所以显示，只是把它压得更紧、并放在麦克风**下方**，不与主控件争视觉权重。 */
+  .quick { margin-top: var(--space-2); gap: var(--space-2); }
+  /* 只压水平内边距，不动 min-height——48px 是这个项目自己的触控下限，为了省一行
+     把它降到 44 就是拿手抖的用户换版面。 */
+  .quick button { padding-inline: var(--space-3); font-size: 15px; }
 
   /* ----------------------------------------------------------------------
      短屏。iPhone SE 是 667px 高，比 iPhone 14 少 177px——而固定家具（角色头 +

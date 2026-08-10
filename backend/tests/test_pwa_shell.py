@@ -238,6 +238,55 @@ def test_no_declaration_was_lost_in_the_split():
     assert "@media (max-width: 760px)" in css, "响应式那一大段不见了"
 
 
+#: 老人端与家属端是真实产品，不是工程演示。这些词不得出现在它们的可见文本里。
+#:
+#: 老人不需要知道什么是 Saga、什么是目的绑定策略，也不该在首屏看到「演示挂号」。
+#: 这些概念属于 /trust 和 /judge——那是另一个世界，给要求看清边界的人看的。
+_ENGINEERING_WORDS = [
+    "Saga", "N-best", "OpenAPI", "dry-run", "dry run",
+    "目的绑定", "自主权包络", "证明式完成", "C4-AI",
+]
+
+
+@pytest.mark.parametrize("page", ["index.html", "elder.html"])
+def test_no_demo_scaffolding_on_the_consumer_first_screen(page):
+    """按钮上的字必须是用户想做的事，不是"这是一个演示"。
+
+    `elder.html` 曾在首屏放三个按钮，标签的字面就是「演示挂号」「演示缴费」
+    「演示提醒」——演示脚手架留在了产品里。而同一个文件下面抽屉里那四个反而是对的
+    写法（「我今天吃药了吗」），是老人真会说的话。两种做法在同一页并存，说明前者是
+    没清理干净的东西。
+    """
+    source = (STATIC / page).read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)      # 注释里会引用旧标签
+    labels = re.findall(r"<button[^>]*>(.*?)</button>", source, re.S)
+    offenders = [
+        re.sub(r"<[^>]+>", "", label).strip()
+        for label in labels
+        if "演示" in re.sub(r"<[^>]+>", "", label)
+    ]
+    assert not offenders, f"{page} 的按钮上还有演示脚手架：{offenders}"
+
+
+@pytest.mark.parametrize("page", ["index.html", "elder.html"])
+def test_no_engineering_vocabulary_in_the_consumer_pages(page):
+    source = (STATIC / page).read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    found = [word for word in _ENGINEERING_WORDS if word in source]
+    assert not found, f"{page} 出现了工程术语：{found}"
+
+
+def test_the_elder_first_screen_says_what_today_holds():
+    """老人打开这一屏，第一件想知道的事是"今天有什么事"。
+
+    此前那句话藏在底部抽屉里，要点开才看得到。
+    """
+    source = (STATIC / "elder.html").read_text(encoding="utf-8")
+    assert 'id="todayLine"' in source, "首屏没有「今天」那一行"
+    js = (STATIC / "elder.js").read_text(encoding="utf-8")
+    assert "renderTodayLine" in js, "没有人去填它"
+
+
 def test_service_worker_bails_out_before_responding():
     source = (STATIC / "sw.js").read_text(encoding="utf-8")
     # 直接放行，而不是先缓存再过滤。
