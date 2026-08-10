@@ -43,6 +43,45 @@ VIEWPORTS = {
 }
 PAGES = ["/elder", "/family", "/care", "/trust", "/judge", "/"]
 
+#: 量"有没有内容够不着"，而不只是 `documentElement.scrollWidth`。
+#:
+#: 只看 scrollWidth 会漏掉整整一类：`position: fixed` 的元素不计入文档滚动尺寸。
+#: 给底部标签栏加 `min-width: 1200px` 做变异，scrollWidth 纹丝不动仍是 390——而它
+#: 右边那两个标签在手机上已经出界、永远点不到。所以这里逐个元素量右边缘。
+#:
+#: 横向滚动容器里的子元素要排除：首页那条创新点横滚带就是**故意**让内容伸出去的，
+#: 露出半个卡片正是"还能往右滑"的提示。判据是祖先链上有没有 overflow-x: auto|scroll。
+OVERFLOW_PROBE = """
+(() => {
+  const inScroller = (el) => {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const ox = getComputedStyle(p).overflowX;
+      if (ox === 'auto' || ox === 'scroll') return true;
+    }
+    return false;
+  };
+  const name = (el) => {
+    const cls = typeof el.className === 'string' && el.className.trim()
+      ? '.' + el.className.trim().split(/\\s+/).join('.') : '';
+    return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + cls;
+  };
+  const offscreen = [];
+  document.querySelectorAll('body *').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    if (r.right <= innerWidth + 1) return;
+    if (inScroller(el)) return;
+    offscreen.push(name(el) + ' 右边缘 ' + Math.round(r.right) + ' > ' + innerWidth);
+  });
+  return JSON.stringify({
+    vw: innerWidth,
+    sw: document.documentElement.scrollWidth,
+    sh: document.documentElement.scrollHeight,
+    offscreen: offscreen.slice(0, 4),
+  });
+})()
+"""
+
 
 class CDP:
     def __init__(self, url: str, websocket_mod) -> None:
@@ -134,6 +173,7 @@ def main() -> int:
 
         browser = CDP(ws_url, websocket)
         written = []
+        overflow: list[str] = []
         for device, (width, height, dsf) in VIEWPORTS.items():
             if only and device not in only:
                 continue
@@ -162,11 +202,23 @@ def main() -> int:
                              deviceScaleFactor=dsf, mobile=device != "desktop")
                     tab.send("Page.navigate", url=base + page)
                     time.sleep(3.0)          # settle fonts, layout and first paint
-                    measured = tab.send("Runtime.evaluate", expression=(
-                        "JSON.stringify({vw:innerWidth,"
-                        "sw:document.documentElement.scrollWidth,"
-                        "sh:document.documentElement.scrollHeight})"
-                    ), returnByValue=True)["result"]["value"]
+                    measured = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
+                                        returnByValue=True)["result"]["value"]
+                    # 量到了就要判。
+                    #
+                    # 这几个数以前只是打印出来，需要有人自己去看——于是没人看。横向
+                    # 溢出在截图上是"右边被切掉一点"，在手机上是整页能左右晃、正文有
+                    # 一半永远够不着；而对比度检查读的是计算色，溢出不改变任何一个
+                    # 元素的颜色，它会一路绿到底。这正是这个项目里"仪器测的不是你
+                    # 关心的那件事"的原型案例。
+                    box = json.loads(measured)
+                    if box["sw"] > box["vw"]:
+                        overflow.append(
+                            f"{device}{page} 文档横向溢出 {box['sw'] - box['vw']}px"
+                            f"（视口 {box['vw']}，内容 {box['sw']}）"
+                        )
+                    for item in box["offscreen"]:
+                        overflow.append(f"{device}{page} 元素右边缘出界：{item}")
                     stem = f"{device}{page.replace('/', '-') or '-home'}"
                     if scheme:
                         stem = f"{stem}-{scheme}"
@@ -202,6 +254,12 @@ def main() -> int:
                     tab.close()
                     browser.send("Target.closeTarget", targetId=target)
         print("\n".join(written))
+        if overflow:
+            print(f"\nFAIL shoot_pages: {len(overflow)} 处横向溢出")
+            for item in overflow:
+                print(f"  {item}")
+            return 1
+        print(f"\nOK shoot_pages: {len(written)} 张截图，无横向溢出")
         return 0
     finally:
         proc.terminate()

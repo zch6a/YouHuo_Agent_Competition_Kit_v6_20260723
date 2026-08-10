@@ -38,6 +38,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# 溢出探针与 shoot_pages 共用一份：那边出图给人看，这边每轮都判。两份会漂。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from shoot_pages import OVERFLOW_PROBE  # noqa: E402
+
 PORT = 8047
 DEVTOOLS_PORT = 9337
 BASE = f"http://127.0.0.1:{PORT}"
@@ -203,6 +208,39 @@ def collect(events: list[dict], page: str) -> list[str]:
                 )
 
     return problems
+
+
+#: 手机视口。这个产品的主要形态是装到主屏的 PWA，横向溢出只在窄屏上才发生。
+PHONE = (390, 844)
+
+
+def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> None:
+    """在手机视口下量"有没有内容够不着"。
+
+    探针与 `shoot_pages.py` 共用一份（那边负责出图给人看，这边负责每轮都判）。
+    横向溢出在截图上只是"右边被切掉一点"，在手机上是整页能左右晃、正文有一半永远
+    够不着；而对比度检查读的是计算色，溢出不改变任何元素的颜色，它会一路绿到底。
+
+    只看 `documentElement.scrollWidth` 不够：`position: fixed` 的元素不计入文档滚动
+    尺寸。给底部标签栏加 `min-width: 1200px`，scrollWidth 纹丝不动，而右边两个标签
+    已经出界、永远点不到。所以探针逐个元素量右边缘。
+    """
+    tab.send("Emulation.setDeviceMetricsOverride",
+             width=PHONE[0], height=PHONE[1], deviceScaleFactor=1, mobile=True)
+    tab.drain(1.2)
+    raw = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
+                   returnByValue=True)["result"].get("value")
+    tab.send("Emulation.clearDeviceMetricsOverride")
+    tab.drain(0.6)
+    if not raw:
+        return
+    box = json.loads(raw)
+    if box["sw"] > box["vw"]:
+        failures.append(
+            f"{page}  手机视口下文档横向溢出 {box['sw'] - box['vw']}px"
+        )
+    for item in box["offscreen"]:
+        failures.append(f"{page}  手机视口下元素右边缘出界：{item}")
 
 
 def check_sprite_icons(tab: "CDP", page: str, failures: list[str]) -> None:
@@ -374,6 +412,7 @@ def main() -> int:
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
                 check_sprite_icons(tab, page, failures)
+                check_no_horizontal_overflow(tab, page, failures)
                 tab.events.clear()
                 check_glass_box(tab, page, failures)
                 failures.extend(collect(tab.events, f"{page} 玻璃盒"))
@@ -393,8 +432,8 @@ def main() -> int:
         for item in failures:
             print(f"  {item}")
         return 1
-    print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，"
-          f"{clicked} 个控件逐个按过，无异常、无 console.error、无失败请求")
+    print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，{clicked} 个控件逐个按过，"
+          f"手机视口无横向溢出，无异常、无 console.error、无失败请求")
     return 0
 
 
