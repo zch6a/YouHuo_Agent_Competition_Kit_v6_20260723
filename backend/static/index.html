@@ -59,7 +59,11 @@
         </div>
       </div>
 
-      <div class="innovation-strip" aria-label="核心创新">
+      <!-- 这一条横滚带在手机上有 706px 内容在屏幕外。没有 tabindex 时键盘用户
+           滚不到它——对他们来说后面那六项创新根本不存在（WCAG 2.1.1）。
+           tabindex="0" 让它可聚焦，浏览器随即支持方向键滚动；role="group" +
+           aria-label 让读屏把它作为一个整体宣布出来，而不是九个孤立的词。 -->
+      <div class="innovation-strip" role="group" tabindex="0" aria-label="核心创新（可左右滚动）">
         <span>认知负荷治理</span><span>玻璃盒依赖校准</span><span>自主权包络</span><span>语音共识</span><span>目的绑定策略</span><span>可恢复Saga</span><span>证明式完成</span><span>家庭共识</span><span>同意记忆</span>
       </div>
       <div class="notice good">离线可复现模拟服务，不依赖模型密钥。模型只提供语言建议，不能跳过确认、直接扣款或虚报成功。</div>

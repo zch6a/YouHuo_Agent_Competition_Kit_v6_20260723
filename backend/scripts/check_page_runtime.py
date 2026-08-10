@@ -213,6 +213,69 @@ def collect(events: list[dict], page: str) -> list[str]:
 #: 手机视口。这个产品的主要形态是装到主屏的 PWA，横向溢出只在窄屏上才发生。
 PHONE = (390, 844)
 
+#: 无障碍：对比度检查管不到的那几件。
+#:
+#: `check_contrast.py` 量的是颜色和触控尺寸——那两项达标，不代表一位用读屏或只用
+#: 键盘的老人能用。这个受众里视力退化和手部精细动作退化是并发的，所以这几条不是
+#: 加分项，是这个产品的及格线。
+#:
+#: 首次跑出三处真问题：/care 的两个 textarea 没有名字（读屏只会念"编辑框"），
+#: 首页那条创新点横滚带有 706px 内容在屏幕外而它不可聚焦——键盘用户滚不到，对他们
+#: 来说后面六项创新根本不存在。
+A11Y_PROBE = r"""
+(() => {
+  const out = {缺少无障碍名字: [], 标题层级: [], 只有placeholder: [], 键盘够不到: [], 地标: []};
+  const accName = (el) => {
+    if (el.getAttribute('aria-label')) return el.getAttribute('aria-label').trim();
+    const by = el.getAttribute('aria-labelledby');
+    if (by) {
+      const t = by.split(/\s+/).map(id => (document.getElementById(id)||{}).textContent||'').join(' ');
+      if (t.trim()) return t.trim();
+    }
+    if (['INPUT','SELECT','TEXTAREA'].includes(el.tagName)) {
+      if (el.labels && el.labels.length) return [...el.labels].map(l => l.textContent).join(' ').trim();
+      if (el.getAttribute('placeholder')) return 'PLACEHOLDER:' + el.getAttribute('placeholder');
+      return el.title || '';
+    }
+    return (el.innerText || el.textContent || '').trim() || el.title || '';
+  };
+  const sel = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')
+    + (typeof el.className === 'string' && el.className.trim()
+        ? '.' + el.className.trim().split(/\s+/).slice(0,2).join('.') : '');
+
+  document.querySelectorAll('button, a[href], input, select, textarea, [tabindex]').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 && r.height < 1) return;
+    const name = accName(el);
+    if (!name) out.缺少无障碍名字.push(sel(el));
+    else if (name.startsWith('PLACEHOLDER:')) out.只有placeholder.push(sel(el) + ' → ' + name.slice(12));
+  });
+
+  let prev = 0;
+  document.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
+    const lvl = Number(h.tagName[1]);
+    if (prev && lvl > prev + 1) {
+      out.标题层级.push(h.tagName + ' 跳级（上一个 H' + prev + '）：' + (h.innerText||'').trim().slice(0,16));
+    }
+    prev = lvl;
+  });
+  const h1 = document.querySelectorAll('h1').length;
+  if (h1 !== 1) out.标题层级.push('h1 有 ' + h1 + ' 个，应当恰好 1 个');
+
+  document.querySelectorAll('*').forEach(el => {
+    const ox = getComputedStyle(el).overflowX;
+    if (ox !== 'auto' && ox !== 'scroll') return;
+    if (el.scrollWidth <= el.clientWidth + 1) return;
+    if (el.tabIndex >= 0) return;
+    out.键盘够不到.push(sel(el) + ' 可横滚 ' + (el.scrollWidth - el.clientWidth) + 'px 却不可聚焦');
+  });
+
+  if (!document.querySelector('main')) out.地标.push('没有 <main>');
+  if (!document.documentElement.lang) out.地标.push('<html> 没有 lang');
+  return JSON.stringify(out);
+})()
+"""
+
 
 def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> None:
     """在手机视口下量"有没有内容够不着"。
@@ -230,6 +293,9 @@ def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> 
     tab.drain(1.2)
     raw = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
                    returnByValue=True)["result"].get("value")
+    # 无障碍那几条也在手机视口下查：横滚带只在窄屏才真的溢出，桌面宽度下它一条
+    # 内容都不隐藏，检查会永远是绿的。
+    check_accessibility(tab, page, failures)
     tab.send("Emulation.clearDeviceMetricsOverride")
     tab.drain(0.6)
     if not raw:
@@ -241,6 +307,21 @@ def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> 
         )
     for item in box["offscreen"]:
         failures.append(f"{page}  手机视口下元素右边缘出界：{item}")
+
+
+def check_accessibility(tab: "CDP", page: str, failures: list[str]) -> None:
+    """在手机视口下查那几条对比度检查看不见的无障碍问题。
+
+    刻意**不**查"有没有 aria-live 区域"：首页是静态落地页，为它加一个 live region
+    只会制造噪音。一条会对正确实现报警的检查，最后一定被人加白名单绕过。
+    """
+    raw = tab.send("Runtime.evaluate", expression=A11Y_PROBE,
+                   returnByValue=True)["result"].get("value")
+    if not raw:
+        return
+    for kind, items in json.loads(raw).items():
+        for item in items:
+            failures.append(f"{page}  无障碍/{kind}：{item}")
 
 
 def check_sprite_icons(tab: "CDP", page: str, failures: list[str]) -> None:
@@ -433,7 +514,7 @@ def main() -> int:
             print(f"  {item}")
         return 1
     print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，{clicked} 个控件逐个按过，"
-          f"手机视口无横向溢出，无异常、无 console.error、无失败请求")
+          f"手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求")
     return 0
 
 
