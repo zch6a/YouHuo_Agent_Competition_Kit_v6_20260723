@@ -14,5 +14,6 @@
     "safety_invariant": 100000
   },
   "failures": [],
-  "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。"
+  "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。",
+  "source_digest": "7b50d7d08052adba9e5e64b6da0e4a092814bb00bf175ab6045ae289b2c0732b"
 }

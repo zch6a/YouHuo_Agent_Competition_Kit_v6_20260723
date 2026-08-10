@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
 $env:PYTHONPATH = Join-Path $Root "backend"

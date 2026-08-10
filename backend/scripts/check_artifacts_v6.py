@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+sys.path.insert(0, str(ROOT / "backend"))
+from youhuo.provenance import source_digest  # noqa: E402
 
 #: Directories that legitimately hold large or generated content we never scan.
 _SKIP_DIRS = {".venv", ".git", "__pycache__", ".pytest_cache", "node_modules"}
@@ -120,6 +124,28 @@ def main() -> int:
     checks["load_passed"] = load["successful"] == 5_000 and load["failed"] == 0
     checks["chaos_passed"] = chaos["scenarios"] == 400 and chaos["failed"] == 0
     checks["http_smoke_passed"] = smoke["passed"] is True and smoke["version"] == "6.0.0"
+
+    # 上面这几条读的是**报告**，不是当场跑出来的结论。
+    #
+    # 重型验证一次要好几分钟，所以结论留在 reports/ 里由这里引用——这本身没问题，
+    # 问题是引用一份比代码还旧的结论。本轮之前，mass_audit_v5_1000000.json 是 08-08
+    # 的，而 v5_services.py（含 PurposeBoundPolicy 的字段规范化）和 security.py 在
+    # 08-10 被改过；那两天里 verify_all 每次都报"全部阶段通过"。它没说谎，只是它
+    # 断言的是一条记录而不是当前的事实。
+    #
+    # 每份重型报告现在都盖着它验证过的那棵 backend/youhuo 的指纹。对不上就是过期，
+    # 必须重跑 verify_heavy，而不是继续引用旧结论。
+    current = source_digest()
+    stale = [
+        name for name, report in (
+            ("mass_audit_v5_1000000", mass_v5), ("load_v6_5000", load),
+            ("chaos_v5_400", chaos), ("http_smoke_v6", smoke),
+        )
+        if report.get("source_digest") != current
+    ]
+    checks["heavy_reports_match_current_source"] = not stale
+    if stale:
+        print(f"过期的重型报告（源码已变，需重跑 verify_heavy）：{stale}")
 
     checks["project_version"] = 'version = "6.0.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     # These used to be three hard-coded paths under data/. The app actually writes

@@ -19,6 +19,7 @@
     "load_passed": true,
     "chaos_passed": true,
     "http_smoke_passed": true,
+    "heavy_reports_match_current_source": true,
     "project_version": true,
     "no_runtime_database": true,
     "no_generated_audit_key": true,

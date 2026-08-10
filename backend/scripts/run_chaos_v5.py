@@ -10,6 +10,7 @@ from youhuo.database import Database
 from youhuo.models import ActorRole, AuthContext
 from youhuo.v5_models import SagaAdvanceRequest, SagaCreateRequest, SagaKind, SagaOutcome
 from youhuo.v5_store import V5FeatureStore
+from youhuo.provenance import source_digest
 
 
 def advance(store: V5FeatureStore, actor: AuthContext, saga_id: str, version: int, key: str, output: dict[str, Any], outcome: SagaOutcome = SagaOutcome.SUCCESS, error: str | None = None):
@@ -104,6 +105,9 @@ def main() -> int:
         "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    # 盖上被验证那棵树的指纹。读一份报告不等于跑过一次验证——check_artifacts_v6
+    # 会重算并比对，对不上就判过期。见 youhuo/provenance.py。
+    report["source_digest"] = source_digest()
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if not failures else 1

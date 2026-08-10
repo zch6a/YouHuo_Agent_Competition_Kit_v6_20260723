@@ -8,5 +8,6 @@
   "invalid_or_conflicting_advances_blocked": 400,
   "failed": 0,
   "failures": [],
-  "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。"
+  "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。",
+  "source_digest": "7b50d7d08052adba9e5e64b6da0e4a092814bb00bf175ab6045ae289b2c0732b"
 }

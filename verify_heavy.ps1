@@ -1,7 +1,11 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
 Set-Location $Root
 $env:PYTHONPATH = Join-Path $Root "backend"
+# 同 verify_all.ps1：这里全是裸 `python`，机器上的 Miniconda 排在 PATH 前面且没有本
+# 项目的依赖，整套重验证会以 ModuleNotFoundError 收场，看起来却像代码坏了。
+$Venv = Join-Path $Root ".venv/Scripts"
+if (Test-Path $Venv) { $env:Path = "$Venv;$env:Path" }
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "reports") | Out-Null
 $Log = Join-Path $Root "reports/verify_heavy_v6.txt"
 & {

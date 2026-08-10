@@ -16,6 +16,78 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+_BOM = b"\xef\xbb\xbf"
+_SKIP_DIRS = {".venv", ".git", "__pycache__", ".pytest_cache", "node_modules"}
+
+
+def _scripts(suffix: str) -> list[Path]:
+    return sorted(
+        p for p in ROOT.rglob(f"*{suffix}")
+        if not set(p.relative_to(ROOT).parts) & _SKIP_DIRS
+    )
+
+
+@pytest.mark.parametrize("script", _scripts(".ps1"), ids=lambda p: p.name)
+def test_powershell_scripts_with_chinese_carry_a_bom(script):
+    """PowerShell 5.1 读没有 BOM 的 .ps1 时，按系统 ANSI 代码页解码。
+
+    这台机器是 CP936。中文注释被解错之后，误解出的字节里只要有一个 0x60 落在行尾，
+    那就是**续行符**——下一行整行被吞进注释。`verify_heavy.ps1` 就是这样把
+    `$Venv = Join-Path ...` 弄丢的，而报错出现在七行之后（"Test-Path: 参数为 null"），
+    从堆栈里完全看不出原因是编码。
+
+    `verify_all.ps1` 当时没坏，纯属它的中文恰好没产生行尾反引号——那不是安全，
+    是运气。
+    """
+    raw = script.read_bytes()
+    if not any(b > 127 for b in raw.lstrip(_BOM)):
+        pytest.skip("纯 ASCII，不需要 BOM")
+    assert raw.startswith(_BOM), (
+        f"{script.name} 含非 ASCII 却没有 UTF-8 BOM；PowerShell 5.1 会按 CP936 解码它"
+    )
+
+
+@pytest.mark.parametrize("script", _scripts(".sh"), ids=lambda p: p.name)
+def test_shell_scripts_never_carry_a_bom(script):
+    """.sh 反过来：BOM 会挤在 `#!` 前面，shebang 直接失效。
+
+    同一个字符，两个文件类型，要求正好相反——所以两条都要有。
+    """
+    assert not script.read_bytes().startswith(_BOM), f"{script.name} 带 BOM，shebang 会失效"
+
+
+#: 重型验证的产物。它们不在 verify_all 里重跑，只被读取，所以必须能判断是否过期。
+_HEAVY_REPORTS = [
+    "reports/mass_audit_v5_1000000.json",
+    "reports/chaos_v5_400.json",
+    "reports/load_v6_5000.json",
+    "reports/http_smoke_v6.json",
+]
+
+
+@pytest.mark.parametrize("report", _HEAVY_REPORTS, ids=lambda p: Path(p).stem)
+def test_heavy_reports_were_produced_by_the_current_source(report):
+    """读一份报告，不等于跑过一次验证。
+
+    一百万条 v5 断言和 400 个 Saga 场景单次要好几分钟，所以结论留在 JSON 里给
+    `check_artifacts_v6` 引用。曾经有两天，`mass_audit_v5_1000000.json` 是 08-08 的，
+    而 `v5_services.py`（含 `PurposeBoundPolicy` 的字段规范化）和 `security.py` 在
+    08-10 被改过——`verify_all` 每次都报"全部阶段通过"，依据却是改动之前的结论。
+
+    这不是它说谎，是它断言的对象错了：一条记录，而不是当前的事实。同一个错误在这个
+    项目里还表现为"页面登记在 JSON 里就算够得着"和"`node --check` 过了就算能跑"。
+    """
+    import json
+
+    from youhuo.provenance import source_digest
+
+    data = json.loads((ROOT / report).read_text(encoding="utf-8"))
+    assert "source_digest" in data, f"{report} 没有盖指纹，无法判断是否过期"
+    assert data["source_digest"] == source_digest(), (
+        f"{report} 是用另一版 backend/youhuo 跑出来的，重跑 verify_heavy"
+    )
+
+
 def _load_checker():
     spec = importlib.util.spec_from_file_location(
         "check_artifacts_v6", ROOT / "backend/scripts/check_artifacts_v6.py"

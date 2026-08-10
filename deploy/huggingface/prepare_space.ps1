@@ -1,4 +1,4 @@
-# Assemble a Hugging Face Space commit without touching the GitHub working tree.
+﻿# Assemble a Hugging Face Space commit without touching the GitHub working tree.
 #
 # A Space is its own git repo and needs a README.md carrying YAML frontmatter at
 # its root. The project README is the project's, so we stage a copy: project

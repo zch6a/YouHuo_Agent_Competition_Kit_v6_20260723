@@ -25,6 +25,7 @@ from youhuo.v5_services import (
     SyncConflictPolicy,
     VoiceConsensusEngine,
 )
+from youhuo.provenance import source_digest
 
 
 class Audit:
@@ -198,6 +199,9 @@ def main() -> int:
         "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。",
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
+    # 盖上被验证那棵树的指纹。读一份报告不等于跑过一次验证——check_artifacts_v6
+    # 会重算并比对，对不上就判过期。见 youhuo/provenance.py。
+    report["source_digest"] = source_digest()
     args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if not audit.failures else 1

@@ -15,6 +15,11 @@ import httpx
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# 这个脚本不 import 应用代码（它只打 HTTP），但报告要盖上被验证那棵树的指纹，
+# 所以把 backend/ 放进路径。见 youhuo/provenance.py。
+sys.path.insert(0, str(ROOT / "backend"))
+from youhuo.provenance import source_digest  # noqa: E402
+
 
 def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -188,6 +193,9 @@ def main() -> int:
     args = parser.parse_args()
     result = run()
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    # 盖上被验证那棵树的指纹。读一份报告不等于跑过一次验证——check_artifacts_v6
+    # 会重算并比对，对不上就判过期。见 youhuo/provenance.py。
+    result["source_digest"] = source_digest()
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
