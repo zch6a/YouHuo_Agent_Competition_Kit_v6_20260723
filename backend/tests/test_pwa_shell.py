@@ -322,6 +322,25 @@ def test_every_section_button_has_a_panel_to_show(page, least):
     assert len(open_panels) == 1, f"{page} 默认展开的分区不是一个：{len(open_panels)}"
 
 
+def test_every_trust_promise_points_at_something_that_proves_it():
+    """四条底线的「→」必须落在这一页真实存在的分区上。
+
+    这一页的整个论点是"每一条都能当场验证"。一条指向 `#nowhere` 的底线不会报错、
+    不会在截图里露馅——点下去 hash 变了、`initSections` 回退到第一段，看起来就像
+    什么都没发生。而它恰恰把这一页最重的那句话变成了空话。
+
+    `check_page_runtime` 的点击遍历只按 `<button>`，这四条是 `<a>`，它不会碰。
+    """
+    source = (STATIC / "trust.html").read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    targets = re.findall(r'<a class="promise" href="#(\w+)"', source)
+    panels = set(re.findall(r'data-panel="(\w+)"', source))
+    assert len(targets) == 4, f"底线不是四条：{targets}"
+    assert len(set(targets)) == 4, f"有两条底线指向同一段：{targets}"
+    dangling = [t for t in targets if t not in panels]
+    assert not dangling, f"这些底线指向不存在的分区：{dangling}（现有分区 {sorted(panels)}）"
+
+
 def test_care_cards_sit_below_their_section_heading():
     """分区标题是 h2，卡片标题必须降到 h3。
 

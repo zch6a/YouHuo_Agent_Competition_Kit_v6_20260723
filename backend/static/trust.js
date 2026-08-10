@@ -152,4 +152,11 @@ byId('metricsDemo').addEventListener('click', async () => {
   catch (error) { output('truthOutput', error.message); }
 });
 
+// 页内分区，与家人端、照护页同一份实现（common.js）。这一页原先是六张卡各带一两个
+// 按钮并排铺开，标题用的是工程名字；现在每一段回答一个具体的疑问。
+//
+// 页头四条底线里的「看一次 →」是普通 hash 链接，落到 initSections 装的 hashchange
+// 上——"主张"和"验证它的那一段"因此共用同一套机制，不需要第二份代码。
+window.YouHuo.initSections('hear');
+
 bootstrap();

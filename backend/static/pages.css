@@ -136,6 +136,9 @@
 .fam-head h1 { font-size: clamp(26px, 5vw, 34px); line-height: var(--lh-tight); margin: 0; }
 .fam-updated { margin: 4px 0 0; font-size: 14px; color: var(--ink-3); }
 .fam-refresh { flex: none; }
+/* `justify-content: space-between` 会把右边这个挤到只剩几个字宽——「← 返回首页」
+   于是折成三行，变成右上角一个比标题还大的白块。实测在可信页上就是这样。 */
+.fam-head .back-link { flex: none; white-space: nowrap; }
 
 .segmented {
   display: flex;
@@ -178,6 +181,64 @@
 .section-note { margin: 0 0 var(--space-3); font-size: 14px; color: var(--ink-3); line-height: var(--lh-snug); }
 
 .metric-row-one { grid-template-columns: 1fr; }
+
+/* --------------------------------------------------------------------------
+   可信中心的主张与四条底线
+   ..........................................................................
+   这四条原先是页头一段 .meta 小字，排在一整行技术名词（"N-best语音共识、目的
+   绑定数据流、可恢复Saga…"）后面——而它们才是这一页的论点。现在它们是第二块
+   内容，每条带一个跳到对应分区的链接：主张必须能当场验证，否则只是宣传。
+
+   刻意不做成四张卡：它们是一份清单，读的时候是从上到下读完的，不是四个要分别
+   点开的对象。四张卡只会让人以为要选一个。
+   -------------------------------------------------------------------------- */
+
+.trust-claim {
+  margin: 0 0 var(--space-4);
+  max-width: 46ch;
+  font-size: 17px;
+  line-height: var(--lh-snug);
+  color: var(--ink-2);
+}
+
+.promise-list {
+  list-style: none;
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+/* 整行就是链接，不在行尾另放一个「看一次 →」。
+   第一版是"名字 + 说明 + 链接"三列，390px 下挤成三行、每条 230px 高，四条底线
+   吃掉整个首屏——而这一页的论点应该一眼读完。整行可点之后一条 76px，四条一屏内
+   读完，命中区反而更大，而且省掉了四遍重复的「看一次」。 */
+.promise {
+  display: grid;
+  grid-template-columns: minmax(5.5em, auto) 1fr auto;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.promise > strong { font-size: 15px; font-weight: 800; color: var(--ink); }
+.promise > span { font-size: 15px; line-height: var(--lh-snug); color: var(--ink-2); }
+.promise::after {
+  content: "→";
+  align-self: center;
+  font-size: 15px;
+  color: var(--ink-3);
+}
+.promise:hover { background: var(--surface-2); }
+.promise:hover > strong { color: var(--youhuo-blue-ink); }
+/* 窄屏：名字换到说明上面一行，箭头跟着名字。
+   ::after 是最后一个网格子项，不显式定位的话会被自动排到第三行最左边——一个孤零零
+   的箭头顶在行首。截图里就是这样。 */
+@media (max-width: 480px) {
+  .promise { grid-template-columns: 1fr auto; }
+  .promise::after { grid-column: 2; grid-row: 1; align-self: baseline; }
+  .promise > span { grid-column: 1 / 3; margin-top: 2px; }
+}
 
 /* 照护页的会话状态：一行字，不是一块横幅。字重和字号都降下来，颜色保留——
    它失败的时候要能一眼看见，成功的时候不该是首屏最重的东西。 */
