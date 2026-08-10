@@ -33,7 +33,14 @@ from .semantic_router import RoutingDecision, SemanticRouter, apply_advisory_slo
 from .teach_back import TeachBackCheck, TeachBackOutcome, TeachBackVerifier
 from .services import Services
 from .v4_services import EmotionAnalyzer
-from .utils import new_id, parse_relative_date, parse_time_text, request_fingerprint, semantic_hash
+from .utils import (
+    local_today,
+    new_id,
+    parse_relative_date,
+    parse_time_text,
+    request_fingerprint,
+    semantic_hash,
+)
 
 
 def semantic_model_configured() -> bool:
@@ -793,7 +800,7 @@ class YouHuoEngine:
             task.result = {"duplicate_task_id": duplicate.id}
             self.db.update_task(task)
             return self._finish_task(session, task, "相同时间的挂号已经存在，不会重复办理。", ResponseCode.DUPLICATE_BLOCKED)
-        validation = self.services.hospital.validate(task.slots, today=self.services.clock.now().date())
+        validation = self.services.hospital.validate(task.slots, today=local_today(self.services.clock.now()))
         if not validation.ok:
             task.status = TaskStatus.COLLECTING
             if validation.code in {"UNKNOWN_HOSPITAL"}:
@@ -923,7 +930,7 @@ class YouHuoEngine:
                 family_id=task.family_id,
                 elder_id=task.elder_id,
                 slots=task.slots,
-                today=self.services.clock.now().date(),
+                today=local_today(self.services.clock.now()),
             )
             if result.ok:
                 calendar = self.services.reminder.create_from_parts(
@@ -1326,7 +1333,7 @@ class YouHuoEngine:
                     if doctor in text or doctor.removesuffix("医生") in text:
                         slots["doctor"] = doctor
                         break
-            parsed_date = parse_relative_date(text, self.services.clock.now().date())
+            parsed_date = parse_relative_date(text, local_today(self.services.clock.now()))
             if parsed_date:
                 slots["appointment_date"] = parsed_date
             parsed_time = parse_time_text(text)
@@ -1334,7 +1341,7 @@ class YouHuoEngine:
                 slots["appointment_time"] = parsed_time
             return
         if task_type == TaskType.REMINDER:
-            parsed_date = parse_relative_date(text, self.services.clock.now().date())
+            parsed_date = parse_relative_date(text, local_today(self.services.clock.now()))
             parsed_time = parse_time_text(text)
             if parsed_date:
                 slots["due_date"] = parsed_date

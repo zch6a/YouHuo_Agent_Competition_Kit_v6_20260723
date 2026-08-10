@@ -551,20 +551,43 @@ function rankReminders(reminders) {
  * 麦克风之前。
  *
  * 只说未完成的。已完成的待办出现在"今天还有 3 件事"里，会让人白紧张一次。
+ *
+ * 而"今天"必须真的是今天。这一行原先拿的是**全部**未完成待办的条数——三条待办
+ * （今天 16:00 复诊、8 月 19 日体检、9 月 4 日缴水费）会渲染成"今天有 3 件事"，
+ * 实际今天只有一件。把今天那条办掉之后更荒唐：变成"今天有 2 件事 · 下一件 8月19日
+ * 09:00 体检"——标题说今天，紧接着自己报了一个九天后的日期。
+ * `/v2/reminders` 没有按日筛选的参数，所以在这里按本地日期筛。
  */
+function isToday(iso) {
+  const at = new Date(iso);
+  const now = new Date();
+  return at.getFullYear() === now.getFullYear()
+    && at.getMonth() === now.getMonth()
+    && at.getDate() === now.getDate();
+}
+
 function renderTodayLine(reminders) {
   const line = document.getElementById('todayLine');
   if (!line) return;
   const open = reminders
     .filter(r => !['completed', 'cancelled'].includes(r.status))
     .sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
-  if (!open.length) {
-    line.textContent = '今天没有要办的事。';
+  const today = open.filter(r => isToday(r.due_at));
+  if (today.length) {
+    const next = today[0];
+    line.textContent = `今天有 ${today.length} 件事 · 下一件 ${friendlyTime(next.due_at)} ${next.title}`;
     line.hidden = false;
     return;
   }
-  const next = open[0];
-  line.textContent = `今天有 ${open.length} 件事 · 下一件 ${friendlyTime(next.due_at)} ${next.title}`;
+  // 今天没事，但后面还有。说"今天没有要办的事"就完事，会让她以为什么都不用管了；
+  // 所以顺带把下一件是哪天说出来——这一行的职责是"今天怎么样"，不是"永远没事"。
+  if (open.length) {
+    const next = open[0];
+    line.textContent = `今天没有要办的事 · 下一件 ${friendlyTime(next.due_at)} ${next.title}`;
+    line.hidden = false;
+    return;
+  }
+  line.textContent = '今天没有要办的事。';
   line.hidden = false;
 }
 

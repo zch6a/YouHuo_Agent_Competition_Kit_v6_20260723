@@ -346,6 +346,64 @@ def test_no_page_labels_itself_with_all_caps_english(page):
     assert not offenders, f"{page} 用一串大写英文介绍自己：{offenders}"
 
 
+def test_the_today_line_counts_only_today():
+    """「今天有 N 件事」里的 N 必须真的是今天的件数。
+
+    这一行原先统计的是**全部**未完成待办：三条待办（今天 16:00 复诊、8 月 19 日体检、
+    9 月 4 日缴水费）渲染成"今天有 3 件事"，而今天只有一件。把今天那条办掉之后更荒唐
+    ——"今天有 2 件事 · 下一件 8月19日 09:00 体检"，标题说今天，紧接着自己报了一个
+    九天后的日期。`/v2/reminders` 没有按日筛选的参数，所以筛选必须在前端做。
+
+    钉渲染代码而不是页面文本：这一行的内容运行时才从接口来，静态 HTML 里只有一个
+    空的 `<p hidden>`，查 HTML 等于什么都没查。
+    """
+    js = (STATIC / "elder.js").read_text(encoding="utf-8")
+    body = re.sub(r"//.*", "", js)
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    render = re.search(r"function renderTodayLine\(.*?\n\}", body, re.S)
+    assert render, "renderTodayLine 不见了"
+    inner = render.group(0)
+    assert "isToday" in inner, "「今天有 N 件事」没有按日筛选"
+    # 计数用的必须是筛过的那个数组，不是全部未完成的 open。
+    count = re.search(r"今天有 \$\{(\w+)\.length\}", inner)
+    assert count, "找不到那句「今天有 N 件事」"
+    assert count.group(1) != "open", f"N 取自未筛选的 {count.group(1)}.length"
+
+    # isToday 必须按本地日期比，不能用 toISOString/getUTC*——那会在 UTC+8 把一天
+    # 切在早上八点，和后端 baseline_api 的 _local_today 打架。
+    helper = re.search(r"function isToday\(.*?\n\}", body, re.S)
+    assert helper, "isToday 不见了"
+    assert "getUTC" not in helper.group(0) and "toISOString" not in helper.group(0), \
+        "isToday 用了 UTC 字段，等于把一天切在早上八点"
+
+
+def test_relative_dates_are_resolved_in_the_elders_timezone():
+    """老人说的"今天/明天"是**他所在时区**的今天和明天。
+
+    两个调用点原先传的是 `clock.now().date()`，也就是 UTC 的日期。在 UTC+8，每天
+    00:00–08:00 这八小时里 UTC 还停在前一天：老人早上七点说"提醒我明天上午九点吃药"，
+    解析出来是今天，提醒早一天。同一个仓库里 `baseline_api` 的 `_local_today` 早就
+    按 Asia/Shanghai 算了——v7 日报的"今天"和 v2 提醒的"今天"是两个不同的日子。
+    """
+    engine = (ROOT / "backend/youhuo/engine.py").read_text(encoding="utf-8")
+    body = re.sub(r"#.*", "", engine)
+    leaks = re.findall(r".{0,50}clock\.now\(\)\.date\(\).{0,20}", body)
+    assert not leaks, f"engine 还在用 UTC 的日期当\"今天\"：{leaks}"
+    assert "local_today" in body, "engine 没有引用本地日期"
+
+    utils = (ROOT / "backend/youhuo/utils.py").read_text(encoding="utf-8")
+    assert "LOCAL_TIMEZONE" in utils and "def local_today" in utils, "本地时区助手不见了"
+    # combine_date_time 必须带上偏移，否则调用方又会去 replace(tzinfo=UTC)。
+    # 取到下一个顶层 def 或文件末尾。`.*?\n\n` 会在 docstring 里的空行就停下——
+    # 那样断言只看到函数签名和第一行文档，永远失败（第一次写就是这样）。
+    combine = re.search(r"def combine_date_time\(.*?(?=\ndef |\Z)", utils, re.S)
+    assert combine and "tzinfo=local_zone()" in combine.group(0), \
+        "combine_date_time 又回到了无时区的裸串"
+    services = (ROOT / "backend/youhuo/services.py").read_text(encoding="utf-8")
+    assert "combine_date_time(due_date, due_time)).replace(tzinfo=UTC)" not in services, \
+        "又把老人说的墙上时间盖成了 UTC"
+
+
 def test_judge_steps_report_failures_where_the_user_clicked():
     """每一步失败时，错误要写进那一步自己的输出区，不只是页面顶部的状态行。
 

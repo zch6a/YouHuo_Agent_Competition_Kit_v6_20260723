@@ -113,6 +113,19 @@ def create_app(
             "v6新增认知负荷治理、玻璃盒依赖校准、安全预演、受约束语义网关与真实用户实验工具链。"
         ),
         lifespan=lifespan,
+        # Swagger UI 与 ReDoc 在这个应用里必然是白屏，所以不要提供它们。
+        #
+        # 这套响应头是 `default-src 'self'; script-src 'self'`，没有 unsafe-inline、
+        # 没有 nonce，而中间件对**每一个**响应下发。FastAPI 默认的 docs 页有三处必然被
+        # 拦：jsdelivr CDN 的 JS 与 CSS，加一段内联 `<script>`；自托管那两个静态文件
+        # 也救不了内联那一段。评委页上原先有一个「接口文档」按钮指向 /docs——点开是
+        # 一片空白加三条 CSP 违规。
+        #
+        # 关掉之后 /docs 是 404，而 404 是实话；白屏看起来像产品坏了。接口定义仍然
+        # 完整可取：`/openapi.json` 是纯 JSON，不受 CSP 约束，离线也能打开，评委页的
+        # 按钮现在指向它。
+        docs_url=None,
+        redoc_url=None,
     )
     app.state.db = db
     app.state.engine = engine

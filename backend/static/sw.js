@@ -49,7 +49,16 @@ const SHELL = [
   '/static/icons/tabs.svg',
   '/static/icons/icon-192.png',
   '/static/icons/apple-touch-icon.png',
-  '/static/manifest.webmanifest',
+  // 六个页面请求的是根路径 `/manifest.webmanifest`（api.py 在根上单独开了一条路由）。
+  // 这里原先写的是 `/static/manifest.webmanifest`——它恰好也能被 StaticFiles 取到，
+  // 所以 `cache.add` 不报错，安安静静缓存了一个**没有任何人请求过**的 URL。缓存按
+  // 完整 URL 索引，于是首次访问后立刻离线冷启，manifest 未命中、fetch 失败，
+  // 安装提示、主题色和图标信息一起缺失。
+  '/manifest.webmanifest',
+  // 512 与两张 maskable 图标此前不在册：离线首装时 Android 只能拿 192 那张放大。
+  '/static/icons/icon-512.png',
+  '/static/icons/icon-192-maskable.png',
+  '/static/icons/icon-512-maskable.png',
 ];
 
 self.addEventListener('install', event => {
@@ -92,7 +101,17 @@ self.addEventListener('fetch', event => {
   if (isApi(url)) return;                       // never cached, never intercepted
 
   event.respondWith(
-    caches.match(request).then(hit => {
+    // `ignoreSearch` 不是可选的。
+    //
+    // `caches.match` 默认把 query 算进匹配，而外壳里存的是 `/elder`。manifest 的
+    // 快捷方式指向 `/elder?mode=companion`——装好 PWA 之后长按图标选「找无忧伴聊聊」，
+    // 离线时缓存未命中、fetch 抛错、`.catch(() => hit)` 得到 undefined，
+    // `respondWith(undefined)` 让这次导航直接失败，连浏览器自带的离线页都拿不到。
+    // 主图标（start_url 是 `/elder`）正常，只有快捷方式是死的。
+    //
+    // API 请求在上面第 101 行就早退了，不会走到这里，所以忽略 query 不会让带参数的
+    // 权威状态请求命中一份陈旧副本。
+    caches.match(request, {ignoreSearch: true}).then(hit => {
       // Stale-while-revalidate for the shell: instant paint, fresh next launch.
       const fetching = fetch(request)
         .then(response => {

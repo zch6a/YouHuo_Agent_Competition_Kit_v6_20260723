@@ -280,7 +280,10 @@ python -m pip install -r requirements.txt
 - 照护中心：http://127.0.0.1:8000/care
 - 可信实验室：http://127.0.0.1:8000/trust
 - **决赛五分钟导览：http://127.0.0.1:8000/judge**
-- OpenAPI：http://127.0.0.1:8000/docs
+- OpenAPI：http://127.0.0.1:8000/openapi.json
+  （Swagger UI 与 ReDoc 已关闭：这套 CSP 是 script-src 'self'、无 unsafe-inline，
+   而它们必须加载 CDN 脚本和一段内联脚本，打开只会是白屏加三条 CSP 违规。
+   接口定义本身完整，纯 JSON，离线可看。）
 
 演示账号仅在 `YOUHUO_DEMO_MODE=true` 时启用：`elder-demo`、`daughter-demo`、`son-demo`。
 
