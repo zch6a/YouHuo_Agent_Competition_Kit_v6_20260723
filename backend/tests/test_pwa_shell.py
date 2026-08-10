@@ -143,7 +143,19 @@ def test_no_native_dialogs(script):
     # 去掉注释再查：本项目的注释里正引用着它删掉的那几处 alert()。
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
     source = re.sub(r"//[^\n]*", "", source)
+    # 裸调用。`(?<![.\w])` 排除掉带点的接收者，本意是别把 `obj.prompt(...)` 这种
+    # 同名方法当成原生对话框。
     found = re.findall(r"(?<![.\w])(alert|confirm|prompt)\s*\(", source)
+    # 但那条反向断言把**全局对象上的**调用一起放过了，而它们冻页面的效果一模一样：
+    #   window.alert('缴费失败') / globalThis.confirm(...) / self.prompt(...)
+    #   window['alert'](...) —— 方括号形式连函数名都不在正则视野里
+    # 四种写法此前全部通过。这一条守的是"这个受众看到系统灰框只知道出事了"，而不是
+    # "源码里不许出现某五个字符"。
+    _GLOBAL = r"(?:window|globalThis|self|top|parent)"
+    found += re.findall(rf"\b{_GLOBAL}\s*\.\s*(alert|confirm|prompt)\s*\(", source)
+    found += re.findall(
+        rf"""\b{_GLOBAL}\s*\[\s*['"](alert|confirm|prompt)['"]\s*\]""", source
+    )
     assert not found, f"{script} 里还有原生对话框：{sorted(set(found))}"
 
 
@@ -170,7 +182,9 @@ def test_only_one_file_owns_the_request_layer(script):
     source = re.sub(r"/\*.*?\*/", "", source, flags=re.S)
     source = re.sub(r"//[^\n]*", "", source)
     assert "/v2/auth/demo" not in source, f"{script} 又自己实现了演示登录"
-    assert "Bearer" not in source, f"{script} 又自己拼 Authorization 头"
+    # 大小写不能敏感：RFC 7235 的 auth-scheme 是大小写不敏感的，`'bearer ' + tok`
+    # 这个头照样工作，而原来那条大小写敏感的子串断言看不见它。
+    assert "bearer" not in source.lower(), f"{script} 又自己拼 Authorization 头"
 
 
 @pytest.mark.parametrize("page", ["care.html", "trust.html", "judge.html"])
@@ -236,6 +250,21 @@ def test_no_declaration_was_lost_in_the_split():
     # 事故立刻可见，而不是慢慢发现某个页面少了一块。
     assert css.count(":root") >= 4, "令牌层丢了"
     assert "@media (max-width: 760px)" in css, "响应式那一大段不见了"
+    # 逐层要有下限。
+    #
+    # 上面那三条断言在**整层被删掉**时全都还成立：把 components.css 清空，花括号仍然
+    # 配对（它自己也配对）、`:root` 那四个全在 tokens.css、那条 media 在 pages.css。
+    # 而这条测试的 docstring 说的就是"任何一层被整段删掉，这里都会掉下来"——它守的
+    # 意图是对的，判据不到位。现在按层数声明。
+    #
+    # 数字是当前实测的保守下限（真实值分别约为 78 / 63 / 470 / 480），改样式时不会
+    # 频繁碰到；它的作用是让"这一层没了"立刻可见。
+    for layer, floor in (("tokens.css", 60), ("base.css", 40),
+                         ("components.css", 300), ("pages.css", 300)):
+        raw = (STATIC / layer).read_text(encoding="utf-8")
+        body = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+        count = len(re.findall(r"[-a-zA-Z]+\s*:\s*[^;{}]+(?=[;}])", body))
+        assert count >= floor, f"{layer} 只剩 {count} 条声明（下限 {floor}）——这一层被删了吗？"
 
 
 #: 老人端与家属端是真实产品，不是工程演示。这些词不得出现在它们的可见文本里。
@@ -318,7 +347,14 @@ def test_every_section_button_has_a_panel_to_show(page, least):
     assert len(sections) >= least, f"{page} 的分区按钮少于 {least} 个：{sections}"
     assert sorted(set(sections)) == sorted(set(panels)), f"按钮 {sections} 与内容 {panels} 对不上"
     # 恰好一个分区默认展开，否则首屏会同时铺开两段。
-    open_panels = [p for p in re.findall(r"<section[^>]*data-panel=[^>]*>", source) if "hidden" not in p]
+    #
+    # 判据必须是 `hidden` **这个属性**，不是子串 "hidden"：`aria-hidden="true"` 里也含
+    # 它，于是把第二个分区的 `hidden` 换成 `aria-hidden="true"` 就能骗过这一条——首屏
+    # 同时铺开两段，而 `aria-hidden` 只对读屏隐藏、视觉上照样在。
+    open_panels = [
+        tag for tag in re.findall(r"<section[^>]*data-panel=[^>]*>", source)
+        if not re.search(r"(?<![-\w])hidden(?=[\s/>=])", tag)
+    ]
     assert len(open_panels) == 1, f"{page} 默认展开的分区不是一个：{len(open_panels)}"
 
 
@@ -339,9 +375,22 @@ def test_no_page_labels_itself_with_all_caps_english(page):
     """
     source = (STATIC / page).read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    # 判据不能挂在 `.eyebrow` 这个类上。
+    #
+    # 重构把 `.eyebrow` 全部移到了 judge.html，于是这条为六页参数化的规则在另外五页上
+    # `re.findall` 返回空列表、for 体一次都不执行——**实际只守一页**，而它列名的五个
+    # 违规样本恰好都在那五页上。而且原正则要求 class 值恰好是 `eyebrow`，
+    # `class="eyebrow foo"` 也会漏掉。
+    #
+    # 现在查的是"任何一段可见文本是不是纯大写 ASCII 标语"，与它用什么类无关。
+    body = re.search(r"<body[^>]*>(.*)</body>", source, re.S)
+    text_only = re.sub(r"<[^>]+>", "\n", body.group(1) if body else source)
     offenders = [
-        text.strip() for text in re.findall(r'class="eyebrow"[^>]*>(.*?)<', source, re.S)
-        if text.strip() and re.fullmatch(r"[A-Z0-9 ·.·\-–—/&+]+", text.strip())
+        line.strip() for line in text_only.splitlines()
+        if len(line.strip()) >= 8
+        and re.fullmatch(r"[A-Z0-9 ·.·\-–—/&+]+", line.strip())
+        # 单个全大写英文词（OPENAPI、SOS）不是标语；连着两个词才是。
+        and len(line.strip().split()) >= 2
     ]
     assert not offenders, f"{page} 用一串大写英文介绍自己：{offenders}"
 
@@ -444,6 +493,15 @@ def test_every_trust_promise_points_at_something_that_proves_it():
     assert len(set(targets)) == 4, f"有两条底线指向同一段：{targets}"
     dangling = [t for t in targets if t not in panels]
     assert not dangling, f"这些底线指向不存在的分区：{dangling}（现有分区 {sorted(panels)}）"
+    # 片段目标还必须真的存在为一个 id。
+    #
+    # `data-panel` 让 JS 切得动分区，但浏览器要设置**顺序焦点导航起点**靠的是 id：
+    # 没有 id 时键盘和读屏用户按下「看一次 →」之后焦点原地不动、没有任何播报，
+    # 只能盲目 Tab 过五个分区按钮去找。鼠标用户看得见变化，他们看不见——而这一页
+    # 想证明的恰恰是"每一条都能当场验证"。
+    ids = set(re.findall(r'\bid="(\w+)"', source))
+    missing = [t for t in targets if t not in ids]
+    assert not missing, f"这些底线的锚点没有对应的 id：{missing}"
 
 
 def test_care_cards_sit_below_their_section_heading():
@@ -458,12 +516,26 @@ def test_care_cards_sit_below_their_section_heading():
     """
     source = (STATIC / "care.html").read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
-    for card in re.findall(r'<article class="panel feature-panel.*?</article>', source, re.S):
+    # 两处判据原先都是脆的，变异一测就穿：
+    #   * 卡片靠 `class="panel feature-panel` 这个**确切词序**匹配——写成
+    #     `class="feature-panel panel"`（完全等效）就一条都匹配不到，for 体不执行；
+    #   * 分区靠 `\n    </section>` 这个**确切缩进**结尾——把闭合标签的缩进从四个空格
+    #     改成两个，同样一条都匹配不到。
+    # 两种情况下 `re.findall` 返回空列表，两个 for 循环双双空转，测试照样绿。
+    # 所以先断言"找到了东西"，再断言"东西是对的"。
+    cards = re.findall(r'<article\b[^>]*class="[^"]*\bfeature-panel\b[^"]*"[^>]*>.*?</article>',
+                       source, re.S)
+    assert len(cards) >= 7, f"照护页只匹配到 {len(cards)} 张卡——class 词序变了吗？"
+    for card in cards:
         assert "<h2" not in card, f"照护页有卡片仍在用 h2：{card[:90]}"
         assert "<h3" in card, f"照护页有卡片没有标题：{card[:90]}"
-    # 每个分区恰好一个 h2（它自己的标题）。
-    for panel in re.findall(r'<section class="page-section".*?\n    </section>', source, re.S):
-        assert panel.count("<h2") == 1, f"分区里的 h2 不是一个：{panel[:90]}"
+    # 每个分区恰好一个 h2（它自己的标题）。缩进不参与判据：按下一个同级 <section
+    # 或 </main> 断句。
+    panels = re.split(r'(?=<section\b[^>]*class="[^"]*\bpage-section\b)', source)[1:]
+    assert len(panels) >= 5, f"照护页只匹配到 {len(panels)} 个分区"
+    for panel in panels:
+        head = panel.split("</section>")[0]
+        assert head.count("<h2") == 1, f"分区里的 h2 不是一个：{head[:90]}"
 
 
 def test_a_failed_family_load_lands_somewhere_visible():
@@ -550,10 +622,26 @@ def test_no_inline_script_or_style_survives(page):
 
 
 def test_csp_is_still_strict(client):
-    csp = client.get("/elder").headers["content-security-policy"]
-    assert "script-src 'self'" in csp
-    assert "unsafe-inline" not in csp
-    assert "unsafe-eval" not in csp
+    """六个页面都要有同一条严格 CSP，而且 script-src 里不许有别的来源。
+
+    原先只查一页，而且只禁 `unsafe-inline` / `unsafe-eval`：
+    `script-src 'self' https://cdn.example *` 三个断言全部通过——通配符和外部主机
+    比内联脚本更宽，一个被投毒的 CDN 就能在这个应用里执行任意代码。这条测试是
+    "无构建步骤、无 CDN、无网络字体"那条硬约束的守卫，判据必须覆盖来源本身。
+    """
+    for route in ("/", "/elder", "/family", "/care", "/trust", "/judge"):
+        csp = client.get(route).headers["content-security-policy"]
+        assert "script-src 'self'" in csp, f"{route} 的 CSP 不是 script-src 'self'"
+        assert "unsafe-inline" not in csp, f"{route} 放开了内联脚本"
+        assert "unsafe-eval" not in csp, f"{route} 放开了 eval"
+        # script-src 那一段的来源列表：只允许 'self' 与关键字，不许主机、不许通配符。
+        directive = next(
+            (part.strip() for part in csp.split(";") if part.strip().startswith("script-src")),
+            "",
+        )
+        sources = directive.split()[1:]
+        bad = [s for s in sources if s != "'self'" and not s.startswith("'")]
+        assert not bad, f"{route} 的 script-src 允许了外部来源：{bad}"
 
 
 # --- safe areas and the mobile shell -------------------------------------

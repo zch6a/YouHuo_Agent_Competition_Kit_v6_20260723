@@ -5,6 +5,10 @@
 多条。所以收敛的同时必须有这三条。
 
 三条都只查这三层（tokens.css 是定义层，本身就该出现字面量）。
+
+**这个文件本身被审计过一轮，找出五条可绕过的路径**，逐条记在下面对应位置：
+最后一条声明省掉分号、`calc()` 豁免整个 value、逻辑属性的 `-start/-end` 变体不在
+名单里、`--space-*` 改名后整条测试空转、`hsl()`/`oklch()` 写死颜色放行。
 """
 from __future__ import annotations
 
@@ -17,11 +21,18 @@ ROOT = Path(__file__).resolve().parents[2]
 STATIC = ROOT / "backend" / "static"
 LAYERS = ["base.css", "components.css", "pages.css"]
 
+#: 逻辑属性的 `-start` / `-end` 变体必须在名单里。
+#:
+#: 原名单只有 `padding-inline` 和 `margin-block` 这样的两端简写，于是
+#: `padding-inline-start: 11px` 是一条完全合法、完全等效、而这条标尺看不见的绕道。
 SPACING_PROPS = {
     "margin", "padding", "gap", "row-gap", "column-gap",
     "margin-top", "margin-bottom", "margin-left", "margin-right",
     "padding-top", "padding-bottom", "padding-left", "padding-right",
     "margin-block", "margin-inline", "padding-block", "padding-inline",
+    "margin-block-start", "margin-block-end", "margin-inline-start", "margin-inline-end",
+    "padding-block-start", "padding-block-end", "padding-inline-start", "padding-inline-end",
+    "inset", "inset-block", "inset-inline", "top", "right", "bottom", "left",
 }
 
 #: 只有 --text-xs(13px) 与 --text-sm(15px) 是固定值；--text-base 起全是 clamp()，
@@ -29,12 +40,24 @@ SPACING_PROPS = {
 #: 管辖范围内——硬套 clamp 令牌会让它们在窄屏变小，而窄屏正是老人的屏幕。
 FIXED_SIZE_TOKENS = {"13px": "--text-xs", "15px": "--text-sm"}
 
+#: 流体尺寸的函数。它们内部的两端另外核（`.panel` 的 clamp 两端都在网格上）。
+_FLUID = re.compile(r"\b(?:clamp|calc|max|min|minmax|env|var)\([^()]*(?:\([^()]*\)[^()]*)*\)")
+
 
 def _declarations(name: str):
+    """(property, value) 对。
+
+    分号不能是必需的。原正则是 `([-a-zA-Z]+)\\s*:\\s*([^;{}]+);` —— 要求以分号结尾，
+    而 CSS 允许块内最后一条声明省掉分号。也就是说 `.x { padding: 11px }` 对这三条
+    标尺**全部隐形**：间距、字号、阴影走的都是这个生成器。一条完全合法的 CSS 就能让
+    整个文件的三条标尺同时失效。
+
+    现在以 `;` 或 `}` 收尾，两种都认。
+    """
     text = (STATIC / name).read_text(encoding="utf-8")
     # 注释里也写像素数（"命中区只有 19px 高"），必须先剥掉。
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    for match in re.finditer(r"([-a-zA-Z]+)\s*:\s*([^;{}]+);", text):
+    for match in re.finditer(r"([-a-zA-Z]+)\s*:\s*([^;{}]+)(?=[;}])", text):
         prop, value = match.group(1).strip(), match.group(2).strip()
         if prop.startswith("--"):
             continue
@@ -50,18 +73,20 @@ def test_spacing_sits_on_the_four_pixel_grid(layer):
     定下来又互相不知道的数。
 
     两类豁免，都是有理由的：
-    - `clamp()` / `calc()` / `max()` / `min()` / `env()` 里的值是流体尺寸，两端另外
-      核（`.panel` 的 `clamp(16px, 2.4vw, 28px)` 两端都在网格上）；
+    - 流体函数（`clamp` / `calc` / `max` / `min` / `env`）里的值另外核；
     - 大于 64px 的值不是间距档位，是页面级尺寸（`calc((100% - 560px) / 2)` 里的
       560px 是正文最大宽度）。
+
+    豁免的范围是**函数内部**，不是整条 value。原写法一见 `calc(` 就 `continue`，于是
+    `padding: 11px calc(1rem)` 里那个 11px 直接过关——只要在同一条声明里随便挂一个
+    calc，任意魔数都能带进来。现在只把函数体挖掉，剩下的照查。
     """
     offenders = []
     for prop, value in _declarations(layer):
         if prop not in SPACING_PROPS:
             continue
-        if re.search(r"(clamp|calc|max|min|env)\(", value):
-            continue
-        for px in re.findall(r"(?<![\w-])(\d+)px", value):
+        outside = _FLUID.sub(" ", value)
+        for px in re.findall(r"(?<![\w-])(\d+)px", outside):
             n = int(px)
             if n <= 64 and n % 4:
                 offenders.append(f"{prop}: {value}")
@@ -99,27 +124,49 @@ def test_no_shadow_hardcodes_a_colour(layer):
     "凸起"而不是"画上去"的那道受光边，两种模式下都要是白的。
 
     另外 12 处 box-shadow 字面量是**聚焦环和光晕**，不是高程，本来就不该套
-    `--shadow-1/2/3`，而且它们的颜色都由 `color-mix` 从主题令牌算出来。上一轮把环、
-    光晕和高程混在一起数成"14 个阴影无深色取值"，只有 `.step-index` 那一处是真的。
+    `--shadow-1/2/3`，而且它们的颜色都由 `color-mix` 从主题令牌算出来。
+
+    颜色函数不止 rgb 和 hex。原写法只认 `#hex` 与 `rgb()/rgba()`，于是
+    `box-shadow: 0 10px 24px hsl(224 65% 26% / .28)` 是同一个缺陷的合法写法，而这条
+    标尺是为它换来的。现在 hsl / hwb / lab / lch / oklab / oklch / color 一并查。
     """
     offenders = []
     for prop, value in _declarations(layer):
         if prop != "box-shadow":
             continue
-        stripped = re.sub(r"rgba\(\s*255\s*,\s*255\s*,\s*255\s*,[^)]*\)", "", value)
-        if re.search(r"#[0-9a-fA-F]{3,8}\b", stripped) or re.search(r"\brgba?\(", stripped):
+        stripped = re.sub(r"rgba?\(\s*255\s*,?\s*255\s*,?\s*255\s*[,/]?[^)]*\)", "", value)
+        hardcoded = (
+            re.search(r"#[0-9a-fA-F]{3,8}\b", stripped)
+            or re.search(r"\brgba?\(", stripped)
+            or re.search(r"\b(?:hsla?|hwb|lab|lch|oklab|oklch|color)\(", stripped)
+        )
+        if hardcoded:
             offenders.append(f"{prop}: {value}")
     assert not offenders, f"{layer} 有阴影写死了颜色：{offenders}"
 
 
 def test_the_grid_and_the_tokens_agree():
-    """令牌本身也得在网格上——否则用令牌反而把魔数藏得更深。"""
+    """令牌本身也得在网格上——否则用令牌反而把魔数藏得更深。
+
+    这条原先可以整条空转：把 `--space-*` 全部改名 `--sp-*` 并设成 11px，
+    `re.findall` 返回空列表，for 体一次都不执行，测试通过。断言"至少找到几个"是
+    这一类测试的必需项——一条只在有数据时才成立的检查，等于没有检查。
+    """
     tokens = (STATIC / "tokens.css").read_text(encoding="utf-8")
     tokens = re.sub(r"/\*.*?\*/", "", tokens, flags=re.S)
+    found = re.findall(r"(--space-[\w-]+)\s*:\s*([^;}]+)(?=[;}])", tokens)
+    assert len(found) >= 8, f"间距令牌只找到 {len(found)} 个——它们被改名了吗？"
     offenders = []
-    for name, value in re.findall(r"(--space-[\w-]+)\s*:\s*([^;]+);", tokens):
+    for name, value in found:
         px = re.fullmatch(r"(\d+)px", value.strip())
         assert px, f"{name} 不是一个 px 值：{value}"
         if int(px.group(1)) % 4:
             offenders.append(f"{name}: {value}")
     assert not offenders, f"间距令牌自己不在 4px 网格上：{offenders}"
+
+    # 三层里必须真的有间距声明可查，否则上面三条参数化测试全是空转。
+    # 一个把 CSS 挪走或改名的重构会让它们静默变成"通过"。
+    total = sum(
+        1 for layer in LAYERS for prop, _ in _declarations(layer) if prop in SPACING_PROPS
+    )
+    assert total >= 100, f"三层里只解析出 {total} 条间距声明——解析器还认得这些文件吗？"
