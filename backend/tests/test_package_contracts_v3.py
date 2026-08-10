@@ -61,10 +61,30 @@ def test_competition_description_stays_under_800_chinese_chars_roughly() -> None
     assert len(body.replace("\n", "")) <= 800
 
 
-def test_landing_page_mentions_trust_innovations() -> None:
-    text = (ROOT / "backend/static/index.html").read_text(encoding="utf-8")
+def test_trust_page_names_the_trust_innovations() -> None:
+    """这四项可信主张必须写在产品里，而不是只写在文档里。
+
+    此前这条断言钉在 `index.html` 上。首页改成角色选择页之后那些术语被移走了——
+    但断言守的意图是对的，只是钉错了页面：`自主权包络` / `证明式完成` / `同意记忆`
+    / `家庭共识` 是工程词汇，它们属于可信中心，不属于一位老人或他子女看到的第一屏。
+    所以这条测试迁到 `/trust`，不是删掉。
+    """
+    text = (ROOT / "backend/static/trust.html").read_text(encoding="utf-8")
     for term in ["自主权包络", "证明式完成", "同意记忆", "家庭共识"]:
-        assert term in text
+        assert term in text, f"可信中心没有提到「{term}」"
+
+
+def test_landing_page_is_a_role_chooser_not_a_directory() -> None:
+    """首页只问"你是谁"，不列目录。
+
+    重构前它是 390px 下 8574px 的项目目录：六张导航卡、九个工程术语、一整块工程证据
+    区，而视觉权重最高的卡片是「五分钟决赛导览」。
+    """
+    text = (ROOT / "backend/static/index.html").read_text(encoding="utf-8")
+    assert 'href="/elder"' in text and 'href="/family"' in text
+    for engineering_term in ["自主权包络", "证明式完成", "同意记忆", "家庭共识",
+                             "OpenAPI", "Saga", "C4-AI"]:
+        assert engineering_term not in text, f"首页不该出现工程术语「{engineering_term}」"
 
 
 def test_optional_mcp_not_core_dependency() -> None:

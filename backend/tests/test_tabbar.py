@@ -29,14 +29,18 @@ STATIC = ROOT / "backend" / "static"
 CSS = read_stylesheet()
 
 # (页面文件, 该页在标签栏里应当高亮的 href)
+#
+# index.html 不在这里：它已经不是"控制台页面"，而是一张角色选择页——只问"你是老人
+# 还是家人"，然后送你去对应的那一端。一张只有两个动作的选择页不需要常驻导航，给它
+# 加一条反而是在说"这里还有别处可去"。它的"没有标签栏"由
+# test_the_landing_page_has_no_tab_bar 单独钉住。
+# trust 与 judge 也不在这里：可信实验室和评委导览是工程世界，把它们放进老人与家属
+# 的动线上，和把「评委」做成一格标签是同一个错误。它们仍可直达，用返回链接回首页。
 PAGES = [
-    ("index.html", "/"),
     ("family.html", "/family"),
     ("care.html", "/care"),
-    ("trust.html", "/trust"),
-    ("judge.html", "/judge"),
 ]
-EXPECTED_HREFS = ["/", "/family", "/care", "/trust", "/judge"]
+EXPECTED_HREFS = ["/", "/family", "/care"]
 
 
 def bar(page: str) -> str:
@@ -103,6 +107,33 @@ def test_tab_icons_are_decorative_not_announced(page: str, _: str):
         assert 'aria-hidden="true"' in svg, "标签栏里的图标必须 aria-hidden"
 
 
+def test_the_landing_page_has_no_tab_bar():
+    """角色选择页只问一件事，不该有常驻导航。
+
+    它此前是一份项目目录：六张导航卡 + 五格标签栏，而视觉权重最高的那张卡是「五分钟
+    决赛导览」。一个真实用户在那一页上没有任何可以完成的事。现在它只有两个入口，给它
+    一条标签栏等于在说"这里还有别处可去"——而那正是要去掉的那个信息层级。
+    """
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'class="tabbar"' not in html
+    # 但它必须有那两个入口，否则这一页什么用也没有。
+    assert 'href="/elder"' in html and 'href="/family"' in html
+    # 以及评委能找到演示的那一行。
+    assert 'href="/judge"' in html
+
+
+def test_the_demo_entry_is_not_in_any_consumer_navigation():
+    """评委演示不得出现在老人或家属的动线上。
+
+    `/judge` 仍然可直达（评委拿到地址就能进），但它不能是消费者导航里的一格。
+    """
+    for page in ("index.html", "elder.html", "family.html"):
+        html = (STATIC / page).read_text(encoding="utf-8")
+        match = re.search(r'<nav class="tabbar".*?</nav>', html, re.S)
+        if match:
+            assert "/judge" not in match.group(0), f"{page} 的标签栏里还有评委入口"
+
+
 def test_every_screen_has_some_way_out():
     """没有标签栏的那一屏，返回链接就不能藏。
 
@@ -113,16 +144,23 @@ def test_every_screen_has_some_way_out():
     """
     for page in STATIC.glob("*.html"):
         html = page.read_text(encoding="utf-8")
-        if "class=\"tabbar\"" in html:
-            continue          # 有标签栏，返回链接可以藏
         if "back-link" not in html:
             continue          # 本来就没有返回链接的页面不在讨论范围
-        assert "app-frame" in html, (
-            f"{page.name} 没有标签栏，它的返回链接必须可见；"
-            "而隐藏规则限定在 :not(.app-frame)，所以这一页必须带 app-frame"
+        # 隐藏规则现在锚在 body[data-nav="tabbar"] 上，而不是"不是 app-frame 的页面"。
+        # 换判据是因为 trust 和 judge 退出了标签栏：按旧规则它们会既没有标签栏、
+        # 返回链接又在手机上被藏掉，正好又造出一条死路——而这条测试当初就是被一条
+        # 真实死路换来的。现在的规则是自洽的：**只有真的有标签栏的页面**才允许藏
+        # 返回链接，因为只有它们提供了替代出口。
+        if 'data-nav="tabbar"' in html:
+            assert 'class="tabbar"' in html, (
+                f"{page.name} 声称有标签栏（data-nav）却没有渲染它——返回链接会被藏掉"
+            )
+            continue
+        assert 'class="tabbar"' not in html, (
+            f"{page.name} 有标签栏却没标 data-nav，返回链接不会被藏，两条导航并存"
         )
     # 隐藏规则本身必须是限定过的，不能是一刀切。
-    assert "main.shell:not(.app-frame) .back-link" in CSS, (
+    assert 'body[data-nav="tabbar"] .back-link' in CSS, (
         "返回链接的隐藏规则没有限定范围——没有标签栏的屏幕会变成死路"
     )
     assert not re.search(r"^\s*\.back-link\s*\{\s*display:\s*none", CSS, re.M), (

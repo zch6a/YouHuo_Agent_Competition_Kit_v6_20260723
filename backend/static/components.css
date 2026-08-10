@@ -7,7 +7,7 @@
    Surfaces
    -------------------------------------------------------------------------- */
 
-.panel, .hero, .card {
+.panel {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
@@ -38,70 +38,11 @@
 }
 .panel { padding: clamp(18px, 2.4vw, 28px); }
 
-.hero {
-  position: relative;
-  overflow: hidden;
-  padding: clamp(26px, 4vw, 52px);
-  border-radius: var(--r-2xl);
-  box-shadow: var(--shadow-3);
-  background:
-    linear-gradient(168deg, color-mix(in srgb, var(--role-accent) 8%, var(--surface)) 0%, var(--surface) 46%);
-}
-/* Thin luminous rule along the top edge of the hero. */
-.hero::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet) 46%, var(--wuyou-orange));
-}
-.hero h1 {
-  background: linear-gradient(120deg, var(--ink) 22%, var(--youhuo-blue-deep) 62%, var(--youhuo-violet));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.hero h2 { color: var(--ink-2); font-weight: 700; font-size: clamp(18px, 2.2vw, 26px); }
-
-/* Six-column bed so the cards fall into a deliberate 1 / 2 / 3 rhythm. */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
-  margin-top: 24px;
-}
-.card {
-  grid-column: span 6;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  padding: 24px;
-  text-decoration: none;
-  color: inherit;
-  transition: transform .22s cubic-bezier(.2, .7, .3, 1), box-shadow .22s ease, border-color .22s ease;
-}
-.card.span-3 { grid-column: span 3; }
-.card.span-2 { grid-column: span 2; }
-.card p { flex: 1 1 auto; }
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--youhuo-blue), var(--youhuo-violet));
-  opacity: 0;
-  transition: opacity .22s ease;
-}
-.card:hover, .card:focus-visible {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-3);
-  border-color: color-mix(in srgb, var(--youhuo-blue) 42%, var(--line));
-}
-.card:hover::before, .card:focus-visible::before { opacity: 1; }
-.card h2 { font-size: 21px; margin-bottom: 8px; }
-.card p { margin: 0; font-size: 15px; }
-
+/* .hero / .cards / .card 一族已删除。
+ *
+ * 它们只服务于旧首页那六张导航卡和那个渐变 hero。首页改成角色选择之后，全站 HTML
+ * 与 JS 对这十一个类的引用降到 0——留着就是交付包里一段没人能触发的样式。
+ * 首页现在的两个入口用 .role-pick，定义在 pages.css 的 Landing 段。 */
 .mode-companion { background: linear-gradient(165deg, color-mix(in srgb, var(--wuyou-orange) 13%, var(--surface)), var(--surface) 62%); }
 
 /* --------------------------------------------------------------------------

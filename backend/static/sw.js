@@ -14,7 +14,7 @@
 //: 上一版把 /v7/* 当成外壳缓存了下来，那些条目此刻还躺在已安装设备的 v1 缓存里。
 //: activate 只删除 key 不等于 VERSION 的缓存——不改这个字符串，被污染的条目就会
 //: 一直留着，改了 isApi() 也救不回已经装好的那批。
-const VERSION = 'youhuo-shell-v2';
+const VERSION = 'youhuo-shell-v3';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -33,6 +33,7 @@ const SHELL = [
   '/static/base.css',
   '/static/components.css',
   '/static/pages.css',
+  '/static/landing.js',
   '/static/identity.js',
   '/static/common.js',
   '/static/elder.js',
