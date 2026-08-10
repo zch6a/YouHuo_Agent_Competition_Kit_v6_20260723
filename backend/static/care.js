@@ -177,7 +177,7 @@ byId('routineDemo').addEventListener('click', async () => {
 byId('monthlyReport').addEventListener('click', async () => {
   try {
     const report = await api('/v4/reports/monthly', {
-      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, year: 2026, month: 7 })
+      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
     }, 'family');
     setOutput('routineOutput', report);
   } catch (error) { setOutput('routineOutput', error.message); }

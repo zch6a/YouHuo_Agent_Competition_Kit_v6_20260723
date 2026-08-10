@@ -12,7 +12,17 @@
    两个选择、一行降级入口。没有卡片网格，没有 bento，没有渐变 hero。
    -------------------------------------------------------------------------- */
 
+/* margin 与 padding 不能省。
+   .landing 不是 .shell，所以 base.css 那条 margin: 0 auto 和左右安全区内边距
+   都不适用于它——此前整列贴在窗口左边缘，1280px 桌面上右边 720px 是空的，而两个
+   角色卡的边框正好压在物理屏幕边缘上，和其余五页 16px 的 gutter 完全不一致。 */
 .landing {
+  margin: 0 auto;
+  padding-left: max(var(--space-4), env(safe-area-inset-left));
+  padding-right: max(var(--space-4), env(safe-area-inset-right));
+  /* svh 兜底：不支持 dvh 的引擎会整条丢弃，justify-content: center 就无处可居中，
+     整页塌到顶部。其余四处 dvh 都成对写了 svh，只有这里漏了。 */
+  min-height: 100svh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -151,7 +161,13 @@
 }
 .seg {
   flex: 1;
-  min-height: 44px;
+  /* 48px，不是 44px。
+     `components.css` 的 `a, button, input, textarea, select { min-height: 48px }` 是
+     元素选择器（特异性 0,0,1），`.seg` 是类（0,1,0），所以这里写 44 就是**悄悄退回**
+     ——而那份注释明确写着立场：「48px rather than the 44px in Apple's HIG — the extra
+     4px matters for tremor and for reading glasses」。这三页的分区按钮是唯一的换屏
+     控件，390px 下每个只有约 67px 宽，高度更不该省。 */
+  min-height: 48px;
   padding: var(--space-2) var(--space-1);
   border: 1px solid transparent;
   border-radius: calc(var(--r-md) - 5px);
@@ -160,7 +176,12 @@
   color: var(--ink-2);
   font-size: var(--text-sm);
   font-weight: 650;
+  /* 320px（最窄在售安卓机）下五个标签每个只有 52px 文本宽，而「听不清」三个全角字
+     是 45px——加上内边距就折行，那一个标签变两行、和另外四个高度对不齐。 */
+  min-width: 0;
+  white-space: nowrap;
 }
+@media (max-width: 360px) { .seg { font-size: 14px; padding-inline: 0; } }
 /* 当前分区不只靠颜色：底色、边框和字重同时变，色觉障碍下仍然分得出。 */
 .seg.is-current {
   background: var(--surface);
@@ -267,6 +288,23 @@
   cursor: pointer;
 }
 .report-more[open] > summary { margin-bottom: var(--space-2); }
+
+/* 老人端抽屉里那个折叠开关此前在四层 CSS 里一条规则都没有，命中区就是一行字的
+   行盒，约 22px 高——而这个项目自己声明的下限是 48px。 */
+.rail-fold > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+.rail-fold[open] > summary { margin-bottom: var(--space-2); }
 
 .fam-links { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); }
 .fam-link {
@@ -518,7 +556,11 @@
      it reserved `--space-16 + 44px` against nothing (grep found no fixed bottom
      furniture at all), and on the elder screen those phantom pixels were the
      whole overflow the frame then had to clip. Now there is a real bar. */
-  main.shell:not(.app-frame) {
+  /* 只给**真的有**标签栏的页面让位。
+   :not(.app-frame) 命中四页，而 /trust 和 /judge 没有 .tabbar——它们底部因此
+   多出 76px 幽灵空白，页面比内容多滚一屏的十分之一。改成按 data-nav 判断，与
+   返回链接的隐藏规则同一个判据。 */
+body[data-nav="tabbar"] main.shell:not(.app-frame) {
     padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--space-5));
   }
   /* The frame cannot take that as page padding — it would push itself past its
@@ -973,4 +1015,10 @@
      right model. Hidden rather than removed from the markup so the two layouts
      stay one document — and so the tab order is identical in both. */
   .tabbar { display: none; }
+  /* 标签栏在这个宽度下藏掉了，所以返回链接必须回来。
+     standalone 那一段无条件隐藏 ody[data-nav="tabbar"] .back-link，理由是
+     "only where there is another way out"——它只考虑了老人端那个例外，没考虑
+     宽度。装到主屏的平板（竖屏逻辑宽 >=761px）打开照护中心，四个链接全部不可见，
+     而 standalone 下没有地址栏：一条真正的死路。 */
+  body[data-nav="tabbar"] .back-link { display: inline-flex; }
 }

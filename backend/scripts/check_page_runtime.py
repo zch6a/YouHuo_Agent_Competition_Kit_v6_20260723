@@ -99,6 +99,13 @@ MAX_PRESSES = 60
 REQUIRED_PRESSES = {
     "/elder": ("#saveProfile", "#repeatLast", "#companionEntry", "#logEntry"),
     "/family": ("#scheduler",),
+    # /care 与 /trust 各有四个默认折叠的分区，里面共 17 个按钮只有按过 `.seg` 之后才
+    # 可达——而它们此前一个钉子都没有，也就是说这个字典的注释说自己在守的那件事，
+    # 对这两页完全没做。名单里点的是每个折叠分区里最深的那一个，其中包括 `#sosDemo`
+    # （模拟老人主动呼救）和 `#breakGlassDemo`（限时破窗）——SKIP_SELECTORS 的注释
+    # 明确说"真正做事的按钮一个都不放过，包括 SOS 和限时破窗"。
+    "/care": ("#monthlyReport", "#medicalDemo", "#sosDemo", "#capabilitiesDemo"),
+    "/trust": ("#policyAttack", "#syncDemo", "#breakGlassDemo", "#metricsDemo"),
 }
 
 
@@ -327,8 +334,20 @@ def check_no_horizontal_overflow(tab: "CDP", page: str, failures: list[str]) -> 
     """
     # 视口在 main() 里 navigate 之前就设成手机了，整页一直保持——这里不再切换。
     # 原先是"临时切到手机、量完就清掉"，于是后面的点击遍历跑在桌面宽度上。
-    raw = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE,
-                   returnByValue=True)["result"].get("value")
+    reply = tab.send("Runtime.evaluate", expression=OVERFLOW_PROBE, returnByValue=True)
+    # 探针自己抛了异常，就是这一页的失败，不是"这一页没问题"。
+    #
+    # `Runtime.evaluate` 抛错时回包里根本没有 `value` 键（只有 `exceptionDetails` 和一个
+    # subtype=error 的 result），于是 `.get("value")` 是 None，紧接着的
+    # `if not raw: return` 静默返回——横向溢出、无障碍五项、sprite 图标三项一起变成
+    # "通过"，而汇总行照样打印"手机视口无横向溢出、无障碍五项通过"。
+    # `exceptionDetails` 一直就在回包里，此前从来没人看它。
+    if "exceptionDetails" in reply:
+        detail = reply["exceptionDetails"]
+        text = (detail.get("exception") or {}).get("description") or detail.get("text")
+        failures.append(f"{page}  溢出探针自己抛了异常，这一页没有被真的量过：{text}")
+        return
+    raw = reply["result"].get("value")
     # 无障碍那几条也在手机视口下查：横滚带只在窄屏才真的溢出，桌面宽度下它一条
     # 内容都不隐藏，检查会永远是绿的。
     check_accessibility(tab, page, failures)
@@ -554,8 +573,20 @@ def main() -> int:
     try:
         import websocket  # type: ignore
     except ImportError:
-        print("SKIP page_runtime: websocket-client not installed")
-        return 0
+        # 缺依赖是**硬失败**，不是跳过。
+        #
+        # `websocket-client` 此前不在 requirements.lock.txt 里（那里只有 uvicorn 的
+        # `websockets`），而 CI 只装 lock 文件。后果：CI 上这个检查、对比度检查、
+        # 截图检查全部走到这一行 `return 0`，验证链紧接着打印 PASS，最后打印
+        # "ALL V6 DETERMINISTIC VERIFICATION STAGES PASSED"——**CI 从来没有在真实
+        # 浏览器里加载过任何一个页面**。把 care.js 第一行改回那个让两整页按钮全死的
+        # TDZ 缺陷，CI 照样全绿。
+        #
+        # 依赖现在声明了，所以 import 失败意味着环境坏了，而不是"这台机器没装调试
+        # 工具所以我们跳过运行时验证"。宁可红。
+        print("FAIL page_runtime: websocket-client 没装。它在 requirements 里——"
+              "装上它，不要跳过运行时验证。")
+        return 1
     chrome = find_chrome()
     if not chrome:
         print("SKIP page_runtime: no Chromium browser found")

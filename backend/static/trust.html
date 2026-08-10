@@ -69,7 +69,7 @@
       <button type="button" class="seg" data-section="truth">进度</button>
     </nav>
 
-    <section class="page-section" data-panel="hear" aria-label="听不清的时候，它不猜">
+    <section class="page-section" id="hear" data-panel="hear" aria-label="听不清的时候，它不猜">
       <h2 class="section-head">听不清的时候，它不猜</h2>
       <p class="section-note">多路识别的候选不一致就停下来问。涉及付钱、删东西、认身份的事，门槛还要再高一档。</p>
       <article class="panel feature-panel">
@@ -80,7 +80,7 @@
         <div class="result" id="voiceOutput" aria-live="polite"></div>
       </article>
     </section>
-    <section class="page-section" data-panel="doc" aria-label="别人写的字，不算你的指令" hidden>
+    <section class="page-section" id="doc" data-panel="doc" aria-label="别人写的字，不算你的指令" hidden>
       <h2 class="section-head">别人写的字，不算你的指令</h2>
       <p class="section-note">账单照片上的金额只能当作待核验的数据，不能直接变成付款授权。</p>
       <article class="panel feature-panel">
@@ -91,7 +91,7 @@
         <div class="result" id="policyOutput" aria-live="polite"></div>
       </article>
     </section>
-    <section class="page-section" data-panel="half" aria-label="办到一半断了，它记得走到哪" hidden>
+    <section class="page-section" id="half" data-panel="half" aria-label="办到一半断了，它记得走到哪" hidden>
       <h2 class="section-head">办到一半断了，它记得走到哪</h2>
       <p class="section-note">每一步都落盘、带版本、带幂等键。失败时只回退已经做完且能回退的那几步。</p>
       <article class="panel feature-panel">
@@ -108,7 +108,7 @@
         <div class="result" id="syncOutput" aria-live="polite"></div>
       </article>
     </section>
-    <section class="page-section" data-panel="urgent" aria-label="真出事的时候，多给的权限会自己收回" hidden>
+    <section class="page-section" id="urgent" data-panel="urgent" aria-label="真出事的时候，多给的权限会自己收回" hidden>
       <h2 class="section-head">真出事的时候，多给的权限会自己收回</h2>
       <p class="section-note">只开位置、健康摘要、紧急联系人和进行中的事，十分钟后自动关。陪聊原文和支付凭据永久禁止。</p>
       <article class="panel feature-panel">
@@ -118,7 +118,7 @@
         <div class="result" id="breakGlassOutput" aria-live="polite"></div>
       </article>
     </section>
-    <section class="page-section" data-panel="truth" aria-label="哪些是真做到了，哪些还没有" hidden>
+    <section class="page-section" id="truth" data-panel="truth" aria-label="哪些是真做到了，哪些还没有" hidden>
       <h2 class="section-head">哪些是真做到了，哪些还没有</h2>
       <p class="section-note">已实现、沙箱闭环、演示适配、仍需真机验证——分开说，不含糊。</p>
       <article class="panel feature-panel">

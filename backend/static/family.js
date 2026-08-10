@@ -165,8 +165,9 @@ function fmtTask(t) {
   if (t.status === 'awaiting_family_approval' && t.approval_digest) {
     const yes = document.createElement('button'); yes.textContent = '核对后确认接力';
     const no = document.createElement('button'); no.textContent = '拒绝'; no.className = 'danger';
-    yes.onclick = () => approve(t.id, t.approval_digest, true);
-    no.onclick = () => approve(t.id, t.approval_digest, false);
+    // 把按钮本身传进去，approve() 才能在飞行期间禁用它。不传的话双击就是两次独立审批。
+    yes.onclick = () => approve(t.id, t.approval_digest, true, yes);
+    no.onclick = () => approve(t.id, t.approval_digest, false, no);
     div.append(yes, document.createTextNode(' '), no);
   }
   return div;
@@ -187,34 +188,73 @@ function notify(message, tone) {
   host.hidden = false;
 }
 
-async function approve(taskId, approvalDigest, approveValue) {
-  try {
-    const data = await api('/v2/family/approve', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        task_id: taskId, approve: approveValue, approval_digest: approvalDigest,
-        reason: approveValue ? '家属已核对任务摘要' : '家属拒绝', request_id: crypto.randomUUID()
-      })
-    });
-    notify(data.message); load();
-  } catch (e) { notify(e.message, 'warning'); }
+/** 收回提示条。
+ *
+ * 这个函数原先不存在：`#familyNotice` 只有显示路径。地铁上信号断了打出
+ * "没能取到最新情况"，出站后按刷新、四个分区全刷上新数据，而那条错误还挂在标题
+ * 正下方——它带 aria-live，读屏已经念过一次，然后没有任何路径把它收回。
+ */
+function clearNotice() {
+  const host = document.querySelector('#familyNotice');
+  if (!host) return;
+  host.hidden = true;
+  host.textContent = '';
+}
+
+async function approve(taskId, approvalDigest, approveValue, trigger) {
+  await window.YouHuo.once(trigger, async () => {
+    try {
+      const data = await api('/v2/family/approve', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          task_id: taskId, approve: approveValue, approval_digest: approvalDigest,
+          reason: approveValue ? '家属已核对任务摘要' : '家属拒绝', request_id: crypto.randomUUID()
+        })
+      });
+      // 语气由后端的 code / ui.theme 决定，不是一律绿色。"任务已处理或当前不需要家属
+      // 审批""家属未批准，本次操作已安全取消"都是 HTTP 200——一次取消画成绿色成功框，
+      // 家属无法把它和真的批准成功区分开。
+      notify(data.message, window.YouHuo.toneOf(data));
+      load();
+    } catch (e) { notify(e.message, 'warning'); }
+  });
 }
 
 async function createReminder(e) {
   e.preventDefault();
-  const title = document.querySelector('#reminderTitle').value.trim();
+  const titleField = document.querySelector('#reminderTitle');
+  const title = titleField.value.trim();
   const dueLocal = document.querySelector('#reminderDue').value;
   const escalation = Number(document.querySelector('#escalation').value || 30);
-  if (!title || !dueLocal) return;
-  try {
-    const dueAt = new Date(dueLocal).toISOString();
-    const data = await api('/v2/family/reminders', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({elder_id: ELDER_ID, title, due_at: dueAt,
-        escalation_after_minutes: escalation, request_id: crypto.randomUUID()})
-    });
-    notify(data.message); e.target.reset(); load();
-  } catch (err) { notify(err.message, 'warning'); }
+  // 只输入空格时 `required` 是满足的（值不是空字符串），于是原先直接 return——
+  // 屏幕上什么都不发生，反复点也一样。现在说出来，并把焦点送回去。
+  if (!title) {
+    notify('事项还没填。写一句他看得懂的话，比如"复诊前准备病历"。', 'warning');
+    titleField.focus();
+    return;
+  }
+  if (!dueLocal) {
+    notify('时间还没选。', 'warning');
+    document.querySelector('#reminderDue').focus();
+    return;
+  }
+  await window.YouHuo.once(e.submitter || e.target.querySelector('[type="submit"]'), async () => {
+    try {
+      const dueAt = new Date(dueLocal).toISOString();
+      const data = await api('/v2/family/reminders', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({elder_id: ELDER_ID, title, due_at: dueAt,
+          escalation_after_minutes: escalation, request_id: crypto.randomUUID()})
+      });
+      const tone = window.YouHuo.toneOf(data);
+      notify(data.message, tone);
+      // 只有真的添上了才清空表单。"同一时间的同一提醒已经存在"是 200，原先照样
+      // reset()，把家属重试所需要的输入一起清掉——屏幕上剩一句绿色的"已经存在"和
+      // 一个空表单。
+      if (tone === 'good') e.target.reset();
+      load();
+    } catch (err) { notify(err.message, 'warning'); }
+  });
 }
 
 async function runScheduler() {
@@ -291,7 +331,15 @@ function renderCalendar(reminders) {
 async function loadWeekly() {
   const end = new Date();
   const start = new Date(end.getTime() - 6 * 24 * 3600 * 1000);
-  const iso = d => d.toISOString().slice(0, 10);
+  // 按**本地**日期切，不是 UTC。
+  //
+  // 原先是 `d.toISOString().slice(0, 10)`。在 UTC+8，那等于把一天切在早上八点：
+  // 北京时间 8 月 10 日 07:30 打开「趋势」，窗口是 08-03 至 08-09，页面上却写着
+  // 8 月 10 日——今天全部的情绪信号被排除在外；08:00 一到，同一次刷新变成 08-04
+  // 至 08-10。后端 baseline_api.py 里对这个模式有明确警告，而同一文件里
+  // renderMetrics 和 renderCalendar 用的都是本地 toDateString()，只有这里是 UTC。
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    + `-${String(d.getDate()).padStart(2, '0')}`;
   try {
     const report = await api(
       `/v4/reports/emotion/${ELDER_ID}?period_start=${iso(start)}&period_end=${iso(end)}`
@@ -454,6 +502,10 @@ async function load() {
       line(auditEl, `另有 ${audit.events.length - AUDIT_VISIBLE} 条更早的记录。`, 'meta');
     }
     updatedEl.textContent = `最后更新 ${new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit', hour12: false})}`;
+    // 这一轮成功了，就把上一轮的失败提示收回。否则地铁上断网打出的"没能取到最新
+    // 情况"会在出站刷新成功之后继续挂在标题正下方——它带 aria-live，读屏已经念过
+    // 一次，而原先没有任何路径把它收回。
+    clearNotice();
 
     renderCalendar(reminders);
     renderMetrics(tasks, reminders, audit.chain_valid);
@@ -487,7 +539,21 @@ async function load() {
 // 页内分区的实现在 common.js，照护页用的是同一套。
 window.YouHuo.initSections('today');
 
-document.querySelector('#refresh').addEventListener('click', load);
-document.querySelector('#scheduler').addEventListener('click', runScheduler);
+document.querySelector('#refresh').addEventListener('click',
+  () => window.YouHuo.once('#refresh', load));
+document.querySelector('#scheduler').addEventListener('click',
+  () => window.YouHuo.once('#scheduler', runScheduler));
 document.querySelector('#reminderForm').addEventListener('submit', createReminder);
-login().then(load).catch(e => { chainEl.textContent = e.message; });
+
+// 登录失败也必须写在看得见的地方。
+//
+// 这里原先是 `.catch(e => { chainEl.textContent = e.message; })`——和 load() 的 catch
+// 一模一样的错，只是我上一轮只改了 load() 那一处。后果更重：登录失败时 load() 从不
+// 执行，于是 #famUpdated 永久停在"正在加载……"、#dailyReport 永久停在"正在生成……"、
+// 任务/日历/通知全空，而唯一那句错误在 #chain 里，#chain 在默认折叠的「我的」分区里。
+// 子女看到的是一个永远转圈、什么都不说的页面。
+login().then(load).catch(e => {
+  notify(`没能登录：${e.message}`, 'bad');
+  updatedEl.textContent = '暂时没连上';
+  dailyEl.textContent = '登录失败，暂时取不到今天的情况。';
+});

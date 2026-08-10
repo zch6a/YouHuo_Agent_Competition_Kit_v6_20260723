@@ -5,14 +5,14 @@
   "concurrency": 100,
   "successful": 5000,
   "failed": 0,
-  "elapsed_seconds": 109.9833,
-  "throughput_rps": 45.46,
+  "elapsed_seconds": 161.7558,
+  "throughput_rps": 30.91,
   "latency_ms": {
-    "mean": 2156.026,
-    "p50": 1477.047,
-    "p95": 6417.286,
-    "p99": 9902.855,
-    "max": 17342.213
+    "mean": 3171.5,
+    "p50": 2186.787,
+    "p95": 9332.952,
+    "p99": 14206.863,
+    "max": 25895.585
   },
   "mix": {
     "liveness_reads": 3000,
@@ -22,5 +22,5 @@
   "keepalive_retries": 0,
   "transport_errors": {},
   "note": "真实Uvicorn回环网络负载；不等同于公网、多进程或真实HarmonyOS设备压测。keepalive_retries 表示连接被服务端回收后重试的次数，属于长连接竞态，不是请求失败。",
-  "source_digest": "7b50d7d08052adba9e5e64b6da0e4a092814bb00bf175ab6045ae289b2c0732b"
+  "source_digest": "c7490ca93e50850a186671126ab88425356cbda2e06da181c559f89e641a36dd"
 }

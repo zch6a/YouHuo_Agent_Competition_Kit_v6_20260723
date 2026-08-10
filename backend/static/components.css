@@ -119,12 +119,42 @@ input, textarea, select {
   transition: border-color .18s ease, box-shadow .18s ease;
 }
 input::placeholder, textarea::placeholder { color: var(--ink-3); }
+/* 表单域的焦点提示原先比按钮弱五倍。
+ *
+ * 这条规则是元素+伪类（特异性 0,1,1），下面那条"全站唯一权威焦点圈"的
+ * `:focus-visible` 只有 (0,1,0)——它输掉了，`outline` 和 `box-shadow` 双双被覆盖。
+ * 于是 Tab 到打字框、语速/字号下拉、家人端三个表单域时拿到的是 2px 淡蓝边框
+ * （实测对底色 3.17:1），而 Tab 到任何按钮拿到的是 3px 深色描边（16.96:1）。
+ * 落在焦点上的那一刻，最需要被看见的反而最不显眼。
+ *
+ * 现在只在**指针**聚焦时去掉 outline；键盘聚焦让权威焦点圈接管。 */
 input:focus, textarea:focus, select:focus {
-  outline: none;
   border-color: var(--role-accent);
   box-shadow: var(--ring);
 }
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible) { outline: none; }
 textarea { line-height: 1.6; resize: vertical; }
+
+/* 正文里的行内链接。
+   `min-height: 48px` 对非替换行内元素无效——命中区就是字号乘行高，约 20px。
+   项目在首页量过同一个坑（124×19）并用 inline-flex 修好了；家人端正文里那条通往
+   可信中心的链接是漏网处。用 inline-block + 垂直内边距把命中区撑到 48px，而不改
+   inline-flex（那会把链接从文字流里拽出来，正文里会断行）。 */
+.inline-tap {
+  display: inline-block;
+  /* 实测 4.43:1，差 0.07 过不了 AA——链接沿用了 base.css 那条比正文淡的颜色，而它
+     所在的 .section-note 本身就是次要文字色。给它一个自己的颜色并保留下划线：
+     不靠颜色区分链接，颜色只负责够不够看得清。 */
+  color: var(--youhuo-blue-deep);
+  text-decoration: underline;
+  /* 16 而不是 14：14 不在 4px 网格上，`test_design_rulers` 立刻就抓住了它。
+     16 + 20（14px 字 × --lh-snug）+ 16 = 52px，过 48 的下限，且负外边距抵消掉
+     多出来的高度，正文行距不变。 */
+  padding-block: var(--space-4);
+  margin-block: calc(var(--space-4) * -1);
+}
 
 button {
   border: 1px solid transparent;
@@ -215,6 +245,16 @@ a, button, input, textarea, select { min-height: 48px; }
 }
 .notice.good { border-left-color: var(--ok); background: var(--ok-bg); color: color-mix(in srgb, var(--ok) 68%, var(--ink)); }
 .notice.warning { border-left-color: var(--warn); background: var(--warn-bg); }
+/* `.notice.bad` 此前没有规则，而 JS 有四条路径在生成它：整页加载失败、登录失败、
+   后端 `ui.theme` 为 danger/error、以及**审计链断裂**
+   （`chainEl.classList.toggle('bad', !audit.chain_valid)`）。`.notice` 基类本身就是
+   琥珀色告警，所以 `bad` 不贡献任何声明——"记录对不上了"和一条普通提醒像素级相同。
+   同一个 bug 的另一半已经修过并留了注释（base.css 的 `.meta.bad`），这一半漏了。 */
+.notice.bad {
+  border-left-color: var(--danger);
+  background: var(--danger-bg);
+  color: color-mix(in srgb, var(--danger) 72%, var(--ink));
+}
 /* "waiting for a human" is a normal step, not an alarm. */
 .notice.info {
   border-left-color: var(--youhuo-blue);
@@ -582,7 +622,12 @@ body[data-mode="companion"] .role-icon .icon-companion { display: block; }
   background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
   transition: background var(--mode-fade) ease;
 }
-.rail { display: grid; gap: var(--space-4); position: sticky; top: 18px; }
+/* 这里原先带 `position: sticky; top: 18px`，而它**从未生效过**：全站唯一的 `.rail`
+   元素永远同时带 `sheet` 类（sheet.js 只 toggle `is-open`），而 `.rail.sheet` 的
+   特异性 (0,2,0) 更高，在 ≤760px 是 `fixed`、≥761px 是 `static`——两段合起来覆盖
+   全部宽度。注释里还写着「The sidebar version of .rail is sticky with a top」，
+   而那个形态不存在。删掉而不是去实现它：宽屏侧栏和主内容一样长，跟着页面滚是对的。 */
+.rail { display: grid; gap: var(--space-4); }
 .rail-card { padding: var(--space-5); }
 .rail-head {
   display: flex;

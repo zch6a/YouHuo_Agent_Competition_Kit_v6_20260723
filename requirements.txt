@@ -9,3 +9,4 @@ PyYAML==6.0.3
 # Windows and slim Linux images ship no system tz database; zoneinfo needs this
 # for Asia/Shanghai routine scheduling.
 tzdata==2026.1; platform_system == "Windows"
+websocket-client

@@ -26,6 +26,8 @@ from datetime import date, datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
+from .utils import local_now, local_today
+
 
 class CareIntent(StrEnum):
     MEDICATION_TODAY = "medication_today"      # 今天吃药了吗
@@ -145,8 +147,22 @@ class CareAnswer:
 # --------------------------------------------------------------------- 说法
 
 def _clock_time(value: datetime) -> str:
-    """Local wall-clock rendering. speech.js turns this into spoken Chinese."""
-    return value.strftime("%H:%M")
+    """墙上时间。speech.js 会把它念成中文。
+
+    docstring 一直写着 "Local wall-clock"，而实现是对一个 **aware-UTC** 的时刻直接
+    `strftime`——打印的是它自己的 UTC 字段。后果是这个产品对一位老人说错时间：
+    真实时间晚上 19:36，问"现在几点了"，优活答"现在11:36"，而 speech.js 把它念成
+    "上午十一点三十六分"。女儿设的上午九点复诊，回读成"明天凌晨一点复诊"。
+    每天 00:00–08:00 之间连日期都退到前一天。
+
+    先换算到老人所在时区，再取字段。
+    """
+    return local_now(value).strftime("%H:%M")
+
+
+def _local_date(value: datetime) -> date:
+    """取"哪一天"也必须先落到本地时区，否则和 `_clock_time` 对不上。"""
+    return local_today(value)
 
 
 def _day_phrase(target: date, today: date) -> str:
@@ -315,7 +331,7 @@ def answer_health_recent(*, events: list[Any], now: datetime) -> CareAnswer:
             {"events": 0},
         )
     latest = events[0]
-    when = _day_phrase(latest.event_at.date(), now.date())
+    when = _day_phrase(_local_date(latest.event_at), _local_date(now))
     detail = ""
     readable = {
         key: value
@@ -340,7 +356,8 @@ def answer_schedule_today(*, reminders: list[Any], now: datetime) -> CareAnswer:
             {"count": 0},
         )
     parts = [
-        f"{_day_phrase(item.due_at.date(), now.date())}{_clock_time(item.due_at)}{item.title}"
+        f"{_day_phrase(_local_date(item.due_at), _local_date(now))}"
+            f"{_clock_time(item.due_at)}{item.title}"
         for item in reminders
     ]
     return CareAnswer(
@@ -404,11 +421,16 @@ def answer_orientation(*, now: datetime) -> CareAnswer:
     # No year: speech.js drops it for the current year too, and "2026年" written
     # out would be read as a cardinal number rather than digit by digit. The
     # HH:MM form is left for speech.js to turn into "下午两点半".
+    #
+    # 日期、星期、时刻三者必须来自**同一个**本地时刻。此前三者都读 UTC 字段：
+    # 每天 00:00–08:00 之间老人会被告知今天是昨天、星期几也错一天，而"现在几点"
+    # 全天都差 8 小时。这是这个产品能犯的最直白的一种错——它就是被用来问时间的。
+    here = local_now(now)
     return CareAnswer(
-        f"今天是{now.month}月{now.day}日，{_WEEKDAYS[now.weekday()]}，"
+        f"今天是{here.month}月{here.day}日，{_WEEKDAYS[here.weekday()]}，"
         f"现在{_clock_time(now)}。",
         "CARE_QUERY_ORIENTATION",
-        {"date": now.date().isoformat()},
+        {"date": _local_date(now).isoformat()},
     )
 
 

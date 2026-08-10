@@ -162,8 +162,11 @@ def main() -> int:
     try:
         import websocket  # type: ignore
     except ImportError:
-        print("SKIP contrast_v6: websocket-client not installed")
-        return 0
+        # 与 check_page_runtime 同一个理由：这个跳过分支让 CI 上整层运行时验证消失，
+        # 而验证链照样打印 PASS。依赖已声明，缺了就报红。
+        print("FAIL contrast_v6: websocket-client 没装。它在 requirements 里——"
+              "装上它，不要跳过对比度验证。")
+        return 1
     chrome = find_chrome()
     if not chrome:
         print("SKIP contrast_v6: no Chromium browser found")
@@ -242,6 +245,17 @@ def main() -> int:
                 # 的分项、每个结果卡里的原始响应）。所以是展开，不是跳过。
                 tab.send("Runtime.evaluate", expression=(
                     "document.querySelectorAll('details').forEach(d => d.open = true);"
+                    # 分区也要展开，理由和 `<details>` 完全一样。
+                    #
+                    # 上面那段注释说得对，但只做了一半：`[data-panel]` 分区靠 `hidden`
+                    # 切换，而探针的第一道过滤是 `!el.offsetParent` —— 于是**六页 261 个
+                    # 有文本的元素里有 122 个从来没被量过**（family 51、care 36、
+                    # trust 26），90 个交互元素里有 34 个因为 0×0 而豁免了触控下限。
+                    # /care 与 /trust 的全部内容都住在非默认分区里，也就是说这两页的
+                    # 对比度基本没被审计过。一行 `.page-section[hidden] .section-note
+                    # { color: #c9c9c9 }`（白底 1.6:1）可以让 12/12 照样通过。
+                    "document.querySelectorAll('[data-panel][hidden]')"
+                    "  .forEach(s => s.hidden = false);"
                 ))
                 time.sleep(0.4)
                 result = tab.send("Runtime.evaluate", expression=AUDIT_JS,

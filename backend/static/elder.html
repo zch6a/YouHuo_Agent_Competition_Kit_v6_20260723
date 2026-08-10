@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="优活" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>优活老人端 · v6适老交互</title>
+  <title>优活</title>
   <link rel="stylesheet" href="/static/tokens.css" />
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
@@ -55,7 +55,7 @@
         <p id="todayLine" class="today-line" hidden></p>
 
         <div id="chat" class="chat" aria-live="polite"></div>
-        <div id="relianceHost"></div>
+        <div id="relianceHost" aria-live="polite"></div>
 
         <div class="mic-stage">
           <div class="mic-dial">
@@ -63,7 +63,7 @@
               <svg viewBox="0 0 24 24" width="62" height="62" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19v3" /> <path d="M19 10v2a7 7 0 0 1-14 0v-2" /> <rect x="9" y="2" width="6" height="13" rx="3" /></svg>
             </button>
           </div>
-          <div id="micHint" class="mic-hint">按一下，然后慢慢说</div>
+          <div id="micHint" class="mic-hint" role="status" aria-live="polite">按一下，然后慢慢说</div>
         </div>
 
         <div class="composer">
@@ -90,7 +90,10 @@
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16" /><path d="M4 6h16" /><path d="M4 18h16" /></svg>
             <span>待办、常用和设置</span>
           </button>
-          <div id="status" class="meta status-line"></div>
+          <!-- aria-live 不是可选的：elder.js 把 12 处状态写入收敛到一个入口，理由就是
+         "读屏用户听到的顺序才是确定的"——而这个元素此前没有 aria-live，那句话是假的。
+         识别失败、正在听、待办没能更新、整页初始化失败，全部静默。 -->
+    <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
         </div>
       </section>
 
@@ -169,8 +172,9 @@
              主动作，一位老人多一次"先选一个分区"的决定，比多滚一下更贵。分区是解那
              一类问题的，不是这一类。 -->
         <section class="panel rail-card">
+          <h2>看得清、听得懂</h2>
           <details class="rail-fold">
-          <summary><h2>看得清、听得懂</h2></summary>
+          <summary>语速、文字大小和可信提示</summary>
           <div class="profile-tools" aria-label="适老交互设置">
             <label>语速
               <select id="speechRate">

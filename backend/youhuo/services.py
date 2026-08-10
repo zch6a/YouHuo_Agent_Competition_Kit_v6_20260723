@@ -250,7 +250,16 @@ class ReminderService:
         due_time: str,
         created_by: str,
     ) -> ToolResult:
-        due_at = datetime.fromisoformat(combine_date_time(due_date, due_time)).replace(tzinfo=UTC)
+        # 老人说"明天上午九点"，说的是**他所在时区**的九点。
+        #
+        # 这里原先是 `.replace(tzinfo=UTC)`——把 09:00 这个墙上时间直接盖一个 UTC 标签，
+        # 存进库的于是是 09:00Z，也就是北京时间 17:00。同一屏上聊天气泡说"时间是
+        # 2026-08-11 09:00"，而待办卡渲染出来是"8月11日 17:00"：两处对同一件事说了两个
+        # 时间。连带 due 判定、提前提醒的 24h/12h/1h 阶梯、超时升级，全部晚 8 小时触发。
+        #
+        # `combine_date_time` 现在返回带本地偏移的 ISO 串，解析出来就是 aware，
+        # 只需换算到 UTC 存储。
+        due_at = datetime.fromisoformat(combine_date_time(due_date, due_time)).astimezone(UTC)
         return self.create(
             db,
             family_id=family_id,

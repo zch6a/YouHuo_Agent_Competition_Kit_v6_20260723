@@ -7,6 +7,7 @@ import unicodedata
 import uuid
 from datetime import date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 _CONTROL_CATEGORIES = {"Cc", "Cf", "Cs", "Co", "Cn"}
 _CN_NUM = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
@@ -160,7 +161,37 @@ def parse_time_text(text: str) -> str | None:
     return f"{hour:02d}:{minute:02d}"
 
 
+#: 老人所在的时区。
+#:
+#: 这个常量原先只在 `baseline_store.py` 有一份，v7 日报靠它把"今天"切在本地零点，
+#: 那份注释写得很清楚：「用 UTC 的今天，在 UTC+8 就等于把一天切在早上八点」。
+#: 而 v2 的提醒链路和语音回读完全不知道它存在——于是同一个产品里，v7 日报的"今天"
+#: 和 v2 提醒的"今天"是两个不同的日子，而"现在几点了"答的是格林尼治时间。
+#: 放在 utils 里，两边共用一份。
+LOCAL_TIMEZONE = "Asia/Shanghai"
+
+
+def local_zone() -> ZoneInfo:
+    return ZoneInfo(LOCAL_TIMEZONE)
+
+
+def local_now(now: datetime) -> datetime:
+    """换算到老人所在时区。一切要读出**墙上时间**的地方都必须先过这一步。"""
+    return now.astimezone(local_zone())
+
+
+def local_today(now: datetime) -> date:
+    """"今天"是老人所在时区的今天，不是 UTC 的今天。"""
+    return local_now(now).date()
+
+
 def combine_date_time(date_iso: str, time_hhmm: str) -> str:
+    """把"哪一天"和"几点"拼成一个**带本地偏移**的 ISO 串。
+
+    原先返回的是无时区的裸串，调用方紧接着 `.replace(tzinfo=UTC)`——那等于宣称老人
+    说的"上午九点"是格林尼治的九点，实际存成了北京 17:00。带上偏移之后，调用方只需
+    `astimezone(UTC)` 换算存储。
+    """
     d = date.fromisoformat(date_iso)
     h, m = [int(x) for x in time_hhmm.split(":")]
-    return datetime.combine(d, time(hour=h, minute=m)).isoformat()
+    return datetime.combine(d, time(hour=h, minute=m), tzinfo=local_zone()).isoformat()

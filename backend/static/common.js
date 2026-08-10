@@ -65,9 +65,21 @@
     try { sessionStorage.setItem(RENEW_FLAG, '1'); } catch (_) { /* 隐私模式 */ }
   }
 
+  // 这个标签页打开过内页了。首页据此判断"冷启动 vs 会话内返回"。
+  //
+  // 判据原先是 `document.referrer`，而站点自己下发 `Referrer-Policy: no-referrer`，
+  // referrer 恒为空——"冷启动"恒为真，于是每一个「返回首页」都会被立刻弹回去。
+  // 这一行是那条判据的真正来源；`landing.js` 读它。
+  try { sessionStorage.setItem('youhuo_visited_v1', '1'); } catch (_) { /* 隐私模式 */ }
+
   function cachedToken(role) {
     if (tokens.has(role)) return tokens.get(role);
-    const stored = sessionStorage.getItem(cacheKey(role));
+    // 这一行原先没有 try/catch，是本文件里唯一裸调的存储访问。
+    // 存储被禁时（Chrome"阻止所有网站数据"、无 allow-same-origin 的 sandbox iframe）
+    // 它在第一次请求就抛 SecurityError，五个页面全部停在"初始化失败"——而
+    // identity.js 本来写好了退回共享演示家庭的降级路径，被这一行绕过。
+    let stored = null;
+    try { stored = sessionStorage.getItem(cacheKey(role)); } catch (_) { /* 隐私模式 */ }
     if (stored) tokens.set(role, stored);
     return stored || null;
   }
@@ -169,7 +181,11 @@
   });
 
   function verdictOf(name) {
-    return VERDICT[name] || VERDICT.unknown;
+    // 自有属性才算命中。`VERDICT['constructor']` 会返回 `Object`（真值），于是调用方
+    // 的 `const [word, tone] = verdictOf(...)` 抛 "is not iterable"，而不是老老实实
+    // 落到 `VERDICT.unknown`。
+    return (Object.prototype.hasOwnProperty.call(VERDICT, name) && VERDICT[name])
+      || VERDICT.unknown;
   }
 
   /** 当前令牌，没有就返回 null。给需要自己拼请求的地方用（例如离线语音的音频流）。 */
@@ -219,7 +235,9 @@
   };
 
   function labelFor(key) {
-    return FIELD_LABEL[key] || key;
+    // 自有属性才算命中。否则 `__proto__` 这个键名会取到 `Object.prototype`，
+    // 标签渲染成 `[object Object]`——而这一层的契约恰恰是"查不到就原样露出键名"。
+    return (Object.prototype.hasOwnProperty.call(FIELD_LABEL, key) && FIELD_LABEL[key]) || key;
   }
 
   function scalarText(value) {
@@ -242,12 +260,27 @@
         return list;
       }
       const wrap = document.createElement('div');
-      value.forEach((item) => wrap.appendChild(objectNode(item)));
+      // 递归回 valueNode，而不是对每个元素无条件调 objectNode。
+      //
+      // 上一句"是否全是标量"是对**整个数组**做的一次判定，混合数组因此掉到这里，
+      // 然后每个元素——包括 null、字符串、嵌套数组——都被当成对象喂给
+      // `Object.entries`。实测三种结果：null 抛 TypeError 而 renderResult 已经先
+      // replaceChildren() 了，那张卡片就此永久空白；字符串被逐字拆成一行一个字，
+      // 标签是 0/1/2…；数组套数组渲染成下标键行。入口是敞开的——
+      // `SyncConflictRecord.current_value/incoming_value` 是 `Any`。
+      value.forEach((item) => wrap.appendChild(valueNode(item)));
       return wrap;
     }
     if (value && typeof value === 'object') return objectNode(value);
 
-    const tone = TONE_BY_VALUE[String(value)];
+    // `Object.prototype` 的成员不算命中。
+    //
+    // 方括号取值会把原型链算进来：取值恰好等于 `constructor` / `toString` /
+    // `valueOf` 时 `tone !== undefined` 为真，于是一个普通文本被渲染成判定色块，
+    // className 还被拆成 `pill function Object() { [native code] }` 这样六个垃圾类名。
+    // 实测如此。`Object.freeze` 只冻结自有属性，挡不住这一层。
+    const tone = Object.prototype.hasOwnProperty.call(TONE_BY_VALUE, String(value))
+      ? TONE_BY_VALUE[String(value)] : undefined;
     if (tone !== undefined) {
       const pill = document.createElement('span');
       pill.className = `pill ${tone}`;
@@ -260,7 +293,17 @@
   function objectNode(value) {
     const box = document.createElement('div');
     box.className = 'result-group';
-    Object.entries(value).forEach(([key, item]) => {
+    const entries = Object.entries(value);
+    // 空对象要说自己是空的。
+    //
+    // 原先渲染出一个空的 `.result-group`——字段名下面什么都没有。可信页点「创建
+    // Saga」必然撞上：六个步骤各有 `input_data` 和 `output_data` 两个 `{}`，
+    // 于是十二行标签下面是十二块空白。空数组有「（无）」，空对象什么也没有。
+    if (!entries.length) {
+      box.appendChild(document.createTextNode('（无）'));
+      return box;
+    }
+    entries.forEach(([key, item]) => {
       const row = document.createElement('div');
       row.className = 'result-row';
       const label = document.createElement('strong');
@@ -292,6 +335,51 @@
     body.textContent = pretty(value);
     raw.append(summary, body);
     el.appendChild(raw);
+  }
+
+  // --- 飞行中禁用 ------------------------------------------------------------
+  //
+  // 全站**没有任何一个按钮**在自己那次请求飞行期间被禁用过。手机上 300ms 内的连点是
+  // 常态而不是边缘情况，而这些按钮背后是不可逆的东西：
+  //
+  //   * 家人端「核对后确认接力」——两次点击各带一个新的 `crypto.randomUUID()`，
+  //     后端按 (scope, request_id, fingerprint) 去重，UUID 不同就是两次独立审批。
+  //     第二次返回 200 + "这位家属已经确认过本次任务，请等待其他家属…"，而界面显示的
+  //     是**后返回的那一个** —— 家属在一次已经批准并执行完的付款上，看到"还在等其他人"。
+  //   * 可信页「开启10分钟最小访问」（破窗）——两条独立授权、两个各自 10 分钟的窗口，
+  //     界面只显示后一条，第一条仍然生效且**没有任何入口能看到或撤销**。
+  //   * 照护页「模拟老人主动呼救」——两条 SOS 告警、两次家属通知、两次社区升级准备。
+  //
+  // 这个项目自己的运行时闸门结构上测不出这一类：它对每个控件只按一次，还会跳过
+  // `disabled` 的按钮。所以补了 `check_double_click`，那边真的连点两次数请求。
+  async function once(trigger, run) {
+    const el = typeof trigger === 'string' ? document.querySelector(trigger) : trigger;
+    if (!el) return run();
+    if (el.dataset.inFlight === '1') return undefined;
+    el.dataset.inFlight = '1';
+    el.disabled = true;
+    el.setAttribute('aria-busy', 'true');
+    try {
+      return await run();
+    } finally {
+      delete el.dataset.inFlight;
+      el.disabled = false;
+      el.removeAttribute('aria-busy');
+    }
+  }
+
+  //: HTTP 200 不等于"办成了"。
+  //:
+  //: 后端对业务失败的约定是 200 + `code` + `ui.theme`：任务已被别人处理、家属未批准
+  //: 因此安全取消、同一时间的同一提醒已存在——全是 200。调用方只取 `message` 的话，
+  //: 一次取消会显示成一个绿色的成功框，而用户无法把它和真的成功区分开。
+  const THEME_TONE = {warning: 'warning', warn: 'warning', danger: 'bad', error: 'bad'};
+  function toneOf(data) {
+    const theme = ((data || {}).ui || {}).theme;
+    if (theme && THEME_TONE[theme]) return THEME_TONE[theme];
+    const code = (data || {}).code;
+    if (code && code !== 'OK' && code !== 'SUCCESS') return 'warning';
+    return 'good';
   }
 
   // --- 页内分区 --------------------------------------------------------------
@@ -329,6 +417,6 @@
 
   window.YouHuo = {
     ready, login, api, forget, token,
-    byId, pretty, VERDICT, verdictOf, renderResult, initSections,
+    byId, pretty, VERDICT, verdictOf, renderResult, initSections, once, toneOf,
   };
 })();

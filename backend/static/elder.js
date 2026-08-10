@@ -50,7 +50,20 @@ const REMINDER_STATUS = {
   cancelled: ['已取消', 'cancelled'],
 };
 
-let sessionId = localStorage.getItem('youhuo_session_v2');
+// 存储访问必须包起来——这一行在**模块顶层**，抛了它下面的一切都不执行。
+//
+// Chrome 勾选"阻止所有网站数据"、无 allow-same-origin 的 sandbox iframe，
+// `window.localStorage` 一访问就抛 SecurityError。此前的后果是老人打开这一页看到
+// 一张纯静态 HTML：没有开场气泡、麦克风与发送和待办一个监听器都没绑、也没有任何
+// 错误提示。全项目只有这个文件没有做这层保护（landing / common / identity 都有）。
+function readStore(key) {
+  try { return localStorage.getItem(key); } catch (_) { return null; }
+}
+function writeStore(key, value) {
+  try { localStorage.setItem(key, value); } catch (_) { /* 隐私模式：会话不跨刷新存活 */ }
+}
+
+let sessionId = readStore('youhuo_session_v2');
 let lastSpoken = '';
 let currentMode = 'youhuo';
 let interactionProfile = {speech_rate: 0.88, font_scale: 1.25};
@@ -300,14 +313,30 @@ async function saveProfile() {
   speak(status.textContent, profile.speech_rate);
 }
 
+// 建会话要记忆化，否则首次使用时的两次点击会建出两个会话。
+//
+// 原先是"跨 await 检查再赋值一个普通变量"：全新浏览器里快速点「挂号」再点「交水费」，
+// 两个 postChat 都在 sessionId 还是 null 时进来，各发一个 POST /v2/sessions，后写的
+// localStorage 胜出。第一轮落在会话 A，之后所有轮次落在会话 B——在 A 里开始的多轮
+// 挂号流程再也接不上，老人回答追问，服务器那边没有对应的任务。
+let sessionPending = null;
+
 async function ensureSession() {
   if (sessionId) return sessionId;
-  const data = await api('/v2/sessions', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})
-  });
-  sessionId = data.session_id;
-  localStorage.setItem('youhuo_session_v2', sessionId);
-  return sessionId;
+  if (sessionPending) return sessionPending;
+  sessionPending = (async () => {
+    const data = await api('/v2/sessions', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})
+    });
+    sessionId = data.session_id;
+    writeStore('youhuo_session_v2', sessionId);
+    return sessionId;
+  })();
+  try {
+    return await sessionPending;
+  } finally {
+    sessionPending = null;
+  }
 }
 
 /** Send one turn, recovering once from a session id cached from an older database.
@@ -320,7 +349,7 @@ async function postChat(text) {
   } catch (e) {
     if (e.status !== 400) throw e;
     sessionId = null;
-    localStorage.removeItem('youhuo_session_v2');
+    try { localStorage.removeItem('youhuo_session_v2'); } catch (_) { /* 隐私模式 */ }
     return api('/v2/chat', {method: 'POST', headers, body: body(await ensureSession())});
   }
 }
@@ -408,9 +437,25 @@ async function showGlassBox(heardText, data) {
 
 /* ------------------------------------------------------------------ */
 
+// 一次只办一件事——这一页把这句话印在界面上，代码也必须做到。
+//
+// 此前两轮对话可以并发：点「交水费」再点「今天有什么事」，两个 POST /v2/chat 一起飞。
+// 如果缴费那轮先回来且需要确认，玻璃盒会把金额确认卡渲染进 #relianceHost；随后第二轮
+// 回来走 else 分支执行 `relianceHost.replaceChildren()`——**老人正在被要求确认一笔付款，
+// 确认卡凭空消失**，状态行显示的是另一轮的文案。气泡和「返回上一步」的历史也按完成
+// 顺序而不是发送顺序排，于是回放的是错的那一句。
+//
+// 清空输入框那一招只覆盖打字路径，传参进来的（快捷按钮、语音、无忧伴入口）不受它约束。
+let turnInFlight = false;
+
 async function send(text) {
   text = (text || input.value).trim();
   if (!text) return;
+  if (turnInFlight) {
+    setStatus('上一句还在办，我一次只做一件事。稍等一下。');
+    return;
+  }
+  turnInFlight = true;
   input.value = '';
   addBubble(text, 'user');
   setActivity('processing');
@@ -464,6 +509,7 @@ async function send(text) {
     addBubble(`系统暂时不可用：${e.message}`, 'agent');
     setStatus('没有执行任何操作，请稍后再试。');
   } finally {
+    turnInFlight = false;
     setActivity('idle');
   }
 }
@@ -597,7 +643,17 @@ async function loadActivity() {
 }
 
 document.querySelector('#send').addEventListener('click', () => send());
-input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+input.addEventListener('keydown', e => {
+  // `isComposing` 不是可选的。
+  //
+  // 中文输入法在合成期间照样派发 keydown（`key === 'Enter'`、`isComposing === true`）。
+  // 老人用拼音打 "guahao" 后按 Enter 选字，此前会直接 send()——`input.value` 里是还没
+  // 上屏的拼音串，于是「挂号」没打出去，取而代之是一次垃圾对话，而 send() 还会清空
+  // 输入框、把输入法的合成状态一起打断。
+  // Firefox 上这条是**唯一**的输入通道（没有 SpeechRecognition），所以这不是边角。
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === 'Enter') send();
+});
 document.querySelectorAll('[data-text]').forEach(btn => btn.addEventListener('click', () => send(btn.dataset.text)));
 
 document.querySelector('#companionEntry').addEventListener('click', () => {
@@ -661,13 +717,50 @@ if (SR) {
     if (document.body.dataset.activity === 'listening') setActivity('idle');
     setMicHint('按一下，然后慢慢说');
   };
+  //: Web Speech 的错误枚举是英文标识符，不能直接给老人看，尤其不能配一句
+  //: "请再说一遍"——权限被拒时再说一百遍也不会成功，而页面从不告诉她要去哪里开。
+  //: 这一页为了不让引擎标识符出现在老人眼前，已经写了四张这样的表。
+  const RECOGNITION_TROUBLE = {
+    'not-allowed': '我没有拿到麦克风的许可。您可以在下面打字，或者让家人帮您在手机设置里打开麦克风权限。',
+    'service-not-allowed': '这台手机暂时不让我用语音。您可以在下面打字。',
+    'audio-capture': '我找不到麦克风。您可以在下面打字。',
+    'no-speech': '我没有听到声音。请离手机近一点，再按一下慢慢说。',
+    'network': '网络不太好，语音没送出去。您可以在下面打字，或者等一会儿再试。',
+    'aborted': '刚才那次听被打断了。您可以再按一下。',
+  };
+
   rec.onerror = e => {
     recentRetries += 1;
     setActivity('idle');
     setMicHint('按一下，然后慢慢说');
-    setStatus(`语音识别没有成功：${e.error}。没有执行任何操作，请再说一遍。`);
+    setStatus(RECOGNITION_TROUBLE[e.error]
+      || '语音没能用起来。您可以在下面打字，我一样能办。');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed'
+        || e.error === 'audio-capture') input.focus();
   };
-  mic.addEventListener('click', () => rec.start());
+
+  mic.addEventListener('click', () => {
+    // 正在听的时候再按一下，按规范 `start()` 会抛 InvalidStateError——而老人重复按
+    // 恰恰是最常见的操作。此前这个未捕获异常让屏幕上什么都不变：状态行不动、
+    // 呼吸圈不动，她得不到"第二下没用"的任何反馈。
+    if (document.body.dataset.activity === 'listening') {
+      setMicHint('我正在听，您说吧');
+      return;
+    }
+    // 说话和听必须互斥。
+    //
+    // 此前 agent 还在念的时候按麦克风，`rec.start()` 会成功——识别器于是把手机
+    // 扬声器里 agent 自己的 TTS 转写下来，再当成老人这一轮发出去。`speak()` 里没有
+    // 任何东西停 `rec`，`rec.onstart` 里也没有调 `stopSpeaking`。
+    stopSpeaking();
+    try {
+      rec.start();
+    } catch (_) {
+      // 状态机和引擎不同步（上一次 onend 还没到）。不抛给用户，让她再按一次。
+      setActivity('idle');
+      setMicHint('再按一下试试');
+    }
+  });
 } else {
   mic.addEventListener('click', () => {
     setMicHint('这个浏览器不支持语音，请在下面打字');

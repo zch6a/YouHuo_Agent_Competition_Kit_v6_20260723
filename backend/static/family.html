@@ -51,11 +51,11 @@
     <section class="page-section" data-panel="today" aria-label="今天">
       <h2 class="section-head">今天怎么样</h2>
       <div id="dailyReport" aria-live="polite">正在生成……</div>
-      <section class="metric-row" aria-label="今日概览">
+      <div class="metric-row">
         <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
         <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
         <div class="metric"><span class="metric-label">今天到期</span><strong id="mToday">–</strong></div>
-      </section>
+      </div>
       <h2 class="section-head">需要您处理</h2>
       <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
       <div id="tasks"></div>
@@ -84,19 +84,19 @@
 
     <section class="page-section" data-panel="mine" aria-label="我的" hidden>
       <h2 class="section-head">做过的事</h2>
-      <div class="metric-row metric-row-one" aria-label="记录状态">
+      <div class="metric-row metric-row-one">
         <div class="metric"><span class="metric-label">记录</span><strong id="mChain">–</strong></div>
       </div>
       <p id="chain" class="notice"></p>
       <div id="audit"></div>
-      <p class="section-note">这里是给家人看的说法。逐条的原始记录、校验算法和证明过程在<a href="/trust">可信中心</a>。</p>
+      <p class="section-note">这里是给家人看的说法。逐条的原始记录、校验算法和证明过程在<a href="/trust" class="inline-tap">可信中心</a>。</p>
       <h2 class="section-head">其他</h2>
       <div class="fam-links">
         <a href="/care" class="fam-link">照护档案</a>
         <a href="/trust" class="fam-link">可信中心</a>
       </div>
       <button id="scheduler" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1" /> <path d="M16 2v3" /> <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /> <path d="M3 9h5.859" /> <path d="M8 2v3" /> <circle cx="16" cy="16" r="6" /></svg><span>立即检查到期待办</span></button>
-      <p class="section-note">这件事平时每分钟自动做一次，这里可以手动催一下。</p>
+      <p class="section-note">提前提醒和超时升级要靠这一步推进。现在还没有后台定时器，所以需要手动催一下——正式环境会由服务端定时触发。</p>
     </section>
 
     <nav class="tabbar" aria-label="主要分区">
