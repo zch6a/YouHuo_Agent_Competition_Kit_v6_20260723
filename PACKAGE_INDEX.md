@@ -58,7 +58,7 @@
 
 ## 评测和验证
 
-- `backend/tests/`：939项自动化测试；
+- `backend/tests/`：950项自动化测试；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -73,7 +73,7 @@
 - `check_arkts.py`：鸿蒙端十一类静态检查。`@kit.*` 符号归属按公开 OpenHarmony SDK 的 1159 个符号逐个核对；另含**页面可达性**（任何 `.ets` 不得既未登记为路由页面、又不被任何文件引入）、登记页面必须有 `@Entry`、禁用已废弃的 `router`；
 - `shoot_pages.py`：七种视口（含折叠屏内外屏、平板）× 明暗两模式的真机尺寸截图；
 - `verify_features_v6.py` / `run_feature_audit.py`：130项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
-- `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）；
+- `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）。另含**重型报告新鲜度**：上面四项重型验证的结论以 JSON 留存供引用，每份都盖着它验证过的那棵 `backend/youhuo` 的指纹（`youhuo/provenance.py`），检查器重算比对——对不上就判过期。加这一条是因为曾有两天，`mass_audit_v5_1000000.json` 是 08-08 的而 `v5_services.py` 08-10 才改过，`verify_all` 照样报"全部通过"；
 - `verify_all.*`：确定性日常回归；
 - `verify_heavy.*`：百万回归、故障和网络重验证。
 
@@ -96,7 +96,7 @@
 
 - FastAPI OpenAPI路径：99个；OpenAPI 操作覆盖：103/103；
 - 小艺Skill：13个；
-- 自动化测试：939项；逐功能验收：130项；
+- 自动化测试：950项；逐功能验收：130项；
 - 页面运行时闸门：6个页面、41个控件逐个按过；
 - 核心Python语句覆盖率：91%。
 

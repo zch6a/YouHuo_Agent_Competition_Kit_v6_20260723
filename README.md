@@ -240,7 +240,7 @@ curl -L -o ohos-sdk.tar.gz \
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
 backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           939项自动化测试
+backend/tests/           950项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -296,7 +296,7 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、939项测试与覆盖率、130项逐功能验收、12个页面/模式无障碍、**页面运行时逐控件点击**、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、950项测试与覆盖率、130项逐功能验收、12个页面/模式无障碍、**页面运行时逐控件点击**、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
 
 重验证：
 
@@ -312,7 +312,7 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**939/939通过**；
+- pytest：**950/950通过**；
 - 逐功能端到端验收：**130/130通过**，OpenAPI 操作覆盖 **103/103**；
 - 页面运行时闸门：**6个页面加载无异常，41个控件逐个按过**，无未捕获异常、无 console.error、无同源 4xx/5xx、无原生对话框；
 - 核心Python语句覆盖率：**91%**；
