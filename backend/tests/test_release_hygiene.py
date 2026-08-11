@@ -107,12 +107,19 @@ def test_the_release_is_mostly_source_not_screenshots():
     `frontend_audit/screenshots/` 里 384 张**重构之前**那个界面的照片。评委解开包，
     看到的是一个已经不存在的 UI 的 384 张截图。
 
-    那些图仍然留在 git 里——它们是审计轮的"改之前"证据，删掉就是抹掉记录。
-    `make_release.py` 的 `REGENERABLE_DIRS` 把它们挡在**包**外面，因为它们是
-    `shoot_pages.py` 每次运行都能重新生成的东西，不是源码。
+    现在有**两道**防线，而它们是先后建起来的：
 
-    这条断言守的是那个排除清单跟得上现实：下一个人新建一个截图目录、忘了登记，
-    包会安静地涨回两百兆，而没有任何东西会说一句话。
+    1. `make_release.py` 的 `REGENERABLE_DIRS`——把它们挡在**交付包**外面。
+    2. `.gitignore` 里的 `shots/` 与 `frontend_audit/screenshots/`——2026-08-11 推公开
+       仓库之前加的，因为推上去就永久在历史里，事后清不掉别人的 fork 和缓存。
+       `git rm -r --cached` 只解除跟踪，磁盘上 482 个文件一张没删。
+
+    第二道生效之后，这条断言的红法变了：它不再靠 `REGENERABLE_DIRS` 才通过（那两个
+    目录已经不在 `git ls-files` 里）。所以早先那次"清空 REGENERABLE_DIRS → 红"的变异
+    结论**对现在的代码不再成立**，写在这里免得下一个人以为它还成立。
+
+    它守的性质一个字没变：**交付包必须主要是源码**。谁再把一个截图目录提交进来，
+    比例会立刻跳上去。
     """
     spec = importlib.util.spec_from_file_location(
         "make_release", ROOT / "backend" / "scripts" / "make_release.py"

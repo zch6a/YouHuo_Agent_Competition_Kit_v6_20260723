@@ -24,3 +24,15 @@ data/tts/
 
 reports/*_console.txt
 reports/*_time.txt
+
+# 截图：可再生产物，不进仓库。
+#
+# 实测过一次：git ls-files 覆盖 195.9 MB，其中 185.1 MB（94%）是 PNG，而 173.5 MB
+# 是 frontend_audit/screenshots/ 里 384 张**前端重构之前**那个界面的照片。它们既让
+# 每次 clone 多拉两百兆，也让评委解开交付包时看到一个已经不存在的 UI。
+#
+# 磁盘上的文件一张都没删，shoot_pages.py 随时能重新生成：
+#   python backend/scripts/shoot_pages.py http://127.0.0.1:8041 shots
+# make_release.py 的 REGENERABLE_DIRS 已经把同样两个目录挡在交付包外面。
+shots/
+frontend_audit/screenshots/
