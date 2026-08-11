@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 字符编码与视口设置：确保移动端和PC端正确显示，PC端利用100vh/vw占满屏幕 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>优活Agent · 独居守护</title>
+    <!-- 引入Inter字体，提升现代感（后备字体为系统字体） -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <style>
+        /* ----- 全局重置与基础样式：让body占满视口，无内外边距 ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            min-height: 100vh;          /* 至少占满视口高度 */
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+            background: #0b0a1a;        /* 深色基底，衬托紫色渐变 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;              /* 留点安全边距，尤其移动端 */
+        }
+
+        /* ----- 主卡片：占满整个屏幕（通过宽高和视口单位） ----- */
+        .hero-card {
+            position: relative;
+            width: 100%;                /* 宽度占满父容器 */
+            max-width: 100%;            /* 不限制最大宽度，以便撑满屏幕 */
+            height: auto;               /* 高度由内容撑起，但保证至少占满视口 */
+            min-height: 85vh;           /* 至少占视口高度的85%，视觉上接近全屏 */
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            border-radius: 56px;        /* 保留圆角，全屏时依然美观 */
+            padding: 32px 36px 40px;    /* 内边距适当放大，适应大屏 */
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(180, 130, 255, 0.15);
+            overflow: hidden;           /* 气泡溢出隐藏，保持卡片圆角整洁 */
+            border: 1px solid rgba(200, 160, 255, 0.2);
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;    /* 内容垂直居中，视觉更平衡 */
+        }
+
+        /* ----- 动态紫色渐变气泡背景层（z-index:0） ----- */
+        .bubble-bg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;       /* 让交互元素不被遮挡 */
+            z-index: 0;
+            border-radius: inherit;
+            overflow: hidden;
+        }
+
+        .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(180, 80, 255, 0.5), rgba(100, 40, 200, 0.2));
+            filter: blur(32px);
+            opacity: 0.5;
+            /* 气泡浮动动画：每个气泡独立运动，形成灵动效果 */
+            animation: floatBubble 8s infinite alternate ease-in-out;
+            will-change: transform, opacity;
+        }
+
+        /* 四个不同大小、位置和速度的气泡，营造丰富层次，全屏下位置适当调整 */
+        .bubble-1 {
+            width: 320px;
+            height: 320px;
+            top: -80px;
+            right: -60px;
+            background: radial-gradient(circle at 30% 30%, #b77aff, #7a3bff);
+            animation-duration: 10s;     /* 不同速度更灵动 */
+            opacity: 0.35;
+            animation-delay: 0s;
+        }
+        .bubble-2 {
+            width: 400px;
+            height: 400px;
+            bottom: -120px;
+            left: -120px;
+            background: radial-gradient(circle at 60% 40%, #b56eff, #4f1fad);
+            animation-duration: 14s;
+            opacity: 0.3;
+            animation-delay: -2s;
+        }
+        .bubble-3 {
+            width: 220px;
+            height: 220px;
+            top: 25%;
+            left: 10%;
+            background: radial-gradient(circle at 40% 40%, #d79aff, #6b28d9);
+            animation-duration: 9s;
+            opacity: 0.25;
+            animation-delay: -4s;
+        }
+        .bubble-4 {
+            width: 280px;
+            height: 280px;
+            bottom: 30px;
+            right: -40px;
+            background: radial-gradient(circle at 20% 50%, #b07eff, #5320b3);
+            animation-duration: 12s;
+            opacity: 0.3;
+            animation-delay: -6s;
+        }
+
+        /* 气泡浮动动画：上下左右飘移 + 轻微缩放，更加生动 */
+        @keyframes floatBubble {
+            0% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+            20% { transform: translate(15px, -25px) scale(1.05); opacity: 0.5; }
+            40% { transform: translate(-10px, 15px) scale(0.95); opacity: 0.35; }
+            60% { transform: translate(25px, 10px) scale(1.08); opacity: 0.45; }
+            80% { transform: translate(-20px, -15px) scale(0.92); opacity: 0.3; }
+            100% { transform: translate(10px, 20px) scale(1.02); opacity: 0.4; }
+        }
+
+        /* ----- 内容层（置于气泡之上，z-index:2）使用flex列，撑满空间 ----- */
+        .content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;                  /* 间距稍调，适应全屏 */
+            color: #f0eeff;
+            flex: 1;                    /* 让内容撑满卡片高度 */
+            justify-content: center;    /* 垂直居中 */
+        }
+
+        /* 品牌头部：名称 + 标签 */
+        .brand-header {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .brand-name {
+            font-size: 32px;            /* 大屏放大 */
+            font-weight: 600;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #d6b6ff, #b07eff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(150, 80, 255, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .brand-name small {
+            font-size: 18px;
+            font-weight: 400;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 14px;
+            border-radius: 40px;
+            color: #d6c0ff;
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(2px);
+        }
+        .tagline {
+            font-size: 16px;
+            color: #c9b8ff;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+            font-weight: 400;
+            opacity: 0.9;
+            border-left: 3px solid #a77aff;
+            padding-left: 14px;
+        }
+
+        /* 主标题 */
+        .main-title {
+            font-size: 36px;            /* 大屏放大 */
+            font-weight: 700;
+            line-height: 1.2;
+            color: white;
+            text-shadow: 0 4px 20px rgba(100, 40, 200, 0.3);
+            margin: 4px 0 2px;
+        }
+        .main-title span {
+            background: linear-gradient(135deg, #d9baff, #b285ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        /* ----- 产品介绍卡片（替换原来的“数字生活困境”） ----- */
+        .product-intro {
+            background: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            padding: 18px 22px;
+            border-radius: 28px;
+            border: 1px solid rgba(200, 160, 255, 0.2);
+            font-size: 15px;
+            line-height: 1.7;
+            color: #ddd6ff;
+            margin: 2px 0;
+            /* 过渡动画：使凸起效果更平滑 */
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+            cursor: default;
+        }
+        .product-intro strong {
+            color: #f0e6ff;
+            font-weight: 600;
+        }
+        /* 鼠标悬停凸起动效：上浮 + 阴影放大 + 边框光晕 */
+        .product-intro:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 12px 32px rgba(120, 60, 220, 0.25), 0 0 0 1px rgba(200, 160, 255, 0.4);
+            border-color: rgba(200, 170, 255, 0.4);
+        }
+
+        /* 原先的 .highlight-grid 保留，但产品介绍中不再需要，此处保留以备后续 */
+        .highlight-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            margin-top: 8px;
+            font-weight: 400;
+        }
+        .highlight-grid span {
+            background: rgba(160, 100, 255, 0.15);
+            padding: 4px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            border: 1px solid rgba(180, 130, 255, 0.2);
+            backdrop-filter: blur(2px);
+        }
+
+        /* ----- 特性行：新文字，每个标签带淡紫色圆角长方形背景 ----- */
+        .feature-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;              /* 标签之间的间距 */
+            background: rgba(0, 0, 0, 0.15);
+            padding: 12px 18px;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(200, 170, 255, 0.15);
+            font-size: 15px;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+            cursor: default;
+        }
+        /* 鼠标悬停凸起动效 */
+        .feature-row:hover {
+            transform: translateY(-3px) scale(1.005);
+            box-shadow: 0 10px 28px rgba(120, 60, 220, 0.2), 0 0 0 1px rgba(200, 170, 255, 0.35);
+            border-color: rgba(200, 170, 255, 0.35);
+        }
+
+        /* 每个特性标签：淡紫色圆角长方形 */
+        .feature-tag {
+            background: rgba(180, 130, 255, 0.2);   /* 淡紫色背景 */
+            padding: 4px 16px;
+            border-radius: 30px;                    /* 圆角长方形 */
+            color: #e5d9ff;
+            font-weight: 400;
+            font-size: 14px;
+            letter-spacing: 0.2px;
+            border: 1px solid rgba(200, 170, 255, 0.15);
+            backdrop-filter: blur(2px);
+            white-space: nowrap;                    /* 防止换行 */
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            cursor: default;
+        }
+        /* 标签悬停单独凸起（更细腻） */
+        .feature-tag:hover {
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 4px 16px rgba(140, 80, 255, 0.25);
+            background: rgba(180, 130, 255, 0.3);
+            border-color: rgba(200, 170, 255, 0.4);
+        }
+
+        /* 分隔符样式（保持和之前类似） */
+        .feature-sep {
+            color: #cfc3ff;
+            font-weight: 300;
+            opacity: 0.6;
+        }
+
+        /* 核心标语 */
+        .slogan-highlight {
+            font-size: 26px;            /* 大屏放大 */
+            font-weight: 600;
+            background: linear-gradient(135deg, #f0e6ff, #c7adff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin: 4px 0 2px;
+            line-height: 1.3;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+            cursor: default;
+            display: inline-block;      /* 使transform生效 */
+        }
+        .slogan-highlight:hover {
+            transform: translateY(-3px) scale(1.02);
+            filter: drop-shadow(0 8px 20px rgba(160, 100, 255, 0.3));
+        }
+
+        /* 办事 + 陪伴 双卡片 */
+        .double-card {
+            display: flex;
+            gap: 16px;
+            margin: 4px 0 8px;
+        }
+        .double-card > div {
+            flex: 1;
+            background: rgba(20, 10, 40, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border-radius: 24px;
+            padding: 16px 14px;
+            border: 1px solid rgba(180, 130, 255, 0.2);
+            text-align: center;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+            cursor: default;
+        }
+        .double-card > div:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 12px 32px rgba(120, 60, 220, 0.2), 0 0 0 1px rgba(200, 170, 255, 0.3);
+            border-color: rgba(200, 170, 255, 0.35);
+        }
+        .double-card .card-title {
+            font-weight: 600;
+            font-size: 20px;
+            color: #e5d9ff;
+            letter-spacing: 0.5px;
+        }
+        .double-card .card-sub {
+            font-size: 14px;
+            color: #b9a8f0;
+            margin-top: 4px;
+        }
+
+        /* 保留的标语：让每一个独居老人，不被数字时代遗忘 ... */
+        .preserved-slogan {
+            margin-top: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border-radius: 32px;
+            padding: 18px 20px;
+            border: 1px solid rgba(180, 140, 255, 0.12);
+            text-align: center;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+            cursor: default;
+        }
+        .preserved-slogan:hover {
+            transform: translateY(-3px) scale(1.005);
+            box-shadow: 0 10px 28px rgba(120, 60, 220, 0.15), 0 0 0 1px rgba(200, 170, 255, 0.25);
+            border-color: rgba(200, 170, 255, 0.3);
+        }
+        .preserved-slogan .main-line {
+            font-size: 20px;
+            font-weight: 500;
+            color: #e5d9ff;
+            letter-spacing: 0.3px;
+            line-height: 1.4;
+        }
+        .preserved-slogan .sub-line {
+            font-size: 15px;
+            color: #b4a0ea;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+            font-weight: 300;
+        }
+
+        /* ----- 两个入口按钮（居中偏左下，圆角方形，外围渐变紫，中心米白） ----- */
+        .action-buttons {
+            position: relative;
+            z-index: 3;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 20px 28px;
+            margin-top: 16px;
+            padding-left: 4px;
+        }
+
+        .btn-entry {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 36px;
+            min-width: 150px;
+            border-radius: 48px;          /* 圆角方形 */
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+            color: #1e142f;
+            background: #fcf5ff;          /* 米白色基底 */
+            border: none;
+            box-shadow: 0 0 0 3px #fcf5ff, 0 0 0 8px rgba(160, 80, 255, 0.4), 0 8px 24px rgba(80, 30, 160, 0.3);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 240, 255, 0.6);
+            flex: 0 1 auto;
+        }
+        .btn-entry.second {
+            background: #fcf5ff;
+            box-shadow: 0 0 0 3px #fcf5ff, 0 0 0 8px rgba(140, 70, 255, 0.4), 0 8px 24px rgba(80, 30, 160, 0.3);
+        }
+        /* 按钮悬停凸起效果（更明显） */
+        .btn-entry:hover {
+            transform: translateY(-5px) scale(1.04);
+            box-shadow: 0 0 0 3px #ffffff, 0 0 0 12px rgba(170, 100, 255, 0.5), 0 16px 40px rgba(90, 30, 180, 0.4);
+        }
+        .btn-entry:active {
+            transform: scale(0.95) translateY(0px);
+        }
+
+        /* 底部品牌信息 */
+        .brand-footer {
+            text-align: right;
+            font-size: 13px;
+            color: #9b86d4;
+            margin-top: 14px;
+            letter-spacing: 1px;
+            opacity: 0.7;
+            border-top: 1px solid rgba(180, 130, 255, 0.08);
+            padding-top: 14px;
+            transition: transform 0.2s ease, opacity 0.3s ease;
+            cursor: default;
+        }
+        .brand-footer:hover {
+            transform: translateY(-2px);
+            opacity: 1;
+        }
+        .brand-footer strong {
+            color: #c6b2ff;
+        }
+
+        /* 为所有可悬停栏目增加统一的凸起感，使用通用类（已分别实现） */
+
+        /* ----- 响应式适配：移动端 & 小屏 ----- */
+        @media (max-width: 600px) {
+            .hero-card {
+                padding: 24px 18px 30px;
+                border-radius: 40px;
+                min-height: 90vh;          /* 移动端依然占满 */
+                justify-content: flex-start;
+            }
+            .content {
+                gap: 16px;
+            }
+            .brand-name {
+                font-size: 26px;
+            }
+            .main-title {
+                font-size: 26px;
+            }
+            .slogan-highlight {
+                font-size: 22px;
+            }
+            .double-card {
+                flex-direction: column;
+                gap: 8px;
+            }
+            .btn-entry {
+                padding: 12px 24px;
+                min-width: 120px;
+                font-size: 17px;
+                box-shadow: 0 0 0 2px #fcf5ff, 0 0 0 6px rgba(160, 80, 255, 0.4);
+            }
+            .action-buttons {
+                gap: 14px;
+                margin-top: 12px;
+            }
+            .feature-row {
+                font-size: 13px;
+                padding: 8px 12px;
+                gap: 6px 10px;
+            }
+            .feature-tag {
+                font-size: 12px;
+                padding: 3px 12px;
+            }
+            .preserved-slogan .main-line {
+                font-size: 17px;
+            }
+            .preserved-slogan .sub-line {
+                font-size: 13px;
+            }
+            .brand-footer {
+                font-size: 11px;
+            }
+            .product-intro {
+                font-size: 14px;
+                padding: 14px 16px;
+            }
+            /* 移动端悬停效果保留但触屏无hover，不影响 */
+        }
+
+        @media (max-width: 400px) {
+            .btn-entry {
+                width: 100%;
+                justify-content: center;
+            }
+            .action-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .hero-card {
+                padding: 18px 14px 24px;
+                min-height: 92vh;
+            }
+            .feature-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+            .feature-sep {
+                display: none;   /* 小屏竖排时隐藏分隔符，更整洁 */
+            }
+            .product-intro {
+                font-size: 13px;
+                padding: 12px 14px;
+            }
+        }
+
+        /* PC宽屏下，卡片内边距和字号进一步放大，但始终占满屏幕 */
+        @media (min-width: 1024px) {
+            .hero-card {
+                padding: 48px 56px 52px;
+                min-height: 80vh;          /* 大屏下视觉舒服 */
+                border-radius: 64px;
+            }
+            .brand-name {
+                font-size: 40px;
+            }
+            .main-title {
+                font-size: 44px;
+            }
+            .slogan-highlight {
+                font-size: 32px;
+            }
+            .btn-entry {
+                padding: 20px 48px;
+                min-width: 180px;
+                font-size: 24px;
+                box-shadow: 0 0 0 4px #fcf5ff, 0 0 0 10px rgba(160, 80, 255, 0.4);
+            }
+            .double-card .card-title {
+                font-size: 24px;
+            }
+            .preserved-slogan .main-line {
+                font-size: 24px;
+            }
+            .feature-row {
+                font-size: 18px;
+                padding: 14px 24px;
+                gap: 10px 16px;
+            }
+            .feature-tag {
+                font-size: 17px;
+                padding: 6px 22px;
+            }
+            .product-intro {
+                font-size: 17px;
+                padding: 22px 28px;
+                line-height: 1.8;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-card">
+        <!-- 动态紫色渐变气泡背景层（不影响交互），气泡已通过CSS动画持续浮动 -->
+        <div class="bubble-bg">
+            <div class="bubble bubble-1"></div>
+            <div class="bubble bubble-2"></div>
+            <div class="bubble bubble-3"></div>
+            <div class="bubble bubble-4"></div>
+        </div>
+
+        <!-- 主要内容（覆盖在气泡之上） -->
+        <div class="content">
+            <!-- 图1 品牌头部 -->
+            <div class="brand-header">
+                <div class="brand-name">
+                    优活Agent
+                    <small>U-Hope</small>
+                </div>
+                <div class="tagline">独居老人全维度数字守护助手</div>
+            </div>
+
+            <!-- 主标题 -->
+            <div class="main-title">
+                让晚年，<span>从容有爱</span>
+            </div>
+
+            <!-- 产品介绍卡片（替换原来的“数字生活困境”栏目） -->
+            <div class="product-intro">
+                <strong>优活 Agent</strong> 是一款面向独居老人家庭场景设计的主动式家庭智能体。项目采用语音优先交互，设计双色双角色AI（蓝色优活办事，橙色无忧伴陪伴）降低老人使用门槛，区别于传统智能设备单一危险预警逻辑，本产品依托ESP32采集环境与人体活动数据，建立老人专属行为基线，个性化判别日常状态；系统每日自动生成老人生活安心报告推送子女，持续维系远程家庭关怀。
+            </div>
+
+            <!-- 特性行：替换为新文字，每个标签带淡紫色圆角长方形 -->
+            <div class="feature-row">
+                <span class="feature-tag">个性化基线机制（千人千面）</span>
+                <span class="feature-sep">｜</span>
+                <span class="feature-tag">推给子女生活日报</span>
+                <span class="feature-sep">｜</span>
+                <span class="feature-tag">双角色AI配合双模式灯光</span>
+                <span class="feature-sep">｜</span>
+                <span class="feature-tag">兜底预警机制</span>
+            </div>
+
+            <!-- 核心标语 -->
+            <div class="slogan-highlight">
+                “无需懂手机，只需一声优活”
+            </div>
+
+            <!-- 办事 + 陪伴 双卡 -->
+            <div class="double-card">
+                <div>
+                    <div class="card-title">📋 办事优活</div>
+                    <div class="card-sub">让办事更简单</div>
+                </div>
+                <div>
+                    <div class="card-title">💬 问亲无忧伴</div>
+                    <div class="card-sub">让陪伴更安心</div>
+                </div>
+            </div>
+
+            <!-- 保留的标语：完全移除“可信技术保障”栏目，但保留该独立标语块 -->
+            <div class="preserved-slogan">
+                <div class="main-line">让每一个独居老人，不被数字时代遗忘</div>
+                <div class="sub-line">Your Hope, Our Care — U-Hope Agent</div>
+            </div>
+
+            <!-- 两个入口按钮 -->
+            <div class="action-buttons">
+                <button class="btn-entry" aria-label="进入老人端">📱 老人端</button>
+                <button class="btn-entry second" aria-label="进入子女管理平台">👨‍👩‍👧 子女管理平台</button>
+            </div>
+
+            <!-- 底部 slogan -->
+            <div class="brand-footer">
+                <strong>优活</strong> · 为独居，安放安心
+            </div>
+        </div>
+        <!-- end content -->
+    </div>
+    <!-- end hero-card -->
+</body>
+</html>
