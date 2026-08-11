@@ -1003,6 +1003,11 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     cursor: grab;
     touch-action: none;              /* the drag is ours, not the scroller's */
   }
+  /* 抓手是 sticky 的，而 `scrollIntoView({block: 'start'})` 会把目标顶到滚动容器的
+     顶边——也就是**正好压在抓手底下**。实测 320×568：老人点开「我的记录」，标题
+     被那道抓手挡住，她看到的第一行是自己记录的第二行。
+     抓手 44px + 下外边距 4px，留 56px 给它，多出的 8px 是喘气的余量。 */
+  .rail.sheet > .panel { scroll-margin-top: 56px; }
   .sheet-grip {
     width: 44px;
     height: 5px;
@@ -1209,4 +1214,237 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      宽度。装到主屏的平板（竖屏逻辑宽 >=761px）打开照护中心，四个链接全部不可见，
      而 standalone 下没有地址栏：一条真正的死路。 */
   body[data-nav="tabbar"] .back-link { display: inline-flex; }
+}
+
+/* ==========================================================================
+   矮视口的老人端。判据是**高度**，不是宽度。
+   ..........................................................................
+   实测输入行离首屏底部的距离（Chrome headless，量的是 #text 的 bottom）：
+
+     390×844  iPhone 14 竖     首屏内 ✓
+     320×568  iPhone SE 竖     首屏内 ✓
+     768×1024 iPad 竖          首屏内 ✓
+     1024×768 iPad 横          首屏外 156px
+     1280×800 笔记本           首屏外 138px
+     844×390  手机横屏         首屏外 522px（麦克风也在外面，首屏上只有页头）
+
+   在这一页上"要滚动才看得到"不是排版问题。打字是语音失败时唯一的退路，在 Firefox
+   上（没有 Web Speech）是唯一的入口——够不到就等于这个功能不存在。而最糟的那一格
+   不是什么冷门设备，是**把手机横过来**。
+
+   原因是那一整套定高处理挂在 `max-width: 760px` 下。把手机转 90°，宽度变成 844，
+   整套失效。宽度从来不是这件事的判据：一屏够不够放下家具，问的是高度。
+
+   这里刻意做成**双列各自滚动**而不是复用手机那一套：手机那一套会把侧栏收成抽屉，
+   而在 1280×800 上侧栏有 925px 高，收起来是把待办和设置变成够不到的东西——把一个
+   排版问题换成一个功能缺失。宽屏有横向空间，那就用横向空间。
+   ========================================================================== */
+@media (min-width: 761px) and (max-height: 820px) {
+  main.shell.app-frame {
+    height: 100svh;
+    height: 100dvh;
+    max-height: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .app-bar { flex: 0 0 auto; }
+
+  .elder-layout {
+    flex: 1 1 auto;
+    min-height: 0;                    /* 没有这一条，grid 子项的自然高度会把父级顶开 */
+    grid-template-columns: minmax(0, 1fr) minmax(272px, 372px);
+    align-items: stretch;
+    margin-bottom: 0;
+  }
+
+  /* 对话列：家具定高，对话自己让。它是可滚动的那一块，所以缩的应该是它。 */
+  .elder-layout > .stage {
+    min-height: 0;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+  }
+  .elder-layout > .stage > #chat {
+    flex: 1 1 auto;
+    min-height: 64px;                 /* 再挤也要能看见一句话 */
+    max-height: none;
+    overflow-y: auto;
+  }
+  .mic-stage, .composer, .quick, .role-header, .status-line { flex: 0 0 auto; }
+
+  /* 侧栏：单列，自己滚。`align-content: start` 是为了别把四张卡拉成等高——
+     P2 里那个"最后一行两个空格"就是等高拉伸留下的。
+     选择器必须写成 `.rail.sheet`：上面那个 `min-width: 761px` 的块里有一条
+     `.rail.sheet { overflow: visible }`，两个类比一个类特异性高，写 `.rail` 会输。
+     输掉的后果是侧栏不滚而是把 main 顶大，实测 1280×800 下 567px 用手滚不到。 */
+  .rail.sheet {
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  /* 家具按短屏档缩。这几个数字和 `max-width: 760px` 里那一档是同一套——那一档原本
+     嵌在宽度查询里，于是横屏时一次都没生效过。 */
+  .mic-dial { width: 132px; height: 132px; }
+  .mic-big { width: 96px; height: 96px; }
+  .mic-big svg { width: 38px; height: 38px; }
+  .status-line { min-height: 0; margin-top: var(--space-1); }
+  .mic-stage { margin: var(--space-3) 0 var(--space-2); }
+  .role-icon { width: 44px; height: 44px; }
+  .role-header { margin-bottom: var(--space-2); }
+  #agentTitle { font-size: var(--text-lg); }
+}
+
+/* ==========================================================================
+   极矮视口（手机横过来）。判据只有高度，两条分支都覆盖。
+   ..........................................................................
+   844×390 下逐层量过，390px 里家具本身要 507px：
+
+     main 上下内边距            51
+     app-bar + 下外边距         71
+     stage 上下内边距           44
+     角色头 + 下外边距          61
+     今天那一行 + 下外边距      63
+     对话区（已经压到下限）     80
+     麦克风区                  157
+     输入区                    143
+     ------------------------------
+     合计                      670   而屏幕只有 390
+
+   这个视口**装不下**这一页的家具，把每一件都再缩一档也装不下。所以这里不假装它
+   装得下：页面恢复正常滚动，而**输入行钉在视口底部**。
+
+   钉住的是输入行而不是麦克风，因为语音在这一页是首选、打字是唯一的退路——退路必须
+   永远在。麦克风滚上去了她还能滚回来；输入框够不到，Firefox 用户就完全进不来。
+
+   540 这个门槛是查着数定的：320×568 竖屏（568）在门槛之上，不受影响；
+   844×390 与 667×375 两种横屏在门槛之下。
+   ========================================================================== */
+@media (max-height: 540px) {
+  /* 定高框架在这里帮不了忙，它只会把装不下的东西裁掉且滚不到。 */
+  main.shell.app-frame {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    display: block;
+    padding-block: var(--space-3);
+  }
+  .app-bar { margin-bottom: var(--space-2); }
+  .elder-layout { display: block; }
+  .elder-layout > .stage {
+    height: auto;
+    max-height: none;
+    display: block;
+    padding-block: var(--space-3);
+    /* 必须解除。`.stage` 的 `overflow: hidden`（为圆角裁背景渐变）会把它变成一个
+       滚动容器，于是里面的 `position: sticky` 是相对**它**定位的——而它自己从不
+       滚动，所以粘性永远不生效。第一版就这样静静地什么也没发生：输入行照旧在
+       首屏外 271px。 */
+    overflow: visible;
+  }
+
+  /* 对话区给到四成屏高，自己滚。 */
+  .elder-layout > .stage > #chat {
+    max-height: 40svh;
+    max-height: 40dvh;
+    min-height: 96px;
+    overflow-y: auto;
+  }
+
+  /* 家具再让一档。 */
+  .mic-dial { width: 104px; height: 104px; }
+  .mic-big { width: 76px; height: 76px; }
+  .mic-big svg { width: 30px; height: 30px; }
+  .mic-stage { margin: var(--space-2) 0 var(--space-1); }
+  .role-icon { width: 36px; height: 36px; }
+  .role-header { margin-bottom: var(--space-1); }
+  #agentTitle { font-size: var(--text-base); }
+  /* 开场白压成一行。它是这一页告诉老人"该说什么"的地方，所以压而不删。 */
+  #roleOpening {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 输入行钉底。
+     负外边距 + 同量内边距是为了让它的背景铺满 stage 的整个宽度——否则滚动时
+     对话气泡会从它左右两侧的缝里穿过去。 */
+  .composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-inline: calc(var(--space-5) * -1);
+    padding: var(--space-2) var(--space-5);
+    background: var(--surface);
+    box-shadow: 0 -10px 24px color-mix(in srgb, var(--ink) 12%, transparent);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   矮**而宽**：横过来的手机。麦克风回到首屏。
+   ..........................................................................
+   上面那一档把输入行钉住了，但麦克风还在首屏外——而这是一个语音产品，主控件不该
+   要滚一下才看得见。横屏有的是横向空间，那就用横向空间：麦克风占左栏并居中，
+   对话、今天那一行和输入区走右栏。竖着装不下的东西，横着装得下。
+
+   放置只指定麦克风一个（跨满所有行），其余子元素自动落到第二列。这样 `#relianceHost`
+   和 `.status-line` 这类"有内容才出现"的兄弟节点加进来时不需要改这里——用
+   `grid-template-areas` 逐个点名的写法，新增一个子元素就会掉到网格外面去。
+   -------------------------------------------------------------------------- */
+@media (max-height: 540px) and (min-width: 640px) {
+  /* 麦克风搬出文档流，放进左侧一条固定栏并垂直居中。
+     试过 grid（两列 + 麦克风跨行）：能排，但 `grid-row: 1 / -1` 在只声明了列的网格
+     里会退化成"跨一行"——`-1` 指的是**显式**网格的最后一条线，而行全是隐式的。
+     于是麦克风只占第一行、第一行被撑到 145px、右栏的角色头从 53px 变成 141px，
+     「今天」那一行和整个对话区被挤出屏幕。改用 span 20 能修，但整体仍然脆：
+     `#relianceHost`、`.status-line` 这类"有内容才出现"的兄弟节点一进来，自动放置的
+     行号就全变了。
+     绝对定位没有这个问题：它把麦克风从行的账面上完全拿掉，右栏就是普通块流。 */
+  .elder-layout > .stage { padding-left: 196px; }
+  .elder-layout > .stage > .mic-stage {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 164px;
+    margin: 0;
+  }
+
+  /* 390px 高里的账，逐项省出来的：
+       main 上下内边距 24 → 16
+       app-bar 55 → 44
+       stage 上下内边距 24 → 16
+       「今天」下外边距 12 → 4
+       对话区上外边距 16 → 8
+     剩给对话区约 80px，两行字。完整上文一滚就有，而两个控件都在屏上。 */
+  main.shell.app-frame { padding-block: var(--space-2); }
+  .app-bar { min-height: 44px; margin-bottom: var(--space-1); }
+  .elder-layout > .stage { padding-block: var(--space-2); }
+  #todayLine { padding-block: var(--space-1); margin-bottom: var(--space-1); }
+  .elder-layout > .stage > #chat {
+    margin-top: var(--space-2);
+    max-height: 16svh;
+    max-height: 16dvh;
+    min-height: 56px;
+  }
+
+  /* 钉底撤掉。
+     两列布局的前提就是"装得下"，而钉住的输入行带着一块不透明白底和 z-index: 2
+     被拉到视口底部之后，**盖住了它上面的对话区和「今天」那一行**——截图上右栏只剩
+     一个角色头和一块白板，agent 的开场白和当天状态全被压在下面。
+     一个为"装不下"设计的补偿措施，用在装得下的地方就是损失。 */
+  .composer {
+    position: static;
+    margin-inline: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .role-header { margin-bottom: var(--space-1); }
 }

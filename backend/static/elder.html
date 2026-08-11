@@ -136,6 +136,22 @@
           </div>
         </section>
 
+        <!-- 「我的记录」在这里，紧挨着开它的那个按钮。
+             它原先是 `.elder-layout` 的**兄弟**节点，排在定高框架里那个定高子元素的
+             后面——而定高框架里，排在后面的兄弟没有地方可去。实测 390×844：面板高
+             252px，其中只有 70px 在屏内，剩下的被 `overflow: hidden` 裁掉且滚不到。
+             老人按下「查看我的记录」，看到的是一个标题和一句灰色小字，她自己的记录
+             一条都看不见。
+             放进抽屉之后，它落在一个本来就可滚动的容器里，而按钮也在同一个抽屉里
+             ——她按下去，东西就在手边展开。 -->
+        <section id="logPanel" class="panel rail-card log-panel" hidden>
+          <div class="rail-head">
+            <h2>我的记录</h2>
+            <span class="rail-note">和无忧伴聊天的内容不会记在这里</span>
+          </div>
+          <div id="activityLog" class="log-list"></div>
+        </section>
+
         <section class="panel rail-card">
           <div class="rail-head">
             <h2>问问看</h2>
@@ -203,14 +219,6 @@
         </section>
       </aside>
     </div>
-
-    <section id="logPanel" class="panel log-panel" hidden>
-      <div class="rail-head">
-        <h2>我的记录</h2>
-        <span class="rail-note">和无忧伴聊天的内容不会记在这里</span>
-      </div>
-      <div id="activityLog" class="log-list"></div>
-    </section>
   </main>
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
