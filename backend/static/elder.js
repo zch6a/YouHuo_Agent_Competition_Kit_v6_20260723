@@ -85,11 +85,60 @@ const relianceHost = document.querySelector('#relianceHost');
 const activityLogEl = document.querySelector('#activityLog');
 const logPanel = document.querySelector('#logPanel');
 const micHint = document.querySelector('#micHint');
+// 在这里取，不在下面语音那一段取：`setActivity()` 要写它的 aria-label，而那一段在
+// 七百行之后——`const` 的暂时性死区会让任何早一步的调用直接把这一页打哑。
+const mic = document.querySelector('#mic');
 const speechRateEl = document.querySelector('#speechRate');
 const fontScaleEl = document.querySelector('#fontScale');
 
-function setActivity(state) {
+/** Voice Orb 的状态表。**唯一**的定义处。
+ *
+ * 此前 `setActivity` 只是一行 `dataset.activity = state`，状态名以字符串字面量散在
+ * 七个调用点，CSS 只认其中两个。后果不是代码不整齐，是**老人分不清三种完全不同的
+ * 处境**：`error` 被折叠进 `idle`（失败了看起来像可以再按），而 agent 正在说话时
+ * 没有任何状态（她看到的是 idle，于是按下去打断自己）。
+ *
+ * 每一态三样东西缺一不可：
+ *   - `hint`  麦克风下那行字。这是这个控件的名字，不是装饰。
+ *   - `label` 麦克风按钮的 aria-label。读屏用户看不到环，环的全部信息得从这里出。
+ *   - CSS 里一条 `body[data-activity="…"]` 规则，且**不能只靠颜色**（见 components.css）。
+ *
+ * 加了一个任务书没点名的 `speaking`——任务书自己的问题陈述里写着"speaking 不存在"，
+ * 那它就是缺陷之一。所以是十一态，不是十态。
+ */
+const ACTIVITY = {
+  idle:       {hint: '按一下，然后慢慢说',        label: '按一下开始说话'},
+  pressed:    {hint: '松开手，我就开始听',        label: '正在按下'},
+  listening:  {hint: '我在听，您慢慢说',          label: '正在听您说，按一下可以停下'},
+  processing: {hint: '让我想一想',                label: '正在理解您说的话，请稍等'},
+  clarifying: {hint: '有一处我要问清楚',          label: '我有一处要问清楚，请看上面'},
+  confirming: {hint: '请您念一遍再确认',          label: '正在等您确认，请看上面的卡片'},
+  executing:  {hint: '正在替您办',                label: '正在替您办，请稍等'},
+  speaking:   {hint: '我在说，按一下可以打断我',  label: '我正在说话，按一下打断'},
+  success:    {hint: '办好了',                    label: '刚才那件事办好了，按一下可以说下一件'},
+  error:      {hint: '没能办成，可以再说一次',    label: '刚才那件事没能办成，按一下再说一次'},
+  offline:    {hint: '现在连不上网',              label: '现在连不上网，暂时不能办事'},
+};
+
+// 挂给闸门读。`check_page_runtime.py` 的 `check_voice_orb_states` 会逐个把状态写进
+// `data-activity`，在关掉动效之后量每一态的静止形态并两两比对。它必须读**这一份**
+// 清单——在脚本里另写一份，两份就会各自漂移，而漂移的那天检查照样绿。
+window.__voiceOrbStates = ACTIVITY;
+
+/** 切换 Voice Orb 的状态。
+ *
+ * 只写 `#micHint` 和麦克风的 aria-label，**不碰 `#status`**——状态行上多数时候有一句
+ * 比"让我想一想"具体得多的话（哪个任务、差多少钱、为什么停下）。一个自动播报的
+ * 状态机去覆盖它，就是用泛化的话盖掉唯一有信息量的那句。
+ *
+ * `hint` 可以按需覆写：状态相同、处境不同的时候（比如正在听时又按了一下麦克风）。
+ */
+function setActivity(state, hint = null) {
+  const spec = ACTIVITY[state];
+  if (!spec) return;                    // 打错状态名不该把这一页弄哑。
   document.body.dataset.activity = state;
+  setMicHint(hint || spec.hint);
+  if (mic) mic.setAttribute('aria-label', spec.label);
 }
 
 /** 状态行。这一页对老人说的每一句"现在怎么了"都从这里出去。
@@ -162,14 +211,52 @@ function addBubble(text, who, meta = '') {
 
 let stopSpeaking = null;
 
+/** 这一轮说完话之后该停在哪一态。
+ *
+ * `send()` 的 finally 比朗读早得多——它发起 `speak()` 就走了。如果 finally 直接写
+ * `success`，那么整段朗读期间屏幕上写的是"办好了"，而老人这时候按麦克风会打断
+ * agent 自己的话。所以结论先寄存在这里，等 `onDone` 再落。 */
+let pendingSettle = null;
+let speakWatchdog = null;
+
 function speak(text, rate = null, pitch = null) {
   lastSpoken = text;
   if (stopSpeaking) stopSpeaking();
+  setActivity('speaking');
+
+  const finished = () => {
+    window.clearTimeout(speakWatchdog);
+    // 只有还停在 speaking 才动。中途她按了麦克风（listening）、或下一轮已经开始想了
+    // （processing），那些都比"我说完了"更新，不该被回退覆盖。
+    if (document.body.dataset.activity !== 'speaking') return;
+    const next = pendingSettle || 'idle';
+    pendingSettle = null;
+    setActivity(next);
+  };
+
+  // 看门狗。Chrome 的 speechSynthesis 会在长文本上静默停住而**不触发 onend**（长期
+  // 存在的已知问题），神经语音那条也可能卡在一次永不 resolve 的 play() 上。真发生
+  // 时屏幕会一直写着"我在说，按一下可以打断我"——而这一整轮改动的全部意义，就是让
+  // 屏幕不要对老人说假话。
+  //
+  // 中文语音在 rate≈0.88 下大约每秒四个字，给两倍余量再加 6 秒，上限 90 秒。
+  const budget = Math.min(90_000, 6_000 + text.length * 500);
+  window.clearTimeout(speakWatchdog);
+  speakWatchdog = window.setTimeout(finished, budget);
+
   // Clause-by-clause with spoken-Chinese dates and amounts; see speech.js.
   stopSpeaking = speakClauses(text, {
     rate: Number(rate || interactionProfile.speech_rate || 0.88),
     pitch: Number(pitch || ROLES[currentMode].pitch),
+    onDone: finished,
   });
+}
+
+/** 一轮结束时落到 `state`——正在说话就先寄存，说完再落。 */
+function settleActivity(state) {
+  if (document.body.dataset.activity === 'speaking') { pendingSettle = state; return; }
+  pendingSettle = null;
+  setActivity(state);
 }
 
 /** Design §4.1: ~1s crossfade plus a spoken announcement on every mode change. */
@@ -467,6 +554,7 @@ async function send(text) {
   addBubble(text, 'user');
   setActivity('processing');
   setStatus('正在理解您的目标，并检查权限与风险……');
+  let settled = 'idle';
   try {
     const data = await postChat(text);
     setMode(data.mode);
@@ -511,14 +599,46 @@ async function send(text) {
       : '办事可留痕；陪伴默认不向家属展示聊天全文。');
     loadReminders();
     if (!logPanel.hidden) loadActivity();
+    settled = activityFor(data);
   } catch (e) {
     recentRetries += 1;
     addBubble(`系统暂时不可用：${e.message}`, 'agent');
     setStatus('没有执行任何操作，请稍后再试。');
+    settled = navigator.onLine === false ? 'offline' : 'error';
   } finally {
     turnInFlight = false;
-    setActivity('idle');
+    // 这一轮**结束在哪种处境**，屏幕上就停在哪一态。原先无论办成、办砸、还是正在
+    // 等家人接力，都一律回 idle——十分之九的信息在这一行里丢掉了。
+    settleActivity(settled);
   }
+}
+
+/** 一轮回复落在哪一态。
+ *
+ * 后端的 `code` 与 `task_status` 说的是同一件事的两个侧面，`task_status` 更靠后、
+ * 更权威（它是任务真实走到的位置），所以先看它。
+ */
+function activityFor(data) {
+  const byState = {
+    collecting: 'clarifying',
+    awaiting_elder_confirmation: 'confirming',
+    awaiting_family_approval: 'confirming',
+    executing: 'executing',
+    completed: 'success',
+    cancelled: 'idle',
+    failed: 'error',
+  }[data.task_status];
+  if (byState) return byState;
+  return {
+    need_more_info: 'clarifying',
+    need_elder_confirmation: 'confirming',
+    need_family_approval: 'confirming',
+    task_completed: 'success',
+    task_cancelled: 'idle',
+    duplicate_blocked: 'error',
+    safety_alert: 'clarifying',
+    error: 'error',
+  }[data.code] || 'idle';
 }
 
 async function reminderAction(id, action) {
@@ -733,19 +853,18 @@ fontScaleEl.addEventListener('change', () => applyProfile({...interactionProfile
 speechRateEl.addEventListener('change', () => { interactionProfile.speech_rate = Number(speechRateEl.value); });
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const mic = document.querySelector('#mic');
 if (SR) {
   const rec = new SR();
   rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 3;
   rec.onstart = () => {
     setActivity('listening');
-    setMicHint('正在听，请慢慢说');
     setStatus('正在听，请慢慢说。一次只说一件事也可以。');
   };
   rec.onresult = e => { input.value = e.results[0][0].transcript; send(); };
   rec.onend = () => {
+    // 只有还停在 listening 才回 idle：onresult 已经把状态推到 processing 了，
+    // 这里再写一次 idle 会把"让我想一想"抹掉一瞬间。
     if (document.body.dataset.activity === 'listening') setActivity('idle');
-    setMicHint('按一下，然后慢慢说');
   };
   //: Web Speech 的错误枚举是英文标识符，不能直接给老人看，尤其不能配一句
   //: "请再说一遍"——权限被拒时再说一百遍也不会成功，而页面从不告诉她要去哪里开。
@@ -761,8 +880,8 @@ if (SR) {
 
   rec.onerror = e => {
     recentRetries += 1;
-    setActivity('idle');
-    setMicHint('按一下，然后慢慢说');
+    // 此前这里写 idle——听失败和"可以开始了"在屏幕上长得一模一样。
+    setActivity(e.error === 'network' && !navigator.onLine ? 'offline' : 'error');
     setStatus(RECOGNITION_TROUBLE[e.error]
       || '语音没能用起来。您可以在下面打字，我一样能办。');
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed'
@@ -774,21 +893,21 @@ if (SR) {
     // 恰恰是最常见的操作。此前这个未捕获异常让屏幕上什么都不变：状态行不动、
     // 呼吸圈不动，她得不到"第二下没用"的任何反馈。
     if (document.body.dataset.activity === 'listening') {
-      setMicHint('我正在听，您说吧');
+      setActivity('listening', '我正在听，您说吧');
       return;
     }
+    setActivity('pressed');
     // 说话和听必须互斥。
     //
     // 此前 agent 还在念的时候按麦克风，`rec.start()` 会成功——识别器于是把手机
     // 扬声器里 agent 自己的 TTS 转写下来，再当成老人这一轮发出去。`speak()` 里没有
     // 任何东西停 `rec`，`rec.onstart` 里也没有调 `stopSpeaking`。
-    stopSpeaking();
+    if (stopSpeaking) stopSpeaking();   // 开屏问候还没说、她就按了，这里会是 null。
     try {
       rec.start();
     } catch (_) {
       // 状态机和引擎不同步（上一次 onend 还没到）。不抛给用户，让她再按一次。
-      setActivity('idle');
-      setMicHint('再按一下试试');
+      setActivity('idle', '再按一下试试');
     }
   });
 } else {
@@ -798,6 +917,15 @@ if (SR) {
   });
   mic.title = '当前浏览器不支持语音识别，请使用下方输入框';
 }
+
+// 断网。这一页做的每一件事都要过后端——缴费、挂号、查用药——所以断网不是"某个请求
+// 失败了"，是"现在什么都办不了"。此前它只会表现为一次次点下去、一次次报
+// 「系统暂时不可用」，屏幕上没有任何东西说明为什么。
+window.addEventListener('offline', () => setActivity('offline'));
+window.addEventListener('online', () => {
+  if (document.body.dataset.activity === 'offline') setActivity('idle');
+});
+if (navigator.onLine === false) setActivity('offline');
 
 // manifest 的快捷方式承诺的事，这里要真的做到。
 //

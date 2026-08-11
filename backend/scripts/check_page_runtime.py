@@ -479,6 +479,94 @@ def check_identity_self_heal(tab: "CDP", page: str, failures: list[str]) -> None
         failures.append(f"{page}  身份换过之后生活日报仍然打不开：{state['daily'][:40]}")
 
 
+def check_voice_orb_states(tab: "CDP", page: str, failures: list[str]) -> int:
+    """Voice Orb 的每一态在**关掉动效之后**是否仍然看得出不同。
+
+    这个检查存在的理由，是它第一次跑就抓到了我自己写的缺陷。第一版十一态里有三态
+    完全靠动画区分（listening 靠向外扩散、speaking 靠呼吸、clarifying 靠"虚线不
+    转"），而 pages.css 里有一条全局 `prefers-reduced-motion` 规则把所有动画掐到
+    .01ms、迭代一次。于是在开了「减少动态效果」的手机上，listening 和 speaking
+    都塌回 idle、clarifying 塌回 processing——**屏幕不再告诉她 agent 正在说话**，
+    她按下去打断的是 agent 自己的回答。
+
+    前庭失调、偏头痛、晕动症的人开这个开关，而这一页的目标用户正是最可能开它的
+    一群。所以这里模拟 reduce 之后再量。
+
+    量的是三个元素的**静止形态指纹**：两道环的线型 / 粗细 / 半径 / 明度，以及 orb
+    自身的 box-shadow / filter / transform。指纹相同 ⇒ 画出来一定一样。反过来不
+    成立（指纹不同也可能肉眼难辨），所以这是个**下界**检查：它保证不了"好看"，
+    只保证"没有两态在这个通道上是同一个东西"。
+    """
+    # 先把浏览器切到「减少动态效果」。这不只是关动画——万一将来有哪条静态规则也挂在
+    # 这个媒体查询下，量的就得是那一套。
+    tab.send("Emulation.setEmulatedMedia",
+             features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
+    try:
+        states = tab.send("Runtime.evaluate", returnByValue=True, expression="""
+      (() => {
+        const mic = document.querySelector('#mic');
+        const dial = document.querySelector('.mic-dial');
+        if (!mic || !dial) return {skip: '这一页没有 Voice Orb'};
+        // 状态名从页面自己的常量来。在这里写死一份，就成了两份会各自漂移的清单。
+        const names = Object.keys(window.__voiceOrbStates || {});
+        if (!names.length) return {error: 'elder.js 没有把状态表挂出来（window.__voiceOrbStates）'};
+
+        // 过渡也要停掉，量的才是**停稳之后**的样子。
+        // 用 constructable stylesheet 而不是插一个 <style>：这一站的 CSP 是
+        // `default-src 'self'`，行内 <style> 会被直接拦掉，而且是静默拦掉——那样
+        // 这个检查会带着"过渡还在路上"的中间值去比对，得出一堆假红。
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync('*,*::before,*::after{transition:none !important;animation:none !important}');
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+        const before = document.body.dataset.activity;
+        try {
+          const shot = () => {
+            const ring = w => {
+              const s = getComputedStyle(dial, w);
+              return [s.borderStyle, s.borderWidth, s.top, s.left, s.opacity, s.borderColor].join('|');
+            };
+            const o = getComputedStyle(mic);
+            return [ring('::before'), ring('::after'),
+                    o.boxShadow, o.filter, o.transform, o.opacity].join('##');
+          };
+          const out = {};
+          for (const name of names) {
+            document.body.dataset.activity = name;
+            dial.getBoundingClientRect();          // 逼一次样式重算
+            out[name] = shot();
+          }
+          return {shots: out};
+        } finally {
+          document.body.dataset.activity = before;
+          document.adoptedStyleSheets = document.adoptedStyleSheets.filter(s => s !== sheet);
+        }
+      })()
+    """)["result"].get("value")
+    finally:
+        tab.send("Emulation.setEmulatedMedia", features=[])
+
+    if not states or states.get("skip"):
+        return 0
+    if states.get("error"):
+        failures.append(f"{page}  Voice Orb：{states['error']}")
+        return 0
+
+    shots: dict[str, str] = states["shots"]
+    if len(shots) < 10:
+        failures.append(f"{page}  Voice Orb 只有 {len(shots)} 态，任务书要的是十态起")
+    seen: dict[str, str] = {}
+    for name, fingerprint in shots.items():
+        twin = seen.get(fingerprint)
+        if twin:
+            failures.append(
+                f"{page}  Voice Orb：关掉动效后「{twin}」和「{name}」长得一模一样"
+                f"——这两态里有一个只靠动画区分"
+            )
+        else:
+            seen[fingerprint] = name
+    return len(shots)
+
+
 def check_multi_tab_identity(browser: "CDP", ws_host: str, websocket, failures: list[str]) -> None:
     """两个标签页同时冷启动，必须落在同一个家庭。
 
@@ -687,6 +775,7 @@ def main() -> int:
     browser_proc = None
     failures: list[str] = []
     clicked = 0
+    orb_states = 0
     try:
         for _ in range(80):
             try:
@@ -754,6 +843,7 @@ def main() -> int:
                 failures.extend(collect(tab.events, f"{page} 玻璃盒"))
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
+                orb_states += check_voice_orb_states(tab, page, failures)
                 check_identity_self_heal(tab, page, failures)
                 if page == "/elder":
                     # 放在 /elder 之后、用同一个浏览器：此时 localStorage 已经有身份了，
@@ -775,7 +865,13 @@ def main() -> int:
         for item in failures:
             print(f"  {item}")
         return 1
+    # 态数必须印出来。一个"检查跑了但什么都没量到"的检查，和没有这个检查是一回事，
+    # 而它在汇总行里看起来一模一样地绿。
+    if orb_states < 10:
+        print(f"FAIL page_runtime: Voice Orb 只量到 {orb_states} 态——检查没真的跑起来")
+        return 1
     print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，{clicked} 个控件逐个按过，"
+          f"Voice Orb {orb_states} 态在关掉动效后两两可辨，"
           f"手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求")
     return 0
 

@@ -677,12 +677,153 @@ button.block { width: 100%; margin-top: var(--space-3); }
   transition: border-color var(--mode-fade) ease;
 }
 .mic-dial::after { inset: 0; opacity: .3; }
-body[data-activity="listening"] .mic-dial::before { animation: ring-out 1.9s ease-out infinite; }
-body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease-out .6s infinite; }
+/* --------------------------------------------------------------------------
+   Voice Orb 的十个状态
+   ..........................................................................
+   这是这个产品最重要的一个控件，而它此前只有三态（idle / listening / processing），
+   `error` 被折叠进 idle，`speaking` 根本不存在——老人无法从界面上区分"它在说话，
+   别按"和"空闲，可以按"。
+
+   十一态（任务书点名十个，外加它自己在问题陈述里写的 `speaking`）靠**三条非颜色
+   通道**区分——色觉障碍和单色屏下，只靠颜色的状态等于没有状态（任务书第 106 节的
+   grayscale test）：
+
+     形态   环的半径 / 线型 / 粗细 / 明度，必要时 orb 自身
+     动效   无 / 向外扩散 / 旋转 / 呼吸
+     饱和   常态 / 降饱和（只有 offline）
+
+   **动效只能是第二层。** 第一版把 listening / speaking / clarifying 全交给动画去
+   区分，但 pages.css 的 `prefers-reduced-motion` 块会把全站动画一律掐到 .01ms、
+   迭代一次——那三态于是在开了「减少动态效果」的手机上分别塌回 idle、idle、
+   processing。前庭失调的人开这个开关，而这一页的目标用户正是最可能开它的一群。
+   所以每一态先有一副**静止形态**，动效只是叠在上面；掐掉动效，十一态仍两两不同。
+   这一条由 check_page_runtime.py 的 `check_voice_orb_states` 实测，不靠这段注释。
+
+   每一态还必须有一句中文标签写进 `#micHint` 与麦克风的 aria-label——读屏用户看不到
+   环，标签是他们唯一的通道。标签在 elder.js 的 `ACTIVITY` 常量里，一处定义。
+   -------------------------------------------------------------------------- */
+
+/* 第一版是**十一种边框微调**，闸门全过而人分不清。
+   ..........................................................................
+   拍成联系表看了一眼：processing / executing / clarifying 三个虚线环肉眼几乎一样，
+   pressed 和 idle 看不出区别，success 弱得像什么都没发生，speaking 的光晕在浅色
+   背景上基本消失。指纹两两不同不等于人分得出——那个闸门量的是**下界**，它保证
+   "没有两态是同一张图"，保证不了"看得出来是两回事"。
+
+   重做成四组语汇。同组共享一种形，组间换形，而不是十一次改粗细：
+
+     输入中   完整的环，靠**亮度与半径**分：idle 暗中 / pressed 收紧 / listening 贴边最亮
+     处理中   **弧段** + 转：processing 一段 / executing 两段更粗更慢
+              （一段弧在转就是全世界通用的 spinner，语义本来就对）
+     等你     **断续与重环**：clarifying 虚线收紧 / confirming 两道实粗环
+     结果     动 **orb 本体** 而不是环：success 提亮 + 实心光盘 /
+              error 点线 + orb 压暗 / offline 降饱和
+     输出中   speaking：orb 外一圈实心光晕（同样在 orb 上，因为出声的是它）
+   -------------------------------------------------------------------------- */
+
+/* 听：环贴边、加粗、最亮，另叠两道向外扩散的波。 */
+body[data-activity="listening"] .mic-dial::before { inset: 4px; border-width: 3px; opacity: 1; }
+body[data-activity="listening"] .mic-dial::before,
+body[data-activity="listening"] .mic-dial::after { animation: ring-out 1.9s ease-out infinite; }
+body[data-activity="listening"] .mic-dial::after { animation-delay: .6s; }
 @keyframes ring-out {
   0% { transform: scale(.82); opacity: .7; }
   100% { transform: scale(1.08); opacity: 0; }
 }
+
+/* 按下：**动 orb 本体，不动环**。
+   环留在 idle 的位置，orb 缩小并往里压出一道内阴影——这是"按下去了"的物理语汇，
+   和其余十态用的所有通道都不重叠。
+   （第一版让环收紧到 inset 22。dial 是 200、orb 是 156，边界正好在 22——那道环
+   整个被 orb 挡住，pressed 于是和 idle 一模一样。指纹不同，但它是隐形的。） */
+body[data-activity="pressed"] .mic-big {
+  transform: scale(.94);
+  box-shadow: var(--shadow-pressed), 0 6px 16px var(--role-glow);
+}
+
+/* 想：一段弧在转。这是 spinner 的通用语汇，不需要教。
+   `border-color` 只留一边，圆形元素上就是一段四分之一弧。 */
+body[data-activity="processing"] .mic-dial::before {
+  border-width: 3px;
+  border-color: var(--role-accent) transparent transparent transparent;
+  opacity: .9;
+}
+body[data-activity="processing"] .mic-dial::after { opacity: .18; }
+body[data-activity="processing"] .mic-dial::before,
+body[data-activity="executing"] .mic-dial::before { animation: ring-spin 1.6s linear infinite; }
+@keyframes ring-spin { to { transform: rotate(1turn); } }
+
+/* 办：两段弧、更粗、转得更慢。"正在替您办"比"想一想"更重，也更久。 */
+body[data-activity="executing"] .mic-dial::before {
+  border-width: 5px;
+  border-color: var(--role-accent) transparent var(--role-accent) transparent;
+  opacity: .95;
+  animation-duration: 3.2s;
+}
+body[data-activity="executing"] .mic-dial::after { opacity: .18; }
+
+/* 要问清楚：虚线环收紧贴着 orb，不转。断续的线是"这里还缺一块"，
+   而它停着——停着的意思是它在等你，不是它在忙。 */
+body[data-activity="clarifying"] .mic-dial::before {
+  border-style: dashed;
+  border-width: 3px;
+  inset: 8px;                  /* 22 会被 orb 整个挡住，见 pressed 那条注释 */
+  opacity: .95;
+}
+body[data-activity="clarifying"] .mic-dial::after { opacity: .12; }
+
+/* 要你确认：两道实粗环，一起慢慢呼吸。两道环对应两个点头——您一次、家人一次。 */
+body[data-activity="confirming"] .mic-dial::before,
+body[data-activity="confirming"] .mic-dial::after {
+  border-width: 4px;
+  opacity: .85;
+  animation: ring-breathe 2.8s ease-in-out infinite;
+}
+@keyframes ring-breathe {
+  0%, 100% { transform: scale(1); opacity: .5; }
+  50% { transform: scale(1.03); opacity: .9; }
+}
+
+/* 说话：orb 外一圈实心光晕。放在 orb 上而不在环上，因为出声的是它。
+   第一版 7px / 26% 在浅色背景上看不见，也过不了灰度——加到 12px / 46%。 */
+body[data-activity="speaking"] .mic-big {
+  box-shadow:
+    0 0 0 12px color-mix(in srgb, var(--role-accent) 46%, transparent),
+    0 18px 44px var(--role-glow),
+    0 2px 0 rgba(255, 255, 255, .4) inset;
+  animation: orb-halo 1.6s ease-in-out infinite;
+}
+@keyframes orb-halo {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
+}
+
+/* 办好了：外环变成一整块实心光盘，orb 提亮。
+   这是全套里唯一一次**填充**——"结束了"和"进行中"必须是两种形，不是两种粗细。
+   仍然不闪、不弹、不撒花：一位老人刚交完水费，不需要庆祝动画。 */
+body[data-activity="success"] .mic-dial::before { border-width: 6px; opacity: 1; }
+body[data-activity="success"] .mic-dial::after {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--role-accent) 16%, transparent);
+  opacity: 1;
+}
+body[data-activity="success"] .mic-big { filter: brightness(1.08); }
+
+/* 没办成：环断成点线，orb 自己压暗一档。压暗是为了让它和 success 在灰度下也是
+   一亮一暗两个方向，而不是两种边框。 */
+body[data-activity="error"] .mic-dial::before {
+  border-style: dotted;
+  border-width: 4px;
+  opacity: 1;
+}
+body[data-activity="error"] .mic-big { filter: brightness(.82) saturate(.8); }
+
+/* 连不上：orb 降饱和到几乎是灰的，环退到最细最淡。降饱和是界面里"不可用"的通用
+   语言，而这一态说的正是"现在什么都办不了"。 */
+body[data-activity="offline"] .mic-big { filter: saturate(.18) brightness(.94); }
+body[data-activity="offline"] .mic-dial::before { border-style: dashed; border-width: 1px; opacity: .35; }
+body[data-activity="offline"] .mic-dial::after { opacity: .12; }
+
 .mic-big {
   position: relative;
   width: 156px; height: 156px;

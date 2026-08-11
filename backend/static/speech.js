@@ -318,13 +318,14 @@ async function playNeural(clauses, speed, state) {
 }
 
 /** Browser speech synthesis: always available, used when the neural voice is not. */
-function playBrowser(clauses, {rate, pitch}, state) {
-  if (!('speechSynthesis' in window)) return;
+function playBrowser(clauses, {rate, pitch}, state, onFinish = null) {
+  if (!('speechSynthesis' in window)) { if (onFinish) onFinish(); return; }
   const synth = window.speechSynthesis;
   synth.cancel();
   const voice = pickVoice();
   const speakFrom = index => {
-    if (state.cancelled || index >= clauses.length) return;
+    if (state.cancelled) return;
+    if (index >= clauses.length) { if (onFinish) onFinish(); return; }
     const utterance = new SpeechSynthesisUtterance(clauses[index]);
     utterance.lang = 'zh-CN';
     utterance.rate = rate;
@@ -346,10 +347,22 @@ function playBrowser(clauses, {rate, pitch}, state) {
  * falling back to the browser on any failure.
  * Returns a cancel function so a new turn can interrupt the previous one.
  */
-export function speakClauses(text, {rate = 0.88, pitch = 1.0, today = new Date()} = {}) {
+export function speakClauses(text, {rate = 0.88, pitch = 1.0, today = new Date(), onDone = null} = {}) {
   const clauses = splitClauses(speakableText(text, today));
-  const state = {cancelled: false, timer: null, audio: null};
-  if (!clauses.length) return () => {};
+  const state = {cancelled: false, timer: null, audio: null, finished: false};
+
+  /** 报一次「说完了」，且**只报一次**。
+   *
+   * 两条播放路径可能先后各走一遍——离线神经语音在第 N 句失败时会回落到浏览器合成
+   * 把剩下的说完——但对调用方来说这仍然只是一次朗读。被 cancel 掉的不算说完：
+   * 打断的那一方自己知道接下来要进什么状态，这里不该替它决定。 */
+  const finish = () => {
+    if (state.cancelled || state.finished) return;
+    state.finished = true;
+    if (onDone) onDone();
+  };
+
+  if (!clauses.length) { finish(); return () => {}; }
 
   const cancel = () => {
     state.cancelled = true;
@@ -363,15 +376,15 @@ export function speakClauses(text, {rate = 0.88, pitch = 1.0, today = new Date()
 
   if (neuralAvailable) {
     // Speed maps the profile's browser rate onto the model's speed factor.
-    playNeural(clauses, Math.max(0.5, Math.min(2.0, rate)), state).catch(error => {
+    playNeural(clauses, Math.max(0.5, Math.min(2.0, rate)), state).then(finish).catch(error => {
       if (state.cancelled) return;
       // Resume from the clause that failed so nothing is spoken twice.
       const from = Number.isInteger(error?.clauseIndex) ? error.clauseIndex : 0;
       console.warn(`离线语音在第${from + 1}句失败，回落到浏览器语音：`, error?.message || error);
-      playBrowser(clauses.slice(from), {rate, pitch}, state);
+      playBrowser(clauses.slice(from), {rate, pitch}, state, finish);
     });
   } else {
-    playBrowser(clauses, {rate, pitch}, state);
+    playBrowser(clauses, {rate, pitch}, state, finish);
   }
 
   return cancel;

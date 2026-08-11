@@ -104,6 +104,9 @@
     inset 0 1px 0 rgba(255, 255, 255, .7),
     inset 0 -1px 0 rgba(16, 24, 44, .05);
   --ring: 0 0 0 4px color-mix(in srgb, var(--role-accent) 22%, transparent);
+  /* 按下去的内阴影。方向和上面那三级相反：不是"浮起来"，是"陷进去"。
+     两种模式各一版——深色下背景本来就暗，同样的黑会把控件压成一个洞。 */
+  --shadow-pressed: inset 0 5px 14px rgba(16, 24, 44, .34);
 
   /* --- spacing: 4px base, so margins and padding share one rhythm ---------
      Sizes were previously chosen per component, which is why panels that sit
@@ -225,6 +228,7 @@
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
     --shadow-2: 0 2px 6px rgba(0, 0, 0, .32), 0 14px 34px rgba(0, 0, 0, .38);
     --shadow-3: 0 6px 14px rgba(0, 0, 0, .36), 0 30px 70px rgba(0, 0, 0, .46);
+    --shadow-pressed: inset 0 5px 14px rgba(0, 0, 0, .46);
     color-scheme: dark;
   }
 }
