@@ -125,6 +125,12 @@
      */
     renew() {
       this.reset();
+      // 会话也属于旧家庭，一并扔掉。
+      //
+      // 漏掉这一步的后果是"应用打得开、待办看得见、但一说话就报系统暂时不可用"：
+      // `youhuo_session_v2` 还指着换掉之前的那个 family_id，`/v2/chat` 于是抛
+      // AuthorizationError（403）。R12 修了身份这一半，这一半漏了。
+      try { localStorage.removeItem('youhuo_session_v2'); } catch (_) { /* 隐私模式 */ }
       pending = provision();
       return pending;
     },

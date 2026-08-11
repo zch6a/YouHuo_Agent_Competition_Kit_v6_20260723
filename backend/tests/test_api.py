@@ -122,7 +122,25 @@ def test_security_headers_are_set(tmp_path):
         assert response.status_code == 200
         assert "default-src 'self'" in response.headers['content-security-policy']
         assert response.headers['x-content-type-options'] == 'nosniff'
-        assert response.headers['x-frame-options'] == 'DENY'
+        # 有意修改：DENY → SAMEORIGIN，为了桌面演示舞台把真实 App 装进同源 iframe。
+        #
+        # 这是一处**真的放宽**，不掩饰。保住的安全属性是"第三方站点不能把我们的页面
+        # 套进它的框里"——点击劫持的实际威胁面——放开的只有我们自己的 `/stage`。
+        # CSP 的 `frame-ancestors 'self'` 与它成对，下面一并钉住。
+        #
+        # 残余风险：一个同源 XSS 现在可以把我们自己的页面套进框。但在
+        # `script-src 'self'` 且无内联、无 CDN 的前提下，同源 XSS 本身已经是通局条件，
+        # 套不套框不改变结局。
+        assert response.headers['x-frame-options'] == 'SAMEORIGIN'
+        csp = response.headers['content-security-policy']
+        assert "frame-ancestors 'self'" in csp, "跨站套框的防护不能丢"
+        assert "frame-ancestors 'none'" not in csp
+        # 放宽只到 'self' 为止：出现任何主机名或通配符都说明有人把它继续放开了。
+        ancestors = next(
+            part.strip() for part in csp.split(";")
+            if part.strip().startswith("frame-ancestors")
+        )
+        assert ancestors.split()[1:] == ["'self'"], f"frame-ancestors 被放开了：{ancestors}"
         assert response.headers['cache-control'] == 'no-store'
 
 

@@ -347,7 +347,14 @@ async function postChat(text) {
   try {
     return await api('/v2/chat', {method: 'POST', headers, body: body(await ensureSession())});
   } catch (e) {
-    if (e.status !== 400) throw e;
+    // 403 和 400 都要重建会话。
+    //
+    // 403 是 `AuthorizationError`：这个 session_id 存在，但**不属于当前家庭**。
+    // 换身份之后就是这个形态——R12 修了身份那一半（换库之后重新开通 + 整页重载），
+    // 却漏了会话这一半：`youhuo_session_v2` 还留在 localStorage 里指着旧家庭，
+    // 于是老人每说一句话都是 403，而这条路径只从 400 恢复。表现是"应用打得开、
+    // 待办看得见、但一说话就报系统暂时不可用"，刷新多少次都一样。
+    if (e.status !== 400 && e.status !== 403) throw e;
     sessionId = null;
     try { localStorage.removeItem('youhuo_session_v2'); } catch (_) { /* 隐私模式 */ }
     return api('/v2/chat', {method: 'POST', headers, body: body(await ensureSession())});

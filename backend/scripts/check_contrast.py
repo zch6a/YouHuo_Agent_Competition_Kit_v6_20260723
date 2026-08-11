@@ -22,7 +22,9 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge"]
+#: /stage 也要查：它是答辩时投在大屏上的那一页，控制条的对比度和触控尺寸和产品
+#: 页面一样要达标——把它排除掉就等于说"演示环境不用无障碍"。
+PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge", "/stage"]
 PORT = 8013
 BASE = f"http://127.0.0.1:{PORT}"
 DEVTOOLS_PORT = 9444

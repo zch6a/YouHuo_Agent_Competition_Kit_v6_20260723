@@ -322,6 +322,194 @@
 }
 
 /* --------------------------------------------------------------------------
+   桌面演示舞台
+   ..........................................................................
+   这一页的原则只有一条：手机是主角，桌面什么都不做。
+
+   没有 hero、没有营销标题、没有特性卡片、没有渐变背景。左边一列安静的控制，
+   右边一台手机，手机占掉视觉注意力的绝大部分。它是一个展台，不是一张落地页。
+
+   手机框刻意**不模仿**任何具体机型：中性圆角、薄边框、一道柔和的环境阴影。
+   它的职责是让人相信"这是一台手机"然后立刻退到产品身后——一个画得很像 iPhone
+   的框会把注意力吸到框上。
+   -------------------------------------------------------------------------- */
+
+.stage-body { min-height: 100svh; min-height: 100dvh; }
+
+/* 类名是 .demo-stage 而不是 .stage——老人端本来就有 <section class="panel stage">
+   （对话面板）。第一版取了裸 .stage，于是这里的 min-height: 100svh 落到了老人端
+   那张面板上，把定高框架撑出 90px、内容被裁——而这个文件是全站共用的。
+   共享样式表里不要用通用名词当类名。 */
+.demo-stage {
+  display: grid;
+  /* `minmax(280px, 340px)` 的下限是**硬的**：390px 视口减去两侧 16px 只剩 358px，
+     而 280px 的列加上网格间距就把容器撑破了 8px——溢出探针量出来 398 > 390。
+     `min(280px, 100%)` 让这一列在窄屏上老实收缩；宽屏行为不变。 */
+  grid-template-columns: minmax(min(280px, 100%), 340px) 1fr;
+  gap: var(--space-8);
+  align-items: start;
+  min-height: 100svh;
+  min-height: 100dvh;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+}
+
+/* --- 控制区 --------------------------------------------------------------- */
+
+.stage-controls {
+  display: grid;
+  gap: var(--space-6);
+  position: sticky;
+  top: var(--space-8);
+}
+.stage-brand { display: flex; align-items: center; gap: var(--space-3); }
+.stage-mark {
+  width: 44px; height: 44px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--r-lg);
+  font-size: var(--text-xl); font-weight: 800; line-height: 1;
+  color: var(--ink-invert);
+  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-violet));
+}
+.stage-brand h1 { margin: 0; font-size: var(--text-lg); line-height: var(--lh-tight); }
+.stage-note { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--ink-3); line-height: var(--lh-snug); }
+
+.stage-group { display: grid; gap: var(--space-2); }
+.stage-group h2 {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: var(--ink-3);
+  text-transform: none;
+}
+.stage-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* 控制按钮不用产品的主按钮样式：它们不是产品的一部分，视觉上必须比手机里的任何
+   东西都安静。低对比描边 + 无阴影，当前项靠底色和字重区分（不只靠颜色）。 */
+.stage-pick {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: none;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+.stage-pick:hover:not(:disabled) { transform: none; border-color: var(--line-strong); background: var(--surface-2); }
+.stage-pick.is-current {
+  border-color: var(--ink-3);
+  background: var(--surface-3);
+  color: var(--ink);
+  font-weight: 800;
+}
+/* 命中区 48px。对比度闸门量出来这个链接是 156×16——`min-height` 对行内元素无效，
+   这是这个项目第三次踩同一个坑（首页的演示入口、家人端正文里的可信中心链接）。 */
+.stage-exit a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  color: var(--ink-3);
+}
+
+/* --- 手机 ---------------------------------------------------------------- */
+
+.stage-viewport {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-4);
+  min-height: calc(100svh - var(--space-8) * 2);
+}
+
+
+/* 边框厚度与外圆角是同一个来源算出来的：屏幕圆角 + 边框厚度 = 机身圆角。
+   两处各写一份就会在某个尺寸上露出一道白边。 */
+.device {
+  /* `--want-*` 是 JS 提的需求（视口按钮选的尺寸）；`--screen-*` 是钳过之后真正用的。
+     职责分开：JS 不知道窗口有多高，CSS 不知道用户选了哪一档。 */
+  --want-w: 390px;
+  --want-h: 844px;
+  --bezel: 12px;
+  --screen-radius: 38px;
+  /* 44px 留给下面那行「老人端 · 390 × 844」加它的间距。 */
+  --chrome: calc(var(--space-8) * 2 + var(--bezel) * 2 + 44px);
+  --screen-w: var(--want-w);
+  --screen-h: min(var(--want-h), calc(100svh - var(--chrome)));
+  padding: var(--bezel);
+  border-radius: calc(var(--screen-radius) + var(--bezel));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--ink) 82%, var(--surface)),
+    color-mix(in srgb, var(--ink) 94%, #000));
+  /* 一道环境阴影，不是四道。高程靠位置和大小，不靠堆叠阴影。 */
+  box-shadow:
+    0 var(--space-8) var(--space-16) color-mix(in srgb, var(--ink) 22%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.device-screen {
+  width: var(--screen-w);
+  height: var(--screen-h);
+  border-radius: var(--screen-radius);
+  overflow: hidden;
+  background: var(--bg);
+  /* 屏幕自己不投影：影子属于机身。 */
+  box-shadow: none;
+}
+.device-screen iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.device-caption {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 答辩模式 ------------------------------------------------------------ */
+
+/* 只留背景和手机。控制区在 JS 里同时被打上 inert，所以它不只是看不见，是真的
+   不在 Tab 顺序和可访问树里——录屏时一次误触不会把"场景：诈骗"请回画面。 */
+.is-clean .demo-stage { grid-template-columns: 1fr; }
+.is-clean .stage-controls { display: none; }
+
+.stage-escape {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: none;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  opacity: .5;
+}
+.stage-escape:hover { opacity: 1; transform: none; }
+
+/* 窄屏上舞台没有意义：手机浏览器里直接用应用本身。 */
+@media (max-width: 900px) {
+  .demo-stage { grid-template-columns: 1fr; padding: var(--space-4); }
+  .stage-controls { position: static; }
+  /* 减的是**整台机器**的宽度，不只是屏幕。
+     此前写的是 `100vw - var(--space-8)`（= 视口减两侧 16px 内边距），得到 358px 的
+     屏幕，再加上两侧各 12px 的机身边框就是 382px——比容器宽 8px，溢出探针量出来
+     398 > 390。边框是机身的一部分，必须一起算进去。 */
+  .device {
+    --screen-w: min(390px, calc(100vw - var(--space-8) - var(--bezel) * 2));
+  }
+  .device-screen { height: min(844px, 78svh); }
+}
+
+/* --------------------------------------------------------------------------
    Judge walkthrough
    -------------------------------------------------------------------------- */
 

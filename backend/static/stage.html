@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>优活演示舞台</title>
+  <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <link rel="stylesheet" href="/static/base.css" />
+  <link rel="stylesheet" href="/static/components.css" />
+  <link rel="stylesheet" href="/static/pages.css" />
+</head>
+<!-- 这一页刻意**不注册 service worker**：它是展示环境，不是要装到主屏的应用，
+     而一个会缓存自己的舞台在反复改版时只会给出昨天的样子。 -->
+<body data-mode="youhuo" class="stage-body">
+  <main class="demo-stage" id="main">
+    <!-- 左侧控制区。它只存在于这一页——六个 App 页面里不出现「场景：诈骗」这种按钮，
+         那是给答辩人用的，不是给一位老人用的。 -->
+    <aside class="stage-controls" id="stageControls" aria-label="演示控制">
+      <header class="stage-brand">
+        <span class="stage-mark" aria-hidden="true">优</span>
+        <div>
+          <h1>优活演示舞台</h1>
+          <p class="stage-note">框里跑的是真实应用，不是截图。</p>
+        </div>
+      </header>
+
+      <section class="stage-group" aria-label="看哪一端">
+        <h2>看哪一端</h2>
+        <div class="stage-choices" id="stageRoles">
+          <button type="button" class="stage-pick is-current" data-route="/elder" aria-current="true">老人端</button>
+          <button type="button" class="stage-pick" data-route="/family">家人端</button>
+          <button type="button" class="stage-pick" data-route="/care">照护</button>
+          <button type="button" class="stage-pick" data-route="/trust">可信中心</button>
+          <button type="button" class="stage-pick" data-route="/judge">评委导览</button>
+        </div>
+      </section>
+
+      <section class="stage-group" aria-label="演示台词">
+        <h2>演示台词</h2>
+        <p class="stage-note">点一下，把这句话送进老人端的输入框——真的发出去，不是演的。</p>
+        <div class="stage-choices" id="stageLines">
+          <button type="button" class="stage-pick" data-say="帮我交这个月的水费">缴费</button>
+          <button type="button" class="stage-pick" data-say="帮我挂个心内科">挂号</button>
+          <button type="button" class="stage-pick" data-say="我今天吃药了吗">用药</button>
+          <button type="button" class="stage-pick" data-say="有人说我中奖了要我先交钱">识别诈骗</button>
+          <button type="button" class="stage-pick" data-say="我一个人很孤单，没人陪">陪伴</button>
+        </div>
+      </section>
+
+      <section class="stage-group" aria-label="视口">
+        <h2>视口</h2>
+        <div class="stage-choices" id="stageSizes">
+          <button type="button" class="stage-pick is-current" data-w="390" data-h="844" aria-current="true">390 × 844</button>
+          <button type="button" class="stage-pick" data-w="320" data-h="568">320 × 568</button>
+          <button type="button" class="stage-pick" data-w="412" data-h="915">412 × 915</button>
+        </div>
+      </section>
+
+      <section class="stage-group" aria-label="舞台">
+        <h2>舞台</h2>
+        <div class="stage-choices">
+          <button type="button" class="stage-pick" id="stageClean">只留手机（答辩模式）</button>
+          <button type="button" class="stage-pick" id="stageFull">全屏</button>
+          <button type="button" class="stage-pick" id="stageReset">重新开始</button>
+        </div>
+        <p class="stage-note" id="stageHint" role="status" aria-live="polite"></p>
+      </section>
+
+      <p class="stage-note stage-exit"><a href="/">直接打开应用（不套框）→</a></p>
+    </aside>
+
+    <!-- 手机。它是这一页的主角，桌面部分刻意什么都不做。 -->
+    <div class="stage-viewport">
+      <div class="device" id="device">
+        <div class="device-screen">
+          <!-- 真 iframe，不是 transform: scale()。App 必须在 390px 视口里真的跑起来：
+               媒体查询、env(safe-area-inset-*)、100dvh、抽屉的 position: fixed
+               全都依赖真实视口宽度。缩放只是把桌面布局拍小。 -->
+          <iframe id="deviceFrame" src="/elder" title="优活应用" allow="microphone"></iframe>
+        </div>
+      </div>
+      <p class="device-caption" id="deviceCaption">老人端 · 390 × 844</p>
+    </div>
+
+    <!-- 答辩模式下的唯一出口。控制条整体 inert 之后，这个按钮必须还在。 -->
+    <button type="button" class="stage-escape" id="stageEscape" hidden>显示控制</button>
+  </main>
+  <script src="/static/stage.js" defer></script>
+</body>
+</html>

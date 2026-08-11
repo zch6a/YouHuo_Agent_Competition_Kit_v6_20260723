@@ -179,6 +179,14 @@ def test_every_screen_has_some_way_out():
             exits.append("back-link")
         if 'class="tabbar"' in html:
             exits.append("tabbar")
+        # 一条指向首页的链接就是出口，不管它穿什么类。
+        #
+        # 只认 `.back-link` 和 `.tabbar` 会把 `/stage` 判成死路——那一页的出口是
+        # 「直接打开应用（不套框）→」，一个普通的 `<a href="/">`。判据挂在类名上，
+        # 就会在下一个不用那两个类的页面上重演一次"没有出口"的误报；而给某一页
+        # 开特例，等于把这条测试变回它最初那个"不在讨论范围就跳过"的形状。
+        if re.search(r'<a[^>]*href="/"', html):
+            exits.append("home-link")
         if page.name == "index.html":
             exits.append("role-chooser")     # 它自己就是首页，两个入口即出口
         assert exits, f"{page.name} 没有任何离开这一页的办法"

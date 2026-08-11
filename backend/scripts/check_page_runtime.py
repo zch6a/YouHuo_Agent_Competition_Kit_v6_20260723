@@ -47,7 +47,7 @@ PORT = 8047
 DEVTOOLS_PORT = 9337
 BASE = f"http://127.0.0.1:{PORT}"
 
-PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge"]
+PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge", "/stage"]
 
 #: 页面加载后等多久再收网。首屏之后还有 `bootstrap()` 的登录、identity 的 provision
 #: 和几个 GET，抛错往往发生在这一段而不是解析期。

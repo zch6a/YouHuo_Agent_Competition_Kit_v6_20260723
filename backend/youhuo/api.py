@@ -173,10 +173,26 @@ def create_app(
             # blob: is required to play locally synthesized WAV audio; it is
             # created in-page from a same-origin response, never fetched.
             b"media-src 'self' blob:; "
-            b"connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+            # 桌面演示舞台把真实 App 装进一个 390x844 的 iframe 里。
+            #
+            # 这是一处**真的放宽**，不掩饰：`frame-ancestors` 从 `'none'` 放到 `'self'`，
+            # `X-Frame-Options` 从 `DENY` 放到 `SAMEORIGIN`。保住的安全属性是"第三方站点
+            # 不能把我们的页面套进它的框里"——点击劫持的实际威胁面——放开的只有我们
+            # 自己的 `/stage`。
+            #
+            # 残余风险说清楚：一个同源 XSS 现在可以把我们自己的页面套进框。但在
+            # `script-src 'self'` 且无内联、无 CDN 的前提下，同源 XSS 本身就已经是
+            # 通局条件，套不套框不改变结局。
+            #
+            # 为什么必须是真 iframe 而不是 `transform: scale()`：App 得在 390px 视口里
+            # **真的**跑起来——媒体查询、`env(safe-area-inset-*)`、`100dvh`、抽屉的
+            # `position: fixed` 全都依赖真实视口宽度。缩放只是把桌面布局拍小，
+            # 那是另一个东西。
+            b"frame-src 'self'; "
+            b"connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
         ),
         (b"x-content-type-options", b"nosniff"),
-        (b"x-frame-options", b"DENY"),
+        (b"x-frame-options", b"SAMEORIGIN"),
         (b"referrer-policy", b"no-referrer"),
         (b"permissions-policy", b"microphone=(self), camera=(self), geolocation=(self)"),
         (b"cache-control", b"no-store"),
@@ -265,6 +281,15 @@ def create_app(
     @app.get("/judge", include_in_schema=False)
     def judge_ui() -> FileResponse:
         return FileResponse(static_dir / "judge.html")
+
+    @app.get("/stage", include_in_schema=False)
+    def demo_stage() -> FileResponse:
+        """桌面演示舞台：手机框 + 框内真实 App。
+
+        它**不是**产品的一部分，是答辩、录屏和截图用的展示环境。控制条只存在于这一页，
+        六个 App 页面里不出现——一位老人不该在自己的界面上看到"场景：诈骗"这种按钮。
+        """
+        return FileResponse(static_dir / "stage.html")
 
     @app.get("/ping", include_in_schema=False)
     async def ping() -> dict[str, str]:

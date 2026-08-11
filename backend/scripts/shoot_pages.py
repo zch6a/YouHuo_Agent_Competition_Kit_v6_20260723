@@ -33,15 +33,26 @@ DEVTOOLS_PORT = 9333
 #: is just under it and an unfolded one just over, so the fold crosses the
 #: breakpoint. Testing only 390 and 1360 never exercises that transition.
 VIEWPORTS = {
+    "narrow-320": (320, 568, 2),      # 最窄的在售安卓机，也是唯一暴露过折行的一档
     "iphone-se": (375, 667, 2),
     "iphone-14": (390, 844, 3),
     "pixel-7": (412, 915, 3),
     "fold-closed": (344, 882, 3),    # Mate X5 外屏，比 iPhone SE 还窄
     "fold-open": (720, 748, 3),       # Mate X5 内屏展开，仍在 760px 断点之下
     "tablet": (800, 1200, 2),         # MatePad 竖屏，刚过断点
+    "tablet-landscape": (1024, 768, 2),   # MatePad 横屏：短而宽，没有别的视口覆盖
     "desktop": (1360, 900, 1),
 }
-PAGES = ["/elder", "/family", "/care", "/trust", "/judge", "/"]
+
+#: 320x568 是唯一在这一档上发现过真缺陷的视口（可信页的分区标签折行、老人端
+#: 对话区被固定家具挤到不足 40px），也是最窄的在售安卓机。
+#:
+#: 任务书列的 360x800 / 393x852 / 430x932 与现有的 375 / 390 / 412 相差几个像素，
+#: 加进来只会让每轮多跑一倍时间而带不来新信息，所以**没有**加——这一条是判断，
+#: 可以推翻。
+#: /stage 是桌面演示舞台：手机框 + 框内真实 App。它排在最后，因为它只在宽视口下
+#: 有意义——窄屏上它自己会退成直接用应用本身。
+PAGES = ["/elder", "/family", "/care", "/trust", "/judge", "/", "/stage"]
 
 #: 量"有没有内容够不着"，而不只是 `documentElement.scrollWidth`。
 #:
@@ -174,7 +185,14 @@ def main() -> int:
         browser = CDP(ws_url, websocket)
         written = []
         overflow: list[str] = []
-        for device, (width, height, dsf) in VIEWPORTS.items():
+        # 不指定模式就明暗都扫。
+        #
+        # 深色此前要单独跑一次，也就是说"全尺寸截图"这件事默认只出了一半——而
+        # 对比度审计读的是计算色，12/12 通过只说明色值达标，不说明看起来是对的：
+        # 一个背景没跟着换、或者一处写死的白底，色值检查全都发现不了。
+        schemes = [scheme] if scheme else ["light", "dark"]
+        for mode in schemes:
+          for device, (width, height, dsf) in VIEWPORTS.items():
             if only and device not in only:
                 continue
             for page in PAGES:
@@ -192,10 +210,9 @@ def main() -> int:
                     # 深色模式必须能真的看一眼。对比度审计读的是计算出来的颜色，
                     # 12/12 通过只说明色值达标，不说明看起来是对的——一个背景没
                     # 跟着换、或者一处写死的白底，色值检查全都发现不了。
-                    if scheme:
-                        tab.send("Emulation.setEmulatedMedia", features=[
-                            {"name": "prefers-color-scheme", "value": scheme}
-                        ])
+                    tab.send("Emulation.setEmulatedMedia", features=[
+                        {"name": "prefers-color-scheme", "value": mode}
+                    ])
                     # mobile=True so `width=device-width` and the safe-area /
                     # touch media queries behave as they do on a real handset.
                     tab.send("Emulation.setDeviceMetricsOverride", width=width, height=height,
@@ -242,9 +259,7 @@ def main() -> int:
                         )
                     for item in box["offscreen"]:
                         overflow.append(f"{device}{page} 元素右边缘出界：{item}")
-                    stem = f"{device}{page.replace('/', '-') or '-home'}"
-                    if scheme:
-                        stem = f"{stem}-{scheme}"
+                    stem = f"{device}{page.replace('/', '-') or '-home'}-{mode}"
                     # The first screen alone, which is what decides whether the
                     # app screen is complete without scrolling. Judging that from
                     # a 2400px full-page capture is impossible.

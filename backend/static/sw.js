@@ -45,6 +45,8 @@ const SHELL = [
   '/static/glassbox.js',
   '/static/sheet.js',
   '/static/register-sw.js',
+  '/stage',
+  '/static/stage.js',
   // 标签栏图标的外部 sprite。不缓存它，离线时五个标签会变成一排空白——而且不报错。
   '/static/icons/tabs.svg',
   '/static/icons/icon-192.png',
