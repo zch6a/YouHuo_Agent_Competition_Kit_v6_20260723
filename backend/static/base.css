@@ -4,6 +4,22 @@
  */
 * { box-sizing: border-box; }
 
+/* 「这个页面要用服务器打开」那条提示，平时藏起来。
+   ..........................................................................
+   这一条规则是那条提示的**全部机制**：CSS 加载成功 → 藏起来；CSS 加载不到 → 露出来。
+
+   为什么需要它：七个页面引用样式和脚本用的是 `/static/...` **绝对路径**（它们被
+   服务在 `/elder`、`/trust` 这样的路径上，相对路径会算错）。双击 HTML 用 `file://`
+   打开时，那四个 CSS 和全部 JS 一次性全部 404，剩下一张裸 HTML——而裸 HTML 在深色
+   渲染下就是**一片黑底**，没有任何东西说明发生了什么。
+
+   实测就是这么发生的：编辑器把 judge.html 用 file:// 打进了预览面板，屏幕上一片黑，
+   而所有闸门都是绿的——它们全部通过 HTTP 加载页面，没有一条走过 file://。
+
+   不用 JS 做这件事，因为 JS 在 file:// 下同样取不到；不用内联脚本，因为严格 CSP
+   禁止。「CSS 藏、CSS 失效即现」是这个约束下唯一还能工作的机制。 */
+.needs-server { display: none; }
+
 /* Grid items default to min-width:auto, so a long placeholder or an unbreakable
    token can push a track past the viewport. Every grid in this file wants the
    track to shrink instead. */

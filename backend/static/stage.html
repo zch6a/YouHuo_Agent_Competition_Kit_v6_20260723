@@ -14,6 +14,17 @@
 <!-- 这一页刻意**不注册 service worker**：它是展示环境，不是要装到主屏的应用，
      而一个会缓存自己的舞台在反复改版时只会给出昨天的样子。 -->
 <body data-mode="youhuo" class="stage-body">
+  <!-- 直接双击 HTML 打开时唯一会说话的东西。
+       这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
+       `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
+       就露出来——一片黑屏至少变成一句话。
+       它不用 JS：JS 在 file:// 下同样取不到。也不用内联脚本：严格 CSP 禁止。
+       CSS 藏、CSS 失效即现，是这个约束下唯一还能工作的机制。 -->
+  <p class="needs-server">
+    这个页面要用服务器打开，不能直接双击 HTML 文件。<br />
+    在项目根目录运行 <b>run_demo.ps1</b>（Windows）或 <b>run_demo.sh</b>，
+    然后访问 <b>http://127.0.0.1:8041/</b>
+  </p>
   <main class="demo-stage" id="main">
     <!-- 左侧控制区。它只存在于这一页——六个 App 页面里不出现「场景：诈骗」这种按钮，
          那是给答辩人用的，不是给一位老人用的。 -->
