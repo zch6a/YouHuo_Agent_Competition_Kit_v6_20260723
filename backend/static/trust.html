@@ -61,6 +61,20 @@
 
     <p class="notice good care-status" aria-live="polite" id="status">正在建立老人、家属与系统演示身份……</p>
 
+    <!-- 事务凭证。
+         这一页原先是"六张能力演示卡"——每张卡都能证明一件事，但要评委自己把六件事
+         拼成一次完整的办事经过。凭证反过来：先给一次真实缴费的全过程，六张卡再作为
+         它每一环的单独证明。
+         凭证里的每一行都来自 /v2/audit 的哈希链，不新增任何后端接口。 -->
+    <section class="page-section receipt-section" aria-label="一次真实缴费的凭证">
+      <h2 class="section-head">上面四条，在一次真实缴费里是这样的</h2>
+      <p class="section-note">下面这份凭证不是写好的例子。你打开这一页的时候，系统真的办了一次水费：
+        老人开口、核对账单、复述金额、家人点头、拿回执。每一行都从审计链里读出来，逐条哈希相连。</p>
+      <article class="panel receipt" id="receipt" aria-live="polite">
+        <p class="receipt-pending">正在真的办一件事……</p>
+      </article>
+    </section>
+
     <nav class="segmented" aria-label="可信分区">
       <button type="button" class="seg is-current" data-section="hear" aria-current="true">听不清</button>
       <button type="button" class="seg" data-section="doc">文档</button>

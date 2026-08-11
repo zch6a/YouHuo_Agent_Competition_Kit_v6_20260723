@@ -184,6 +184,12 @@ def main() -> int:
 
         browser = CDP(ws_url, websocket)
         written = []
+        # 每一组拍**两张**（首屏 + 全页），所以要分开数。
+        #
+        # 汇总行原先印 `len(written)`——也就是组数——而磁盘上是它的两倍。一个自己
+        # 少报一半的仪器，你没法拿它的输出去比较两次运行："这次 108 张"和"上次
+        # 216 个文件"看起来像两件不同的事，实际是同一件。
+        files: list[Path] = []
         overflow: list[str] = []
         # 不指定模式就明暗都扫。
         #
@@ -279,14 +285,16 @@ def main() -> int:
                     first = tab.send(
                         "Page.captureScreenshot", format="png", captureBeyondViewport=False
                     )
-                    (out_dir / f"{stem}.png").write_bytes(base64.b64decode(first["data"]))
+                    files.append(out_dir / f"{stem}.png")
+                    files[-1].write_bytes(base64.b64decode(first["data"]))
                     # ...then the whole layout, whose expansion no longer matters.
                     tab.send("Emulation.setDeviceMetricsOverride", width=width, height=height,
                              deviceScaleFactor=dsf, mobile=device != "desktop")
                     full = tab.send(
                         "Page.captureScreenshot", format="png", captureBeyondViewport=True
                     )
-                    (out_dir / f"{stem}-full.png").write_bytes(base64.b64decode(full["data"]))
+                    files.append(out_dir / f"{stem}-full.png")
+                    files[-1].write_bytes(base64.b64decode(full["data"]))
                     written.append(f"{stem}  {measured}")
                 finally:
                     tab.close()
@@ -297,7 +305,18 @@ def main() -> int:
             for item in overflow:
                 print(f"  {item}")
             return 1
-        print(f"\nOK shoot_pages: {len(written)} 张截图，无横向溢出")
+        # 报告磁盘上真的有什么，不是"我打算写什么"。
+        #
+        # `write_bytes` 不抛异常只说明调用返回了。一张 0 字节的 PNG 在文件列表里
+        # 和一张好图长得一样，而它正是"服务没起、拍到错误页"那一类失败的样子——
+        # 这个脚本的注释里已经记着一次 42 张 ERR_CONNECTION_REFUSED 被报成成功。
+        empty = [f.name for f in files if not f.exists() or f.stat().st_size == 0]
+        if empty:
+            print(f"\nFAIL shoot_pages: {len(empty)} 个文件是空的或没落盘：{empty[:6]}")
+            return 1
+        print(f"\nOK shoot_pages: {len(written)} 组 × 2（首屏 + 全页）= "
+              f"{len(files)} 个文件，共 {sum(f.stat().st_size for f in files) // 1024} KiB，"
+              f"无横向溢出")
         return 0
     finally:
         proc.terminate()
