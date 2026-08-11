@@ -37,6 +37,19 @@ FORBIDDEN_SUFFIXES = (".db", ".db-wal", ".db-shm", ".audit.key", ".onnx", ".pyc"
 FORBIDDEN_NAMES = (".env",)
 FORBIDDEN_DIRS = (".venv", "__pycache__", ".pytest_cache", "node_modules", ".git")
 
+#: git 跟踪、但**不进交付包**的可再生产物。
+#:
+#: 实测：交付包 195.9 MB，其中 185.1 MB（94%）是 PNG，而 173.5 MB 是
+#: `frontend_audit/screenshots/` 里 384 张**这一轮重构之前**那个界面的照片。评委解开
+#: 包，看到的是一个已经不存在的 UI 的 384 张截图。
+#:
+#: 它们仍然留在 git 里——那是审计轮的"改之前"证据，删掉就是抹掉记录。但它们是
+#: `shoot_pages.py` 每次运行都重新生成的东西，不是源码，没有理由占交付包 94% 的体积。
+#: 怎么自己生成写在 frontend_redesign/README.md 里。
+#:
+#: 这一条是**排除**，不是禁止：`audit()` 不查它，因为往包里放截图并不危险，只是没必要。
+REGENERABLE_DIRS = ("shots/", "frontend_audit/screenshots/")
+
 
 def tracked_files() -> list[str]:
     """git 跟踪的全部文件。
@@ -105,11 +118,17 @@ def main() -> int:
 
     copied = 0
     missing: list[str] = []
+    skipped_bytes = 0
+    skipped = 0
     for rel in files:
         src = ROOT / rel
         if not src.is_file():
             # 跟踪但磁盘上没有（例如刚被删除还没提交）。记下来，不要静默跳过。
             missing.append(rel)
+            continue
+        if rel.startswith(REGENERABLE_DIRS):
+            skipped += 1
+            skipped_bytes += src.stat().st_size
             continue
         dst = folder / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -148,6 +167,11 @@ def main() -> int:
     print(f"压缩包  {archive}  ({archive.stat().st_size / 1024 / 1024:.1f} MB)")
     print(f"散列    {archive.name}.sha256")
     print(f"内容    {copied} 个文件，{total_mb:.1f} MB，MANIFEST 覆盖 {len(lines)} 项")
+    if skipped:
+        # 明说跳过了什么、省了多少。一个静默瘦身的打包脚本，和一个漏文件的打包脚本
+        # 在输出里长得一模一样。
+        print(f"跳过    {skipped} 个可再生截图（{skipped_bytes / 1024 / 1024:.1f} MB）："
+              f"{'、'.join(REGENERABLE_DIRS)}——用 shoot_pages.py 现生成")
     if missing:
         print(f"⚠ {len(missing)} 个已跟踪但磁盘上不存在的文件被跳过：{missing[:5]}")
     print("检查    未发现运行库、审计密钥、.env、虚拟环境或缓存")

@@ -5,32 +5,34 @@ START openapi_v6
 PASS openapi_v6
 START pytest_v6
 ........................................................................ [  7%]
-........................................................................ [ 15%]
-........................................................................ [ 23%]
-........................................................................ [ 30%]
-........................................................................ [ 38%]
-........................................................................ [ 46%]
-........................................................................ [ 53%]
-........................................................................ [ 61%]
-........................................................................ [ 69%]
-........................................................................ [ 76%]
-........................................................................ [ 84%]
-........................................................................ [ 92%]
-........................................................................ [ 99%]
-...                                                                      [100%]
-939 passed in 82.12s (0:01:22)
+........................................................................ [ 14%]
+........................................................................ [ 21%]
+........................................................................ [ 29%]
+........................................................................ [ 36%]
+........................................................................ [ 43%]
+........................................................................ [ 51%]
+........................................................................ [ 58%]
+...............................s........................................ [ 65%]
+........................................................................ [ 73%]
+........................................................................ [ 80%]
+........................................................................ [ 87%]
+........................................................................ [ 95%]
+.................................................                        [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] backend\tests\test_release_hygiene.py:44: 纯 ASCII，不需要 BOM
+984 passed, 1 skipped in 112.59s (0:01:52)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
 ---------------------------------------------------------
 backend\youhuo\__init__.py                1      0   100%
-backend\youhuo\api.py                   330     58    82%
+backend\youhuo\api.py                   333     55    83%
 backend\youhuo\baseline.py              164      8    95%
 backend\youhuo\baseline_api.py           77      7    91%
 backend\youhuo\baseline_models.py        97      2    98%
 backend\youhuo\baseline_services.py     219     16    93%
-backend\youhuo\baseline_store.py        160     18    89%
-backend\youhuo\care_voice.py            166     15    91%
+backend\youhuo\baseline_store.py        160     20    88%
+backend\youhuo\care_voice.py            170     15    91%
 backend\youhuo\companion.py              63      0   100%
 backend\youhuo\database.py              338     26    92%
 backend\youhuo\document_guard.py        179      6    97%
@@ -41,13 +43,14 @@ backend\youhuo\memory_vault.py           92      2    98%
 backend\youhuo\models.py                204      0   100%
 backend\youhuo\orchestration.py         157      4    97%
 backend\youhuo\privacy.py                78     17    78%
+backend\youhuo\provenance.py             10      0   100%
 backend\youhuo\security.py              181     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
 backend\youhuo\services.py              174     20    89%
 backend\youhuo\teach_back.py            119     11    91%
 backend\youhuo\tool_registry.py          85     11    87%
 backend\youhuo\tts.py                    99     50    49%
-backend\youhuo\utils.py                 120     17    86%
+backend\youhuo\utils.py                 128     17    87%
 backend\youhuo\v3_models.py              14      0   100%
 backend\youhuo\v4_api.py                326     51    84%
 backend\youhuo\v4_models.py             483     15    97%
@@ -62,7 +65,7 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7620    699    91%
+TOTAL                                  7645    698    91%
 PASS coverage_v6
 {
   "total": 34,
@@ -338,15 +341,17 @@ START browser_javascript_v6
   ok glassbox.js [module]
   ok identity.js [script]
   ok judge.js [script]
+  ok landing.js [script]
   ok register-sw.js [script]
   ok sheet.js [script]
   ok speech.js [module]
+  ok stage.js [script]
   ok sw.js [script]
   ok trust.js [script]
-PASS browser_javascript_v6: 12 file(s)
-PASS speech_text_v6: 29 项朗读文本断言通过
+PASS browser_javascript_v6: 14 file(s)
+PASS speech_text_v6: 34 项朗读文本断言通过
 START page_runtime_v6
-OK page_runtime: 6 个页面加载干净，41 个控件逐个按过，无异常、无 console.error、无失败请求
+OK page_runtime: 7 个页面加载干净，99 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
 PASS page_runtime_v6
 START arkts_v6
 PASS check_arkts: 18 个 .ets 文件，20 个颜色令牌，已按 SDK 核对 1159 个 kit 符号
@@ -358,13 +363,15 @@ START accessibility_v6
   ok /care [light]
   ok /trust [light]
   ok /judge [light]
+  ok /stage [light]
   ok / [dark]
   ok /elder [dark]
   ok /family [dark]
   ok /care [dark]
   ok /trust [dark]
   ok /judge [dark]
-PASS contrast_v6: 12 个页面/模式全部满足 WCAG AA 与触控尺寸
+  ok /stage [dark]
+PASS contrast_v6: 14 个页面/模式全部满足 WCAG AA 与触控尺寸
 PASS accessibility_v6
 {
   "version": "6.0.0",
@@ -387,6 +394,7 @@ PASS accessibility_v6
     "load_passed": true,
     "chaos_passed": true,
     "http_smoke_passed": true,
+    "heavy_reports_match_current_source": true,
     "project_version": true,
     "no_runtime_database": true,
     "no_generated_audit_key": true,

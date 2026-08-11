@@ -13,8 +13,17 @@
 没有仪器。分数写出来是为了让它可以被反驳：每一条都指到具体元素和具体像素，你看
 截图自己判断。
 
-最后更新：2026-08-11。截图在 `frontend_redesign/screenshots/`（`shoot_pages.py`
-生成，126 组 / 252 个文件）。
+最后更新：2026-08-11。
+
+截图**不在这个目录下**，而且不进仓库——`shoot_pages.py` 每次运行都重新生成，把 252
+个 PNG 提交进去只会让每一次改版都带上几十兆的二进制 diff。自己生成：
+
+```bash
+.venv/Scripts/python backend/scripts/shoot_pages.py http://127.0.0.1:8041 shots
+```
+
+（写这一段之前我在文档里填的是 `frontend_redesign/screenshots/`——那个目录根本不
+存在。一份指向不存在路径的说明，比没有说明更糟：读它的人会以为自己找错了地方。）
 
 ---
 

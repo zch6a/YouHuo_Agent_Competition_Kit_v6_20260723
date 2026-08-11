@@ -88,6 +88,58 @@ def test_heavy_reports_were_produced_by_the_current_source(report):
     )
 
 
+def _tracked_files() -> list[str]:
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "-c", "core.quotepath=false", "ls-files"],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+    )
+    if result.returncode != 0:
+        pytest.skip("不是 git 仓库")
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def test_the_release_is_mostly_source_not_screenshots():
+    """交付包里可再生的图片不许超过它的一半。
+
+    实测过一次 195.9 MB 的包，其中 185.1 MB（94%）是 PNG，而 173.5 MB 是
+    `frontend_audit/screenshots/` 里 384 张**重构之前**那个界面的照片。评委解开包，
+    看到的是一个已经不存在的 UI 的 384 张截图。
+
+    那些图仍然留在 git 里——它们是审计轮的"改之前"证据，删掉就是抹掉记录。
+    `make_release.py` 的 `REGENERABLE_DIRS` 把它们挡在**包**外面，因为它们是
+    `shoot_pages.py` 每次运行都能重新生成的东西，不是源码。
+
+    这条断言守的是那个排除清单跟得上现实：下一个人新建一个截图目录、忘了登记，
+    包会安静地涨回两百兆，而没有任何东西会说一句话。
+    """
+    spec = importlib.util.spec_from_file_location(
+        "make_release", ROOT / "backend" / "scripts" / "make_release.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    shipped = 0
+    images = 0
+    for rel in _tracked_files():
+        path = ROOT / rel
+        if not path.is_file() or rel.startswith(module.REGENERABLE_DIRS):
+            continue
+        size = path.stat().st_size
+        shipped += size
+        if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+            images += size
+
+    assert shipped > 0, "包里一个文件都没有，这条断言在空转"
+    share = images / shipped
+    assert share < 0.5, (
+        f"交付包 {shipped / 1024 / 1024:.1f} MB，其中 {images / 1024 / 1024:.1f} MB"
+        f"（{share:.0%}）是图片。看看是不是有新的截图目录没登记进 "
+        f"make_release.REGENERABLE_DIRS：现有 {module.REGENERABLE_DIRS}"
+    )
+
+
 def _load_checker():
     spec = importlib.util.spec_from_file_location(
         "check_artifacts_v6", ROOT / "backend/scripts/check_artifacts_v6.py"

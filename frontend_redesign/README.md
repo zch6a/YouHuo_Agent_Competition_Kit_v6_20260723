@@ -36,7 +36,12 @@ visual-audit/
   闸门的变异结果、量出来和看出来的缺陷、我自己犯的错
 - [`../KNOWN_ISSUES.md`](../KNOWN_ISSUES.md) —— 已知但没修的东西
 
-截图由 `backend/scripts/shoot_pages.py` 生成（126 组 / 252 个文件），不进仓库。
+截图由 `backend/scripts/shoot_pages.py` 生成（126 组 / 252 个文件），**不进仓库**：
+每次运行都重新生成，提交进去只会让每次改版都带上几十兆的二进制 diff。
+
+```bash
+.venv/Scripts/python backend/scripts/shoot_pages.py http://127.0.0.1:8041 shots
+```
 
 ---
 
