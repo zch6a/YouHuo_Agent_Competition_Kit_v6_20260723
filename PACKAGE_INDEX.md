@@ -67,11 +67,11 @@
 - `run_load_v6.py`：5,000请求、100并发真实Uvicorn回环负载；
 - `run_http_smoke_v6.py`：v6真实HTTP闭环；
 - `check_browser_js.py`：按真实加载方式（script/module）**解析**前端脚本。只解析、不执行——它对运行时错误是盲的，必须与下一条配对使用；
-- `check_page_runtime.py`：六个页面在真实浏览器里加载，再把每一页上每个可见可用的按钮**逐个按过**（当前 41 个），断言无未捕获异常、无 `console.error`、无同源 4xx/5xx、无原生对话框。加这一条的直接原因是 `care.js` / `trust.js` 曾在第一条语句就抛 `ReferenceError`，两页所有按钮全是死的，而只解析的检查一直是绿的；
-- `check_speech_text.mjs`：29项朗读文本规范化断言；
-- `check_contrast.py`：6个页面×明暗两模式的 WCAG AA、**非文字（图标）对比度 1.4.11** 与触控尺寸审计；
+- `check_page_runtime.py`：七个页面在真实浏览器里加载（手机视口 390×844），再把每一页上每个可见可用的按钮**逐个按过**（当前 99 个），断言无未捕获异常、无 `console.error`、无同源 4xx/5xx、无原生对话框。加这一条的直接原因是 `care.js` / `trust.js` 曾在第一条语句就抛 `ReferenceError`，两页所有按钮全是死的，而只解析的检查一直是绿的。同一次运行还量三件事：Voice Orb 十一态在关掉动效后两两可辨、评委页七拍演得完且正文全中文、多标签页冷启动只开通一个家庭；
+- `check_speech_text.mjs`：34项朗读文本规范化断言；
+- `check_contrast.py`：7个页面×明暗两模式（14 个组合）的 WCAG AA、**非文字（图标）对比度 1.4.11** 与触控尺寸审计；
 - `check_arkts.py`：鸿蒙端十一类静态检查。`@kit.*` 符号归属按公开 OpenHarmony SDK 的 1159 个符号逐个核对；另含**页面可达性**（任何 `.ets` 不得既未登记为路由页面、又不被任何文件引入）、登记页面必须有 `@Entry`、禁用已废弃的 `router`；
-- `shoot_pages.py`：七种视口（含折叠屏内外屏、平板）× 明暗两模式的真机尺寸截图；
+- `shoot_pages.py`：九种视口（含折叠屏内外屏、平板、桌面）× 七个页面 × 明暗两模式 = 126 组，每组两张（首屏 + 全页）共 252 个文件，落盘后逐个核对存在且非空；
 - `verify_features_v6.py` / `run_feature_audit.py`：130项逐功能端到端验收与 OpenAPI 覆盖率强制校验；
 - `check_artifacts_v6.py`：文件、OpenAPI、Skill、HarmonyOS、报告与敏感产物检查（全树扫描运行库、审计密钥与模型文件，并列出具体路径）。另含**重型报告新鲜度**：上面四项重型验证的结论以 JSON 留存供引用，每份都盖着它验证过的那棵 `backend/youhuo` 的指纹（`youhuo/provenance.py`），检查器重算比对——对不上就判过期。加这一条是因为曾有两天，`mass_audit_v5_1000000.json` 是 08-08 的而 `v5_services.py` 08-10 才改过，`verify_all` 照样报"全部通过"；
 - `verify_all.*`：确定性日常回归；
@@ -96,8 +96,9 @@
 
 - FastAPI OpenAPI路径：99个；OpenAPI 操作覆盖：103/103；
 - 小艺Skill：13个；
-- 自动化测试：950项；逐功能验收：130项；
-- 页面运行时闸门：6个页面、41个控件逐个按过；
+- 自动化测试：984项；逐功能验收：130项；
+- 页面运行时闸门：7个页面、99个控件逐个按过、Voice Orb 11 态、评委页 7 拍；
+- 对比度与触控：14个页面×模式组合；全尺寸截图：252 个文件；
 - 核心Python语句覆盖率：91%。
 
 以上全部是 `verify_all` 单次运行的实测输出，不是估计值。`MANIFEST.sha256` 由

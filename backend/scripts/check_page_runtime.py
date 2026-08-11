@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -567,6 +568,71 @@ def check_voice_orb_states(tab: "CDP", page: str, failures: list[str]) -> int:
     return len(shots)
 
 
+def check_judge_story(tab: "CDP", page: str, failures: list[str]) -> int:
+    """评委页的七拍：演一遍，然后检查 Product 层说的是不是人话。
+
+    这一页最大的设计决定是"Product 层那七句话由**真实响应**填写，不是写死的文案"
+    ——写死的文案在接口改坏之后照样好看，那不是演示，是插图。
+
+    代价是真实数据是给机器读的。第一版演完之后那七句里漏出了三个英文枚举
+    （语音结论 `clarify`、预演决策 `clarify`、任务状态 `awaiting_family_approval`）
+    和一个四位小数的负荷分数 `0.6684`。一位评委看到的于是是半句中文半个标识符。
+
+    所以这条闸门必须在**演过之后**量，静态扫源码看不见它：那些字是运行时从响应里
+    拼出来的。它按下「从头演一遍」，等七拍走完，再逐句检查。
+    """
+    if page != "/judge":
+        return 0
+
+    ran = tab.send("Runtime.evaluate", returnByValue=True, expression="""
+      (() => {
+        const button = document.querySelector('#playStory');
+        if (!button) return {error: '评委页没有「从头演一遍」这个入口'};
+        button.click();
+        return {ok: true};
+      })()
+    """)["result"].get("value") or {}
+    if ran.get("error"):
+        failures.append(f"{page}  七拍：{ran['error']}")
+        return 0
+
+    # 七拍各有一次网络往返，外加每拍之间 420ms 的停顿。轮询到演完或超时。
+    deadline = time.time() + 30
+    state: dict = {}
+    while time.time() < deadline:
+        time.sleep(1.0)
+        state = tab.send("Runtime.evaluate", returnByValue=True, expression="""
+          (() => ({
+            total: document.querySelectorAll('.beat').length,
+            played: document.querySelectorAll('.beat.is-played').length,
+            busy: document.querySelector('#playStory').disabled,
+            status: document.querySelector('#judgeStatus').textContent,
+            says: [...document.querySelectorAll('.beat-say')].map(n => n.textContent),
+          }))()
+        """)["result"]["value"]
+        if not state.get("busy"):
+            break
+
+    total, played = state.get("total", 0), state.get("played", 0)
+    if total < 7:
+        failures.append(f"{page}  七拍只有 {total} 拍")
+    if played < total:
+        failures.append(
+            f"{page}  七拍演到第 {played} 拍就停了（{total} 拍）：{state.get('status', '')}"
+        )
+        return played
+
+    # Product 层不许出现英文。原始枚举、接口路径、哈希都在 Proof 层的原始响应里，
+    # 那里是它们该在的地方。
+    for index, text in enumerate(state.get("says", []), 1):
+        leaked = re.findall(r"[A-Za-z]{2,}", text)
+        if leaked:
+            failures.append(f"{page}  第 {index} 拍的正文里有英文 {leaked}：{text[:60]}")
+        if not text.strip():
+            failures.append(f"{page}  第 {index} 拍演完之后正文是空的")
+    return played
+
+
 def check_multi_tab_identity(browser: "CDP", ws_host: str, websocket, failures: list[str]) -> None:
     """两个标签页同时冷启动，必须落在同一个家庭。
 
@@ -776,6 +842,7 @@ def main() -> int:
     failures: list[str] = []
     clicked = 0
     orb_states = 0
+    beats = 0
     try:
         for _ in range(80):
             try:
@@ -844,6 +911,7 @@ def main() -> int:
                 tab.events.clear()
                 clicked += press_every_control(tab, page, failures)
                 orb_states += check_voice_orb_states(tab, page, failures)
+                beats += check_judge_story(tab, page, failures)
                 check_identity_self_heal(tab, page, failures)
                 if page == "/elder":
                     # 放在 /elder 之后、用同一个浏览器：此时 localStorage 已经有身份了，
@@ -870,8 +938,11 @@ def main() -> int:
     if orb_states < 10:
         print(f"FAIL page_runtime: Voice Orb 只量到 {orb_states} 态——检查没真的跑起来")
         return 1
+    if beats < 7:
+        print(f"FAIL page_runtime: 评委页七拍只演了 {beats} 拍——检查没真的跑起来")
+        return 1
     print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，{clicked} 个控件逐个按过，"
-          f"Voice Orb {orb_states} 态在关掉动效后两两可辨，"
+          f"Voice Orb {orb_states} 态在关掉动效后两两可辨，评委页 {beats} 拍演完且全中文，"
           f"手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求")
     return 0
 

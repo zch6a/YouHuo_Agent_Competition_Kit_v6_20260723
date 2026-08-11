@@ -701,49 +701,147 @@
 }
 .score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: 14px; }
 
-.timeline { display: grid; gap: var(--space-5); margin-top: var(--space-5); }
-.demo-step {
+/* --------------------------------------------------------------------------
+   评委页的七拍
+   ..........................................................................
+   原先是五张并排的大卡（`.demo-step`），每张一个机制、一个按钮、一块空白结果区。
+   五张卡是五件事；七拍是**一件事**。所以这里不是卡片列表，是一条竖线上的七个节点：
+   卡片之间是并列关系，节点之间是先后关系，而这一页的论点就是"这件事有先后顺序"。
+
+   两层信息的权重也写在样式里：Product 层（`.beat-say`）是这一拍上最大的一行字，
+   Proof 层折在 `<details>` 里、summary 用小字。"这东西是干什么的"必须先于
+   "它怎么实现的"。
+   -------------------------------------------------------------------------- */
+
+.story-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-2);
+}
+.story-run > .notice { flex: 1 1 22ch; margin: 0; }
+
+.story { display: grid; margin-top: var(--space-4); }
+.beat {
+  position: relative;
   display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: var(--space-6);
-  border: 1px solid var(--line);
-  transition: transform .22s cubic-bezier(.2,.8,.3,1), border-color .22s ease, box-shadow .22s ease;
+  grid-template-columns: 56px 1fr;
+  column-gap: var(--space-5);
+  padding: var(--space-5) 0;
 }
-.demo-step.active {
-  border-color: color-mix(in srgb, var(--youhuo-blue) 46%, transparent);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-3);
+/* 竖线穿过序号列，把七拍串成一条。首尾各收一半，线不悬空。 */
+.beat::before {
+  content: "";
+  position: absolute;
+  /* 序号是 56px 见方，圆心在 28px；线宽 2px，所以左边缘退半格。写成 calc 而不是
+     直接写 27px，是因为 27 不在 4px 网格上而 28 在——那 1px 是居中，不是间距。 */
+  left: calc(28px - 1px);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
 }
-.step-index {
-  width: 70px; height: 70px;
+.beat:first-child::before { top: calc(var(--space-5) + 28px); }
+.beat:last-child::before { bottom: calc(100% - var(--space-5) - 28px); }
+
+.beat-index {
+  position: relative;
+  z-index: 1;
+  width: 56px; height: 56px;
   display: grid; place-items: center;
-  border-radius: 22px;
-  color: #fff;
-  font-size: 24px;
-  font-weight: 900;
+  border-radius: var(--r-lg);
+  font-size: 18px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
-  /* 全站唯一一处写死颜色的高程阴影。
-   *
-   * `rgba(23, 53, 111, .28)` 是 `#17356f` 的手抄版——两处同一个颜色写了两遍，而且
-   * 都绕开了令牌，深色模式下不跟随。深色下这块本该几乎没有投影（背景已经是深的），
-   * 结果压着一团比背景更深的蓝。
-   *
-   * 顺带说清另外 12 处 box-shadow 字面量为什么留着：它们是**聚焦环和光晕**
-   * （`0 0 0 4px color-mix(...)`、麦克风的 inset 光晕），不是高程，本来就不该套
-   * `--shadow-1/2/3`；而且它们的颜色都由 `color-mix` 从主题令牌算出来，深色模式
-   * 自动跟随。上一轮把环、光晕和高程混在一起数成"14 个阴影无深色取值"，只有这
-   * 一处是真的。 */
+  /* 演过的那一拍才上色。没演过是空心的——这一页打开时七拍都还没发生，用七个实心
+     蓝块假装它们已经发生过，是这一页最不该做的事。 */
+  color: var(--ink-3);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.beat.is-played .beat-index {
+  color: #fff;
+  border-color: transparent;
   background: linear-gradient(150deg, var(--youhuo-blue-deep),
               color-mix(in srgb, var(--youhuo-blue-deep) 82%, #000));
-  box-shadow: 0 var(--space-3) var(--space-6) color-mix(in srgb, var(--youhuo-blue-deep) 28%, transparent);
 }
-.demo-step pre {
+.beat.is-current .beat-index {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
+}
+
+.beat-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: var(--ink-3);
+}
+/* Product 层。这一拍上最大的一行字。 */
+.beat-say {
+  margin: 0 0 var(--space-2);
+  font-size: 19px;
+  font-weight: 650;
+  line-height: var(--lh-snug);
+  color: var(--ink);
+}
+.beat-why {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--text-sm);
+  line-height: var(--lh-loose);
+  color: var(--ink-2);
+}
+.beat-why strong { color: var(--ink); font-weight: 750; }
+
+/* Proof 层。 */
+.beat-proof { margin-top: var(--space-3); }
+.beat-proof > summary {
+  /* summary 是行内元素，min-height 对它无效——这个项目在三处栽过同一个坑。 */
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.beat-proof > summary:hover { color: var(--youhuo-blue-ink); }
+.beat-proof-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.beat pre {
   background: #0d1526;
   color: #d6e4ff;
   border-color: #1d2b46;
   max-height: 340px;
   overflow: auto;
 }
+
+/* 窄屏：序号缩小，竖线撤掉，改用分隔线。56px 的序号列在 360px 下吃掉 1/6 的宽度，
+   而正文需要的是宽度。 */
+@media (max-width: 560px) {
+  .beat { grid-template-columns: 40px 1fr; column-gap: var(--space-3); }
+  .beat::before { content: none; }
+  .beat + .beat { border-top: 1px solid var(--line); }
+  .beat-index { width: 40px; height: 40px; font-size: var(--text-sm); border-radius: var(--r-md); }
+  .beat-say { font-size: 17px; }
+}
+
+/* `.demo-step` / `.step-index` / `.timeline` 一族已删除。
+ *
+ * 它们只服务于评委页那五张并排的机制卡。改成七拍之后全站 HTML 与 JS 对这三个类的
+ * 引用降到 0——留着就是交付包里一段没人能触发的样式。`.hero` / `.cards` 那一族当初
+ * 是同样的理由删的。
+ *
+ * 那段注释里关于阴影的结论搬到这里，因为它说的事仍然成立：全站曾经唯一一处写死
+ * 颜色的高程阴影就在 `.step-index` 上（`rgba(23, 53, 111, .28)` 是 `#17356f` 的
+ * 手抄版，深色下压着一团比背景更深的蓝）。剩下 12 处 box-shadow 字面量是**聚焦环
+ * 和光晕**，不是高程，本来就不该套 `--shadow-1/2/3`，而且颜色都由 color-mix 从令牌
+ * 算出来、深色自动跟随。`test_design_rulers.py` 守着这条。 */
 
 .glass-card { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
 .glass-card > div {
@@ -835,8 +933,6 @@
   .metric-label { font-size: 12px; }
   .metric strong, .metric.good strong, .metric.bad strong { font-size: 22px; }
   .preview-columns { grid-template-columns: 1fr; }
-  .demo-step { grid-template-columns: 1fr; }
-  .step-index { width: 56px; height: 56px; border-radius: 17px; font-size: 20px; }
   .reliance-row, .glass-card > div, .log-item, .digest-row { grid-template-columns: 1fr; gap: var(--space-1); }
   .calendar-entry { grid-template-columns: 56px 1fr; }
   .calendar-entry .status-chip { grid-column: 2; justify-self: start; }

@@ -513,21 +513,35 @@ def test_judge_steps_report_failures_where_the_user_clicked():
     原先五个处理器都是 `.catch(e => statusEl.textContent = e.message)`。状态行在页面
     顶部，而评委的眼睛在他刚点的那个按钮上——于是一次失败的观感是"点了没反应"。
 
-    顺带把 `.onclick =` 换成 `addEventListener`：这五个按钮写在 judge.html 里，
+    顺带把 `.onclick =` 换成 `addEventListener`：这些按钮写在 judge.html 里，
     `.onclick` 是覆盖而不是叠加，哪天有人再挂一件事，先挂的那件会无声消失。
     （elder.js / family.js 里剩下的 `.onclick` 是在刚 createElement 的按钮上赋值，
     那里没有既有处理器可覆盖，不算同一件事。）
+
+    五步改成七拍之后，绑定从 `STEPS.forEach` 换成了按 `[data-run]` 遍历，落点表
+    换成了 `BEATS`。这条断言跟着改，守的性质一个字没变：**每一拍都要有自己的落点，
+    而失败要写到那里去**。原先钉的是"存在一个叫 STEPS.forEach 的东西"——那是在钉
+    实现的形状，不是钉性质；换个写法它就红，而红的原因和用户看到什么无关。
     """
     js = (STATIC / "judge.js").read_text(encoding="utf-8")
     body = re.sub(r"//.*", "", js)
     assert ".onclick" not in body, "judge.js 又用回了 .onclick ="
-    assert body.count("addEventListener('click'") >= 1, "五个步骤没有一个挂上 click"
-    # 五个步骤各自的输出区都要出现在错误分支所在的那张表里。
-    for out in ["#demoVoiceOut", "#demoLoadOut", "#demoPreviewOut", "#glassCard", "#evidenceBoard"]:
-        assert out in body, f"{out} 没有被登记为失败时的落点"
-    handler = re.search(r"STEPS\.forEach\(.*?\}\);", body, re.S)
-    assert handler, "找不到统一的步骤绑定"
-    assert "out.textContent" in handler.group(0), "失败时没有写进这一步自己的输出区"
+    assert body.count("addEventListener('click'") >= 1, "没有一拍挂上 click"
+
+    # 每一拍都要在落点表里登记一个自己的输出区，而且七拍一个都不能少。
+    beats = re.search(r"const BEATS = \[(.*?)\];", body, re.S)
+    assert beats, "找不到七拍的落点表"
+    outs = re.findall(r"'(#[\w-]+)'\]", beats.group(1))
+    assert len(outs) == 7, f"落点表里只有 {len(outs)} 个输出区：{outs}"
+    assert len(set(outs)) == 7, f"有两拍共用同一个输出区：{outs}"
+    # 证据板不在七拍里，但它同样要有落点。
+    assert "'#evidenceBoard'" in body, "证据板没有被登记为失败时的落点"
+
+    # 失败要同时落在状态行和那一拍自己的输出区。
+    report = re.search(r"function report\(error, outSelector\) \{(.*?)\n\}", body, re.S)
+    assert report, "找不到统一的失败上报"
+    assert "statusEl.textContent" in report.group(1), "失败没有写进状态行"
+    assert "out.textContent" in report.group(1), "失败没有写进这一拍自己的输出区"
 
 
 def test_every_trust_promise_points_at_something_that_proves_it():

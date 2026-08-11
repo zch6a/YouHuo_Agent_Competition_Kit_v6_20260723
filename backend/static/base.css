@@ -10,7 +10,7 @@
 .controls > *, .home-entries > *, .calendar-entry > *, .reliance-row > *,
 .log-item > *, .digest-row > *, .glass-card > * > *, .grid > *,
 .dashboard-grid > *, .cards > *, .evidence-grid > *, .hero-roles > *,
-.preview-columns > *, .score-ribbon > *, .demo-step > * { min-width: 0; }
+.preview-columns > *, .score-ribbon > *, .beat > * { min-width: 0; }
 
 body {
   margin: 0;
