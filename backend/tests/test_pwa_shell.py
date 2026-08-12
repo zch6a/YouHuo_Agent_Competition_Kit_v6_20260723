@@ -188,7 +188,13 @@ def test_only_one_file_owns_the_request_layer(script):
     assert "bearer" not in source.lower(), f"{script} 又自己拼 Authorization 头"
 
 
-@pytest.mark.parametrize("page", ["care.html", "trust.html", "judge.html"])
+#: 有"按一下看响应"这种卡片的页面。`care.html` 和 `trust.html` 不再在这个名单里：
+#: 那些卡片整体搬到了 `/stage`（照护页现在进页面就加载，可信页只剩一份凭证），
+#: 而不是它们的输出变回了 `<pre>`。
+RESULT_PAGES = ["stage.html", "judge.html"]
+
+
+@pytest.mark.parametrize("page", RESULT_PAGES)
 def test_demo_output_is_not_raw_json(page):
     """评委看到的不该是一屏 JSON。
 
@@ -201,6 +207,24 @@ def test_demo_output_is_not_raw_json(page):
     source = (STATIC / page).read_text(encoding="utf-8")
     assert "<pre id=" not in source, f"{page} 里还有直接当输出容器用的 <pre>"
     assert 'class="result"' in source, f"{page} 没有使用结构化结果容器"
+
+
+def test_the_phone_frame_has_no_press_a_button_to_see_a_response_cards():
+    """反向：手机框里不许再出现"按一下看响应"这种卡片。
+
+    上面那条断言只说 `/stage` 和 `/judge` 得用结构化容器。它不阻止有人把一张
+    `<div class="result">` 加回照护页——那正是这一轮花了 17531 个字符搬出去的东西。
+
+    `.result` 是这类卡片的唯一标记（common.js 的 renderResult 往它里面写），
+    所以它在四个 App 页面里出现一次就是一次回流。
+    """
+    for page in ("elder.html", "family.html", "care.html", "trust.html"):
+        source = (STATIC / page).read_text(encoding="utf-8")
+        source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+        assert 'class="result"' not in source, (
+            f"{page} 里又出现了「按一下看响应」的输出容器。手机框里只放产品——"
+            "这种卡片属于 /stage 的「演示」「证明」「工程」三层。"
+        )
 
 
 @pytest.mark.parametrize("page", PAGES)
@@ -545,44 +569,94 @@ def test_judge_steps_report_failures_where_the_user_clicked():
 
 
 def test_every_trust_promise_points_at_something_that_proves_it():
-    """四条底线的「→」必须落在这一页真实存在的分区上。
+    """四条底线的「→」必须落在一段**按得动**的证明上。
 
-    这一页的整个论点是"每一条都能当场验证"。一条指向 `#nowhere` 的底线不会报错、
-    不会在截图里露馅——点下去 hash 变了、`initSections` 回退到第一段，看起来就像
-    什么都没发生。而它恰恰把这一页最重的那句话变成了空话。
+    这一条原先读 `trust.html`。四条底线现在在 `/stage` 的「证明」层：
+    「自主权包络」「证明式完成」这样的名字是给评委的，一位 78 岁的用户从这四个字里
+    得到的信息量是零，所以手机框里那四条改成了普通话（下一条断言守它），
+    四个原名连同验证它们的按钮一起搬到了桌面。它守的性质一个字没变。
+
+    判据比原来严一档。原来是"目标必须是一个 data-panel"；现在是"目标必须是一篇
+    **带按钮**的卡片"——因为四条底线的整个论点是"每一条都能当场验证"，而一个指向
+    纯文字段落的锚点同样把这句话变成空话，却照样满足"目标存在"。
+
+    还有一个新的失效方式要堵：`initSections` 用 `hidden` 切分区，指向某篇卡片的
+    hash 必须能把**它所在的那一层**打开。common.js 里的 `resolve()` 干这件事；
+    没有它，点一条底线的效果是跳回产品介绍——不报错、不在截图里露馅。
 
     `check_page_runtime` 的点击遍历只按 `<button>`，这四条是 `<a>`，它不会碰。
     """
-    source = (STATIC / "trust.html").read_text(encoding="utf-8")
+    source = (STATIC / "stage.html").read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
-    targets = re.findall(r'<a class="promise" href="#(\w+)"', source)
-    panels = set(re.findall(r'data-panel="(\w+)"', source))
+    targets = re.findall(r'<a class="promise" href="#([\w-]+)"', source)
     assert len(targets) == 4, f"底线不是四条：{targets}"
     assert len(set(targets)) == 4, f"有两条底线指向同一段：{targets}"
-    dangling = [t for t in targets if t not in panels]
-    assert not dangling, f"这些底线指向不存在的分区：{dangling}（现有分区 {sorted(panels)}）"
-    # 片段目标还必须真的存在为一个 id。
-    #
-    # `data-panel` 让 JS 切得动分区，但浏览器要设置**顺序焦点导航起点**靠的是 id：
-    # 没有 id 时键盘和读屏用户按下「看一次 →」之后焦点原地不动、没有任何播报，
-    # 只能盲目 Tab 过五个分区按钮去找。鼠标用户看得见变化，他们看不见——而这一页
-    # 想证明的恰恰是"每一条都能当场验证"。
-    ids = set(re.findall(r'\bid="(\w+)"', source))
-    missing = [t for t in targets if t not in ids]
-    assert not missing, f"这些底线的锚点没有对应的 id：{missing}"
+
+    # 每个目标都必须是一篇真实存在、而且**有按钮**的卡片。
+    for target in targets:
+        card = re.search(
+            rf'<article class="panel feature-panel" id="{re.escape(target)}">(.*?)</article>',
+            source, re.S,
+        )
+        assert card, f"底线指向的 #{target} 不是一篇 .feature-panel 卡片"
+        assert "<button" in card.group(1), (
+            f"#{target} 里没有任何按钮——一条按不动的底线和一句宣传没有区别"
+        )
+        # 它还必须待在某个分区里，否则 hash 打不开它所在那一层。
+        before = source[: source.index(f'id="{target}"')]
+        assert re.search(r'data-panel="[\w-]+"', before), f"#{target} 不在任何分区里"
+
+    # `resolve()` 必须还在：它是"hash 指向分区**里面**一个元素"这件事的唯一实现。
+    common = (STATIC / "common.js").read_text(encoding="utf-8")
+    assert "function resolve(" in common and "closest('[data-panel]')" in common, (
+        "common.js 里没有把「分区内部的 id」解析成分区的那一段——"
+        "四条底线点下去会跳回第一段"
+    )
+
+
+def test_the_phone_frame_states_the_same_four_promises_in_plain_words():
+    """搬走名字不等于搬走内容：手机框里那四条必须还在，而且是人话。
+
+    没有这一条，上面那条断言就为"把四条底线整体删掉、只留桌面"背书——而设计稿的
+    要求是"手机框里只放产品"，不是"手机框里少放东西"。这四条**是**产品，
+    它们是这一页对一位老人最重要的四句话。
+    """
+    source = (STATIC / "trust.html").read_text(encoding="utf-8")
+    source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
+    items = re.findall(r'<li class="promise">(.*?)</li>', source, re.S)
+    assert len(items) == 4, f"手机框里的四条底线不是四条：找到 {len(items)} 条"
+
+    # 工程名字不许回来。这四个词在 /stage 上，那里是它们的位置。
+    for word in ("自主权包络", "家庭共识", "证明式完成", "同意记忆"):
+        assert word not in source, f"「{word}」是给评委的名字，不该出现在手机框里"
+
+    for item in items:
+        strong = re.search(r"<strong>([^<]+)</strong>", item)
+        span = re.search(r"<span>([^<]+)</span>", item)
+        assert strong and span, f"这一条缺标题或说明：{item[:60]!r}"
+        # 一句能被听懂的话。10 个汉字是这四条里最短那句的长度下限——
+        # 「记什么、记多久，您说了算」是 12 个字。
+        assert len(re.findall(r"[一-鿿]", strong.group(1))) >= 8, (
+            f"这一条的标题短到不像一句话：{strong.group(1)!r}"
+        )
 
 
 def test_care_cards_sit_below_their_section_heading():
     """分区标题是 h2，卡片标题必须降到 h3。
 
-    照护页原先是七张平铺卡，每张的标题是 h2——那时它们确实是平级的。加上分区之后
-    分区标题成了 h2，如果卡片还是 h2，读屏软件读到的是两个平级标题，而它们现在是
-    包含关系：听的人不知道这张卡属于哪一段。
+    这条原先读 `care.html`。那十九张卡（照护七张 + 可信六张 + 后来加的）现在都在
+    `/stage` 的四层里，照护页改成了进页面就加载、一张 `.feature-panel` 都没有。
+    卡片搬到哪里，这条断言就跟到哪里——它守的是"读屏软件听得出包含关系"，
+    和卡片住在哪一页无关。
+
+    原委：那些卡的标题曾经是 h2（那时它们确实和分区平级）。加上分区之后分区标题成了
+    h2，如果卡片还是 h2，读屏软件读到的是两个平级标题，而它们现在是包含关系：
+    听的人不知道这张卡属于哪一段。
 
     `check_page_runtime` 的标题层级检查只查"有没有跳级"（h1 → h3 会报），查不出
     "该嵌套的却是平级"——那一种在层级上完全合法。
     """
-    source = (STATIC / "care.html").read_text(encoding="utf-8")
+    source = (STATIC / "stage.html").read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
     # 两处判据原先都是脆的，变异一测就穿：
     #   * 卡片靠 `class="panel feature-panel` 这个**确切词序**匹配——写成
@@ -593,17 +667,25 @@ def test_care_cards_sit_below_their_section_heading():
     # 所以先断言"找到了东西"，再断言"东西是对的"。
     cards = re.findall(r'<article\b[^>]*class="[^"]*\bfeature-panel\b[^"]*"[^>]*>.*?</article>',
                        source, re.S)
-    assert len(cards) >= 7, f"照护页只匹配到 {len(cards)} 张卡——class 词序变了吗？"
+    assert len(cards) >= 7, f"桌面舞台只匹配到 {len(cards)} 张卡——class 词序变了吗？"
     for card in cards:
-        assert "<h2" not in card, f"照护页有卡片仍在用 h2：{card[:90]}"
-        assert "<h3" in card, f"照护页有卡片没有标题：{card[:90]}"
+        assert "<h2" not in card, f"有卡片仍在用 h2：{card[:90]}"
+        assert "<h3" in card, f"有卡片没有标题：{card[:90]}"
     # 每个分区恰好一个 h2（它自己的标题）。缩进不参与判据：按下一个同级 <section
     # 或 </main> 断句。
     panels = re.split(r'(?=<section\b[^>]*class="[^"]*\bpage-section\b)', source)[1:]
-    assert len(panels) >= 5, f"照护页只匹配到 {len(panels)} 个分区"
+    assert len(panels) >= 4, f"桌面舞台只匹配到 {len(panels)} 个分区"
     for panel in panels:
         head = panel.split("</section>")[0]
         assert head.count("<h2") == 1, f"分区里的 h2 不是一个：{head[:90]}"
+
+    # 照护页现在**一张卡都不该有**。它改成了进页面就自动加载五段真实数据，
+    # 而"没有卡片"正是那次改动的形状——少了这一条，把卡片加回去不会有任何东西变红。
+    care = re.sub(r"<!--.*?-->", "", (STATIC / "care.html").read_text(encoding="utf-8"), flags=re.S)
+    assert "feature-panel" not in care, (
+        "照护页又出现了 .feature-panel。这一页是一份档案，进来就该有内容，"
+        "不是一排「点了才出数据」的演示卡。"
+    )
 
 
 def test_a_failed_family_load_lands_somewhere_visible():

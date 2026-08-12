@@ -94,7 +94,18 @@ export struct CareHubPage {
       .rowsGap(Dim.SPACE_3)
       .columnsGap(Dim.SPACE_3)
       .width('100%')
-      .height(220)
+      // 高度按行数算出来，不再写一个 220 的常数。
+      //
+      // 上面 7 个模块、两列 = 4 行，每行至少 TOUCH_MIN（48），3 道 SPACE_3（12）的行距，
+      // 一共 228vp。原来写死的 220 比它少 8vp：结果要么最后一行被切掉一截，要么四行
+      // 一起压到 46vp——**低于 48 的触控下限**，而每个 Button 上的
+      // `constraintSize({ minHeight: 48 })` 保证不了这件事，它约束的是按钮，
+      // 裁剪发生在容器。这类缺陷不会报错，只会让「健康档案」那一格按不到。
+      //
+      // 写成表达式而不是 228，是为了让"4 行"这个前提留在代码里看得见：加第 8 个模块
+      // 还是 4 行，加第 9 个就变成 5 行，那时候这两个 4 和 3 都要跟着改。
+      // 一个裸的 228 到那时会静默地退回同一个 bug——而它一次也不会报错。
+      .height(Dim.TOUCH_MIN * 4 + Dim.SPACE_3 * 3)
 
       Scroll() {
         Text(this.resultText)
@@ -117,8 +128,11 @@ export struct CareHubPage {
     Column({ space: Dim.SPACE_4 }) {
       Row({ space: Dim.SPACE_3 }) {
         if (this.sub !== '') {
+          // 「返回」走关键操作那一档（56）。它是子视图**唯一**的出口：标签栏在
+          // 这一屏底下，但按标签栏换的是整个标签页，回不到模块网格。一个够不着的
+          // 唯一出口，等于把人关在子视图里——所以它和发送键同级，不和「刷新」同级。
           Button('返回')
-            .constraintSize({ minHeight: Dim.TOUCH_MIN })
+            .constraintSize({ minHeight: Dim.TOUCH_KEY })
             .backgroundColor($r('app.color.surface_3'))
             .fontColor($r('app.color.ink'))
             .onClick(() => { this.sub = ''; })

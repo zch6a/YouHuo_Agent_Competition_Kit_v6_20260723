@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
   <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo">
+<body data-mode="youhuo" data-surface="consumer">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -44,33 +44,40 @@
     </header>
     <!-- 主张放在 header 外面。放在 .fam-head-text 里会跟返回链接分享同一行的宽度，
          在 390px 下被挤到约 55% 宽、折成三行，而右边返回链接下方是空的。 -->
-    <p class="trust-claim">优活替你办事，但不替你做决定。下面每一条都能在这一页当场验证。</p>
+    <!-- 原文是「下面这四条，每一条在这一页都看得见。」而这一页的凭证只证明得了其中两条
+         （家人点头、真办成才说办好）；另外两条的证据在桌面上，而这一页自己在一千多像素
+         之下写着「那些要在电脑上看」。
+         在一个论点是「只有真的办成了，才说办好了」的页面上，一句多说的话代价最大——
+         它把这一页最想立的那件事亲手推翻。所以改成说得准的版本。 -->
+    <p class="trust-claim">优活替您办事，但不替您做决定。下面这四条，前两条在这一页当场看得见。</p>
 
-    <!-- 四条底线。此前它们是页头里一段 .meta 小字，排在一整行技术名词后面——
-         而它们才是这一页的论点。每条带一个跳到对应分区的链接：主张必须能当场
-         验证，否则只是一句宣传。
-         `test_package_contracts_v3.py::test_trust_page_names_the_trust_innovations`
-         钉住这四个词必须出现在产品里，而不是只写在文档里。 -->
+    <!-- 四条底线，用普通话说。
+         原文是「自主权包络」「家庭共识」「证明式完成」「同意记忆」——那是给评委的
+         名字，一位 78 岁的用户从这四个字里得到的信息量是零。四条说的事一件没少，
+         四个原名连同验证它们的按钮一起在 /stage 的「证明」层，那里每一条都点得下去。
+
+         它们不再是链接：手机框里已经没有可跳的分区了，而一个跳回原地的链接比一段
+         文字更差。去处只留一条，在页尾。 -->
     <ul class="promise-list">
-      <li><a class="promise" href="#urgent">
-        <strong>自主权包络</strong>
-        <span>能力上限由人设定，不由模型自己决定。</span>
-      </a></li>
-      <li><a class="promise" href="#half">
-        <strong>家庭共识</strong>
-        <span>高风险的事需要第二个人点头。</span>
-      </a></li>
-      <li><a class="promise" href="#truth">
-        <strong>证明式完成</strong>
-        <span>只有权威状态回报成功，才算办好了。</span>
-      </a></li>
-      <li><a class="promise" href="#doc">
-        <strong>同意记忆</strong>
-        <span>记什么、记多久，由老人本人批准。</span>
-      </a></li>
+      <li class="promise">
+        <strong>它能做什么，是您和家人定的</strong>
+        <span>不是它自己想做什么就做什么。</span>
+      </li>
+      <li class="promise">
+        <strong>花钱的事，家里要有第二个人点头</strong>
+        <span>您确认的和家人同意的必须是同一笔，对不上就停下。</span>
+      </li>
+      <li class="promise">
+        <strong>只有真的办成了，才说办好了</strong>
+        <span>对方没回执就是没办成，不会含糊过去。</span>
+      </li>
+      <li class="promise">
+        <strong>记什么、记多久，您说了算</strong>
+        <span>它想记住一件事，得先问过您；您也可以随时让它忘掉。</span>
+      </li>
     </ul>
 
-    <p class="notice good care-status" aria-live="polite" id="status">正在建立老人、家属与系统演示身份……</p>
+    <p class="notice good care-status" aria-live="polite" id="status">正在准备……</p>
 
     <!-- 事务凭证。
          这一页原先是"六张能力演示卡"——每张卡都能证明一件事，但要评委自己把六件事
@@ -78,83 +85,34 @@
          它每一环的单独证明。
          凭证里的每一行都来自 /v2/audit 的哈希链，不新增任何后端接口。 -->
     <section class="page-section receipt-section" aria-label="一次真实缴费的凭证">
-      <h2 class="section-head">上面四条，在一次真实缴费里是这样的</h2>
-      <p class="section-note">下面这份凭证不是写好的例子。你打开这一页的时候，系统真的办了一次水费：
-        老人开口、核对账单、复述金额、家人点头、拿回执。每一行都从审计链里读出来，逐条哈希相连。</p>
+      <h2 class="section-head">为什么可以相信这次结果</h2>
+      <!-- 原文写的是「这是**刚刚**真的办完的一次水费」。凭证改成先读链之后，
+           那句话对第二次打开这一页的人就是假的——同一张账单不会重复提交（那是
+           对的产品行为），所以第二次看到的是同一次缴费。时间戳自己说得清是哪一次，
+           这行小字不该抢着替它说。 -->
+      <!-- 原先写的是「一次真实的**水费**缴纳」，而这一段渲染出来是**电费**：
+           种子数据里水费 68.40 与电费 126.50 两条都在，`trust.js` 取 `updated_at`
+           最新的那一条，命中的是电费。说明文字把币种钉死，数据一换就自相矛盾。
+           这里不需要说是哪一种——要证明的是「每一步都留下了记录」。 -->
+      <p class="section-note">一次真实的缴费：开口、核对账单、念一遍金额、家人点头、拿回执。
+        每一步都留下了记录，中间改一步，后面全部对不上。</p>
       <article class="panel receipt" id="receipt" aria-live="polite">
-        <p class="receipt-pending">正在真的办一件事……</p>
+        <p class="receipt-pending">正在读这件事的记录……</p>
       </article>
     </section>
 
-    <nav class="segmented" aria-label="可信分区">
-      <button type="button" class="seg is-current" data-section="hear" aria-current="true">听不清</button>
-      <button type="button" class="seg" data-section="doc">文档</button>
-      <button type="button" class="seg" data-section="half">中断</button>
-      <button type="button" class="seg" data-section="urgent">紧急</button>
-      <button type="button" class="seg" data-section="truth">进度</button>
-    </nav>
+        <!-- 十个工程演示分区已移出手机框（大纲第 26/28 节）。
+         它们在 /stage 的 Trust & Proof 与 Engineering 两区里，一个都没删。
+         原文暂存于 frontend_redesign/_moved_from_trust.html。
 
-    <section class="page-section" id="hear" data-panel="hear" aria-label="听不清的时候，它不猜">
-      <h2 class="section-head">听不清的时候，它不猜</h2>
-      <p class="section-note">多路识别的候选不一致就停下来问。涉及付钱、删东西、认身份的事，门槛还要再高一档。</p>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10v3" /> <path d="M6 6v11" /> <path d="M10 3v18" /> <path d="M14 8v7" /> <path d="M18 5v13" /> <path d="M22 10v3" /></svg></span><span>语音共识与保守澄清</span></h3>
-        <p>多路ASR候选不一致时不猜测；支付、删除、认证等副作用任务使用更高阈值。</p>
-        <button id="voiceSafe">演示一致候选</button>
-        <button class="secondary" id="voiceConflict"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>演示确认/取消冲突</span></button>
-        <div class="result" id="voiceOutput" aria-live="polite"></div>
-      </article>
-    </section>
-    <section class="page-section" id="doc" data-panel="doc" aria-label="别人写的字，不算你的指令" hidden>
-      <h2 class="section-head">别人写的字，不算你的指令</h2>
-      <p class="section-note">账单照片上的金额只能当作待核验的数据，不能直接变成付款授权。</p>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M12 9v6" /> <path d="M16 15v6" /> <path d="M16 3v6" /> <path d="M3 15h18" /> <path d="M3 9h18" /> <path d="M8 15v6" /> <path d="M8 3v6" /></svg></span><span>目的绑定策略防火墙</span></h3>
-        <p>OCR账单中的金额可以作为待核验数据，不能直接成为支付授权或控制字段。</p>
-        <button id="policySafe">演示可信账单</button>
-        <button class="danger" id="policyAttack">演示恶意文档金额</button>
-        <div class="result" id="policyOutput" aria-live="polite"></div>
-      </article>
-    </section>
-    <section class="page-section" id="half" data-panel="half" aria-label="办到一半断了，它记得走到哪" hidden>
-      <h2 class="section-head">办到一半断了，它记得走到哪</h2>
-      <p class="section-note">每一步都落盘、带版本、带幂等键。失败时只回退已经做完且能回退的那几步。</p>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="8" x="3" y="3" rx="2" /> <path d="M7 11v4a2 2 0 0 0 2 2h4" /> <rect width="8" height="8" x="13" y="13" rx="2" /></svg></span><span>可恢复任务Saga</span></h3>
-        <p>每一步持久化、带版本与幂等键；失败时只补偿已经完成且可逆的步骤。</p>
-        <button id="sagaCreate"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="8" x="3" y="3" rx="2" /> <path d="M7 11v4a2 2 0 0 0 2 2h4" /> <rect width="8" height="8" x="13" y="13" rx="2" /></svg><span>创建缴费Saga</span></button>
-        <button class="secondary" id="sagaAdvance">按角色安全推进一步</button>
-        <div class="result" id="sagaOutput" aria-live="polite"></div>
-      </article>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057" /> <path d="M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78" /> <path d="m2 2 20 20" /></svg></span><span>跨设备离线冲突</span></h3>
-        <p>普通字段可按版本合并；健康、身份等高敏感字段发生并发修改时必须由人选择。</p>
-        <button id="syncDemo">生成高敏感冲突</button>
-        <div class="result" id="syncOutput" aria-live="polite"></div>
-      </article>
-    </section>
-    <section class="page-section" id="urgent" data-panel="urgent" aria-label="真出事的时候，多给的权限会自己收回" hidden>
-      <h2 class="section-head">真出事的时候，多给的权限会自己收回</h2>
-      <p class="section-note">只开位置、健康摘要、紧急联系人和进行中的事，十分钟后自动关。陪聊原文和支付凭据永久禁止。</p>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18v-6a5 5 0 1 1 10 0v6" /> <path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z" /> <path d="M21 12h1" /> <path d="M18.5 4.5 18 5" /> <path d="M2 12h1" /> <path d="M12 2v1" /> <path d="m4.929 4.929.707.707" /> <path d="M12 12v6" /></svg></span><span>限时紧急破窗</span></h3>
-        <p>只开放位置、健康摘要、紧急联系人和活动任务；陪聊原文与支付凭据永久禁止。</p>
-        <button class="danger" id="breakGlassDemo">开启10分钟最小访问</button>
-        <div class="result" id="breakGlassOutput" aria-live="polite"></div>
-      </article>
-    </section>
-    <section class="page-section" id="truth" data-panel="truth" aria-label="哪些是真做到了，哪些还没有" hidden>
-      <h2 class="section-head">哪些是真做到了，哪些还没有</h2>
-      <p class="section-note">已实现、沙箱闭环、演示适配、仍需真机验证——分开说，不含糊。</p>
-      <article class="panel feature-panel">
-        <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg></span><span>能力真值与运行指标</span></h3>
-        <p>明确区分已实现、适配器和仍需真机/正式接口验证的能力，避免答辩过度宣传。</p>
-        <button id="truthDemo">加载能力真值</button>
-        <button class="secondary" id="metricsDemo">加载聚合指标</button>
-        <div class="result" id="truthOutput" aria-live="polite"></div>
-      </article>
-    </section>
-  </main>
+         App 内只需要一个问题的答案：为什么可以相信这次结果？那就是上面那份凭证。 -->
+    <p class="trust-more">
+      这背后还有一整套技术证明：听不清时不猜、外来文档里的金额不算指令、办到一半断了
+      记得走到哪、紧急时多给的权限会自己收回。那些要在电脑上看。
+    </p>
+    <a class="trust-more-link" href="/judge">在电脑上看完整证明</a>
+
+</main>
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/trust.js" defer></script>

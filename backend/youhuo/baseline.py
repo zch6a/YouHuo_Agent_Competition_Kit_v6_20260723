@@ -139,6 +139,41 @@ class ChannelDeviation:
     sigma: float | None           # 偏离了几个"个人尺度"
     explanation: str              # 一句面向人的话，不是分数
 
+    # `explanation` 是一句**完整的话**：`起床：比他平常晚了 1 小时 40 分钟（…）。`
+    # 单独成行时（家属端「这一周」那几行）这样是对的。
+    #
+    # 但有两个地方把它当**片段**又包了一层，于是标点撞车，而且是家属端第一屏那一句：
+    #
+    #     今天该有的记录还没出现（外出：今天还没有有效记录。），建议打个电话问一声。
+    #                                              ^^^^  「。），」三个标点连排
+    #     今天和他平常不太一样：起床：比他平常晚了 1 小时 40 分钟（平常 06:08 前后）。
+    #                     ^^          ^^          一句话里两个冒号
+    #
+    # 所以给出两种嵌入形态，让调用处挑，而不是让每个调用处各自去 rstrip。
+    #
+    # 真正的实现是下面两个自由函数：同一份说明还有一个 Pydantic 版本
+    # （`ChannelDeviationView`），日报里那五处 rationale 拼的是**它**。
+    # 把逻辑写成属性再抄一份到 view 上，就是这个项目已经吃过亏的那种分叉
+    # （五份各自正确、各自不同的 `api()`）。所以只写一次，两边都调它。
+
+    @property
+    def parenthetical(self) -> str:
+        return as_parenthetical(self.explanation)
+
+    @property
+    def inline(self) -> str:
+        return as_inline(self.explanation)
+
+
+def as_parenthetical(explanation: str) -> str:
+    """放进括号里用：去掉句末句号，保留「外出：」这个前缀（读者要知道是哪一项）。"""
+    return explanation.rstrip("。")
+
+
+def as_inline(explanation: str) -> str:
+    """接在一个冒号后面用：去掉 label 自己那个冒号，避免一句话里两个「：」。"""
+    return explanation.replace("：", "", 1)
+
 
 # --- 圆周统计 ---------------------------------------------------------------
 
@@ -398,6 +433,9 @@ def _describe(baseline: ChannelBaseline, label: str, delta: float, verdict: Verd
     "偏离 3.2 个标准差"对子女没有意义。"比他平常晚了一小时四十分"才有——它同时
     告诉对方发生了什么、以及这算不算多。
     """
+    # 数字和汉字之间一律加半角空格——三个分支原先是三套写法：
+    #   `（06:08 前后）` 有 / `了1 小时 40 分钟（平常06:08前后）` 时有时无 / `了 100 次` 有
+    # 同一个函数同一句话里三种约定，读者看不出规律，只看得出没校对过。
     if verdict is Verdict.TYPICAL:
         if baseline.is_time():
             return f"{label}：和平常差不多（{_clock(baseline.center)} 前后）。"
@@ -406,8 +444,8 @@ def _describe(baseline: ChannelBaseline, label: str, delta: float, verdict: Verd
     if baseline.is_time():
         direction = "晚" if delta > 0 else "早"
         return (
-            f"{label}：比他平常{direction}了{_duration(abs(delta))}"
-            f"（平常{_clock(baseline.center)}前后）。"
+            f"{label}：比他平常{direction}了 {_duration(abs(delta))}"
+            f"（平常 {_clock(baseline.center)} 前后）。"
         )
     direction = "多" if delta > 0 else "少"
     return f"{label}：比他平常{direction}了 {abs(delta):.0f} 次（平常 {baseline.center:.0f} 次）。"

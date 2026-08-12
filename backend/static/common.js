@@ -38,6 +38,10 @@
     system: ['systemId', null],
   };
 
+  //: 角色 -> 说给人听的说法。`login()` 抛出的 Error 会被各页 catch 之后原样写到
+  //: 屏幕上（老人端还会念出来），所以那条消息里不能出现 'elder' / 'family'。
+  const ROLE_WORD = {elder: '您这边', family: '家人那边', system: '系统'};
+
   let identityPromise = null;
   const tokens = new Map();
 
@@ -96,7 +100,13 @@
 
   async function login(role) {
     const spec = ROLES[role];
-    if (!spec) throw new Error(`未知身份：${role}`);
+    if (!spec) {
+      // 原样抛 `未知身份：${role}` 会把内部枚举写到屏幕上。这是一条纯粹的编码错误
+      // 路径（调用方传了 ROLES 里没有的角色），排查需要的原值进 console，
+      // 给人看的那句不带它。
+      console.error('login() 收到未知角色：', role);
+      throw new Error('这一侧的身份认不出来');
+    }
     const [actorField, tokenField] = spec;
     const ids = await ready();
 
@@ -110,7 +120,11 @@
       body: JSON.stringify({actor_id: ids[actorField]}),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || `演示登录失败：${role}`);
+    // 这一句会走到屏幕上。elder.js 的 catch 是 `addBubble(\`系统暂时不可用：${e.message}\`)`，
+    // 所以老人当时读到（并被念出来）的整句是「系统暂时不可用：演示登录失败：elder」——
+    // 一个工程词加一个英文枚举，而这两样都是这个项目的硬约束明令禁止的。
+    // `role` 是 'elder' | 'family'，直接拼进文案就是把内部枚举念给她听。
+    if (!response.ok) throw new Error(data.detail || `${ROLE_WORD[role] || '这一侧'}没能登录`);
     remember(role, data.access_token);
     return data.access_token;
   }
@@ -176,7 +190,16 @@
     typical: ['和平常一样', 'good'],
     notice: ['有一点不同', 'warn'],
     marked: ['和平常不太一样', 'bad'],
-    unknown: ['还没有记录', 'warn'],
+    // `unknown` 从 `warn` 换成它自己的 `unknown` 色调。
+    //
+    // 上面那段话说的没错：本该有记录却一条都没有，在养老场景里必须被看见。所以它
+    // **不能**降成中性。但它和 `notice` 共用琥珀之后，照护页那一屏上会出现三个字样
+    // 完全相同的琥珀块，而三段里只有一段真的偏离——"我们不知道"被画成了"出事了"。
+    //
+    // 一位子女扫一眼看到三块琥珀，得到的结论是"今天有三件事不对"，而事实是
+    // "有两件事我们没数据"。第三种色调把这两件事分开：琥珀从此只表示"和他平常不一样"，
+    // 而"还没有记录"用一个看得见、但不喊的处理。
+    unknown: ['还没有记录', 'unknown'],
     pending: ['还不好说', ''],
   });
 
@@ -204,23 +227,29 @@
 
   //: 后端字段名 -> 中文标签。查不到就原样显示键名——宁可露出 `foo_bar`，也不要
   //: 悄悄把一个没预料到的字段藏起来。
+  //
+  // 这张表被**四个 app 页面全部加载**，所以它的措辞在手机框里面。
+  // 五条原先是照后端字段名直译的（「语义意图」「被剥离的字段」「允许通过的参数」
+  // 「置信度」「识别引擎」），已改成说值是什么、而不是说字段叫什么。
+  // 评委那一侧一个字节都没少：原始键名照旧在同一张卡下面的「完整记录」里逐字保留，
+  // 这张表只决定结构化卡片上那一行怎么念。
   const FIELD_LABEL = {
-    decision: '判定', reasons: '理由', stripped_fields: '被剥离的字段',
-    status: '状态', message: '说明', semantic_intent: '语义意图',
+    decision: '判定', reasons: '理由', stripped_fields: '被去掉的内容',
+    status: '状态', message: '说明', semantic_intent: '听出来要办什么',
     intent: '意图', mode: '交互模式', headline: '结论',
     task_id: '任务号', risk_level: '风险等级', requires_family_approval: '需家属确认',
     requires_elder_confirmation: '需老人复述确认', reversible: '可撤销',
     approved: '已批准', verdict: '判定', overall: '总体判定',
     speak_text: '播报', visible_options: '本轮可见选项', require_teach_back: '需要复述确认',
     name: '名称', purpose: '用途', authorization: '授权决定',
-    candidates: '候选', confidence: '置信度', engine: '识别引擎',
+    candidates: '候选', confidence: '有多确定', engine: '用哪个来识别',
     advance_notified: '提前提醒', notified: '到期提醒', escalated: '升级家属',
     inside_home_area: '在安全范围内', alert_created: '已产生告警',
     family_notified: '已通知家属', community_escalation_prepared: '已准备社区升级',
     steps: '步骤', current_step_index: '当前步骤', version: '版本',
-    implemented_and_tested: '已实现并测试', not_implemented: '尚未实现',
+    implemented_and_tested: '已做好并核验', not_implemented: '尚未实现',
     privacy_guarantee: '隐私承诺', privacy_note: '隐私说明',
-    allowed_arguments: '允许通过的参数', required_confirmations: '还需要什么',
+    allowed_arguments: '允许通过的内容', required_confirmations: '还需要什么',
     policy_version: '策略版本', decision_digest: '决定摘要', purpose_bound: '目的绑定',
     elder_id: '老人', bill_id: '账单号', amount_cents: '金额（分）',
     expires_at: '有效期至', scopes: '授权范围', granted: '已授权',
@@ -231,7 +260,7 @@
   const TONE_BY_VALUE = {
     allow: 'good', clarify: 'warn', deny: 'bad', blocked: 'bad',
     ok: 'good', success: 'good', failed: 'bad', error: 'bad',
-    typical: 'good', notice: 'warn', marked: 'bad', unknown: 'warn', pending: '',
+    typical: 'good', notice: 'warn', marked: 'bad', unknown: 'unknown', pending: '',
   };
 
   function labelFor(key) {
@@ -330,7 +359,10 @@
     const raw = document.createElement('details');
     raw.className = 'result-raw';
     const summary = document.createElement('summary');
-    summary.textContent = '原始响应';
+    // 「原始响应」是说给写接口的人听的。这个 `<details>` 在 /care 和 /trust 上也渲染，
+    // 那是手机框**里**。内容一个字节都不动——只是标题改成人话。证据要留着（不得
+    // silent delete），但它的名字不该要求读者先懂 HTTP。
+    summary.textContent = '完整记录';
     const body = document.createElement('pre');
     body.textContent = pretty(value);
     raw.append(summary, body);
@@ -398,8 +430,23 @@
     if (!segs.length || !panels.length) return;
     const first = fallback || panels[0].dataset.panel;
 
+    /** hash → 该显示哪个分区。
+     *
+     * hash 可以是分区名，**也可以是某个分区里面一个元素的 id**。桌面舞台上那四条
+     * 底线的「→」就是后一种：它们指向具体那篇证明它的卡片，而不是整段分区。
+     *
+     * 原先只认分区名，别的一律退回第一段——于是点一条底线的效果是"跳回产品介绍"，
+     * 而且不报错、不在截图里露馅。这一页整个论点就是"每一条都能当场验证"。
+     */
+    function resolve(name) {
+      if (panels.some(p => p.dataset.panel === name)) return name;
+      const node = name && document.getElementById(name);
+      const host = node && node.closest('[data-panel]');
+      return host ? host.dataset.panel : first;
+    }
+
     function show(name, writeHash) {
-      const target = panels.some(p => p.dataset.panel === name) ? name : first;
+      const target = resolve(name);
       panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
       segs.forEach(s => {
         const on = s.dataset.section === target;

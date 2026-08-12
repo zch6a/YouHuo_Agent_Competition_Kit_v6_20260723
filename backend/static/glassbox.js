@@ -54,7 +54,19 @@ export function renderGlassBox(host, card, preview) {
   const box = document.createElement('div');
   box.className = 'reliance-card';
   const heading = document.createElement('h3');
-  heading.textContent = `🔍 ${card.title}`;
+  // 标题前原先有一个 `🔍`。这个项目八条硬约束的第七条是**不用 emoji 当图标**，
+  // 而这里是全站最后一处（其余的在别的轮次里已经清掉了）。
+  //
+  // 三个理由，越往后越要紧：
+  //   一，emoji 的字形由**系统**决定——同一个码位在鸿蒙、iOS、Windows 上是三个不同
+  //       的画法、三种不同的粗细，和这一套统一描边的 SVG 图标放在一起永远是异物；
+  //   二，读屏软件会把它念出来（「放大镜」），而这张卡是要念给一位视力在下降的
+  //       老人听的，开头多一个"放大镜"没有任何意义；
+  //   三，它**不携带信息**——这张卡的身份由它自己的底色、阴影和标题文字承担，
+  //       一个放大镜既不表示状态也不表示类别。
+  //
+  // 所以是去掉，不是换成一个 SVG：先要回答"这里需不需要一个图标"，答案是不需要。
+  heading.textContent = card.title;
   box.appendChild(heading);
   box.appendChild(relianceRow('我听到', card.heard));
   box.appendChild(relianceRow('要办的事', card.goal));

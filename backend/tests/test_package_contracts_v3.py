@@ -159,12 +159,21 @@ def test_competition_description_stays_under_800_chinese_chars_roughly() -> None
 def test_trust_page_names_the_trust_innovations() -> None:
     """这四项可信主张必须写在产品里，而不是只写在文档里。
 
-    此前这条断言钉在 `index.html` 上。首页改成角色选择页之后那些术语被移走了——
-    但断言守的意图是对的，只是钉错了页面：`自主权包络` / `证明式完成` / `同意记忆`
-    / `家庭共识` 是工程词汇，它们属于可信中心，不属于一位老人或他子女看到的第一屏。
-    所以这条测试迁到 `/trust`，不是删掉。
+    这条断言迁过两次，两次都是同一个理由往同一个方向多走一步。
+
+    第一次钉在 `index.html`：首页改成角色选择页之后那些术语被移走了，于是迁到
+    `/trust`——因为 `自主权包络` / `证明式完成` / `同意记忆` / `家庭共识` 是工程
+    词汇，不属于一位老人或他子女看到的第一屏。
+
+    第二次（就是现在）迁到 `/stage`：同样的道理，它们也不属于**手机框里的任何一页**。
+    一位 78 岁的用户从「自主权包络」四个字里得到的信息量是零。桌面舞台的「证明」层
+    是它们的位置，而且那里每一条名字下面都有一个按得动的按钮。
+
+    四条主张本身没有离开产品：手机框里用普通话说同样四件事，由
+    `test_pwa_shell.py::test_the_phone_frame_states_the_same_four_promises_in_plain_words`
+    钉住。两条一起才是完整的判据——只有这一条时，"把四条整体删掉只留桌面"也会绿。
     """
-    text = (ROOT / "backend/static/trust.html").read_text(encoding="utf-8")
+    text = (ROOT / "backend/static/stage.html").read_text(encoding="utf-8")
     # 注释不算"写在产品里"。
     #
     # 这条原先不剥 HTML 注释，而它的姐妹断言（test_pwa_shell 里查工程术语那条）剥了。

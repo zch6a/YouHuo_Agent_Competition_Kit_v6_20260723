@@ -148,6 +148,13 @@ skill 有 16 个 GSAP motion preset。**不要引入 GSAP**（无 CDN、无包�
    文档里的命令会解析成 `C:\.claude\skills\...` —— 文件不存在。
    已把 `ui-ux-pro-max/SKILL.md` 里 11 处改成真实路径。
 4. **`.cjs` 脚本用相对路径**，必须先 `cd` 到 skill 目录再 `node scripts/xxx.cjs`。
+5. **`--persist` 在 `MASTER.md` 已存在时整个跳过写入**，包括 `--page` 的 override，
+   除非再加 `--force`。而 `--force` 会用新查询的值覆盖 MASTER。想生成第二套密度时
+   这一条会让你以为文件写出来了而其实没有——实测踩过一次。
+
+已经跑过一次并把取舍记下来了，改设计之前先读：
+`design-system/youhuo/TRANSLATION.md`（八个输出区里两个直接可用、两个翻译后可用、
+三个必须拒绝，含 `Marketplace / Directory` 那次误路由和 `font-weight: 900` 那条）。
 
 核心查询（**实测可用**）：
 

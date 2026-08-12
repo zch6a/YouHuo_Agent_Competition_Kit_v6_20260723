@@ -209,7 +209,7 @@ class YouHuoEngine:
             )
             return self._response(
                 ResponseCode.CHAT,
-                emotion.user_message + " 原来的任务已经安全暂停；准备好后说“继续办事”即可恢复。",
+                emotion.user_message + " 原来的任务已经安全暂停；准备好后说「继续办事」即可恢复。",
                 session,
                 active_task,
                 ui={"theme": "orange", "speak": True, "task_paused": True, "privacy": "不向家属展示聊天原文"},
@@ -256,7 +256,7 @@ class YouHuoEngine:
             if active_task:
                 return self._response(
                     ResponseCode.NEED_MORE_INFO,
-                    "当前还有一件事情没有办完。您可以继续办理，明确说“取消任务”，或在心情不舒服时告诉我，我会安全暂停任务。",
+                    "当前还有一件事情没有办完。您可以继续办理，明确说「取消任务」，或在心情不舒服时告诉我，我会安全暂停任务。",
                     session,
                     active_task,
                 )
@@ -296,7 +296,7 @@ class YouHuoEngine:
                 return self._response(
                     ResponseCode.CHAT,
                     self._companion_reply(text, session.session_id)
-                    + " 原任务仍安全暂停；说“继续办事”即可回到原步骤。",
+                    + " 原任务仍安全暂停；说「继续办事」即可回到原步骤。",
                     session,
                     active_task,
                     ui={"theme": "orange", "speak": True, "task_paused": True, "privacy": "默认不向家属展示聊天全文"},
@@ -361,7 +361,7 @@ class YouHuoEngine:
                 )
                 return self._response(
                     ResponseCode.TASK_COMPLETED,
-                    f"好，刚才那条提醒“{title}”已经取消了。",
+                    f"好，刚才那条提醒「{title}」已经取消了。",
                     session,
                     data={"cancelled_reminder_id": reminder_id},
                     ui={"theme": "blue", "speak": True},
@@ -413,8 +413,8 @@ class YouHuoEngine:
         if task_type is None:
             return self._response(
                 ResponseCode.CHAT,
-                "我在听。您可以说“帮我挂号”“查一下水费”“提醒我明天下午吃药”，"
-                "问“我今天吃药了吗”“我今天有什么事”，或者说“调用无忧伴”。",
+                "我在听。您可以说「帮我挂号」「查一下水费」「提醒我明天下午吃药」，"
+                "问「我今天吃药了吗」「我今天有什么事」，或者说「找无忧伴聊聊」。",
                 session,
                 ui={"theme": "blue", "speak": True},
             )
@@ -546,7 +546,7 @@ class YouHuoEngine:
                     task = self.db.get_task(task.id) or task
                 return self._response(
                     ResponseCode.NEED_ELDER_CONFIRMATION,
-                    "这件事正在等您确认。刚才的话题已经暂存，办完后我们再接着聊。请说“确认办理”或“取消任务”。",
+                    "这件事正在等您确认。刚才的话题已经暂存，办完后我们再接着聊。请说「确认办理」或「取消任务」。",
                     session,
                     task,
                     data={"deferred_topic_count": len(task.deferred_topics)},
@@ -560,7 +560,7 @@ class YouHuoEngine:
                 return self._response(
                     ResponseCode.NEED_ELDER_CONFIRMATION,
                     f"我没太听清。这件事是：{self._summary(task)}。"
-                    "对的话说“确认办理”，要改说“改成……”，不办说“取消任务”。",
+                    "对的话说「确认办理」，要改说「改成……」，不办说「取消任务」。",
                     session,
                     task,
                     data={"unparsed_confirmation_reply": True},
@@ -745,9 +745,9 @@ class YouHuoEngine:
             task.task_type, int(task.risk_level), profile_enabled=True
         )
         ask = (
-            f"请您把金额说一遍，例如“确认支付{amount:.2f}元”；不想办就说“取消任务”。"
+            f"请您把金额说一遍，例如「确认支付{amount:.2f}元」；不想办就说「取消任务」。"
             if teach_back
-            else "是否确认生成家属支付请求？请明确说“确认办理”或“取消任务”。"
+            else "是否确认生成家属支付请求？请明确说「确认办理」或「取消任务」。"
         )
         return self._response(
             ResponseCode.NEED_ELDER_CONFIRMATION,
@@ -758,6 +758,17 @@ class YouHuoEngine:
                 "amount_yuan": f"{amount:.2f}",
                 "due_date": task.slots["due_date"],
                 "teach_back_required": teach_back,
+                # 下面三个是给 Task Space 的（老人端第十节：水费 / ¥68.40 / 给谁 / 哪个月）。
+                #
+                # 它们**本来就在** `task.slots` 里，只是没被带进响应，于是前端只能显示
+                # 「这件事」而不是「缴费」——同一个缺口让状态行也一直说
+                # 「正在办这件事」。那不是渲染错，是后端给的字段比屏幕上要说的话薄。
+                #
+                # 这是**加法**，不是重写 API 层（计划书第六十五节）：业务链、权限、
+                # 确认门一行没动，只是把已经算出来的事实一起交出去。
+                "task_type": task.task_type.value,
+                "bill_type": task.slots.get("bill_type"),
+                "period": task.slots.get("period"),
             },
         )
 
@@ -851,7 +862,7 @@ class YouHuoEngine:
         task = self.db.get_task(task.id) or task
         return self._response(
             ResponseCode.NEED_ELDER_CONFIRMATION,
-            f"请确认：在{task.slots['due_date']} {task.slots['due_time']}提醒您“{task.slots['title']}”。",
+            f"请确认：在{task.slots['due_date']} {task.slots['due_time']}提醒您「{task.slots['title']}」。",
             session,
             task,
         )
@@ -1712,7 +1723,7 @@ class YouHuoEngine:
                 f"{task.slots.get('hospital', '')}{task.slots.get('department', '')}{task.slots.get('doctor', '')}"
             )
         if task.task_type == TaskType.REMINDER:
-            return f"在{task.slots.get('due_date', '')} {task.slots.get('due_time', '')}提醒“{task.slots.get('title', '')}”"
+            return f"在{task.slots.get('due_date', '')} {task.slots.get('due_time', '')}提醒「{task.slots.get('title', '')}」"
         return "逐项语音辅助填写表单"
 
     def _cancel_task(self, actor: AuthContext, session: SessionState, task: TaskRecord) -> ChatResponse:

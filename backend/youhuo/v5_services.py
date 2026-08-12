@@ -218,12 +218,12 @@ class VoiceConsensusEngine:
     @staticmethod
     def _clarification(best: str, intent: str, contradiction: bool) -> str:
         if contradiction:
-            return f"我听到的内容有两种可能。请您明确说“确认办理”或“取消办理”。我刚才听到：{best or '未听清'}。"
+            return f"我听到的内容有两种可能。请您明确说「确认办理」或「取消办理」。我刚才听到：{best or '未听清'}。"
         if intent == "bill_payment":
-            return "我想确认一下：您是要查询账单，还是要发起缴费？请说“只查询”或“发起缴费”。"
+            return "我想确认一下：您是要查询账单，还是要发起缴费？请说「只查询」或「发起缴费」。"
         if intent == "hospital_registration":
-            return "我没有完全听清医院或时间。请您慢一点说，例如“明天下午挂人民医院骨科”。"
-        return f"我没有完全听清。您刚才是不是想说：{best or '这件事'}？请说“是”或重新说一遍。"
+            return "我没有完全听清医院或时间。请您慢一点说，例如「明天下午挂人民医院骨科」。"
+        return f"我没有完全听清。您刚才是不是想说：{best or '这件事'}？请说「是」或重新说一遍。"
 
 
 @dataclass(frozen=True)

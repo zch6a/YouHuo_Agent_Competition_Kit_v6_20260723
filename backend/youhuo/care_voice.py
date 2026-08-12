@@ -2,7 +2,7 @@
 
 v6 已经实现了用药计划、服药依从、库存预测、健康时间线、亲友档案、循环事项和
 适老交互档案——但它们只有 REST 接口。老人端主链对下面这些话一律回同一句
-“我在听。您可以说…”：
+「我在听。您可以说…」：
 
     我今天吃药了吗 / 我的降压药还剩几片 / 我血压怎么样 / 我今天有什么事 /
     给我女儿打个电话 / 你说慢点 / 再说一遍 / 我听不清
@@ -341,7 +341,7 @@ def answer_health_recent(*, events: list[Any], now: datetime) -> CareAnswer:
     if readable:
         detail = "，" + "、".join(f"{key} {value}" for key, value in list(readable.items())[:3])
     return CareAnswer(
-        f"最近一条记录是{when}的“{latest.title}”{detail}。"
+        f"最近一条记录是{when}的「{latest.title}」{detail}。"
         f"我只是把记录念给您听，不做判断；身体上的事请以医生的说法为准。",
         "CARE_QUERY_HEALTH_RECENT",
         {"events": len(events), "latest_kind": latest.kind.value},
@@ -351,7 +351,7 @@ def answer_health_recent(*, events: list[Any], now: datetime) -> CareAnswer:
 def answer_schedule_today(*, reminders: list[Any], now: datetime) -> CareAnswer:
     if not reminders:
         return CareAnswer(
-            "接下来一天里没有安排。要加一件事，您可以说“提醒我明天上午九点复诊”。",
+            "接下来一天里没有安排。要加一件事，您可以说「提醒我明天上午九点复诊」。",
             "CARE_QUERY_SCHEDULE",
             {"count": 0},
         )
@@ -444,7 +444,7 @@ def answer_symptom_mention() -> CareAnswer:
     """
     return CareAnswer(
         "听着您不太舒服。我不能看病，也不敢替医生判断。"
-        "要我帮您挂个号吗？说“帮我挂号”就行；也可以说“提醒我明天去医院”。"
+        "要我帮您挂个号吗？说「帮我挂号」就行；也可以说「提醒我明天去医院」。"
         "要是突然加重、说不清话、站不稳或者胸口发闷，别等我，直接打急救电话或者叫人。",
         "CARE_SYMPTOM_ACKNOWLEDGED",
         {"offered_registration": True, "clinical_advice": False},
@@ -455,7 +455,7 @@ def answer_capability_help() -> CareAnswer:
     return CareAnswer(
         "我能帮您做这些：挂号看病、查水电燃气费和缴费、记提醒和日程、"
         "查今天的药吃了没和药还剩多少、念最近的健康记录、找家里人的号码。"
-        "想找人说话，就说“调用无忧伴”。您一次说一件就行。",
+        "想找人说话，就说「找无忧伴聊聊」。您一次说一件就行。",
         "CARE_QUERY_HELP",
     )
 
@@ -474,7 +474,7 @@ def adjust_profile(intent: CareIntent, profile: Any) -> CareAnswer | None:
         new_rate = round(max(_RATE_MIN, profile.speech_rate - _RATE_STEP), 3)
         if new_rate >= profile.speech_rate:
             return CareAnswer(
-                "已经是最慢的语速了。如果还是跟不上，可以说“我听不清”，我会一句一句地说。",
+                "已经是最慢的语速了。如果还是跟不上，可以说「我听不清」，我会一句一句地说。",
                 "CARE_PROFILE_SPEECH_RATE",
                 {"speech_rate": profile.speech_rate, "changed": False},
             )
@@ -504,7 +504,7 @@ def adjust_profile(intent: CareIntent, profile: Any) -> CareAnswer | None:
         if rate < profile.speech_rate:
             update["speech_rate"] = rate
         return CareAnswer(
-            "好，我把句子说短一点、慢一点，字也调大。您要是还听不清，就说“再说一遍”。",
+            "好，我把句子说短一点、慢一点，字也调大。您要是还听不清，就说「再说一遍」。",
             "CARE_PROFILE_HEARING_SUPPORT",
             {"hearing_support": True, "max_sentence_chars": 24},
             profile_update=update,

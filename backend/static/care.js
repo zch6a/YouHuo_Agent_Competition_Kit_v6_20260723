@@ -1,288 +1,472 @@
 'use strict';
+/* 照护档案。
+ *
+ * 这一页原先是十三个按钮：「上报屋里 13.5℃」「模拟今天 11:20 才起」「加载能力矩阵」
+ * ——点了才出数据。那是一个演示台，不是一份档案。一位子女打开它想知道的是爸爸今天
+ * 怎么样，而不是有哪些接口可以按。
+ *
+ * 所以两件事一起改：
+ *
+ * 一，**进页面就加载**。五段各自去读一个既有的 GET，没有新增任何后端接口：
+ *
+ *     今天 → /v7/daily-report/{id}      作息与活动、要不要提醒家人
+ *     用药 → /v4/medications/{id}       在吃什么、还剩多少
+ *     身体 → /v4/health/events/{id}     体检与就诊记录
+ *              + /v4/medications/{id}   空的时候补一条长期用药（同一次请求，见 medications()）
+ *     心情 → /v4/reports/emotion/{id}   只有类别与趋势，没有聊天原文
+ *     安全 → /v4/safety/policy/{id} + /v4/contacts/{id}
+ *
+ * 二，那十三个按钮**搬到 /stage**，一个都没删（proof-demos.js）。往一位老人的档案
+ * 里塞一条「屋里 13.5℃」是答辩动作，不是子女会做的事。
+ *
+ * 五段全部并发拉取，一段失败不影响其他四段——这一页最不该有的性质是"一个接口慢了，
+ * 整页停在正在加载"。
+ */
 
-// 身份、登录、401 重放和令牌缓存都在 common.js 里。这一页只留下它自己的状态。
-const {api, byId, pretty} = window.YouHuo;
+const {api, byId} = window.YouHuo;
 const state = {elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
-// 结构化渲染 + 折叠的原始响应，见 common.js。这七张卡里有六张原先直接把
-// JSON.stringify 塞进 <pre>。
-function setOutput(id, value) {
-  window.YouHuo.renderResult(id, value);
+const verdictOf = window.YouHuo.verdictOf;
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
+/** 空态里的一组小标题 + 条目。
+ *
+ * 「以后会有什么」和「怎么才会有」两块的形状完全一样，写两遍会分叉。
+ */
+function futureBlock(host, head, items) {
+  const block = el('section', 'care-block');
+  block.appendChild(el('h3', 'care-block-head', head));
+  const list = el('ul', 'care-lines');
+  items.forEach((item) => list.appendChild(el('li', null, item)));
+  block.appendChild(list);
+  host.appendChild(block);
+}
+
+/** 一段的空态。
+ *
+ * **不是**「暂无数据」。这一页有一半内容在一个刚开通的账户里本来就是空的（还没录用药
+ * 计划、还没上传体检报告），而「暂无数据」把一个正常状态说成了一次失败。每一段自己
+ * 说清楚「现在没有什么、需要的时候怎么会有」。
+ *
+ * 一句话不够。「还没有体检或就诊记录」说完就停，读的人既不知道这一段将来会长成什么
+ * 样，也不知道要做什么才会有——那一句诚实，可它和「这个功能没做」在屏幕上长得一模
+ * 一样。所以空态收三样：一句现状、几组「以后会有什么 / 怎么才会有」、一句脚注。
+ * `blocks` 留了默认值，只给一句话的老调用方（用药、安全）不用改。
+ */
+function empty(host, lead, blocks = [], footnote) {
+  host.replaceChildren(el('p', 'care-empty', lead));
+  blocks.forEach(({head, items}) => futureBlock(host, head, items));
+  if (footnote) host.appendChild(el('p', 'meta', footnote));
+}
+
+function failed(host, error) {
+  host.replaceChildren(el('p', 'notice bad', `这一段暂时没取到：${error.message}`));
+}
+
+/* ==========================================================================
+   今天
+   ========================================================================== */
+
+async function loadToday() {
+  const host = byId('todayBody');
+  const updated = byId('careUpdated');
+  try {
+    const {report, alert} = await api(`/v7/daily-report/${state.elderId}`, {}, 'family');
+    host.replaceChildren();
+
+    // 结论在最前。一句话说完今天怎么样，颜色由后端的判定给，不由前端猜。
+    const head = el('div');
+    const [word, tone] = verdictOf(report.overall);
+    head.className = `report-verdict ${tone}`;
+    head.append(el('span', 'report-badge', word), el('strong', null, report.headline));
+    host.appendChild(head);
+
+    if (updated) updated.textContent = `今天 ${report.day} 的情况`;
+
+    // 分项。每一段的判定词也一起给出来——同一个「外出 0 次」在不同人身上是不同结论，
+    // 而那个结论是后端拿这位老人自己的常态算出来的。
+    report.sections.forEach((section) => {
+      const block = el('section', 'care-block');
+      const [w, t] = verdictOf(section.verdict);
+      const title = el('h3', 'care-block-head');
+      title.appendChild(el('span', null, section.title));
+      // 药丸只留给「和平常不一样」。
+      //
+      // 后端的分项固定是三段（作息 / 活动与交流 / 用药），平常日子里三个判定全是
+      // typical，于是三个绿药丸加顶上那个总判定，四个字样完全相同的绿块竖排下来
+      // 抢走了第一落点，而真正有内容的是下面那几行灰色小字。narrow-320 上药丸还
+      // 占掉约四成行宽，和「活动与交流」这个五字标题几乎相撞。
+      //
+      // 一致是默认状态，说一声就够，用中性小字；视觉预算留给偏离的那一项。
+      // 判定词本身照旧从 verdictOf 取——三个端的文案共用一份，不在这里另写一套。
+      title.appendChild(section.verdict === 'typical'
+        ? el('span', 'meta', w)
+        : el('span', `pill ${t}`, w));
+      block.appendChild(title);
+      const list = el('ul', 'care-lines');
+      section.lines.forEach((line) => list.appendChild(el('li', null, line)));
+      block.appendChild(list);
+      host.appendChild(block);
+    });
+
+    // 办事进度。
+    const e = report.errands;
+    const digest = el('div', 'digest');
+    [
+      ['今天要办', `${e.due_today} 件`],
+      ['已经办好', `${e.completed} 件`],
+      ['等您点头', `${e.awaiting_family} 件`],
+      ['已经超时', `${e.overdue} 件`],
+    ].forEach(([label, value]) => {
+      const row = el('div', 'digest-row');
+      row.append(el('strong', null, label), el('div', null, value));
+      digest.appendChild(row);
+    });
+    host.appendChild(digest);
+
+    // 需要子女做点什么。空列表表示"今天不用您操心"，那句话要说出来。
+    if (report.suggested_for_family.length) {
+      const box = el('div', 'notice warning');
+      box.appendChild(el('strong', null, '需要您做的：'));
+      const list = el('ul', 'care-lines');
+      report.suggested_for_family.forEach((s) => list.appendChild(el('li', null, s)));
+      box.appendChild(list);
+      host.appendChild(box);
+    } else {
+      host.appendChild(el('p', 'care-empty', '今天不用您操心。'));
+    }
+
+    // 会不会主动找您。这一条是这个产品的性格：不该打扰的时候不打扰。
+    host.appendChild(el('p', 'meta', alert.push
+      ? `会主动提醒您：${alert.reason}`
+      : `不会打扰您：${alert.reason}`));
+
+    // 隐私说明自己占一块，带小标题。
+    //
+    // 它原先是这一段末尾一行裸 `.meta`，上面没有标题也没有分隔，于是「本日报不包含
+    // 无忧伴陪伴聊天的任何原文」读起来像是在解释上面那四个办事计数——一句讲这份
+    // 日报**少了什么**的话，被读成了「今天该办的事」的一部分。
+    //
+    // 归属用小标题给，不用分割线：这一页的 `--line` 在深色模式下很淡，一条看不见的
+    // 线等于没给归属，而标题在两个配色下都在。它仍然是 `.meta` 小字——承诺要一直
+    // 写着，但它每天都一样，不是今天的新闻（家属端那一份也是这么定的）。
+    const privacy = el('section', 'care-block');
+    privacy.appendChild(el('h3', 'care-block-head', '这份日报不包含什么'));
+    privacy.appendChild(el('p', 'meta', report.privacy_note));
+    host.appendChild(privacy);
+  } catch (error) {
+    failed(host, error);
+    if (updated) updated.textContent = '暂时没连上';
+  }
+}
+
+/* ==========================================================================
+   用药
+   ========================================================================== */
+
+/** 用药计划只拉一次。
+ *
+ * 两段都要它：「用药」拿它当主角，「身体」只拿它的起始日期当一条健康线索。各自拉一遍
+ * 会让同一个 GET 在首屏跑两次——五段本来就是并发的，多一个请求不会更快。
+ */
+let medicationPlans = null;
+function medications() {
+  if (!medicationPlans) {
+    medicationPlans = api(`/v4/medications/${state.elderId}`, {}, 'family');
+    // 先挂一个空处理器。这个 promise 有两个消费者，而「身体」那一段要等
+    // /v4/health/events 回来之后才 await 它；中间那段时间里如果它被拒绝，就是一个
+    // 暂时没人接的 rejection——浏览器会把它当未捕获异常报到控制台，而
+    // check_page_runtime 把控制台里的错误当硬失败。两个真正的消费者各自照旧处理。
+    medicationPlans.catch(() => {});
+  }
+  return medicationPlans;
+}
+
+async function loadMedications() {
+  const host = byId('medBody');
+  try {
+    const plans = await medications();
+    if (!plans.length) {
+      empty(host, '还没有登记在吃的药。等医生开了方子，您或他都可以添上——'
+        + '添上之后到点会提醒他，也会盯着还剩多少。');
+      return;
+    }
+    host.replaceChildren();
+    plans.forEach((plan) => {
+      const card = el('section', 'care-item');
+      const title = el('h3', 'care-item-head');
+      title.append(
+        el('span', null, plan.display_name),
+        el('span', `pill ${plan.active ? 'good' : 'cancelled'}`, plan.active ? '在吃' : '已停'),
+      );
+      card.appendChild(title);
+      card.appendChild(el('p', null, `${plan.dose_text}｜每天 ${plan.times_local.join('、')}`));
+      // 库存换算成"还能吃几天"。`stock_units` 和 `units_per_dose` 是两个数字，
+      // 而一位子女要的是"还剩四天"这一个结论。
+      const perDay = plan.units_per_dose * plan.times_local.length;
+      const days = perDay > 0 ? Math.floor(plan.stock_units / perDay) : null;
+      if (days !== null) {
+        card.appendChild(el('p', days <= 3 ? 'notice warning' : 'meta',
+          days <= 0 ? '药已经吃完了。' : `按现在的吃法还够 ${days} 天。`));
+      }
+      host.appendChild(card);
+    });
+  } catch (error) { failed(host, error); }
+}
+
+/* ==========================================================================
+   身体
+   ========================================================================== */
+
+//: 后端的事件类型码不往界面上印。认识的说人话，不认识的按中性说法归类——
+//: 兜底成原始码等于这层翻译在遇到新类型时自动失效，而那正是它该起作用的时候。
+//:
+//: 这张表原先的五个键（checkup_report / clinic_visit / hospitalization /
+//: vaccination / measurement）后端**一个都不存在**：真正的枚举只有四个。零命中，
+//: 于是每一条记录都印成兜底的「一条记录」。同一段里还有三个字段名也是猜的——
+//: occurred_at（真名 event_at）、summary（真名 title）、source_name（真名 source），
+//: 所以标题永远不显示，日期永远退回入库时间。演示家庭里这张表是空的，这段代码
+//: 从来没跑过一次真实数据，四个错就一起活到了今天。
+const HEALTH_WORD = {
+  checkup: '体检',
+  visit: '就诊',
+  medication: '用药记录',
+  note: '记了一笔',
+};
+
+/** 用药计划里唯一算得上「身体」的东西：长期在吃什么、从哪天起。
+ *
+ * 「身体」在演示家庭里是空的，可档案里其实躺着一条带日期的健康事实——长期在吃降压药，
+ * 而长期用药本身就是病史线索。它比一段纯空白有用，所以补进来，并且写明它是从哪儿来的。
+ *
+ * 库存（`stock_units`）**不**补进来。「还够几天」是补货问题，不是身体状况；它已经是
+ * 「用药」那一段的主角，搬过来只会让两段互相抄一遍。
+ */
+async function longTermMedication(host) {
+  const plans = await medications().catch(() => []);
+  const ongoing = plans.filter((plan) => plan.active && plan.start_date);
+  if (!ongoing.length) return;
+  const block = el('section', 'care-block');
+  block.appendChild(el('h3', 'care-block-head', '档案里已经有的线索'));
+  const list = el('ul', 'care-lines');
+  ongoing.slice(0, 6).forEach((plan) => {
+    list.appendChild(el('li', null, plan.end_date
+      ? `${plan.display_name}：${plan.start_date} 起，吃到 ${plan.end_date}`
+      : `${plan.display_name}：${plan.start_date} 起一直在吃`));
+  });
+  block.appendChild(list);
+  host.appendChild(block);
+  host.appendChild(el('p', 'meta', '这一条是从「用药」那一段推出来的，不是一份体检记录。'));
+}
+
+async function loadHealth() {
+  const host = byId('bodyBody');
+  try {
+    const events = await api(`/v4/health/events/${state.elderId}`, {}, 'family');
+    if (!events.length) {
+      // 空态要说清这一段将来长什么样、怎么才会有。原先只有一句话，勉强诚实但信息量
+      // 低——它和「这个功能没做」在屏幕上没有区别。条目写的就是后端真有的四类记录，
+      // 不是许愿。
+      empty(host, '还没有体检或就诊记录。', [
+        {head: '这一段以后会有什么', items: [
+          '体检：哪一天做的、各项指标、看不懂的术语翻成人话',
+          '就诊：什么时候看的、医生怎么交代、下次什么时候复查',
+          '和用药有关的一笔，以及他自己随手记下的一条',
+        ]},
+        {head: '怎么才会有', items: [
+          '纸质报告拍下来传上去，日期、指标和复查时间会被挑出来，这里自动立一条',
+          '也可以直接添一条，写清哪一天、什么事——您和他都能添',
+          '他可以把某一条留成只给自己看，那一条不会出现在这一页',
+        ]},
+      ]);
+      await longTermMedication(host);
+      host.appendChild(el('p', 'meta', '这里只做整理，不做诊断。看病请以医生的判断为准。'));
+      return;
+    }
+    host.replaceChildren();
+    events.slice(0, 12).forEach((event) => {
+      const card = el('section', 'care-item');
+      const title = el('h3', 'care-item-head');
+      title.append(
+        el('span', null, HEALTH_WORD[event.kind] || '一条记录'),
+        // `event_at` 是事情发生的那一天，`created_at` 是它被录进来的那一天。上个月做的
+        // 体检今天才传，两者差一个月——先取前者，后者只在缺失时兜底。
+        el('span', 'meta', String(event.event_at || event.created_at).slice(0, 10)),
+      );
+      card.appendChild(title);
+      if (event.title) card.appendChild(el('p', null, event.title));
+      // `source` 不往界面上印。它是一个自由文本字段，默认值是 manual，而医疗报告那条
+      // 路径塞进来的是一个带英文缩写的内部名字——两种都是给系统看的字，印到屏幕上就是
+      // 一个英文枚举值。这一条记录真正有用的三样已经在上面了：哪一类、哪一天、写了什么。
+      host.appendChild(card);
+    });
+    host.appendChild(el('p', 'meta', '这里只做整理，不做诊断。看病请以医生的判断为准。'));
+  } catch (error) { failed(host, error); }
+}
+
+/* ==========================================================================
+   心情
+   ========================================================================== */
+
+//: 情绪类别和趋势的码同样不往界面上印，而这两张表原先漏掉的正好是最要紧的几个。
+//:
+//: 类别表少了 positive / low_mood / urgent，还多写了后端根本没有的 sad / happy /
+//: neutral；趋势表少了 distress_increasing / distress_decreasing——后端的趋势一共
+//: 只有三个值，这张表认得其中一个。漏掉的一律走 `|| s.trend` 兜底，于是「他这两周
+//: 更紧张了」这个恰恰最需要被看见的结论，在屏幕上印成一串英文。
+//:
+//: 兜底保留（宁可露出一个没预料到的码，也不要悄悄把它藏起来），但后端现有的值必须
+//: 全在表里——兜底是给将来新增的类型留的门，不是给今天已经存在的枚举用的。
+const EMOTION_WORD = {
+  positive: '心情不错', calm: '平静', lonely: '孤单', low_mood: '低落',
+  anxious: '着急', angry: '烦躁', urgent: '急着要人帮忙',
+};
+const TREND_WORD = {
+  distress_increasing: '比上两周更紧张一些',
+  distress_decreasing: '比上两周松快一些',
+  stable_or_insufficient: '和上两周差不多，或者记录还不够多',
+};
+
+function ymd(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+async function loadMood() {
+  const host = byId('moodBody');
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 13 * 24 * 60 * 60 * 1000);
+    const report = await api(
+      `/v4/reports/emotion/${state.elderId}?period_start=${ymd(start)}&period_end=${ymd(end)}`,
+      {}, 'family',
+    );
+    const s = report.summary;
+    host.replaceChildren();
+    host.appendChild(el('p', 'care-period', `最近两周（${report.period_start} 到 ${report.period_end}）`));
+
+    if (!s.event_count) {
+      // 空态原先是一句「这两周没有需要记下来的情绪波动」加一句隐私承诺。诚实，但读的人
+      // 不知道这一段有了记录会长成什么样，也不知道那些记录从哪来——于是它读起来像一个
+      // 没做完的功能。下面三条「以后会有什么」写的就是后端 summary 真有的三个字段。
+      host.appendChild(el('p', 'care-empty', '这两周没有需要记下来的情绪波动。'));
+      futureBlock(host, '这一段以后会有什么', [
+        '出现过哪几类情绪、各几次——只有类别和次数',
+        '跟上两周比：更紧张了、松快了，还是差不多',
+        '一两句家人可以试着做的事',
+      ]);
+      // 「怎么才会有」这一段必须写准。情绪判断确实每次说话都在做（先用来决定要不要停下
+      // 手上的事、要不要提醒家人），但**留档**是另一件事：后端只认他自己那一侧发起的
+      // 请求，家属的令牌写不进来。所以不写成「聊过天就自动有」，那是句好听的假话。
+      futureBlock(host, '怎么才会有', [
+        '他跟无忧伴说话的时候，情绪是当场就在判断的——先用来决定要不要停下手上的事、要不要提醒您',
+        '要在这一段留下一条，得由他自己那一侧发起；家人没有权限替他记一笔',
+        '留下来的只有类别和强度，聊过的话一句都不留',
+      ]);
+    } else {
+      const digest = el('div', 'digest');
+      const rows = [['整体趋势', TREND_WORD[s.trend] || s.trend]];
+      const labels = Object.entries(s.label_counts);
+      if (labels.length) {
+        rows.push(['出现过', labels.map(([k, v]) => `${EMOTION_WORD[k] || k} ${v}次`).join('，')]);
+      }
+      rows.forEach(([label, value]) => {
+        const row = el('div', 'digest-row');
+        row.append(el('strong', null, label), el('div', null, value));
+        digest.appendChild(row);
+      });
+      host.appendChild(digest);
+      if (s.safe_suggestions.length) {
+        const box = el('div', 'notice');
+        box.appendChild(el('strong', null, '可以试试：'));
+        const list = el('ul', 'care-lines');
+        s.safe_suggestions.forEach((x) => list.appendChild(el('li', null, x)));
+        box.appendChild(list);
+        host.appendChild(box);
+      }
+    }
+    host.appendChild(el('p', 'meta', report.privacy_guarantee));
+  } catch (error) { failed(host, error); }
+}
+
+/* ==========================================================================
+   安全
+   ========================================================================== */
+
+const CONTACT_WORD = {
+  family: '家人', neighbour: '邻居', community: '社区', doctor: '医生', other: '其他',
+};
+
+async function loadSafety() {
+  const host = byId('safetyBody');
+  try {
+    const [policy, contacts] = await Promise.all([
+      api(`/v4/safety/policy/${state.elderId}`, {}, 'family'),
+      api(`/v4/contacts/${state.elderId}`, {}, 'family').catch(() => []),
+    ]);
+    host.replaceChildren();
+
+    const digest = el('div', 'digest');
+    const hours = Math.round((policy.inactivity_minutes || 0) / 60);
+    [
+      ['多久没动静就找人', hours >= 1 ? `${hours} 小时` : `${policy.inactivity_minutes} 分钟`],
+      ['出门多远开始留意', `${policy.geofence_radius_m} 米以外`],
+      ['要不要告诉社区', policy.notify_community ? '要' : '不要'],
+    ].forEach(([label, value]) => {
+      const row = el('div', 'digest-row');
+      row.append(el('strong', null, label), el('div', null, value));
+      digest.appendChild(row);
+    });
+    host.appendChild(digest);
+
+    if (contacts.length) {
+      host.appendChild(el('h3', 'care-block-head', '出事先找谁'));
+      const list = el('ul', 'care-lines');
+      contacts.slice(0, 6).forEach((c) => {
+        list.appendChild(el('li', null,
+          `${c.name}（${CONTACT_WORD[c.contact_role] || c.contact_role}）${c.address_masked}`));
+      });
+      host.appendChild(list);
+    } else {
+      host.appendChild(el('p', 'care-empty', '还没有设紧急联系人。'));
+    }
+
+    host.appendChild(el('p', 'meta',
+      '位置只在需要的时候看一眼，按最小必要留存。定位精度不够时不会自动报警——'
+      + '一次误报会让他以后不敢再带手机出门。'));
+  } catch (error) { failed(host, error); }
+}
+
+/* ========================================================================== */
+
 async function bootstrap() {
+  const status = byId('status');
   try {
     const ids = await window.YouHuo.ready();
     state.elderId = ids.elderId;
     state.daughterId = ids.daughterId;
     state.systemId = ids.systemId;
     await Promise.all([window.YouHuo.login('elder'), window.YouHuo.login('family')]);
-    byId('status').textContent = '演示账户已就绪：老人本人负责同意，家属负责建议与高风险接力。';
+    // 成功之后这一行就没有内容了。它必须一直在（失败的时候必须看得见），
+    // 但一句"就绪了"不该占着首屏最重的一块位置。
+    status.hidden = true;
   } catch (error) {
-    byId('status').textContent = `初始化失败：${error.message}`;
+    status.hidden = false;
+    status.textContent = `暂时没连上：${error.message}`;
+    return;
   }
+  // 五段并发。一段失败只让那一段说话，另外四段照常显示——这一页最不该有的性质
+  // 就是"一个接口慢了，整页停在正在加载"。
+  await Promise.all([loadToday(), loadMedications(), loadHealth(), loadMood(), loadSafety()]);
 }
 
-// 个性化基线（核心创新点 ①）。
-//
-// 这一块不是又一个 JSON 输出框。它要回答的是设计稿里那个具体问题："老人 A 每天上午
-// 散步，老人 B 每天上午在家读书"——所以先把**他自己的**常态一行行摆出来，再说今天。
-const CHANNEL_ICON = { wake: '起床', sleep: '就寝', outing: '外出', medication: '服药', conversation: '说话' };
-// 判定词表在 common.js 里，与家属端共用一份——此前两边各写一份、键与文案完全相同。
-const verdictOf = window.YouHuo.verdictOf;
-
-function renderBaseline(snapshot, care) {
-  const host = byId('baselineOutput');
-  host.replaceChildren();
-
-  const head = document.createElement('div');
-  const [word, tone] = verdictOf(snapshot.overall);
-  head.className = `report-verdict ${tone}`;
-  const badge = document.createElement('span');
-  badge.className = 'report-badge';
-  badge.textContent = word;
-  const line = document.createElement('strong');
-  line.textContent = snapshot.headline;
-  head.append(badge, line);
-  host.appendChild(head);
-
-  // 他自己的常态。这张表就是"千人千面"本身——同一个 0 次外出，对散步的老人和
-  // 读书的老人是两个结论，因为这一列的数字不一样。
-  const table = document.createElement('div');
-  table.className = 'digest';
-  snapshot.baselines.forEach((b) => {
-    const dev = snapshot.deviations.find((d) => d.channel === b.channel);
-    const row = document.createElement('div');
-    row.className = 'digest-row';
-    const label = document.createElement('strong');
-    label.textContent = CHANNEL_ICON[b.channel] || b.label;
-    const cell = document.createElement('div');
-    cell.textContent = b.established
-      ? `他平常 ${b.center_text}｜今天 ${dev && dev.observed_text ? dev.observed_text : '还没有记录'}`
-      : b.reason;
-    row.append(label, cell);
-    table.appendChild(row);
-  });
-  host.appendChild(table);
-
-  if (care) {
-    const spoken = document.createElement('p');
-    spoken.className = 'notice good';
-    spoken.textContent = `会对老人说：「${care.spoken}」`;
-    host.appendChild(spoken);
-    if (care.light) {
-      const light = document.createElement('p');
-      light.className = 'meta';
-      light.textContent = `灯光建议：亮度 ${care.light.brightness_pct}%`
-        + `${care.light.warm ? '、暖光' : ''}${care.light.breathing ? '、慢呼吸' : ''}`
-        + `——${care.light.reason}（建议，未驱动任何设备）`;
-      host.appendChild(light);
-    }
-    if (care.suggest_mode) {
-      const mode = document.createElement('p');
-      mode.className = 'meta';
-      mode.textContent = '建议切换到无忧伴陪伴模式主动安抚。';
-      host.appendChild(mode);
-    }
-    care.schedule_hints.forEach((hint) => {
-      const item = document.createElement('p');
-      item.className = 'meta';
-      item.textContent = `日程建议：${hint}`;
-      host.appendChild(item);
-    });
-  }
-}
-
-byId('baselineDemo').addEventListener('click', async () => {
-  try {
-    const [snapshot, care] = await Promise.all([
-      api(`/v7/baseline/${state.elderId}`),
-      api(`/v7/care/${state.elderId}`),
-    ]);
-    renderBaseline(snapshot, care);
-  } catch (error) { setOutput('baselineOutput', error.message); }
-});
-
-// 环境上报：演示"同样的偏离，屋里冷要说不同的话"。
-byId('coldRoomDemo').addEventListener('click', async () => {
-  try {
-    await api('/v7/environment/samples', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, temperature_c: 13.5, humidity_pct: 28.0, lux: 40.0,
-        occurred_at: new Date().toISOString(), source: 'care-demo',
-      })
-    });
-    const [snapshot, care] = await Promise.all([
-      api(`/v7/baseline/${state.elderId}`),
-      api(`/v7/care/${state.elderId}`),
-    ]);
-    renderBaseline(snapshot, care);
-  } catch (error) { setOutput('baselineOutput', error.message); }
-});
-
-// 让偏离真的发生一次。
-//
-// 不是把界面切到"异常"配色看看效果——那是假的。这里真的往 /v4/safety/heartbeat 写
-// 一条活动记录，然后整条链路（事件流 → 推导观测 → 与他自己的常态比 → 关怀动作）
-// 自己得出结论。演示里能看到的东西，和真实运行时是同一条路径。
-//
-// 而且这个时刻必须是**已经发生过的**。
-//
-// 原先写死"今天 11:20"。在 11:20 之前按下这个按钮，那是一条未来的活动记录：后端现在
-// 会 422 拒掉（因为一条未来心跳会让无交互预警永久失效），而在加那道校验之前，它会被
-// 收下——演示按钮亲手关掉了这位老人的安全告警。
-//
-// 还没到 11:20 就退到"刚刚"。偏离方向会从"起晚了"变成"起早了"，但那同样是真实的
-// 偏离，而且结论仍然由后端拿他自己的常态算出来，不是界面演的。
-function pastDeviationMoment() {
-  const now = new Date();
-  const late = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 11, 20);
-  return late < now ? late : new Date(now.getTime() - 2 * 60 * 1000);
-}
-
-byId('lateWakeDemo').addEventListener('click', async () => {
-  try {
-    const late = pastDeviationMoment();
-    await api('/v4/safety/heartbeat', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, kind: 'morning_activity', occurred_at: late.toISOString(),
-      })
-    });
-    const [snapshot, care] = await Promise.all([
-      api(`/v7/baseline/${state.elderId}`),
-      api(`/v7/care/${state.elderId}`),
-    ]);
-    renderBaseline(snapshot, care);
-  } catch (error) { setOutput('baselineOutput', error.message); }
-});
-
-byId('routineDemo').addEventListener('click', async () => {
-  try {
-    const suffix = String(Date.now()).slice(-6);
-    const routine = await api('/v4/routines', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, title: `每月交水费-${suffix}`, category: 'payment', frequency: 'monthly',
-        interval: 1, day_of_month: 25, time_local: '09:00', timezone: 'Asia/Shanghai',
-        start_date: '2026-07-25', escalation_after_minutes: 60,
-        positive_message: '水费任务完成了，我们做得可真棒！'
-      })
-    }, 'family');
-    const materialized = await api('/v4/routines/materialize', {
-      method: 'POST', body: JSON.stringify({ now: '2026-07-22T00:00:00Z', horizon_days: 60 })
-    }, 'family');
-    setOutput('routineOutput', { routine, materialized });
-  } catch (error) { setOutput('routineOutput', error.message); }
-});
-
-byId('monthlyReport').addEventListener('click', async () => {
-  try {
-    const report = await api('/v4/reports/monthly', {
-      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
-    }, 'family');
-    setOutput('routineOutput', report);
-  } catch (error) { setOutput('routineOutput', error.message); }
-});
-
-byId('emotionDemo').addEventListener('click', async () => {
-  try {
-    const result = await api('/v4/emotions/analyze', {
-      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, text: byId('emotionText').value, store_event: true })
-    });
-    setOutput('emotionOutput', result);
-  } catch (error) { setOutput('emotionOutput', error.message); }
-});
-
-byId('medicalDemo').addEventListener('click', async () => {
-  try {
-    const result = await api('/v4/medical-reports/analyze', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, kind: 'checkup_report', text: byId('medicalText').value,
-        source_name: '全景照护中心演示', create_followup_reminder: true
-      })
-    });
-    setOutput('medicalOutput', result);
-  } catch (error) { setOutput('medicalOutput', error.message); }
-});
-
-byId('interactionDemo').addEventListener('click', async () => {
-  try {
-    const result = await api('/v4/medications/interactions/check', {
-      method: 'POST', body: JSON.stringify({ medication_names: ['华法林', '阿司匹林'] })
-    });
-    setOutput('interactionOutput', result);
-  } catch (error) { setOutput('interactionOutput', error.message); }
-});
-
-async function ensurePolicy() {
-  return api('/v4/safety/policy', {
-    method: 'PUT', body: JSON.stringify({
-      elder_id: state.elderId, inactivity_minutes: 720, home_lat: 39.9042, home_lon: 116.3974,
-      geofence_radius_m: 1000, notify_community: true
-    })
-  }, 'family');
-}
-
-byId('locationInside').addEventListener('click', async () => {
-  try {
-    await ensurePolicy();
-    const result = await api('/v4/location/ping', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, latitude: 39.9042, longitude: 116.3974, accuracy_m: 20,
-        occurred_at: new Date().toISOString(), source: 'care_hub_demo'
-      })
-    });
-    setOutput('locationOutput', result);
-  } catch (error) { setOutput('locationOutput', error.message); }
-});
-
-byId('locationOutside').addEventListener('click', async () => {
-  try {
-    await ensurePolicy();
-    const result = await api('/v4/location/ping', {
-      method: 'POST', body: JSON.stringify({
-        elder_id: state.elderId, latitude: 39.95, longitude: 116.45, accuracy_m: 20,
-        occurred_at: new Date().toISOString(), source: 'care_hub_demo'
-      })
-    });
-    setOutput('locationOutput', result);
-  } catch (error) { setOutput('locationOutput', error.message); }
-});
-
-byId('sosDemo').addEventListener('click', async () => {
-  try {
-    await ensurePolicy();
-    const result = await api('/v4/safety/sos', {
-      method: 'POST', body: JSON.stringify({ elder_id: state.elderId, include_community: true })
-    });
-    setOutput('locationOutput', result);
-  } catch (error) { setOutput('locationOutput', error.message); }
-});
-
-byId('capabilitiesDemo').addEventListener('click', async () => {
-  const container = byId('capabilityList');
-  container.replaceChildren();
-  try {
-    const capabilities = await api('/v4/capabilities');
-    for (const item of capabilities) {
-      const card = document.createElement('section');
-      card.className = 'task capability-card';
-      const title = document.createElement('strong');
-      title.textContent = `${item.capability} · ${item.state}`;
-      const implementation = document.createElement('p');
-      implementation.textContent = item.implementation;
-      const boundary = document.createElement('p');
-      boundary.className = 'meta';
-      boundary.textContent = `安全边界：${item.safety_boundary}`;
-      card.append(title, implementation, boundary);
-      container.append(card);
-    }
-  } catch (error) {
-    container.textContent = error.message;
-  }
-});
-
-// 页内分区，与家人端同一套实现（common.js）。这一页原先是七张全展开的卡并排铺，
-// 十三个按钮一次全摆在眼前，没有先后。
+// 页内分区，与家人端同一套实现（common.js）。
 window.YouHuo.initSections('today');
 
 bootstrap();

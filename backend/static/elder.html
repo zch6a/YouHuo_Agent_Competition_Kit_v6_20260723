@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
   <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo" data-activity="idle">
+<body data-mode="youhuo" data-activity="idle" data-surface="consumer" data-focus="off" data-tab="home">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -38,104 +38,156 @@
   <div class="role-halo" aria-hidden="true"></div>
   <main id="main" class="shell shell-wide app-frame">
 
-    <header class="app-bar">
-      <a href="/" class="back-link">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-        返回
-      </a>
-      <div id="modeBadge" class="badge"><span class="status-dot"></span><span id="modeName">优活办事模式</span></div>
-    </header>
+    <!-- 顶部那条演示壳整个撤了。
+         ..........................................................................
+         这里原先是「‹ 返回」加一个写着「优活办事模式」的徽章。两样都不该在 App 的
+         **根页面**上：
+
+         ① 成熟消费级 App 的首页不会有返回键。她已经在优活里面了，没有"上一层"。
+         ② 「优活办事模式」是内部术语，而且和它下面的角色头**说的是同一件事**——
+            角色头有图标、有名字（优活 / 无忧伴）、有整套配色随模式切换。
+            徽章只是把同一件事用工程话再喊一遍。
+
+         出口没有删掉，是**搬走**了：搬进「我的」那一格的最后一行
+         （`#leaveApp`，「换一个人用」）。真实 App 的"退出 / 切账号"就在设置里，
+         不在首页顶栏。`test_every_screen_has_some_way_out` 守的是"这一页有没有出口"
+         这条性质——它按 `<a href="/">` 判，搬到「我的」之后仍然成立，
+         而它当初被一次真实死路换来的那个教训（老人端没有标签栏、返回又被一刀切藏掉）
+         也没有被削弱：出口仍然在，只是换了一个更像产品的位置。
+
+         `#modeBadge` / `#modeName` 两个 id 一起消失，所以 `elder.js` 里读它们的地方
+         要改成可选（见 setMode 里的注释）。 -->
 
     <div class="elder-layout">
-
       <section class="panel stage">
-        <div id="roleHeader" class="role-header mode-fade">
-          <div class="role-icon" aria-hidden="true">
-            <svg class="icon-youhuo" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 21.4 12 12 21.4 2.6 12z"/><path d="M12 7.6 16.4 12 12 16.4 7.6 12z"/></svg>
-            <svg class="icon-companion" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 8.6c0 5.2-8.6 10.4-8.6 10.4S3.4 13.8 3.4 8.6a4.4 4.4 0 0 1 8.6-1.4 4.4 4.4 0 0 1 8.6 1.4z"/></svg>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ① 首页
+             ═══════════════════════════════════════════════════════════════════
+             这一屏原先塞着角色头、今天、对话、信任卡、麦克风、三个快捷、输入行、
+             抽屉入口、状态行——九样东西。一位老人打开它，第一眼要在九样里找出
+             "我现在该干什么"。
+
+             现在只回答三个问题：今天有没有事、下一件是什么、怎么让优活帮我。
+             对话与输入行移进 Focus Mode（见下面 ②）。 -->
+        <div class="elder-panel" data-panel="home" aria-label="首页">
+
+          <div id="roleHeader" class="role-header mode-fade">
+            <div class="role-icon" aria-hidden="true">
+              <svg class="icon-youhuo" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 21.4 12 12 21.4 2.6 12z"/><path d="M12 7.6 16.4 12 12 16.4 7.6 12z"/></svg>
+              <svg class="icon-companion" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 8.6c0 5.2-8.6 10.4-8.6 10.4S3.4 13.8 3.4 8.6a4.4 4.4 0 0 1 8.6-1.4 4.4 4.4 0 0 1 8.6 1.4z"/></svg>
+            </div>
+            <div class="role-titles">
+              <h1 id="agentTitle">优活</h1>
+              <p id="roleOpening" class="role-opening">我在，您请说。</p>
+            </div>
           </div>
-          <div class="role-titles">
-            <h1 id="agentTitle">优活</h1>
-            <p id="roleOpening" class="role-opening">我在，您请说。</p>
-          </div>
-        </div>
 
-        <!-- 今天。首屏此前没有这一行——老人打开应用看不到"今天有什么事"，得先点开
-             底部抽屉才知道。这是这一屏最该有的一句话，所以它在麦克风之前。
-             由 elder.js 的 loadReminders() 填，没有待办时整行隐藏。 -->
-        <p id="todayLine" class="today-line" hidden></p>
+          <!-- 一行状态。由 loadReminders() 填：有事说有几件，没事就说「今天一切正常」。
+               它取代了原先那句「我在，您请说」独占一行——那句话第二次打开就没有信息了。 -->
+          <p id="todayLine" class="today-line" hidden></p>
 
-        <div id="chat" class="chat" aria-live="polite"></div>
-        <div id="relianceHost" aria-live="polite"></div>
+          <!-- 下一件最重要的事。只显示一件。
+               原先这里是「今日全部事项」，而一位老人不需要在首屏做排序。 -->
+          <article id="nextItem" class="next-item" hidden>
+            <p class="next-label">下一件</p>
+            <p class="next-time" id="nextTime"></p>
+            <h2 class="next-title" id="nextTitle"></h2>
+            <p class="next-where" id="nextWhere"></p>
+            <button type="button" id="nextOpen" class="secondary">查看</button>
+          </article>
 
-        <div class="mic-stage">
-          <div class="mic-dial">
-            <button id="mic" class="mic-big" title="按一下开始说话" aria-label="按一下开始说话">
-              <svg viewBox="0 0 24 24" width="62" height="62" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19v3" /> <path d="M19 10v2a7 7 0 0 1-14 0v-2" /> <rect x="9" y="2" width="6" height="13" rx="3" /></svg>
+          <!-- Voice Orb。这一屏的视觉中心，十一态见 components.css。
+               Focus Mode 下它留在原地——按下去之后它仍然是这一屏唯一的主角。 -->
+          <div class="mic-stage">
+            <div class="mic-dial">
+              <button id="mic" class="mic-big" title="按一下开始说话" aria-label="按一下开始说话">
+                <svg viewBox="0 0 24 24" width="62" height="62" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19v3" /> <path d="M19 10v2a7 7 0 0 1-14 0v-2" /> <rect x="9" y="2" width="6" height="13" rx="3" /></svg>
+              </button>
+            </div>
+            <div id="micHint" class="mic-hint" role="status" aria-live="polite">按一下，然后慢慢说</div>
+            <!-- 打字入口。它必须在首屏、必须看得见、命中区必须够大。
+                 语音是首选，打字是**唯一的退路**：Web Speech 在 Firefox 上不存在，
+                 权限被拒、没有麦克风、网络不好时都会失败。那些时候这个按钮是她进入
+                 这个产品的唯一入口。
+                 `test_the_typing_route_is_reachable_from_the_first_screen` 钉住它。 -->
+            <button type="button" id="typeInstead" class="secondary keyboard-entry">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01" /><path d="M10 10h.01" /><path d="M14 10h.01" /><path d="M18 10h.01" /><path d="M7 14h10" /></svg>
+              <span>用打字说</span>
             </button>
           </div>
-          <div id="micHint" class="mic-hint" role="status" aria-live="polite">按一下，然后慢慢说</div>
+
+          <!-- 今天。最多三条，超出走「查看全部」。 -->
+          <section class="today-block" aria-label="今天">
+            <h2 class="today-head">今天</h2>
+            <div id="reminders"></div>
+            <button id="toggleReminders" class="secondary block">查看全部</button>
+          </section>
         </div>
 
-        <div class="composer">
-          <!-- 这三个按钮此前的标签是「演示挂号」「演示缴费」「演示提醒」——演示脚手架
-               留在了产品首屏上。而同一个文件下面抽屉里那四个反而是对的写法（「我今天
-               吃药了吗」），是老人真会说的话。
-               统一成后者：按钮上的字就是它替你说出口的那句话，按下去等于开口。 -->
-          <div class="quick" aria-label="常说的话">
-            <button data-text="我今天有什么事">今天有什么事</button>
-            <button data-text="帮我交水费">交水费</button>
-            <button data-text="帮我挂个号">挂号</button>
-          </div>
-          <div class="controls">
-            <!-- 短。原来是「也可以打字：帮我挂明天下午的骨科号」，在 390px 宽的屏幕上
-                 从「下午」就被截断了——一个被截断的例句既没教会任何事，又让输入框
-                 看起来像是坏的。 -->
-            <input id="text" aria-label="对优活说" placeholder="也可以打字" />
-            <button id="send">发送</button>
-          </div>
-          <!-- The sheet is reachable by a real labelled button, not only by a
-               swipe: gesture-only affordances fail this audience first. Hidden
-               on wide screens, where the same content is already the sidebar. -->
-          <button id="openExtras" class="secondary sheet-trigger" data-sheet-open aria-expanded="false" aria-controls="extrasSheet">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16" /><path d="M4 6h16" /><path d="M4 18h16" /></svg>
-            <span>待办、常用和设置</span>
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ② Focus Mode —— 首页的一个**态**，不是第五个分区
+             ═══════════════════════════════════════════════════════════════════
+             为什么是态而不是分区：Voice Orb 只能有一个 `#mic`，而大纲第七节里它在
+             Focus Mode 中仍然在场。做成并列分区就得复制一个 orb，两个 orb 的状态机
+             会立刻分叉。
+
+             `body[data-focus="on"]` 时：隐藏角色头 / 下一件 / 今天 / 标签栏，
+             显示这一段。她这时候只需要完成当前这一件事。 -->
+        <!-- 刻意**没有** `data-panel`：`initSections` 会把每个 `[data-panel]` 当成一个
+             要轮换的分区，这一段会变成第五个 Tab 的内容而被它 hidden 掉。
+             它的显隐由 `body[data-focus]` 在 CSS 里决定，不参与 Tab 轮换。 -->
+        <div class="elder-focus">
+          <button type="button" id="focusBack" class="focus-back">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            返回
           </button>
-          <!-- aria-live 不是可选的：elder.js 把 12 处状态写入收敛到一个入口，理由就是
-         "读屏用户听到的顺序才是确定的"——而这个元素此前没有 aria-live，那句话是假的。
-         识别失败、正在听、待办没能更新、整页初始化失败，全部静默。 -->
-    <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
-        </div>
-      </section>
 
-      <!-- On a phone this whole column lives in a bottom sheet so the
-           conversation owns the screen; on a wide viewport the CSS leaves it as
-           the sidebar it has always been. -->
-      <div id="sheetBackdrop" class="sheet-backdrop" aria-hidden="true"></div>
-      <aside id="extrasSheet" class="rail sheet" aria-label="待办、常用功能与设置">
-        <button class="sheet-handle" data-sheet-close aria-label="收起">
-          <span class="sheet-grip" aria-hidden="true"></span>
-        </button>
-        <section class="panel rail-card">
-          <div class="rail-head">
-            <h2>我的待办</h2>
-            <span class="rail-note">最要紧的三件</span>
+          <!-- Task Space。这件事本身，由 `task-space.js` 从后端状态渲染。
+               认不出的状态它什么都不渲染，`body[data-task-view]` 不写，
+               CSS 把下面的聊天区放回来。 -->
+          <div id="taskSpace" aria-live="polite"></div>
+
+          <div id="chat" class="chat" aria-live="polite"></div>
+          <div id="relianceHost" aria-live="polite"></div>
+
+          <div class="composer">
+            <p class="say-label">您可以说</p>
+            <!-- 这三个按钮此前的标签是「演示挂号」「演示缴费」「演示提醒」——演示脚手架
+                 留在了产品首屏上。现在按钮上的字就是它替你说出口的那句话。 -->
+            <div class="quick" aria-label="常说的话">
+              <button data-text="我今天有什么事">今天有什么事</button>
+              <button data-text="帮我交水费">交水费</button>
+              <button data-text="帮我挂个号">挂号</button>
+            </div>
+            <div class="controls">
+              <input id="text" aria-label="对优活说" placeholder="也可以打字" />
+              <button id="send">发送</button>
+            </div>
+            <!-- 更多说法。原先这个按钮叫「待办、常用和设置」，开的是一个装了五张卡的
+                 抽屉——那些内容现在分到了「记录」「家人」「我的」三个 Tab。
+                 抽屉留下来，装它真正该装的东西：想不出该怎么开口时的更多例子。 -->
+            <button id="openExtras" class="secondary sheet-trigger" data-sheet-open aria-expanded="false" aria-controls="extrasSheet">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16" /><path d="M4 6h16" /><path d="M4 18h16" /></svg>
+              <span>更多说法</span>
+            </button>
           </div>
-          <div id="reminders"></div>
-          <button id="toggleReminders" class="secondary block">查看全部待办</button>
-        </section>
 
-        <section class="panel rail-card">
-          <div class="rail-head"><h2>常用</h2></div>
-          <div class="home-entries" aria-label="主要入口">
-            <button id="companionEntry" class="secondary entry-btn">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /></svg>
-              <span id="companionEntryLabel">找无忧伴聊聊</span>
-            </button>
-            <button id="logEntry" class="secondary entry-btn">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></svg>
-              <span id="logEntryLabel">查看我的记录</span>
-            </button>
+          <!-- aria-live 不是可选的：elder.js 把 12 处状态写入收敛到一个入口，理由就是
+               "读屏用户听到的顺序才是确定的"——而这个元素此前没有 aria-live，那句话是假的。 -->
+          <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ③ 记录
+             ═══════════════════════════════════════════════════════════════════ -->
+        <div class="elder-panel" data-panel="log" aria-label="记录" hidden>
+          <h2 class="tab-head">办事记录</h2>
+          <p class="tab-note">和无忧伴聊天的内容不会记在这里。</p>
+          <section id="logPanel" class="panel rail-card log-panel">
+            <div id="activityLog" class="log-list"></div>
+          </section>
+          <div class="home-entries" aria-label="重来一次">
             <button id="repeatLast" class="secondary entry-btn">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /></svg>
               <span>再说一遍</span>
@@ -145,30 +197,99 @@
               <span>返回上一步</span>
             </button>
           </div>
-        </section>
+          <button type="button" id="logEntry" class="secondary block">
+            <span id="logEntryLabel">刷新我的记录</span>
+          </button>
+        </div>
 
-        <!-- 「我的记录」在这里，紧挨着开它的那个按钮。
-             它原先是 `.elder-layout` 的**兄弟**节点，排在定高框架里那个定高子元素的
-             后面——而定高框架里，排在后面的兄弟没有地方可去。实测 390×844：面板高
-             252px，其中只有 70px 在屏内，剩下的被 `overflow: hidden` 裁掉且滚不到。
-             老人按下「查看我的记录」，看到的是一个标题和一句灰色小字，她自己的记录
-             一条都看不见。
-             放进抽屉之后，它落在一个本来就可滚动的容器里，而按钮也在同一个抽屉里
-             ——她按下去，东西就在手边展开。 -->
-        <section id="logPanel" class="panel rail-card log-panel" hidden>
-          <div class="rail-head">
-            <h2>我的记录</h2>
-            <span class="rail-note">和无忧伴聊天的内容不会记在这里</span>
-          </div>
-          <div id="activityLog" class="log-list"></div>
-        </section>
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ④ 家人
+             ═══════════════════════════════════════════════════════════════════
+             不做社交系统。一位老人在这里只需要知道：谁能帮我、能帮什么、怎么找她。 -->
+        <div class="elder-panel" data-panel="kin" aria-label="家人" hidden>
+          <h2 class="tab-head">我的家人</h2>
+          <section class="panel rail-card kin-card">
+            <p class="kin-name" id="kinName">李晴</p>
+            <p class="kin-rel" id="kinRel">女儿</p>
+            <p class="kin-help-label">她可以帮您</p>
+            <ul class="kin-help">
+              <li>重要付款的第二次确认</li>
+              <li>紧急的时候第一个知道</li>
+              <li>替您添一件要记的事</li>
+            </ul>
+            <button type="button" id="kinContact" class="block">联系她</button>
+          </section>
+          <p class="tab-note">高一点风险的事，优活会先问您，再问她。两个人都同意才办。</p>
+        </div>
 
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ⑤ 我的
+             ═══════════════════════════════════════════════════════════════════ -->
+        <div class="elder-panel" data-panel="me" aria-label="我的" hidden>
+          <h2 class="tab-head">我的习惯</h2>
+          <section class="panel rail-card">
+            <div class="profile-tools" aria-label="看得清、听得懂">
+              <label>语速
+                <select id="speechRate">
+                  <option value="0.72">慢</option>
+                  <option value="0.88" selected>舒适</option>
+                  <option value="1.0">正常</option>
+                </select>
+              </label>
+              <label>文字大小
+                <select id="fontScale">
+                  <option value="1.1">较大</option>
+                  <option value="1.25" selected>大</option>
+                  <option value="1.5">特大</option>
+                </select>
+              </label>
+            </div>
+            <button id="saveProfile" class="secondary block">保存我的习惯</button>
+          </section>
+
+          <h2 class="tab-head">常用服务</h2>
+          <section class="panel rail-card">
+            <div class="home-entries" aria-label="常用服务">
+              <button id="companionEntry" class="secondary entry-btn">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" /></svg>
+                <span id="companionEntryLabel">找无忧伴聊聊</span>
+              </button>
+            </div>
+          </section>
+
+          <h2 class="tab-head">优活怎么保护您</h2>
+          <section class="panel rail-card">
+            <div class="trust-line" aria-label="优活怎么保护您">
+              <span id="semanticPill" class="trust-pill neutral">正在检查听得准不准…</span>
+              <span id="voicePill" class="trust-pill neutral">正在检查念得清不清…</span>
+              <span class="trust-pill">一次只问一件事</span>
+              <span class="trust-pill">要紧的事请您念一遍</span>
+              <span class="trust-pill">不会自动扣钱</span>
+            </div>
+          </section>
+
+          <!-- 离开这一侧的出口。
+               从首页顶栏的「‹ 返回」搬到这里——真实 App 的"退出 / 换账号"就在设置里，
+               不在首页顶栏。文案不说「返回」（返回哪里？），说这个动作对她意味着什么。
+               `test_every_screen_has_some_way_out` 按 `<a href="/">` 判，这一条满足它。 -->
+          <h2 class="tab-head">其他</h2>
+          <a id="leaveApp" class="fam-link" href="/">换一个人用</a>
+        </div>
+      </section>
+
+      <!-- 「更多说法」抽屉。手机上是底部抽屉，宽屏上 CSS 把它留成侧栏。
+           里面只有一件事：想不出该怎么开口时的例子。 -->
+      <div id="sheetBackdrop" class="sheet-backdrop" aria-hidden="true"></div>
+      <aside id="extrasSheet" class="rail sheet" aria-label="更多说法">
+        <button class="sheet-handle" data-sheet-close aria-label="收起">
+          <span class="sheet-grip" aria-hidden="true"></span>
+        </button>
         <section class="panel rail-card">
           <div class="rail-head">
             <h2>问问看</h2>
-            <span class="rail-note">照护类问题，直接开口</span>
+            <span class="rail-note">直接念出来就行</span>
           </div>
-          <div class="home-entries" aria-label="照护类提问">
+          <div class="home-entries" aria-label="可以问的话">
             <button class="secondary entry-btn" data-text="我今天吃药了吗">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg>
               <span>今天吃药了吗</span>
@@ -188,52 +309,41 @@
           </div>
           <p class="rail-note">这些只念记录，不做医学判断。</p>
         </section>
-
-        <!-- 设置默认收起。
-             实测：抽屉内容 1582px、窗口 726px，2.2 个抽屉高；而这一张 437px，占 28%，
-             却是里面最不常用的东西——语速和字号设一次就不再动。收起来之后抽屉降到
-             约 1.6 个抽屉高。
-
-             **刻意没有给老人端加分区控件**（家人端、照护页、可信页都加了）。那三页
-             加分区是因为它们各有 6~12 块权重相同的内容，人得自己找；老人端只有一个
-             主动作，一位老人多一次"先选一个分区"的决定，比多滚一下更贵。分区是解那
-             一类问题的，不是这一类。 -->
-        <section class="panel rail-card">
-          <h2>看得清、听得懂</h2>
-          <details class="rail-fold">
-          <summary>语速、文字大小和可信提示</summary>
-          <div class="profile-tools" aria-label="适老交互设置">
-            <label>语速
-              <select id="speechRate">
-                <option value="0.72">慢</option>
-                <option value="0.88" selected>舒适</option>
-                <option value="1.0">正常</option>
-              </select>
-            </label>
-            <label>文字大小
-              <select id="fontScale">
-                <option value="1.1">较大</option>
-                <option value="1.25" selected>大</option>
-                <option value="1.5">特大</option>
-              </select>
-            </label>
-          </div>
-          <button id="saveProfile" class="secondary block">保存我的习惯</button>
-          <div class="trust-line" aria-label="可信提示">
-            <span id="semanticPill" class="trust-pill neutral">语义层：检测中…</span>
-            <span id="voicePill" class="trust-pill neutral">语音：检测中…</span>
-            <span class="trust-pill">一次只问一件事</span>
-            <span class="trust-pill">高风险需要复述</span>
-            <span class="trust-pill">不会自动扣款</span>
-          </div>
-          </details>
-        </section>
       </aside>
     </div>
+
+    <!-- 四个 Tab。页内切换，不换路由：切换零延迟，service worker 外壳、start_url
+         和七条路由全部不动。当前 Tab 写进 URL 的 hash，刷新后还在原地。
+
+         `test_the_conversation_screen_has_no_tab_bar` 原先禁止这一栏，理由写在断言里：
+         "底部是输入框，标签栏会挤掉发送按钮"。那个理由在这一版被消解了——输入行只在
+         Focus Mode 里出现，而 Focus Mode 下这一栏是隐藏的。两者不再争同一块地方。 -->
+    <!-- 每个 Tab 同时带 `seg` 类，两个理由都不能少：
+         `initSections`（common.js）按 `.seg` 找切换控件；而 `check_page_runtime` 的
+         点击遍历也按 `.seg` 判断"这个按钮会换掉整屏，留到最后再按"。少了它，遍历会在
+         第一个 Tab 上就换屏，后面的控件全都点不到，而检查照样报绿。 -->
+    <nav class="tabbar elder-tabs" aria-label="主要分区">
+      <button type="button" class="tab seg is-current" data-section="home" aria-current="true">
+        <svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg>
+        <span>首页</span>
+      </button>
+      <button type="button" class="tab seg" data-section="log">
+        <svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg>
+        <span>记录</span>
+      </button>
+      <button type="button" class="tab seg" data-section="kin">
+        <svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-family" /></svg>
+        <span>家人</span>
+      </button>
+      <button type="button" class="tab seg" data-section="me">
+        <svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-trust" /></svg>
+        <span>我的</span>
+      </button>
+    </nav>
   </main>
   <script src="/static/identity.js"></script>
-    <script src="/static/common.js"></script>
-    <script src="/static/sheet.js" defer></script>
-    <script type="module" src="/static/elder.js"></script>
+  <script src="/static/common.js"></script>
+  <script src="/static/sheet.js"></script>
+  <script type="module" src="/static/elder.js"></script>
 </body>
 </html>

@@ -40,7 +40,18 @@ def test_a_labelled_button_opens_the_sheet():
     assert trigger, "触发器不是 button"
     # A real word, not just an icon: an icon-only control is unlabelled for both
     # a screen reader and a 78-year-old.
-    assert re.search(r'<span>[^<]*待办[^<]*</span>', trigger.group(0)), "触发器缺少文字标签"
+    #
+    # 原判据是「标签里必须含"待办"」。抽屉换了用途之后这条红了——它现在装的是
+    # 「更多说法」（想不出怎么开口时的例子），待办搬去了首页的「今天」。
+    #
+    # 那个词从来不是这条断言要守的东西：它守的是**这个控件有没有可读的名字**，
+    # 因为一个只有图标的控件对读屏软件和一位 78 岁的用户都等于没有名字。
+    # 所以判据改成"有一段非空的中文文字标签"，不再钉某一个词。
+    label = re.search(r'<span>([^<]+)</span>', trigger.group(0))
+    assert label, "触发器缺少文字标签"
+    assert re.search(r"[一-鿿]", label.group(1)), (
+        f"触发器的标签里没有中文：{label.group(1)!r}"
+    )
 
 
 def test_the_trigger_reports_its_state():
@@ -113,8 +124,25 @@ def test_dur_sheet_is_250ms():
 
 
 def test_wide_viewport_reverts_to_the_sidebar():
-    wide = CSS[CSS.index("@media (min-width: 761px) {"):]
-    wide = wide[: wide.index("\n}")]
+    """宽屏上抽屉回到它一直是的那个侧栏。
+
+    原写法取的是**第一个** `@media (min-width: 761px)` 块。老人端改成四 Tab 之后，
+    样式表里多了一个同宽度的块（那一个让 Tab 在宽屏上变成顶部横排），而它排在前面
+    ——于是这条断言去一个跟抽屉毫无关系的块里找 `transform: none`，红了。
+
+    这不是抽屉坏了，是这条断言假设"这个宽度的块只有一个"。找**含 `.rail.sheet` 的
+    那一个**，不靠出现顺序。
+    """
+    blocks = [
+        CSS[m.start():][: CSS[m.start():].index("\n}")]
+        for m in re.finditer(r"@media \(min-width: 761px\) \{", CSS)
+    ]
+    assert blocks, "样式表里没有 min-width: 761px 的块"
+    wide = next((b for b in blocks if ".rail.sheet" in b), None)
+    assert wide, (
+        f"{len(blocks)} 个 min-width: 761px 的块里没有一个提到 .rail.sheet"
+        "——宽屏上抽屉不再变回侧栏了"
+    )
     assert "position: static" in wide, "宽屏必须回到静态侧栏"
     assert "transform: none" in wide
     assert ".sheet-trigger" in wide and "display: none" in wide, "宽屏不该显示触发器"

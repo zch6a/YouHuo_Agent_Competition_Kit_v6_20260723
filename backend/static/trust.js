@@ -5,13 +5,8 @@
 // 顺带修掉这一页原有的两个差异：它此前无条件写 `Authorization: Bearer ${token}`，
 // token 为空串时会发出一个后面什么都没有的头；也没有 401 重放，令牌一过期，六张卡
 // 的按钮就开始静默失败。
-const {api, byId, pretty} = window.YouHuo;
-const state = {saga: null, sagaRole: 'system',
-  elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
-
-// 六张卡的输出原先全是 <pre> 里的原始 JSON。这一页讲的恰恰是"系统拒绝了什么、
-// 为什么拒绝"，用 JSON 讲等于要求评委现场读一遍后端契约。见 common.js。
-function output(id, value) { window.YouHuo.renderResult(id, value); }
+const {api, byId} = window.YouHuo;
+const state = {elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
 async function bootstrap() {
   try {
@@ -22,11 +17,21 @@ async function bootstrap() {
     await Promise.all([
       window.YouHuo.login('elder'), window.YouHuo.login('family'), window.YouHuo.login('system'),
     ]);
-    byId('status').textContent = '演示身份已就绪。高风险动作不会由语言模型直接执行。';
+    byId('status').textContent = '正在为您办一件真的事……';
   } catch (error) { byId('status').textContent = error.message; }
   // 凭证放在身份之后、并且不阻塞它：身份没建起来时凭证也办不成，但身份的状态行
   // 不该等一次完整缴费才更新。
-  renderReceipt().catch(error => receiptFailed(error));
+  // 成功之后把状态行收起来。
+  //
+  // 它原先写完「正在为您办一件真的事……」就再也不动了——凭证渲染完之后屏幕上是
+  // 一张办好的凭证加一条绿色的"正在办"，两句话互相矛盾。而这一页讲的正是"说的和
+  // 做的对得上"。
+  //
+  // 只在成功时隐藏：失败时它是唯一还在说话的东西（`.notice` 一直带 aria-live，
+  // 读屏软件会念出来），所以那一条必须留在屏幕上。
+  renderReceipt()
+    .then(() => { const s = byId('status'); if (s) s.hidden = true; })
+    .catch(error => receiptFailed(error));
 }
 
 /* ==========================================================================
@@ -53,9 +58,9 @@ async function bootstrap() {
 const RECEIPT_STEPS = {
   TASK_CREATED: {
     who: '优活',
-    what: '立了一件事，并按账单接口查了金额',
-    proof: p => `任务类型 ${TASK_WORD[p.task_type] || p.task_type} · 风险级 ${p.risk} · `
-      + `意图来源 ${BASIS_WORD[p.semantic_basis] || p.semantic_basis}`,
+    what: '立了一件事，并去查了这个月该交多少',
+    proof: p => `${TASK_WORD[p.task_type] || '一件事'} · ${RISK_WORD[p.risk] || '未标风险'}`
+      + ` · ${BASIS_WORD[p.semantic_basis] || '照他说的话'}`,
   },
   TEACH_BACK_VERIFIED: {
     who: '他',
@@ -87,7 +92,7 @@ const RECEIPT_STEPS = {
   FAMILY_REJECTED: {who: '家人', what: '拒绝了', proof: () => '没有执行任何支付'},
   FAMILY_APPROVED_EXECUTION_FAILED: {
     who: '家人', what: '同意了，但对方没办成',
-    proof: () => '任务停在"未成功"，不会报成已完成',
+    proof: () => '任务停在「未成功」，不会报成已完成',
   },
   NOTIFICATION_CREATED: {
     who: '优活',
@@ -96,7 +101,19 @@ const RECEIPT_STEPS = {
   },
 };
 const TASK_WORD = {bill_payment: '缴费', appointment: '挂号', medication: '用药'};
-const BASIS_WORD = {keyword_only: '关键词命中', embedding: '语义匹配', hybrid: '关键词加语义'};
+//: 风险等级的说法**必须和家属端一致**。/family 的 RISK_WORD 已经把 1–4 翻成了
+//: 「信息查询 / 低风险 / 敏感操作 / 高风险」，而这一页原先印的是裸数字「风险级 4」。
+//: 同一件事在两页上有两个名字（一个是词、一个是数），读者要自己做换算。
+const RISK_WORD = {1: '信息查询', 2: '低风险', 3: '敏感操作', 4: '高风险'};
+//: 「关键词命中」「语义匹配」是检索的行话。这一页是**凭证**不是实验室，读它的人
+//: 想知道的是「优活凭什么认定他要办这件事」——答案是照原话、照意思、还是两样都对上。
+//:
+//: 兜底也一起改了：原先三处都是 `|| p.<原值>`，后端返回一个没预料到的枚举时，
+//: 屏幕上直接出现 `embedding` / `bill_payment` —— 而「界面上不许出现英文枚举值」
+//: 是这个项目的硬约束。认不出来就说一句不认识，不要把内部值念给人听。
+const BASIS_WORD = {
+  keyword_only: '照他说的原话', embedding: '照他说的意思', hybrid: '原话和意思都对上',
+};
 const NOTIFY_WORD = {
   approval_required: '有一笔要家人点头', task_completed: '这件事办好了',
   task_failed: '这件事没办成', sos: '紧急求助',
@@ -129,6 +146,12 @@ function el(tag, className, text) {
 }
 
 function receiptFailed(error) {
+  const status = byId('status');
+  if (status) {
+    status.hidden = false;
+    status.classList.remove('good');
+    status.textContent = '这一次没办成。下面写着卡在哪一步。';
+  }
   const host = byId('receipt');
   if (!host) return;
   // 不假装成功。这一页的全部内容就是"只有真办成了才说办成了"。
@@ -136,41 +159,74 @@ function receiptFailed(error) {
     `这一次没能办成，所以这里没有凭证可出：${error.message}`));
 }
 
-/** 真的走一遍缴费，然后把它的审计记录渲染出来。 */
+/** 真的走一遍缴费，然后把它的审计记录渲染出来。
+ *
+ * 第一版无条件新办一次，而这一页整页就只有这一份凭证——所以那个假设是这一页的
+ * 全部内容。它是错的：
+ *
+ *   `/v2/chat` → `{"code": "duplicate_blocked",
+ *                  "message": "这笔账单已经在办理或已经完成，不会重复提交。"}`
+ *
+ * 那是**正确**的产品行为（同一张账单不重复提交），而凭证要求每次载入都新办成一笔。
+ * 于是：第一次打开好的，第二次打开整页只有一句「账单金额没读到，不能凭空造一份
+ * 凭证」。更糟的一种：任何一次半途而废（关掉标签页、网断了）会留下一件停在
+ * "等他确认"的任务，那件任务把这个家庭的这张账单**永久**挡住——这一页从此再也
+ * 出不来凭证。实测就是这样，而三道浏览器闸门全绿：它们每次都用全新的沙箱。
+ *
+ * 改成先读链、再决定办不办。凭证仍然只从审计链渲染，一个字都不是编的；变的只是
+ * "这一次"变成"最近这一次"，而时间戳自己说得清是哪一次。
+ */
 async function renderReceipt() {
   const host = byId('receipt');
   if (!host) return;
 
-  const session = (await api('/v2/sessions', {method: 'POST', body: '{}'})).session_id;
-  const asked = '帮我交这个月的水费';
-  const first = await api('/v2/chat', {
-    method: 'POST', body: JSON.stringify({session_id: session, text: asked}),
-  });
-  const amount = (first.data && first.data.amount_yuan)
-    || (first.message.match(/(\d+\.\d{2})\s*元/) || [])[1];
-  if (!amount) throw new Error('账单金额没读到，不能凭空造一份凭证');
+  //: 这一次是我们刚刚亲手办的吗？只有亲手办的才知道他说了什么原话。
+  let asked = null;
+  let taskId = null;
 
-  // 复述确认必须念出金额——这一步就是这个产品的主张，凭证里当然要走真的那条路。
-  const confirmed = await api('/v2/chat', {
-    method: 'POST',
-    body: JSON.stringify({session_id: session, text: `确认支付${amount}元`}),
-  });
-  if (!confirmed.approval_digest) throw new Error('没有拿到确认摘要');
-  const taskId = confirmed.task_id;
+  const bills = (await api('/v2/tasks?limit=100', {}, 'family'))
+    .filter(t => t.task_type === 'bill_payment');
+  // 最近的一件——不挑状态。一件"未成功，已安全停下"的任务同样是这一页要证明的
+  // 事情之一（只有权威状态回报成功才算办好），把它藏起来才是不诚实。
+  const recent = bills.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
 
-  await api('/v2/family/approve', {
-    method: 'POST',
-    body: JSON.stringify({
-      task_id: taskId, approve: true, approval_digest: confirmed.approval_digest,
-    }),
-  }, 'family');
+  if (recent) {
+    taskId = recent.id;
+  } else {
+    // 链上还什么都没有：真的办一次。这是全新沙箱里的路径，也就是评委第一次打开
+    // 这一页时走的那一条。
+    const session = (await api('/v2/sessions', {method: 'POST', body: '{}'})).session_id;
+    asked = '帮我交这个月的水费';
+    const first = await api('/v2/chat', {
+      method: 'POST', body: JSON.stringify({session_id: session, text: asked}),
+    });
+    const amount = (first.data && first.data.amount_yuan)
+      || (first.message.match(/(\d+\.\d{2})\s*元/) || [])[1];
+    if (!amount) throw new Error(`账单金额没读到，不能凭空造一份凭证（${first.message}）`);
+
+    // 复述确认必须念出金额——这一步就是这个产品的主张，凭证里当然要走真的那条路。
+    const confirmed = await api('/v2/chat', {
+      method: 'POST',
+      body: JSON.stringify({session_id: session, text: `确认支付${amount}元`}),
+    });
+    if (!confirmed.approval_digest) throw new Error(`没有拿到确认摘要（${confirmed.message}）`);
+    taskId = confirmed.task_id;
+
+    await api('/v2/family/approve', {
+      method: 'POST',
+      body: JSON.stringify({
+        task_id: taskId, approve: true, approval_digest: confirmed.approval_digest,
+      }),
+    }, 'family');
+  }
 
   const audit = await api(`/v2/audit?limit=200`, {}, 'family');
   const mine = (audit.events || []).filter(e => e.entity_id === taskId);
   if (!mine.length) throw new Error('审计链里找不到这件任务');
 
   const tasks = await api('/v2/tasks?limit=100', {}, 'family');
-  const task = tasks.find(t => t.id === taskId) || {};
+  const task = tasks.find(t => t.id === taskId) || recent || {};
+  const amount = (task.details && task.details.amount_yuan) || '';
 
   host.replaceChildren();
 
@@ -185,11 +241,20 @@ async function renderReceipt() {
   host.appendChild(head);
 
   // --- 没有进链的那一句 ---
+  //
+  // 两种说法，取决于这一次是不是我们刚刚亲手办的。
+  //
+  // 亲手办的时候我们知道他说了什么，所以可以把原话摆出来，再说"链上没有它"。
+  // 读链的时候我们**不知道**——而那恰恰是更强的一次演示：连做这个系统的人都没法
+  // 从这条链上还原他当时说了什么。所以不能沿用第一种说法去编一句原话。
   const off = el('p', 'receipt-offchain');
   off.appendChild(el('strong', null, '他说的原话不在链上。'));
-  off.appendChild(document.createTextNode(
-    `这一次他说的是「${asked}」，而审计链里只有"有一件缴费任务被建立"。`
-    + '少记一样东西也是要证明的事，所以写在这里。'));
+  off.appendChild(document.createTextNode(asked
+    ? `这一次他说的是「${asked}」，而审计链里只有「有一件缴费任务被建立」。`
+      + '少记一样东西也是要证明的事，所以写在这里。'
+    : '这份凭证是从审计链上读出来的，而链上只有「有一件缴费任务被建立」'
+      + '——连我们自己都没法从这条链上还原他当时说了什么。'
+      + '少记一样东西也是要证明的事，所以写在这里。'));
   host.appendChild(off);
 
   // --- 时间轴 ---
@@ -248,137 +313,12 @@ async function renderReceipt() {
   host.appendChild(foot);
 }
 
-byId('voiceSafe').addEventListener('click', async () => {
-  try {
-    output('voiceOutput', await api('/v5/voice/resolve', { method: 'POST', body: JSON.stringify({
-      elder_id: state.elderId, side_effect_possible: true,
-      candidates: [
-        { text: '帮我交水费', confidence: 0.96, engine: 'HarmonyASR' },
-        { text: '帮我缴水费', confidence: 0.93, engine: 'BackupASR' }
-      ]
-    }) }));
-  } catch (error) { output('voiceOutput', error.message); }
-});
-
-byId('voiceConflict').addEventListener('click', async () => {
-  try {
-    output('voiceOutput', await api('/v5/voice/resolve', { method: 'POST', body: JSON.stringify({
-      elder_id: state.elderId, side_effect_possible: true,
-      candidates: [
-        { text: '确认办理缴费', confidence: 0.92, engine: 'HarmonyASR' },
-        { text: '取消不要缴费', confidence: 0.91, engine: 'BackupASR' }
-      ]
-    }) }));
-  } catch (error) { output('voiceOutput', error.message); }
-});
-
-function paymentPolicyPayload(untrusted) {
-  return {
-    elder_id: state.elderId, goal: '帮我交本月水费', action: 'create_payment_request',
-    arguments: { bill_id: 'bill-water-2026-07', amount_cents: untrusted ? 999999 : 6840, elder_id: state.elderId },
-    facts: [
-      { name: 'bill_id', value: 'bill-water-2026-07', origin: 'trusted_tool', purpose: 'bill_payment', trusted_for_control: true },
-      { name: 'amount_cents', value: untrusted ? 999999 : 6840, origin: untrusted ? 'untrusted_document' : 'trusted_tool', purpose: 'bill_payment', trusted_for_control: !untrusted },
-      { name: 'elder_id', value: state.elderId, origin: 'system', sensitivity: 3, purpose: 'bill_payment', trusted_for_control: true }
-    ],
-    user_confirmed: true, family_approvals: 1, reversible: true
-  };
-}
-
-byId('policySafe').addEventListener('click', async () => {
-  try { output('policyOutput', await api('/v5/actions/authorize', { method: 'POST', body: JSON.stringify(paymentPolicyPayload(false)) })); }
-  catch (error) { output('policyOutput', error.message); }
-});
-byId('policyAttack').addEventListener('click', async () => {
-  try { output('policyOutput', await api('/v5/actions/authorize', { method: 'POST', body: JSON.stringify(paymentPolicyPayload(true)) })); }
-  catch (error) { output('policyOutput', error.message); }
-});
-
-byId('sagaCreate').addEventListener('click', async () => {
-  try {
-    state.saga = await api('/v5/sagas', { method: 'POST', body: JSON.stringify({
-      elder_id: state.elderId, kind: 'bill_payment', goal: '交本月水费', context: { bill_type: '水费' },
-      request_id: `trust-lab-${Date.now()}`
-    }) });
-    state.sagaRole = 'system';
-    output('sagaOutput', state.saga);
-  } catch (error) { output('sagaOutput', error.message); }
-});
-
-byId('sagaAdvance').addEventListener('click', async () => {
-  if (!state.saga) { output('sagaOutput', '请先创建Saga。'); return; }
-  try {
-    const step = state.saga.steps[state.saga.current_step_index];
-    let role = 'system';
-    if (step.name === 'elder_confirm') role = 'elder';
-    if (step.name === 'family_approval') role = 'family';
-    const outputs = {
-      locate_bill: { bill_id: 'bill-water-2026-07', amount_cents: 6840 }, elder_confirm: { confirmed: true },
-      family_approval: { approved: true }, generate_payment_request: { request_id: 'demo-payment-request' },
-      observe_authoritative_payment_state: { paid: true, receipt: 'demo-receipt' }, verify_final_state: { verified: true }
-    };
-    state.saga = await api(`/v5/sagas/${state.saga.id}/advance`, { method: 'POST', body: JSON.stringify({
-      outcome: 'success', output: outputs[step.name] || {}, expected_version: state.saga.version,
-      idempotency_key: `${state.saga.id}-${state.saga.version}`
-    }) }, role);
-    output('sagaOutput', state.saga);
-  } catch (error) { output('sagaOutput', error.message); }
-});
-
-async function register(role, actorId, deviceId) {
-  try {
-    await api('/v4/devices', { method: 'POST', body: JSON.stringify({
-      actor_id: actorId, device_id: deviceId, platform: 'HarmonyOS', brand: 'Demo', device_name: deviceId, push_capable: true
-    }) }, role);
-  } catch (error) {
-    if (!String(error.message).includes('UNIQUE')) throw error;
-  }
-}
-
-byId('syncDemo').addEventListener('click', async () => {
-  try {
-    const suffix = String(Date.now());
-    await register('elder', state.elderId, `elder-${suffix}`);
-    await register('family', state.daughterId, `family-${suffix}`);
-    const first = await api('/v5/sync/operations', { method: 'POST', body: JSON.stringify({
-      operation_id: `op-a-${suffix}`, device_id: `elder-${suffix}`, entity_type: 'health_profile', entity_id: state.elderId,
-      field_name: 'preferred_hospital', value: '人民医院', base_version: 0, lamport_clock: 1, sensitivity: 'high',
-      occurred_at: new Date().toISOString()
-    }) });
-    const second = await api('/v5/sync/operations', { method: 'POST', body: JSON.stringify({
-      operation_id: `op-b-${suffix}`, device_id: `family-${suffix}`, entity_type: 'health_profile', entity_id: state.elderId,
-      field_name: 'preferred_hospital', value: '协和医院', base_version: 0, lamport_clock: 2, sensitivity: 'high',
-      occurred_at: new Date().toISOString()
-    }) }, 'family');
-    output('syncOutput', { first, second });
-  } catch (error) { output('syncOutput', error.message); }
-});
-
-byId('breakGlassDemo').addEventListener('click', async () => {
-  try {
-    const record = await api('/v5/break-glass', { method: 'POST', body: JSON.stringify({
-      elder_id: state.elderId, reason: '老人主动呼救后电话中断，需要确认最近位置',
-      scopes: ['location', 'emergency_contacts', 'active_tasks'], duration_minutes: 10
-    }) }, 'family');
-    const view = await api(`/v5/break-glass/${record.id}/view`, {}, 'family');
-    output('breakGlassOutput', { record, view });
-  } catch (error) { output('breakGlassOutput', error.message); }
-});
-
-byId('truthDemo').addEventListener('click', async () => {
-  try { output('truthOutput', await api('/v5/capability-truth')); }
-  catch (error) { output('truthOutput', error.message); }
-});
-byId('metricsDemo').addEventListener('click', async () => {
-  try { output('truthOutput', await api('/v5/metrics', {}, 'family')); }
-  catch (error) { output('truthOutput', error.message); }
-});
-
-// 页内分区，与家人端、照护页同一份实现（common.js）。这一页原先是六张卡各带一两个
-// 按钮并排铺开，标题用的是工程名字；现在每一段回答一个具体的疑问。
+// 这一页现在只有一件事：一份凭证。
 //
-// 页头四条底线里的「看一次 →」是普通 hash 链接，落到 initSections 装的 hashchange
-// 上——"主张"和"验证它的那一段"因此共用同一套机制，不需要第二份代码。
-window.YouHuo.initSections('hear');
-
+// 原先它是「六张能力演示卡 + 页内分区」，而那六张卡讲的是语音共识、恶意文档、
+// Saga、跨设备冲突、限时破窗、能力真值——把整个比赛项目塞进了一位老人的手机里。
+// 它们全部搬到了 /stage 的「证明」与「工程」两层，一个都没删（proof-demos.js）。
+//
+// 分区导航跟着搬走了，所以这里不再需要 initSections：一页一件事的时候，
+// 分区机制是纯粹的多余复杂度。
 bootstrap();

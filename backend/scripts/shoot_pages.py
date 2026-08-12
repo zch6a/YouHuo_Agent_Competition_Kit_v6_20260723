@@ -10,6 +10,21 @@ bug, which makes it worse than useless for judging a mobile design.
 already drives Chrome that way for the contrast audit, so the pattern is proven.
 
     python backend/scripts/shoot_pages.py http://127.0.0.1:8041 F:/优活/shots
+
+**整页截图里的底部固定家具会看起来在切内容。**
+
+`captureBeyondViewport` 把文档整高画出来，而 `position: fixed` 的元素画在**视口**
+底边，不是文档底边。于是一条钉底的标签栏会落在真实页底之上（实测 /family：文档
+893 CSS px、视口 844，栏压在 844 处，盖住了下面 49px 的内容），看起来像把内容
+齐腰切断了。
+
+这一条害过一次：视觉复审据此报了一个 P0「内容被 Tab 栏切断」，而逐项量下来
+——滚动容器是 document、预留的 76px 一直生效、滚到底之后最后一张卡到栏顶还有
+32px、栏本来就是不透明的——布局完全正确。按那个误诊去加 padding，会重新造出
+pages.css 里明确记着"已经删掉过一次"的幽灵空白。
+
+六个带标签栏的页面全部受影响。要判断底部是不是真的被切，看**首屏**那一张
+（不带 `-full`），或者直接量 `getBoundingClientRect()`，不要看整页图。
 """
 
 from __future__ import annotations
@@ -24,7 +39,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-DEVTOOLS_PORT = 9333
+#: 端口在运行时向系统要，不写死——见 `_free_port()` 的说明。
+DEVTOOLS_PORT = 0
 
 #: Real devices worth checking, plus the smallest phone still in wide use.
 #:
@@ -94,6 +110,44 @@ OVERFLOW_PROBE = """
 """
 
 
+#: `_free_port()` 已经发出去的端口。见那个函数的说明。
+_ISSUED_PORTS: set[int] = set()
+
+
+def _free_port() -> int:
+    """向系统要一个此刻空闲、而且这一进程内没发过的端口。
+
+    这里原先是一个写死的端口号。两份检查同时跑（比如主进程和一个并发的 agent）会
+    连到同一个 DevTools 端点上，而失败模式有两种：好的那种是
+    `ConnectionResetError: [WinError 10054]`；**坏的那种是它不报错**——一个实例的
+    `Runtime.evaluate` 落进另一个实例的标签页，点击遍历因此少按几个控件，然后报一个
+    更小的控件数，看起来正好像一次覆盖回退。
+
+    这些脚本自己拉起浏览器、自己连上去，端口号只需要在这一次运行里成立，
+    所以没有理由写死它。
+
+    **但"bind 0、读号、close"连调两次会拿到同一个号。** 操作系统完全可以把刚释放的
+    临时端口立刻再发一遍——于是 uvicorn 占了它，Chrome 再也 bind 不上，DevTools 起不来。
+    第一版就是这样，`check_page_runtime` 改成动态端口之后直接 SKIP 了。
+    所以记住这一进程内发过的号，撞上就重取。
+
+    **不要"保持 socket 打开"来占位**——我试过，那样端口对自己也是锁着的：
+    uvicorn 随后 bind 同一个号会失败，检查报 `server did not start`。
+    一个为了防冲突加的保险，把服务器挡在了门外。去重这一半就够用：
+    第一个号被 uvicorn 立刻占住之后，操作系统本来也不会再发它。
+    """
+    import socket
+    for _ in range(50):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        if port in _ISSUED_PORTS:
+            continue
+        _ISSUED_PORTS.add(port)
+        return port
+    raise RuntimeError("连 50 次都没要到一个没发过的端口")
+
+
 class CDP:
     def __init__(self, url: str, websocket_mod) -> None:
         self.ws = websocket_mod.create_connection(url, timeout=60)
@@ -130,6 +184,10 @@ def find_chrome() -> str | None:
 
 
 def main() -> int:
+    # 见 `_free_port()`。这个脚本连的是外部服务器（命令行给的 base），
+    # 所以只有 DevTools 端口需要取。
+    global DEVTOOLS_PORT
+    DEVTOOLS_PORT = _free_port()
     base = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8041"
     out_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "shots")
     args = sys.argv[3:]

@@ -198,7 +198,7 @@ class DelegationPolicy:
 class ConversationTaskInterleaver:
     """Split task-bearing clauses from social clauses without losing either.
 
-    This is the executable form of the project's “刚性任务锁”: the system keeps
+    This is the executable form of the project's 「刚性任务锁」: the system keeps
     the actionable clause in the foreground and stores social clauses for later.
     """
 

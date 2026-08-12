@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
   <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo" data-nav="tabbar">
+<body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -38,7 +38,24 @@
   <main id="main" class="shell family-app">
     <header class="fam-head">
       <div class="fam-head-text">
-        <h1>家里今天</h1>
+        <!-- 第一句话就是结论。
+             这里原先是「家里今天」加一行「最后更新 08:14」——一个栏目名和一个时间戳，
+             两句都不回答子女点开这一页要问的那件事。真正的结论此前排在**第四位**：
+             标题、四个分区按钮、「今天怎么样」小标题之后，才是 #dailyReport 里那一行
+             判定。一份把结论埋在第四位的日报，子女读两次就不会再读第三次。
+
+             这一句由 renderConclusion() 用真实数据写：report.overall 决定这句怎么说，
+             有事在等她点头时改成「今天有一件事要您点头」，report.headline 原样放在
+             下面一行。HTML 里这几个字只是数据还没到之前的占位——它一定会被覆盖，
+             覆盖不了就是请求失败了，那时写的是「暂时取不到今天的情况」，不是留着
+             这句占位假装在加载。
+
+             aria-live 只罩住结论这两行，不罩下面的 #famUpdated：那一行每次刷新都变
+             （时间戳），罩进来等于每按一次刷新就念一遍"最后更新 08:15"。 -->
+        <div aria-live="polite">
+          <h1 id="famVerdict" class="fam-verdict">正在看今天的情况</h1>
+          <p id="famHeadline" class="lead" hidden></p>
+        </div>
         <p id="famUpdated" class="fam-updated">正在加载……</p>
       </div>
       <button id="refresh" class="secondary fam-refresh"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" /></svg><span>刷新</span></button>
@@ -60,6 +77,21 @@
     <!-- 今天：这一页存在的理由。打开它的人想知道三件事——他今天怎么样、有没有
          需要我拍板的、今天还有什么。别的都往后排。 -->
     <section class="page-section" data-panel="today" aria-label="今天">
+      <!-- 「需要您确认」提到了结论正下方，也就是第一屏。
+           它原先是这一段的**第三块**（日报、三个数字，然后才是它），而且 #tasks 里
+           铺的是**全部**任务：已取消的、已完成的、正在执行的和真正在等家属点头的混在
+           一起按时间排。这一页只有这一件事需要子女**动手**，而找到它要逐张卡读状态词。
+
+           其余任务没有删，收进下面的「其他正在办的事」。0 件在等的时候 #tasks 里写
+           一句「今天不用您操心」——一个空盒子说不清那是"今天没事"还是"没加载出来"。
+
+           说明文字挪到 #tasks 下面。它解释的是"什么东西会出现在这里"，属于看完之后
+           的补充；排在标题和卡片之间的话，两行灰字会把这一屏唯一要动手的东西又往下
+           推一截，而它正是被提上来的原因。 -->
+      <h2 class="section-head">需要您确认</h2>
+      <div id="tasks"></div>
+      <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
+
       <h2 class="section-head">今天怎么样</h2>
       <div id="dailyReport" aria-live="polite">正在生成……</div>
       <div class="metric-row">
@@ -67,9 +99,15 @@
         <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
         <div class="metric"><span class="metric-label">今天到期</span><strong id="mToday">–</strong></div>
       </div>
-      <h2 class="section-head">需要您处理</h2>
-      <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
-      <div id="tasks"></div>
+
+      <!-- 不需要子女动手的那些事。收起来而不是删掉：读到上面「进行中 2」之后想追问
+           的人才会点开它，而那个数字必须有地方可以落。
+           复用 .report-more 的 summary 样式（48px、有边框），不新起一个类：这个项目
+           在四个地方栽过「min-height 对行内元素无效」，而 <summary> 正是行内元素。 -->
+      <details class="report-more">
+        <summary>其他正在办的事</summary>
+        <div id="otherTasks"></div>
+      </details>
     </section>
 
     <section class="page-section" data-panel="todo" aria-label="待办" hidden>
@@ -100,14 +138,12 @@
       </div>
       <p id="chain" class="notice"></p>
       <div id="audit"></div>
-      <p class="section-note">这里是给家人看的说法。逐条的原始记录、校验算法和证明过程在<a href="/trust" class="inline-tap">可信中心</a>。</p>
+      <p class="section-note">这里是给家人看的说法。逐条记录和它们怎么被核对上的，在<a href="/trust" class="inline-tap">可信中心</a>。</p>
       <h2 class="section-head">其他</h2>
       <div class="fam-links">
         <a href="/care" class="fam-link">照护档案</a>
         <a href="/trust" class="fam-link">可信中心</a>
       </div>
-      <button id="scheduler" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 14v2.2l1.6 1" /> <path d="M16 2v3" /> <path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338" /> <path d="M3 9h5.859" /> <path d="M8 2v3" /> <circle cx="16" cy="16" r="6" /></svg><span>立即检查到期待办</span></button>
-      <p class="section-note">提前提醒和超时升级要靠这一步推进。现在还没有后台定时器，所以需要手动催一下——正式环境会由服务端定时触发。</p>
     </section>
 
     <nav class="tabbar" aria-label="主要分区">

@@ -627,7 +627,7 @@ class SemanticGateway:
         if any(term in normalized for term in ("取消", "不办了", "算了")):
             return "cancel", 0.9, {}, False, flags
         # Scheduling verbs express the user's requested action even when the
-        # reminder contains medical nouns such as “复诊”.
+        # reminder contains medical nouns such as 「复诊」.
         if any(term in normalized for term in ("提醒", "日历", "待办", "别忘了", "闹钟", "到时候叫我")):
             return "reminder", 0.88, {"title": normalized[:80]}, False, flags
         if any(term in normalized for term in ("挂号", "医院", "医生", "科室", "看病")):

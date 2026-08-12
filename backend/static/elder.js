@@ -2,6 +2,7 @@ import {
   configureNeuralVoice, pickVoice, probeNeuralVoice, resetVoiceCache, speakClauses,
 } from '/static/speech.js';
 import {renderGlassBox} from '/static/glassbox.js';
+import {renderTaskSpace, taskViewModel} from '/static/task-space.js';
 
 // Resolved from identity.js: on a public deployment each browser gets its own
 // isolated demo household, so visitors do not share one elder's data. Falls back
@@ -75,6 +76,10 @@ const promptHistory = [];
 const chat = document.querySelector('#chat');
 const input = document.querySelector('#text');
 const status = document.querySelector('#status');
+// 顶栏那条演示壳（返回 + 「优活办事模式」徽章）已经从根页面撤掉，所以这两个可能是
+// null。**不要把它们删掉**：宽屏与横屏的布局里还留着承接位，而且模式切换是这个产品
+// 的一个核心特性——哪天要把徽章放回某个表面，读它的代码应该还在。
+// 现在的做法是"有就写，没有就跳过"，而不是假设它一定在。
 const modeBadge = document.querySelector('#modeBadge');
 const modeName = document.querySelector('#modeName');
 const agentTitle = document.querySelector('#agentTitle');
@@ -82,8 +87,8 @@ const roleOpening = document.querySelector('#roleOpening');
 const roleHeader = document.querySelector('#roleHeader');
 const remindersEl = document.querySelector('#reminders');
 const relianceHost = document.querySelector('#relianceHost');
+const taskSpaceHost = document.querySelector('#taskSpace');
 const activityLogEl = document.querySelector('#activityLog');
-const logPanel = document.querySelector('#logPanel');
 const micHint = document.querySelector('#micHint');
 // 在这里取，不在下面语音那一段取：`setActivity()` 要写它的 aria-label，而那一段在
 // 七百行之后——`const` 的暂时性死区会让任何早一步的调用直接把这一页打哑。
@@ -108,7 +113,11 @@ const fontScaleEl = document.querySelector('#fontScale');
  */
 const ACTIVITY = {
   idle:       {hint: '按一下，然后慢慢说',        label: '按一下开始说话'},
-  pressed:    {hint: '松开手，我就开始听',        label: '正在按下'},
+  // 「松开手，我就开始听」是错的：设置 `pressed` 的只有一处，在 `click` 处理器里
+  // （elder.js 里没有 pointerdown / mousedown / touchstart），而 `click` 触发时
+  // **手已经松开了**。这行字在告诉她去做一件刚做完的事——对一位正在学怎么用它的
+  // 老人，那是"我做错了吗"的来源。
+  pressed:    {hint: '按到了，我这就开始听',      label: '已按下，正在开始听'},
   listening:  {hint: '我在听，您慢慢说',          label: '正在听您说，按一下可以停下'},
   processing: {hint: '让我想一想',                label: '正在理解您说的话，请稍等'},
   clarifying: {hint: '有一处我要问清楚',          label: '我有一处要问清楚，请看上面'},
@@ -266,19 +275,35 @@ function setMode(mode, {announce = true} = {}) {
   const role = ROLES[next];
   currentMode = next;
   roleHeader.classList.add('switching');
+  // 时长从 CSS 问，不写字面量。
+  //
+  // 两件事：
+  // ① 这里原先是硬编码的 `500`，而 CSS 那边是 `calc(var(--mode-fade) * .5)`。
+  //    同一个常量两份，改一边另一边静默漂移。`sheet.js` 的注释**点名了这个坑**
+  //    （「这个项目已经因为『两处各写一份常量』吃过亏（elder.js 的 500ms 与
+  //    --mode-fade）」），它自己用"问 CSS"躲开了，而被点名的这一处一直没修。
+  // ② 更要紧：`prefers-reduced-motion` 下 `pages.css` 把过渡掐到 `.01ms`，
+  //    而这个定时器**没有任何门控**——于是标题瞬间消失、**硬空白 500ms**、再瞬间
+  //    出现。对开了「减少动态效果」的前庭失调用户，结果比不做动效更糟。
+  //    问 CSS 就自动跟着走：过渡被掐到 0，这里也就是 0。
+  const fade = Math.round(parseFloat(getComputedStyle(roleHeader).transitionDuration) * 1000) || 0;
   window.setTimeout(() => {
     document.body.dataset.mode = next;
-    modeBadge.classList.toggle('orange', next === 'companion');
-    modeName.textContent = role.modeName;
+    // 顶栏徽章已从根页面撤掉，所以这两行要能在它不存在时安静地不做事。
+    // 模式仍然是看得出来的：角色头换图标、换名字（优活 / 无忧伴）、整套配色跟着切，
+    // 而 `speak()` 还会把 `role.announcement` 念出来——徽章原先只是把同一件事
+    // 用工程话（「优活办事模式」）再喊一遍。
+    if (modeBadge) modeBadge.classList.toggle('orange', next === 'companion');
+    if (modeName) modeName.textContent = role.modeName;
     agentTitle.textContent = role.name;
     roleOpening.textContent = role.opening;
     document.querySelector('#companionEntryLabel').textContent =
       next === 'companion' ? '回到优活办事' : '找无忧伴聊聊';
     roleHeader.classList.remove('switching');
-  }, 500);
+  }, fade);
   if (announce) {
     // Spoken cue carries the same information as the colour change.
-    window.setTimeout(() => speak(`${role.announcement}${role.opening}`, null, role.pitch), 520);
+    window.setTimeout(() => speak(`${role.announcement}${role.opening}`, null, role.pitch), fade + 20);
   }
 }
 
@@ -362,10 +387,18 @@ async function loadVoiceMode() {
   const pill = document.querySelector('#voicePill');
   const status = await probeNeuralVoice();
   if (!pill) return;
-  pill.textContent = status.available ? '语音：离线本地合成' : '语音：浏览器语音';
+  // 这两个 pill 所在的那一段，标题是「优活怎么保护您」，旁边三个兄弟是
+  // 「一次只问一件事」「要紧的事请您念一遍」「不会自动扣钱」——全是**对她的承诺**。
+  // 原先这两条写的是「语音：离线本地合成」和「语义层：离线确定性」，是**对我的描述**。
+  // HTML 里的占位符（「正在检查念得清不清…」）其实早就是产品话了，是 JS 把它盖掉的：
+  // 有人修了模板没修脚本，而屏幕上活着的是脚本那一版。
+  //
+  // 事实一个字没改，只是换成她这一侧的说法。工程说法在 /judge 与 /trust 有完整版本
+  // （那是手机框**外**，读者是评委）——这里是换地方，不是删掉。
+  pill.textContent = status.available ? '说话不出这台手机' : '用手机自带的声音念';
   pill.title = status.available
-    ? '语音在本机合成，文本不上传。'
-    : '未启用离线合成，使用系统自带语音。';
+    ? '念给您听的声音在这台手机上生成，您说的话不会传出去。'
+    : '用手机自带的声音念给您听。';
 }
 
 /** Show whether a model is advising the semantic layer. Authorization never is. */
@@ -374,14 +407,14 @@ async function loadSemanticMode() {
   if (!pill) return;
   try {
     const health = await (await fetch('/health')).json();
-    pill.textContent = health.semantic_model_configured
-      ? '语义层：模型已接入（不授权）'
-      : '语义层：离线确定性';
+    // 「听得懂话，做不了主」是这件事对她的全部含义：模型只做意图与槽位理解，
+    // 而要不要办、办什么、花多少钱，仍然由确定性代码决定。
+    pill.textContent = health.semantic_model_configured ? '听得懂话，做不了主' : '不上网也听得懂';
     pill.title = health.semantic_model_configured
-      ? '语言模型只做意图和槽位理解，权限、确认与执行仍由确定性代码控制。'
-      : '当前未配置模型，全部理解由确定性规则完成。';
+      ? '听懂您的话可以借助外部帮助；但要不要办、办成什么样，只由优活固定的规矩决定。'
+      : '不联网也能听懂您说的话。';
   } catch (_) {
-    pill.textContent = '语义层：状态未知';
+    pill.textContent = '这项暂时查不到';
   }
 }
 
@@ -503,6 +536,15 @@ const CARE_WORD = {
   repeat: '重复上一句',
 };
 
+//: 任务类型 → 一位老人听得懂的说法。状态行用它代替原始任务 ID（见 postChat 里那段）。
+//: 认不出的类型不兜底成原始值——兜底成 `bill_payment` 等于这层翻译在遇到新类型时
+//: 自动失效，而那正是它该起作用的时候。认不出就说「这件事」。
+const TASK_TYPE_WORD = {
+  bill_payment: '缴费',
+  appointment: '挂号',
+  medication: '用药',
+};
+
 const STATE_WORD = {
   collecting: '正在收集信息',
   awaiting_elder_confirmation: '等您复述确认',
@@ -550,6 +592,32 @@ async function send(text) {
     return;
   }
   turnInFlight = true;
+
+  // 说话之前先把 Focus Mode 打开。**这一行是一个 P0 的修复。**
+  //
+  // 对话区 `#chat`、状态行 `#status`、玻璃盒确认卡 `#relianceHost` 全都住在
+  // `.elder-focus` 里，而它默认是 `display: none`。`#typeInstead`、`#nextOpen`、
+  // `#kinContact` 三个入口都记得调 `setFocus(true)`，唯独**语音**这条没有——
+  // 而语音是这个产品的主路径。
+  //
+  // 实测（390×844，按 `rec.onresult` 原样复现）：她说「帮我交这个月的电费」之后，
+  // `#chat` 涨到 5 条气泡、`#relianceHost` 写进 1181 个字符的确认卡（126.50 元、
+  // 风险等级 4、等待她复述确认），而三者的渲染高度**全是 0**。屏幕上依然写着
+  // 「今天没有要办的事。」——系统正在等她口头确认一笔付款，而她看不到任何东西。
+  // 唯一的通道是朗读。
+  //
+  // 附带损伤：`addBubble` 末尾那句 `chat.scrollTop = chat.scrollHeight` 作用在隐藏
+  // 元素上是空操作，所以她事后手动进 Focus Mode，对话也永久停在开场白——连回头
+  // 找答案都做不到。
+  //
+  // 修在 `send()` 顶上，而不是在语音回调里：这里是所有调用方的咽喉，补一处就覆盖
+  // 全部入口，下一个新入口也不会再漏。
+  //
+  // 另一件要记的事：`stage.js` 和 `judge.js` **各自**为这条路径打过 workaround
+  // （先点一下 `#typeInstead` 再填字）。也就是说这条路径的不可见性早就被发现了两次，
+  // 而两次补丁都打在演示脚手架上，没有一次打进产品自己。
+  setFocus(true);
+
   input.value = '';
   addBubble(text, 'user');
   setActivity('processing');
@@ -588,17 +656,49 @@ async function send(text) {
       await refreshProfile();
     }
 
+    // Task Space：这件事办到哪一步，用**页面**说。
+    //
+    // 计划书第九至十三节：优活是 Task Agent，不是聊天机器人。她说完
+    // 「帮我交这个月水费」之后，屏幕上该出现的是这件事本身——多少钱、给谁、
+    // 办到哪一步、现在要她做什么——而不是一串气泡让她自己从对话里拼出来。
+    //
+    // 状态全部来自后端（`code` / `task_status` / `data`），这个模块只负责怎么显示。
+    // 认不出的状态它回 `null`，那时 `body.dataset.taskView` 不写，
+    // CSS 把聊天区放回来——**不猜**。多一个没见过的状态码就渲染一个内容是编的页面，
+    // 比不渲染糟得多：她会照着假页面去做决定。
+    //
+    // 聊天记录没有删（不得 silent delete），它退到 Task Space 下面。
+    const taskView = taskViewModel(data);
+    if (renderTaskSpace(taskSpaceHost, taskView)) {
+      document.body.dataset.taskView = taskView.kind;
+    } else {
+      delete document.body.dataset.taskView;
+    }
+
     if (asksForConfirmation) {
       await showGlassBox(text, data);
     } else {
       relianceHost.replaceChildren();
     }
 
+    // 状态行说"我在办什么"，不说任务 ID。
+    //
+    // 原文是 `当前任务：${data.task_id}。`——屏幕上出现的是
+    // 「当前任务：task-cf917fee2790476500fb。您随时可以说"再说一遍"或"取消"。」
+    // 那串十六进制是给数据库看的，而这一行的读者是一位视力在下降的老人；更糟的是
+    // 这一行会被读屏软件念出来，念一串哈希是这个产品最不该做的事。
+    //
+    // 它想说的其实是"我还在办这件事，你可以打断我"。说成「正在办：缴费」就够了，
+    // 而任务类型是后端已经给出来的。
+    //
+    // 这个缺陷先在 /family 被视觉审查抓到（那边把任务 ID 印在卡片上），
+    // 顺着同一条规则建的运行时标识符闸门把这里也点了出来——同一个错，受众更差。
+    const doing = TASK_TYPE_WORD[data.data?.task_type];
     setStatus(data.task_id
-      ? `当前任务：${data.task_id}。您随时可以说“再说一遍”或“取消”。`
+      ? `正在办${doing ? '：' + doing : '这件事'}。您随时可以说「再说一遍」或「取消」。`
       : '办事可留痕；陪伴默认不向家属展示聊天全文。');
     loadReminders();
-    if (!logPanel.hidden) loadActivity();
+    if (document.body.dataset.tab === 'log') loadActivity();
     settled = activityFor(data);
   } catch (e) {
     recentRetries += 1;
@@ -651,7 +751,7 @@ async function reminderAction(id, action) {
     addBubble(adapted.visual_text || data.message, 'agent', '待办状态更新');
     if (data.ui?.speak) speak(adapted.speak_text || data.message, adapted.speech_rate);
     loadReminders();
-    if (!logPanel.hidden) loadActivity();
+    if (document.body.dataset.tab === 'log') loadActivity();
   } catch (e) {
     // 老人端尤其不能弹 `alert()`：装到主屏后那是一个带 "127.0.0.1 显示" 字样的
     // 系统灰框，会盖住整屏、冻住页面，而且只有一个"确定"可按。这一页其余的失败
@@ -723,6 +823,8 @@ async function loadReminders() {
   try {
     const reminders = await api('/v2/reminders?limit=50');
     renderTodayLine(reminders);
+    renderNextItem(reminders);
+    renderTodayBlock(reminders);
     remindersEl.replaceChildren();
     const visible = rankReminders(reminders);
     visible.forEach(r => {
@@ -752,7 +854,7 @@ async function loadReminders() {
         remindersEl,
         ['M8 3.4v3.2M16 3.4v3.2', 'M4.4 9.4h15.2', 'M5.4 5h13.2a1.6 1.6 0 0 1 1.6 1.6v12a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6v-12A1.6 1.6 0 0 1 5.4 5z'],
         '现在没有待办',
-        '您可以说“提醒我明天上午九点复诊”，我来记着。',
+        '您可以说「提醒我明天上午九点复诊」，我来记着。',
       );
     }
     const toggle = document.querySelector('#toggleReminders');
@@ -807,16 +909,24 @@ input.addEventListener('keydown', e => {
 document.querySelectorAll('[data-text]').forEach(btn => btn.addEventListener('click', () => send(btn.dataset.text)));
 
 document.querySelector('#companionEntry').addEventListener('click', () => {
-  send(currentMode === 'companion' ? '继续办事' : '调用无忧伴');
+  // 这两句会**当成她自己说的话**上屏：`send()` 里就是 `addBubble(text, 'user')`。
+  // 所以按钮送出去的不能是触发词，得是一句她真会说的话——原先送的是「调用无忧伴」，
+  // 于是聊天记录里出现一条她的气泡写着「调用」，一个编程动词。
+  //
+  // 「找无忧伴聊聊」照样命中：companion.py 的 COMPANION_REQUESTS 里有「找无忧伴」，
+  // 匹配是 `any(phrase in text …)` 的子串匹配。「继续办事」同理（engine.py:1418）。
+  send(currentMode === 'companion' ? '继续办事' : '找无忧伴聊聊');
 });
 
+// 「我的记录」从折叠面板变成了「记录」Tab 里常驻的一段，所以这个按钮的职责从
+// 展开/收起变成了刷新。
+//
+// 原来还带一次 `scrollIntoView`——那是为了对付"面板排在定高框架里定高子元素后面、
+// 只露 70px 且滚不到"的老问题。现在它在自己的 Tab 里，从第一行就看得见。
 document.querySelector('#logEntry').addEventListener('click', () => {
-  logPanel.hidden = !logPanel.hidden;
-  document.querySelector('#logEntryLabel').textContent = logPanel.hidden ? '查看我的记录' : '收起我的记录';
-  if (!logPanel.hidden) {
-    loadActivity();
-    logPanel.scrollIntoView({behavior: 'smooth', block: 'start'});
-  }
+  const label = document.querySelector('#logEntryLabel');
+  label.textContent = '正在读取…';
+  loadActivity().finally(() => { label.textContent = '刷新我的记录'; });
 });
 
 document.querySelector('#toggleReminders').addEventListener('click', () => {
@@ -882,6 +992,25 @@ if (SR) {
     recentRetries += 1;
     // 此前这里写 idle——听失败和"可以开始了"在屏幕上长得一模一样。
     setActivity(e.error === 'network' && !navigator.onLine ? 'offline' : 'error');
+    // 上面那六句话，此前**一句都不会出现在屏幕上**。
+    //
+    // `setStatus` 写的是 `#status`，而 `#status` 在 `.elder-focus` 里面，而
+    // `pages.css:304` 是 `.elder-focus { display: none }`。进 Focus Mode 的唯一入口
+    // 在 `send()` 里——语音失败时 `send()` 从来没被调用过（`onresult` 才调它）。
+    // 所以真实经过是：她按下麦克风，系统弹权限框，她点了"不允许"，然后**屏幕上
+    // 什么都没变**。那句唯一能告诉她「去手机设置里打开麦克风权限」的话，
+    // 被写进了一个 display:none 的元素里。`input.focus()` 同理——`#text` 也在里面，
+    // 对一个不显示的输入框调 focus() 什么都不会发生。
+    //
+    // 这是 A-01 的同一个缺陷第二次出现，而 A-01 修的是成功路径。失败路径更要紧：
+    // 顺利的时候她不需要提示，卡住的时候才需要。
+    //
+    // Focus Mode 恰好满足这六句话的全部前提：`#status` 显形（她读得到），composer
+    // 显形（「在下面打字」这句话从此为真，`input.focus()` 也真的落到输入框上），
+    // 而麦克风**不在**被 Focus Mode 藏起来的那一组里（`pages.css:310-314` 藏的是
+    // roleHeader / todayLine / nextItem / today-block / elder-tabs），所以
+    // 「再按一下慢慢说」也仍然可做。`#focusBack` 给她回去的路。
+    setFocus(true);
     setStatus(RECOGNITION_TROUBLE[e.error]
       || '语音没能用起来。您可以在下面打字，我一样能办。');
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed'
@@ -918,6 +1047,117 @@ if (SR) {
   mic.title = '当前浏览器不支持语音识别，请使用下方输入框';
 }
 
+/* ==========================================================================
+   四个 Tab 与 Focus Mode
+   ..........................................................................
+   这一屏原先塞着九样东西：角色头、今天、对话、信任卡、麦克风、三个快捷、输入行、
+   抽屉入口、状态行。一位老人打开它，第一眼要在九样里找出"我现在该干什么"。
+
+   现在首页只回答三个问题——今天有没有事、下一件是什么、怎么让优活帮我——对话与
+   输入行进 Focus Mode。
+
+   Focus Mode 是首页的一个**态**（`body[data-focus]`），不是第五个 Tab。理由是
+   Voice Orb 只能有一个 `#mic`，而按下它之后 orb 仍然在场；做成并列分区就得复制一个
+   orb，两个 orb 的状态机会立刻分叉。
+   ========================================================================== */
+
+/** 进/出 Focus Mode。
+ *
+ * 不碰 Voice Orb 的状态——那由 `setActivity` 独占管理。这里只管"屏幕上还剩哪些东西"。
+ */
+function setFocus(on, {focusInput = false} = {}) {
+  document.body.dataset.focus = on ? 'on' : 'off';
+  if (on && focusInput) input.focus();
+  if (!on) {
+    // 退出时清空输入框。留着上一次没发出去的半句话，下次进来会让人以为它已经发过了。
+    input.value = '';
+    mic.focus({preventScroll: true});
+  }
+}
+
+document.querySelector('#typeInstead').addEventListener('click', () => {
+  setFocus(true, {focusInput: true});
+});
+document.querySelector('#focusBack').addEventListener('click', () => setFocus(false));
+
+// Esc 退出。键盘用户在 Focus Mode 里必须有一条不用找按钮的出路。
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.body.dataset.focus === 'on') setFocus(false);
+});
+
+/** 「下一件」。首页只显示一件最要紧的事，不显示今日全部。
+ *
+ * 一位老人不需要在首屏做排序——她需要知道下一步。由 `loadReminders()` 调用。
+ */
+/** 「今天」那一块的显隐。
+ *
+ * 没有待办时收起来。原先它会显示一个「现在没有待办」的空状态，而上面那一行
+ * `#todayLine` 已经写着「今天没有要办的事。」——一屏内容里有两处在说同一件事，
+ * 而这一屏的全部设计意图就是"一次只说一件事"。
+ */
+function renderTodayBlock(reminders) {
+  const block = document.querySelector('.today-block');
+  if (!block) return;
+  const open = (reminders || []).filter(
+    item => !['completed', 'cancelled'].includes(item.status));
+  block.hidden = open.length === 0;
+}
+
+function renderNextItem(reminders) {
+  const card = document.querySelector('#nextItem');
+  if (!card) return;
+  const open = (reminders || [])
+    .filter(item => !['completed', 'cancelled'].includes(item.status))
+    .filter(item => isToday(item.due_at))
+    .sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
+  const next = open[0];
+  // `data-ready` 是内容的**盖章**，不是显隐开关。
+  //
+  // 这张卡原先只靠 `hidden` 属性控制，而这个函数要等 `/v2/reminders` 回来才跑——
+  // 首屏渲染发生在那之前，于是有一瞬间卡是露着的，而里面只有一个孤零零的「查看」
+  // 按钮。截图抓到的就是那一瞬间。
+  // 现在 CSS 兜底：没盖章就不显示（`.next-item:not([data-ready])`）。显隐和内容
+  // 由同一件事决定，不再是两个地方各说一半。
+  if (!next) {
+    card.removeAttribute('data-ready');
+    card.hidden = true;
+    return;
+  }
+  const at = new Date(next.due_at);
+  const pad = value => String(value).padStart(2, '0');
+  document.querySelector('#nextTime').textContent = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  document.querySelector('#nextTitle').textContent = next.title || '一件要办的事';
+  const where = next.location || next.note || '';
+  const whereEl = document.querySelector('#nextWhere');
+  whereEl.textContent = where;
+  whereEl.hidden = !where;
+  card.dataset.ready = 'true';
+  card.hidden = false;
+}
+
+// 「查看」把这件事说出口，走的是和语音一模一样的那条路——这一页只有一个入口，
+// 不给老人第二套心智模型。
+document.querySelector('#nextOpen').addEventListener('click', () => {
+  const title = document.querySelector('#nextTitle').textContent.trim();
+  setFocus(true);
+  send(title ? `说说${title}这件事` : '我今天有什么事');
+});
+
+document.querySelector('#kinContact').addEventListener('click', () => {
+  setFocus(true);
+  send('帮我联系家人');
+});
+
+// Tab 切换。`initSections` 在 common.js 里，家人端和照护页用的是同一套约定。
+// 切 Tab 一律退出 Focus Mode：她已经离开那件事了，屏幕不该还停在对话上。
+window.YouHuo.initSections('home');
+document.querySelectorAll('.elder-tabs .seg').forEach(tab => {
+  tab.addEventListener('click', () => {
+    setFocus(false);
+    document.body.dataset.tab = tab.dataset.section;
+  });
+});
+
 // 断网。这一页做的每一件事都要过后端——缴费、挂号、查用药——所以断网不是"某个请求
 // 失败了"，是"现在什么都办不了"。此前它只会表现为一次次点下去、一次次报
 // 「系统暂时不可用」，屏幕上没有任何东西说明为什么。
@@ -945,8 +1185,8 @@ if (navigator.onLine === false) setActivity('offline');
 //: 报一遍办事菜单——那正是她刚刚选择**不要**的东西。
 const GREETING = {
   youhuo: {
-    text: '您好，我是优活。您可以直接说“帮我挂号”“查一下水费”或“调用无忧伴”。我会一次只问一件事。',
-    speak: '您好，我是优活。您可以直接说帮我挂号、查一下水费，或者调用无忧伴。',
+    text: '您好，我是优活。您可以直接说「帮我挂号」「查一下水费」或「找无忧伴聊聊」。我会一次只问一件事。',
+    speak: '您好，我是优活。您可以直接说帮我挂号、查一下水费，或者找无忧伴聊聊。',
   },
   companion: {
     text: '我在这儿呢。想聊什么都行，不着急，慢慢说。',

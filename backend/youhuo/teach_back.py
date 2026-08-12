@@ -187,7 +187,7 @@ class TeachBackVerifier:
             bill_type = slots.get("bill_type", "账单")
             return (
                 f"这是{bill_type}，{_yuan(amount)}元。"
-                f"为了确认您听清了，请您把金额说一遍，例如“确认支付{_yuan(amount)}元”。"
+                f"为了确认您听清了，请您把金额说一遍，例如「确认支付{_yuan(amount)}元」。"
             )
         return "请用自己的话复述一遍要办理的内容。"
 
@@ -213,7 +213,7 @@ class TeachBackVerifier:
                     expected_display=_yuan(expected),
                     prompt=(
                         f"我还需要确认您听清了金额。请您说一遍金额，"
-                        f"例如“确认支付{_yuan(expected)}元”。"
+                        f"例如「确认支付{_yuan(expected)}元」。"
                     ),
                     signals={"restated": False},
                 )
@@ -225,7 +225,7 @@ class TeachBackVerifier:
                     heard_display=_yuan(heard),
                     prompt=(
                         f"您说的是{_yuan(heard)}元，这次要交的是{_yuan(expected)}元。"
-                        f"金额不一样，我先不办。请您再说一遍“确认支付{_yuan(expected)}元”。"
+                        f"金额不一样，我先不办。请您再说一遍「确认支付{_yuan(expected)}元」。"
                     ),
                     signals={"restated": True, "expected_cents": expected, "heard_cents": heard},
                 )

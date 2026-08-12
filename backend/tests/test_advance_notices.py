@@ -42,9 +42,9 @@ def test_ladder_fires_once_per_rung_as_due_time_approaches(env, fixed_now):
 
     # Each notice states the real remaining time at the moment it was sent.
     assert _advance_messages(db) == [
-        "提前提醒:还有约24小时就到“复诊”了。",
-        "提前提醒:还有约12小时就到“复诊”了。",
-        "提前提醒:还有约1小时就到“复诊”了。",
+        "提前提醒:还有约24小时就到「复诊」了。",
+        "提前提醒:还有约12小时就到「复诊」了。",
+        "提前提醒:还有约1小时就到「复诊」了。",
     ]
 
 
@@ -53,7 +53,7 @@ def test_notice_states_real_remaining_time_not_the_rung_name(env, fixed_now):
     db, engine, elder, family, _ = env
     _create(engine, family, elder, fixed_now, hours_ahead=3)
     assert engine.scheduler_tick(family, fixed_now)["advance_notified"] == 1
-    assert _advance_messages(db) == ["提前提醒:还有约3小时就到“复诊”了。"]
+    assert _advance_messages(db) == ["提前提醒:还有约3小时就到「复诊」了。"]
 
 
 def test_ladder_is_idempotent_across_repeated_ticks(env, fixed_now):
@@ -75,7 +75,7 @@ def test_late_first_tick_announces_the_real_remaining_time(env, fixed_now):
     assert result["advance_notified"] == 1
     # The notification pipeline normalises the fullwidth colon to ASCII.
     messages = _advance_messages(db)
-    assert messages == ["提前提醒:还有约30分钟就到“复诊”了。"]
+    assert messages == ["提前提醒:还有约30分钟就到「复诊」了。"]
     # All three rungs are consumed, so nothing replays later.
     reminder = db.list_reminders("fam-demo")[0]
     assert sorted(db.sent_advance_notices(reminder.id)) == [60, 720, 1440]

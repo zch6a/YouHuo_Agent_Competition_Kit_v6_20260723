@@ -15,9 +15,14 @@
   const device = document.getElementById('device');
   const caption = document.getElementById('deviceCaption');
   const controls = document.getElementById('stageControls');
+  const proof = document.getElementById('stageProof');
   const escape = document.getElementById('stageEscape');
   const hint = document.getElementById('stageHint');
   if (!frame || !device) return;
+
+  //: 答辩模式要一起 inert 掉的两侧。右栏是后来加的，第一版只列了左栏——
+  //: 于是「演示恶意文档金额」和「加载聚合指标」在"只留手机"之后仍然在 Tab 顺序里。
+  const RAILS = [controls, proof].filter(Boolean);
 
   const ROLE_WORD = {
     '/elder': '老人端', '/family': '家人端', '/care': '照护',
@@ -92,10 +97,35 @@
     }
 
     const doc = frame.contentDocument;
+
+    // 先按应用**自己的**打字入口，进 Focus Mode。
+    //
+    // 这三行是一个真缺陷换来的。老人端的对话、输入行和玻璃盒卡全都住在 Focus Mode
+    // 里（`body[data-focus="on"]`）；直接填 `#text` 那一轮**真的发生**——任务立起来、
+    // 审计链上有记录、气泡也进了 DOM——而屏幕停在「我在，您请说」，因为
+    // `.elder-focus` 是 `display: none`。于是这一页会在旁白里说
+    // 「已经替您说了：「帮我交这个月的水费」」，而投在大屏上的那台手机什么都没变。
+    //
+    // 答辩现场那一刻，是这台手机当众否掉了讲解人的话。而三道闸门都是绿的：
+    // 点击遍历只问按不按得到，对比度只读计算颜色，截图拍的是没点过的首屏。
+    //
+    // 按 `#typeInstead` 而不是直接写 `body.dataset.focus`：同一条原则——
+    // 演示不能走 App 自己不会走的路径，否则它证明不了任何事。
+    const enter = doc && doc.getElementById('typeInstead');
+    if (enter && doc.body.dataset.focus !== 'on') {
+      enter.click();
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    }
+
     const input = doc && doc.getElementById('text');
     const send = doc && doc.getElementById('send');
     if (!input || !send) {
       say('框里的应用还没准备好，等一下再点。');
+      return;
+    }
+    // 说出去之前先确认她**看得见**这件事发生。宁可红，不要报一句假的"已经说了"。
+    if (doc.body.dataset.focus !== 'on') {
+      say('框里的应用没能进到对话状态，这句话没有发出去。');
       return;
     }
     // 真的填、真的按。不走任何 App 自己不会走的路径。
@@ -114,8 +144,10 @@
     document.body.classList.toggle('is-clean', on);
     // `inert` 而不是只降透明度：答辩模式下控制条必须真的从可访问树和 Tab 顺序里
     // 消失，否则录屏时一次误触或一次 Tab 就把"场景：诈骗"这种按钮请回画面。
-    if (on) controls.setAttribute('inert', ''); else controls.removeAttribute('inert');
-    controls.setAttribute('aria-hidden', on ? 'true' : 'false');
+    RAILS.forEach((rail) => {
+      if (on) rail.setAttribute('inert', ''); else rail.removeAttribute('inert');
+      rail.setAttribute('aria-hidden', on ? 'true' : 'false');
+    });
     escape.hidden = !on;
     if (on) escape.focus({preventScroll: true});
     else document.getElementById('stageClean').focus({preventScroll: true});
@@ -149,6 +181,50 @@
     frame.src = route;
     say('框里的应用已经重新开始。');
   });
+
+  // --- 四个分区与深度开关 ---------------------------------------------------
+
+  // 页内分区，与 App 那几页同一份实现（common.js）。四条底线的「→」指向的是分区
+  // **里面**那篇卡片，靠的是 initSections 里的 resolve()。
+  if (window.YouHuo && window.YouHuo.initSections) {
+    window.YouHuo.initSections('product');
+  }
+
+  const depthButtons = {
+    product: document.getElementById('depthProduct'),
+    technical: document.getElementById('depthTechnical'),
+  };
+
+  /** 产品模式 / 技术模式。
+   *
+   * 产品模式把「工程」整层收起来：答辩的前八分钟不该有人看见 `/v5/metrics` 的原始
+   * 响应，最后两分钟必须能当场打开。
+   *
+   * 收起来的时候必须处理"当前正停在工程层"这一种情况——否则右栏整个变空白，而
+   * 页面不会报任何错。第一版就是这样：CSS 把那一段 display:none 掉，而
+   * `initSections` 仍然认为它是当前分区。
+   */
+  function setDepth(depth) {
+    document.body.dataset.depth = depth;
+    Object.entries(depthButtons).forEach(([name, btn]) => {
+      if (!btn) return;
+      const on = name === depth;
+      btn.classList.toggle('is-current', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    const engineering = document.querySelector('.seg[data-section="engineering"]');
+    if (depth === 'product' && engineering && engineering.classList.contains('is-current')) {
+      const fallback = document.querySelector('.seg[data-section="product"]');
+      if (fallback) fallback.click();
+    }
+  }
+
+  if (depthButtons.product) {
+    depthButtons.product.addEventListener('click', () => setDepth('product'));
+  }
+  if (depthButtons.technical) {
+    depthButtons.technical.addEventListener('click', () => setDepth('technical'));
+  }
 
   applySize();
 })();

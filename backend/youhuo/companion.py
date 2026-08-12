@@ -162,7 +162,7 @@ def compose_reply(text: str, context: CompanionContext) -> tuple[str, Theme, boo
 def resume_offer(topic: str) -> str:
     """Design §5.2: offer to pick the parked topic back up, and mean it."""
     trimmed = topic.strip()[:40]
-    return f"您刚才提到“{trimmed}”。现在要不要接着聊？说“好啊”我就切到无忧伴。"
+    return f"您刚才提到「{trimmed}」。现在要不要接着聊？说「好啊」我就切到无忧伴。"
 
 
 def accepts_resume(text: str) -> bool:

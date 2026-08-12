@@ -24,6 +24,7 @@ from .baseline import (
     ChannelDeviation,
     Observation,
     Verdict,
+    as_parenthetical,
     build_baseline,
     evaluate,
     minutes_of_day,
@@ -219,14 +220,16 @@ class BaselineAnalyzer:
             return "今天还没过完，还不到下结论的时候。"
         if overall is Verdict.UNKNOWN:
             # 这句话现在有分量了：本该有记录却一条都没有。
-            missing = [d.explanation for d in deviations if d.verdict is Verdict.UNKNOWN]
+            missing = [d.parenthetical for d in deviations if d.verdict is Verdict.UNKNOWN]
             lead = f"（{missing[0]}）" if missing else ""
             return f"今天该有的记录还没出现{lead}，建议打个电话问一声。"
         if overall is Verdict.TYPICAL:
             return "今天和他平常差不多。"
         worst = [d for d in deviations if d.verdict in (Verdict.MARKED, Verdict.NOTICE)]
         worst.sort(key=lambda d: -(d.sigma or 0.0))
-        lead = worst[0].explanation if worst else ""
+        # `.inline` 而不是 `.explanation`：后者自带「起床：」那个冒号，接在
+        # `{prefix}：` 后面就成了一句话两个冒号。
+        lead = worst[0].inline if worst else ""
         prefix = "今天和他平常不太一样" if overall is Verdict.MARKED else "今天有一点和平常不同"
         return f"{prefix}：{lead}"
 
@@ -331,20 +334,20 @@ class CareComposer:
             if deviation.channel is Channel.WAKE and (deviation.delta_minutes or 0) > 0:
                 spoken.append("今天起得比平常晚一些，不着急，慢慢来。")
                 hints.append("上午的事项可以往后挪一挪，不用赶。")
-                rationale.append(f"起床晚于常态（{deviation.explanation}）。")
+                rationale.append(f"起床晚于常态（{as_parenthetical(deviation.explanation)}）。")
             elif deviation.channel is Channel.SLEEP and (deviation.delta_minutes or 0) > 0:
                 spoken.append("昨晚睡得比平常晚，白天想睡就眯一会儿。")
-                rationale.append(f"就寝晚于常态（{deviation.explanation}）。")
+                rationale.append(f"就寝晚于常态（{as_parenthetical(deviation.explanation)}）。")
             elif deviation.channel is Channel.OUTING and (deviation.delta_minutes or 0) < 0:
                 spoken.append("今天还没怎么出门，要是身上不舒服，跟我说一声。")
-                rationale.append(f"外出少于常态（{deviation.explanation}）。")
+                rationale.append(f"外出少于常态（{as_parenthetical(deviation.explanation)}）。")
             elif deviation.channel is Channel.MEDICATION:
                 spoken.append("今天的药和平常的时间不太一样，需要我提醒您吗？")
                 hints.append("确认今天的服药时间是否需要调整。")
-                rationale.append(f"服药时间偏离常态（{deviation.explanation}）。")
+                rationale.append(f"服药时间偏离常态（{as_parenthetical(deviation.explanation)}）。")
             elif deviation.channel is Channel.CONVERSATION and (deviation.delta_minutes or 0) < 0:
                 spoken.append("今天您话比平常少，我在这儿陪着您。")
-                rationale.append(f"交流少于常态（{deviation.explanation}）。")
+                rationale.append(f"交流少于常态（{as_parenthetical(deviation.explanation)}）。")
 
         # --- 环境联动：同样的偏离，屋里冷和屋里暗要说不同的话 ---
         if EnvironmentComfort.COLD in comforts:

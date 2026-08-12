@@ -1,0 +1,161 @@
+# 控件清单（机器生成，不要手改）
+
+由 `backend/scripts/build_control_inventory.py` 从代码生成。
+**这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
+
+| 总数 | 145 |
+|---|---|
+| 有 id | 145 |
+| 无 id（匿名控件，无法被矩阵追踪） | 0 |
+| 未分类 | 0 |
+| 追不到 handler（非 `<a>`） | 1 |
+
+## 全部控件
+
+| id | 页面 | panel | 标签 | 交互 | handler | 接口 | surface | shell | module | visibility |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#nextOpen` | elder | home | button | click | elder.js:open | — | consumer | elder | home | hidden-until-state |
+| `#mic` | elder | home | button | — | elder.js:writeStore | — | consumer | elder | home | primary |
+| `#typeInstead` | elder | home | button | click | elder.js:setFocus | — | consumer | elder | home | secondary |
+| `#toggleReminders` | elder | home | button | — | elder.js:loadReminders | — | consumer | elder | home | secondary |
+| `#focusBack` | elder | — | button | click | elder.js:setFocus | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#text` | elder | — | input | — | elder.js:writeStore | — | consumer | elder | shell | primary |
+| `#send` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#openExtras` | elder | — | button | — | —:— | — | consumer | elder | shell | secondary |
+| `#repeatLast` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
+| `#stepBack` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
+| `#logEntry` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
+| `#kinContact` | elder | kin | button | click | elder.js:open | — | consumer | elder | kin | hidden-until-state |
+| `#speechRate` | elder | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
+| `#fontScale` | elder | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
+| `#saveProfile` | elder | me | button | click | elder.js:loadActivity | — | consumer | elder | me | hidden-until-state |
+| `#companionEntry` | elder | me | button | click | elder.js:loadActivity | — | consumer | elder | me | hidden-until-state |
+| `#leaveApp` | elder | me | a | navigate | —:— | — | consumer | elder | me | hidden-until-state |
+| `#` | elder | — | button | — | sheet.js:(顶层) | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
+| `#refresh` | family | — | button | click | family.js:load | — | consumer | family | shell | secondary |
+| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | family | today | summary | details-toggle | common.js:code | — | consumer | family | today | primary |
+| `#reminderForm` | family | todo | form | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
+| `#reminderTitle` | family | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
+| `#reminderDue` | family | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
+| `#escalation` | family | todo | input | change | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
+| `#` | family | todo | button | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
+| `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
+| `#depthProduct` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#depthTechnical` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#stageClean` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#stageFull` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#stageReset` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
+| `#baselineDemo` | stage | demo | button | — | proof-demos.js:showBaseline | — | presentation | stage | demo | presentation-only |
+| `#coldRoomDemo` | stage | demo | button | — | proof-demos.js:showBaseline | — | presentation | stage | demo | presentation-only |
+| `#lateWakeDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#routineDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#monthlyReport` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#interactionDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#emotionText` | stage | demo | textarea | change | proof-demos.js:pastDeviationMoment | /v4/emotions/analyze | presentation | stage | demo | presentation-only |
+| `#emotionDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#medicalText` | stage | demo | textarea | change | proof-demos.js:pastDeviationMoment | /v4/medical-reports/analyze | presentation | stage | demo | presentation-only |
+| `#medicalDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
+| `#locationInside` | stage | demo | button | — | proof-demos.js:ping | — | presentation | stage | demo | presentation-only |
+| `#locationOutside` | stage | demo | button | — | proof-demos.js:ping | — | presentation | stage | demo | presentation-only |
+| `#sosDemo` | stage | demo | button | — | proof-demos.js:ping | — | presentation | stage | demo | presentation-only |
+| `#scheduler` | stage | demo | button | — | proof-demos.js:ping | — | presentation | stage | demo | presentation-only |
+| `#` | stage | proof | a | navigate | —:— | — | presentation | stage | proof | presentation-only |
+| `#` | stage | proof | a | navigate | —:— | — | presentation | stage | proof | presentation-only |
+| `#` | stage | proof | a | navigate | —:— | — | presentation | stage | proof | presentation-only |
+| `#` | stage | proof | a | navigate | —:— | — | presentation | stage | proof | presentation-only |
+| `#voiceSafe` | stage | proof | button | — | proof-demos.js:bootstrap | — | presentation | stage | proof | presentation-only |
+| `#voiceConflict` | stage | proof | button | — | proof-demos.js:bootstrap | — | presentation | stage | proof | presentation-only |
+| `#policySafe` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#policyAttack` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#breakGlassDemo` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#sagaCreate` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#sagaAdvance` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#truthDemo` | stage | proof | button | — | proof-demos.js:register | — | presentation | stage | proof | presentation-only |
+| `#metricsDemo` | stage | proof | button | — | proof-demos.js:register | — | presentation | stage | proof | presentation-only |
+| `#memoryPropose` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#memoryApprove` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#memoryList` | stage | proof | button | — | proof-demos.js:paymentPolicyPayload | — | presentation | stage | proof | presentation-only |
+| `#syncDemo` | stage | engineering | button | — | proof-demos.js:register | — | presentation | stage | engineering | presentation-only |
+| `#capabilitiesDemo` | stage | engineering | button | — | proof-demos.js:register | — | presentation | stage | engineering | presentation-only |
+| `#` | stage | engineering | a | navigate | —:— | — | presentation | stage | engineering | presentation-only |
+| `#stageEscape` | stage | — | button | — | stage.js:(顶层) | — | presentation | stage | shell | presentation-only |
+| `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
+| `#playStory` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | — | judge.js:activate | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | summary | details-toggle | judge.js:say | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#demoBoard` | judge | — | button | click | judge.js:report | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
+| `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |

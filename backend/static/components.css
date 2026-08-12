@@ -24,15 +24,30 @@
    colours the same way. */
 @supports (color: oklch(from #fff l c h)) {
   :root {
-    --role-tint: oklch(from var(--role-accent) 0.965 calc(c * 0.42) h);
-    --surface-2: oklch(from var(--role-accent) 0.985 calc(c * 0.14) h);
-    --surface-3: oklch(from var(--role-accent) 0.962 calc(c * 0.20) h);
+    /* 只有 `--role-tint` 从强调色派生。
+       ......................................................................
+       `--surface-2` 和 `--surface-3` 原先也在这里，从 `--role-accent` 派生——
+       于是画布改成暖中性白（Warm Ivory，#f7f6f3）之后，两个中性面仍然锁在品牌蓝的
+       色相上：老人端首页那句「今天没有要办的事」坐在一块蓝盒子里，而它周围是暖白。
+       正是我在 tokens.css 里写注释要避免的那道冷暖接缝，而它由这三行造成。
+
+       实测（CDP 量的计算值）：
+         --bg         #f7f6f3                                  暖
+         --surface-2  oklch(from #4A90D9 0.985 calc(c*0.14) h)  冷
+
+       中性面就该是中性的：它们回到 tokens.css 里的暖白值。`--role-tint` 留在这里，
+       因为它**本来就该带品牌色**——它是"这一块属于优活/无忧伴"的那层薄色，
+       而且模式一切换（蓝↔橙）它要跟着变。 */
+    /* 0.965 / 42% 实测落在 #f1fbff：B 顶到 255、G 也高于 R——那是**青色**，
+       不是蓝色，而且它是全站最冷的一个面（R−B = −14），铺在老人端「今天没有
+       要办的事」整条、四个分区控件的轨道、凭证里的引文块上。
+       降明度一点、降彩度一半，落到一个能和暖白共存的淡蓝。 */
+    --role-tint: oklch(from var(--role-accent) 0.955 calc(c * 0.22) h);
   }
   @media (prefers-color-scheme: dark) {
     :root {
+      /* 深色下同理：只留 tint。两个中性面用 tokens.css 里的暖深灰。 */
       --role-tint: oklch(from var(--role-accent) 0.30 calc(c * 0.55) h);
-      --surface-2: oklch(from var(--role-accent) 0.235 calc(c * 0.22) h);
-      --surface-3: oklch(from var(--role-accent) 0.275 calc(c * 0.26) h);
     }
   }
 }
@@ -217,7 +232,20 @@ label { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); font-
    48px rather than the 44px in Apple's HIG — the extra 4px matters for tremor
    and for reading glasses, and nothing on these pages is dense enough to need
    the space back. */
-a, button, input, textarea, select { min-height: 48px; }
+a, button, input, textarea, select { min-height: var(--tap); }
+
+/* 关键操作再高一档。
+   ..........................................................................
+   48 是地板，不是标准。「提交」「保存」这类**做完就改变了什么**的动作走 56
+   （`--tap-key`），理由和地板那 4px 一样：手抖的人按错一次代价不同——按错一个
+   Tab 只是走岔，按错一次提交是把一件事真的办了或者没办成。
+
+   判据取语义（`type="submit"` 与表单的默认提交键），不是逐个 id 点名——
+   点名会漏掉下一个加进来的表单。实测原先：家属端「同步到他的手机」51.2px、
+   老人端「保存我的习惯」49.2px，都是内容把 48 顶出去的零头，不是有人定过的高度。 */
+button[type="submit"],
+form > button:not([type]),
+#saveProfile { min-height: var(--tap-key); }
 
 /* The single authoritative focus ring. --ink rather than the role accent: this
    has to stay visible on tinted, accented and inverted surfaces alike, and
@@ -380,6 +408,28 @@ pre {
 .pill.warn { background: var(--warn-bg); color: color-mix(in srgb, var(--warn) 72%, var(--ink)); }
 .pill.bad  { background: var(--danger-bg); color: color-mix(in srgb, var(--danger) 72%, var(--ink)); }
 
+/* 「还没有记录」自己的一档：**看得见，但不喊**。
+   ......................................................................
+   `unknown` 原先和 `notice` 共用琥珀。common.js 里那段注释说得对——本该有记录却
+   一条都没有，在养老场景里必须被看见，所以它不能降成中性。但共用琥珀之后，照护页
+   那一屏上出现三个字样完全相同的琥珀块，而三段里只有一段真的偏离：一位子女扫一眼
+   得到的结论是"今天有三件事不对"，而事实是"有两件事我们没数据"。
+
+   所以给它第三档：中性底 + 一圈描边 + 正文墨色。描边是关键——它比 `.pill` 的裸底
+   更"有东西"（不会被读成占位），又不带任何情绪色。琥珀从此只表示"和他平常不一样"。
+
+   仍然不靠颜色单独区分：文字本身就写着「还没有记录」。 */
+.pill.unknown {
+  background: var(--surface-3);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.report-verdict.unknown .report-badge {
+  background: var(--surface-3);
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
 /* ------------------------------------------------------------------------
    Card heading icon chip.
    A stack of six bare <h2>s on white is a document outline: to find
@@ -445,7 +495,7 @@ body[data-mode="youhuo"] {
   --role-accent: var(--youhuo-blue);
   --role-accent-deep: var(--youhuo-blue-deep);
   --role-ink: var(--youhuo-blue-ink);
-  --role-accent-2: var(--youhuo-violet);
+  --role-accent-2: var(--youhuo-blue-shade);
   --role-glow: rgba(74, 144, 217, .32);
 }
 body[data-mode="companion"] {
@@ -455,13 +505,24 @@ body[data-mode="companion"] {
   --role-accent-2: var(--wuyou-yellow);
   --role-glow: rgba(245, 166, 35, .34);
 }
+/* 无忧伴模式原先另铺一套橙色背景 mesh。整族 mesh 已经退场（设计稿第 45 节），
+   这一套是我第一遍只清了 tokens.css 时漏掉的第二处——`test_no_ai_slop_visuals.py::
+   test_the_background_mesh_paints_nothing` 第一次跑就抓到了它。
+
+   令牌保留并置为透明，不删：base.css 里那三条 radial-gradient 仍然引用它们，
+   而未定义的自定义属性会让整条 `background` 声明失效（不是"透明"），
+   那会连 `--bg` 的底色一起弄没，整页变成浏览器默认白。
+
+   两种模式的区分不靠背景色雾：靠 `--role-accent` 那一族（橙 vs 蓝）、
+   `.mode-companion` 卡片的暖色渐变、以及屏幕边缘的呼吸光晕。 */
 body[data-mode="companion"] {
-  --bg-mesh-1: rgba(245, 166, 35, .17);
-  --bg-mesh-2: rgba(255, 212, 102, .15);
-  --bg-mesh-3: rgba(216, 134, 11, .10);
+  --bg-mesh-1: transparent;
+  --bg-mesh-2: transparent;
+  --bg-mesh-3: transparent;
 }
 
-/* Screen-edge breathing glow: blue→violet while working, orange→yellow while listening. */
+/* 屏幕边缘的呼吸光晕：办事时蓝色，倾听时橙→黄。
+   （原注释写的是 blue→violet；紫色那一端已经换成同色相的深蓝。） */
 .role-halo {
   position: fixed;
   inset: 0;
@@ -469,7 +530,9 @@ body[data-mode="companion"] {
   z-index: 40;
   box-shadow: inset 0 0 0 5px color-mix(in srgb, var(--role-accent) 26%, transparent);
   opacity: .45;
-  transition: box-shadow var(--mode-fade) ease, opacity var(--mode-fade) ease;
+  /* box-shadow 只在换身份时变（保留 1s）；opacity 是「我在听」的状态通道，
+     手机上全屏脉冲被换成静态色调之后，它就是那条信号——1s 太慢，同 `.mic-dial`。 */
+  transition: box-shadow var(--mode-fade) ease, opacity var(--dur-base) var(--ease-out);
 }
 /* The glow used to animate `box-shadow` blur radius across the whole viewport.
    Blur radius is not a compositor property: every frame re-rasterised a
@@ -483,19 +546,31 @@ body[data-mode="companion"] {
   position: absolute;
   inset: 0;
   opacity: 0;
-  will-change: opacity;
+  /* `will-change` 原先写在这里，是**永久**的——不是"动画期间"，是页面整个生命周期。
+     而这两个伪元素是 `position: fixed; inset: 0`，两个全视口合成层
+     （375×812 @DPR2 估算每层约 4.9 MB 显存）。更糟的是在 ≤760px 上它们的
+     `animation` 是 `none !important`：层被提出来，为的是一个永远不会发生的动画，
+     而这个受众用的正是入门安卓机。
+
+     挪到真正会跑动画的那两条状态规则上（见下）。 */
 }
 .role-halo::before {
-  box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-violet) 66%, transparent);
+  /* 屏幕边缘的呼吸光晕原先是紫色（`--youhuo-violet`）。设计稿第 45 节把
+     pink/purple glow 和 aurora 一起点名禁止——它是 AI 生成界面的另一个签名。
+     改成同一个蓝的深端：光晕还在（它是「正在办事」的唯一非文字信号之一），
+     颜色不再跨色相。 */
+  box-shadow: inset 0 0 70px 18px color-mix(in srgb, var(--youhuo-blue-shade) 66%, transparent);
 }
 .role-halo::after {
   box-shadow: inset 0 0 60px 16px color-mix(in srgb, var(--wuyou-yellow) 74%, transparent);
 }
 body[data-activity="processing"] .role-halo::before {
   animation: halo-fade 3.4s var(--ease-in-out) infinite;
+  will-change: opacity;
 }
 body[data-activity="listening"] .role-halo::after {
   animation: halo-fade 1.9s var(--ease-in-out) infinite;
+  will-change: opacity;
 }
 @keyframes halo-fade {
   0%, 100% { opacity: 0; }
@@ -613,15 +688,20 @@ body[data-mode="companion"] .role-icon .icon-companion { display: block; }
     var(--surface);
   transition: background var(--mode-fade) ease;
 }
-/* Hairline of role colour along the top edge of the hero card. */
-.stage::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
-  transition: background var(--mode-fade) ease;
-}
+/* `.stage::before` 已删除。
+ *
+ * 它是卡片顶边一条 3px 通长的彩色重线。两个独立的仪器指向同一处：Impeccable 的机械
+ * 检测器判它属于 side-tab 一族（「在卡片一条边上贴一道彩色重线，是 AI 生成界面最容易
+ * 辨认的痕迹」），而一次逐像素视觉审查的原话是「卡片顶边有一条通长蓝色横线…眯眼看
+ * 第一眼落在这条线上，而不是落在麦克风按钮上」。
+ *
+ * 判据不是「它不好看」，是**它不携带任何信息**：不表示状态、不表示分组、不表示进度。
+ * 而它抢走了这一屏的第一落点，那个位置属于麦克风。
+ *
+ * 先试过保留规则、只把 `content` 置成 `none`——想留下这个伪元素的历史。但检测器读的是
+ * 声明本身，读不出「它不渲染」，于是那两条会**永久**留在报告里；而一份长期挂着两条
+ * 已知误报的报告，下次真出现同类问题时没人会注意到。所以真删，历史留在这段话里。
+ * 手机上那条 `.elder-layout > .stage::before` 的覆写也随之没有对象，一并清掉了。 */
 /* 这里原先带 `position: sticky; top: 18px`，而它**从未生效过**：全站唯一的 `.rail`
    元素永远同时带 `sheet` 类（sheet.js 只 toggle `is-open`），而 `.rail.sheet` 的
    特异性 (0,2,0) 更高，在 ≤760px 是 `fixed`、≥761px 是 `static`——两段合起来覆盖
@@ -674,7 +754,20 @@ button.block { width: 100%; margin-top: var(--space-3); }
   border: 2px solid color-mix(in srgb, var(--role-accent) 30%, transparent);
   inset: 12px;
   opacity: .55;
-  transition: border-color var(--mode-fade) ease;
+  /* 状态通道不能用模式切换的令牌。
+     ......................................................................
+     `--mode-fade` 是 1000ms，为「优活 ↔ 无忧伴」那次身份 crossfade 定的（design §4.1
+     要求 ~1s，配语音播报）。但**这条边框色同时是十一态的主要通道**：processing 的
+     单弧、executing 的双弧，都是靠 border-color 只留一边画出来的。
+
+     后果：老人说完话之后，`ring-spin` 从第 0 毫秒就开始转，而弧要**整整一秒**
+     才从那圈 30% 的淡环里长出来——头一秒她看到的是一个几乎没变化的整圆在转，
+     而整圆旋转在视觉上等于静止。这个产品最核心的状态信号，被一个为别的事情定的
+     令牌拖慢了 5 倍。
+
+     `border-width` 本来就不在过渡列表里（「变粗」是瞬时的），所以这里改成
+     `--dur-base` 之后两条通道才第一次同时到达。 */
+  transition: border-color var(--dur-base) var(--ease-out);
 }
 .mic-dial::after { inset: 0; opacity: .3; }
 /* --------------------------------------------------------------------------
@@ -736,7 +829,20 @@ body[data-activity="listening"] .mic-dial::after { animation-delay: .6s; }
    和其余十态用的所有通道都不重叠。
    （第一版让环收紧到 inset 22。dial 是 200、orb 是 156，边界正好在 22——那道环
    整个被 orb 挡住，pressed 于是和 idle 一模一样。指纹不同，但它是隐形的。） */
-body[data-activity="pressed"] .mic-big {
+/* `:not(:disabled)` 不是装饰，是为了赢过 `:hover`。
+   ......................................................................
+   `.mic-big:hover:not(:disabled)`  = (0,3,0)   ← .mic-big + :hover + :disabled
+   `body[data-activity="pressed"] .mic-big` = (0,2,1)
+   3 > 2，**hover 全胜**。后果是这两态设计的形态在真实使用中根本不渲染：
+   按下时看到的是 `:hover`/`:active` 的 scale(.98)（116px→113.7px，每边 1.15px），
+   不是这里写的 scale(.94)。
+
+   加上 `:not(:disabled)` 之后变成 (0,3,1)，压过 hover，且不需要 `!important`。
+
+   为什么闸门没抓到：`check_voice_orb_states` 是在**没有指针悬停**的前提下逐个写
+   `data-activity` 再量的——它量到的是用户永远看不到的那一版。这是本轮第四次
+   「读到的那个值不是决定结果的那个值」。 */
+body[data-activity="pressed"] .mic-big:not(:disabled) {
   transform: scale(.94);
   box-shadow: var(--shadow-pressed), 0 6px 16px var(--role-glow);
 }
@@ -786,7 +892,12 @@ body[data-activity="confirming"] .mic-dial::after {
 
 /* 说话：orb 外一圈实心光晕。放在 orb 上而不在环上，因为出声的是它。
    第一版 7px / 26% 在浅色背景上看不见，也过不了灰度——加到 12px / 46%。 */
-body[data-activity="speaking"] .mic-big {
+/* `:not(:disabled)` 同 pressed，理由在那里；但这一条更要紧。
+   这圈 12px 光晕是 speaking 与 idle 的**唯一**非动效差别——环的两个伪元素在这两态下
+   像素级相同。被 hover 压掉之后，「我在说话，按一下会打断我」和「可以说话了」长得
+   一模一样，于是老人按下去打断优活自己的话。而那正是 elder.js 开头那段注释写明要修的
+   缺陷。触屏上更躲不掉：sticky hover 让她点过一次麦克风之后 `:hover` 一直挂着。 */
+body[data-activity="speaking"] .mic-big:not(:disabled) {
   box-shadow:
     0 0 0 12px color-mix(in srgb, var(--role-accent) 46%, transparent),
     0 18px 44px var(--role-glow),
@@ -826,6 +937,20 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 
 .mic-big {
   position: relative;
+  /* 话筒图形要和外圈同心。
+     ......................................................................
+     这个按钮是 `display: block`，里面的 `<svg>` 是 `display: inline` +
+     `vertical-align: baseline`——也就是说图形是按**文字基线**排的，不是按居中。
+     实测偏上 4px（390×844、412×915，按钮 116px）到 5px（900×1000，按钮 156px）。
+
+     平时这种量级看不出来，但这里能：外面正好套着一圈 `.mic-dial` 同心环，
+     把真正的圆心画了出来，图形没落在环心上就是看得见的。而这是全站第一视觉焦点、
+     也是老人唯一的主操作。
+
+     同项目其余每一个圆形容器都写了这一行——`.mic-dial`、`.role-icon`、
+     `.landing-mark`——只有最重要的这个漏了。加上之后实测偏移归零。 */
+  display: grid;
+  place-items: center;
   width: 156px; height: 156px;
   border-radius: 50%;
   font-size: 58px; line-height: 1;
@@ -921,11 +1046,10 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   box-shadow: var(--shadow-2);
   animation: bubble-in .3s cubic-bezier(.2,.8,.3,1) both;
 }
-.reliance-card::before {
-  content: "";
-  position: absolute; inset: 0 0 auto 0; height: 4px;
-  background: linear-gradient(90deg, var(--role-accent), var(--role-accent-2));
-}
+/* `.reliance-card::before` 已删除，和 `.stage::before` 同一族、同一个理由。
+   而这张卡出现在 Focus Mode 里——那一屏本来就紧（Phase 0 为它一寸一寸腾出过 4px），
+   一道不携带信息的重线在那里代价更高。
+   卡片的身份由它自己的浅色底和阴影承担，不需要顶边再画一次。 */
 .reliance-card h3 { margin: var(--space-1) 0 var(--space-3); font-size: 22px; }
 .reliance-row {
   display: grid;

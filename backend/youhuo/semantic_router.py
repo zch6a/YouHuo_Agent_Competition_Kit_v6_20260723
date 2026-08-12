@@ -98,7 +98,7 @@ class SemanticRouter:
     def _clarification(keyword_type: TaskType, model_type: TaskType) -> str:
         return (
             f"我不太确定您是想{_TASK_LABEL[keyword_type]}还是{_TASK_LABEL[model_type]}。"
-            f"请您说一句“我要{_TASK_LABEL[keyword_type]}”或“我要{_TASK_LABEL[model_type]}”。"
+            f"请您说一句「我要{_TASK_LABEL[keyword_type]}」或「我要{_TASK_LABEL[model_type]}」。"
         )
 
     @classmethod

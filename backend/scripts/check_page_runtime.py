@@ -44,8 +44,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shoot_pages import OVERFLOW_PROBE  # noqa: E402
 
-PORT = 8047
-DEVTOOLS_PORT = 9337
+#: 端口在运行时向系统要，不写死——见 `_free_port()` 的说明。
+PORT = 0
+DEVTOOLS_PORT = 0
 BASE = f"http://127.0.0.1:{PORT}"
 
 PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge", "/stage"]
@@ -63,7 +64,16 @@ CLICK_SETTLE_SECONDS = 1.6
 #: 收集到的错误会张冠李戴。真正做事的按钮一个都不放过，包括 SOS 和限时破窗：
 #: 它们是这个产品的安全路径，正因为危险才更需要每轮都真的走一遍。演示库是每次
 #: 新建的临时文件，点坏了也只坏它自己。
-SKIP_SELECTORS = "a, .back-link, .tab"
+#: 会**导航走**的控件，不按——按下去这一页就没了，后面的检查全部落在别的页面上。
+#:
+#: `.tab` 改成 `a.tab`。原写法按类名跳过所有标签，而那条规则是为家人端和照护端写的
+#: ——那两页的标签是 `<a href="/care">`，按下去真的换页。老人端改成四个 Tab 之后，
+#: 它的标签是**页内切换的 `<button>`**（`class="tab seg"`），却被同一条规则无条件
+#: 跳过：「记录」「家人」「我的」三个分区里的控件一次都没被按到，而遍历安静地结束，
+#: 只有 REQUIRED_PRESSES 那条点名把它抓了出来。
+#:
+#: 判据应该是"它会不会导航走"，而不是"它叫什么类名"。`<a>` 会，`<button>` 不会。
+SKIP_SELECTORS = "a, .back-link, a.tab"
 
 #: 会换掉整屏内容的控件，留到最后按。
 #:
@@ -85,12 +95,30 @@ DEFER_SELECTORS = ".seg, summary, [data-sheet-open]"
 #: `<summary>` 放在同一档的话，它会先被按到，把抽屉关上——于是里面的 `<summary>`
 #: 再也点不开，`#saveProfile` 报"没被按到"。实测就是这样。
 #: 所以是三档：先按此刻屏幕上的，再按会**展开**东西的，最后才按会**收起**的。
-CLOSER_SELECTORS = "[data-sheet-close]"
+#:
+#: `#focusBack` 也在这一档，而且它是"复位重按"那条规则的主要用户。老人端的 Focus Mode
+#: 是一层模态：进去之后四个 Tab 是 `display: none`，唯一出口就是它。而好几个控件
+#: （`#mic`、`#typeInstead`、`#nextOpen`、`#kinContact`）都会把界面推进这一层——
+#: 于是遍历会反复被关进去，而 `#focusBack` 只能按一次的话就再也出不来，
+#: 最后那个 Tab 里的控件永远到不了。
+CLOSER_SELECTORS = "[data-sheet-close], #focusBack"
 
-#: 单页点击遍历的次数上限。按下一个按钮可能让另一批按钮**出现**——页内分区、
-#: 抽屉、条件渲染都会——所以遍历是"按一个再找一次"，没有固定名单。这个上限只是
-#: 防止两个按钮互相召唤对方转不出去；正常页面在 20 次以内就找不到新的了。
-MAX_PRESSES = 60
+#: 点击遍历的次数上限**由页面自己的控件数算出来**，不是一个固定数字。
+#:
+#: 它守的是"两个按钮互相召唤对方，转不出去"。而真正的互相召唤必须**不断造出新元素**
+#: ——已经按过的元素在 WeakSet 里，永远不会被再按一次——所以那种情况下按下去的次数
+#: 是无界的，任何上限都会被撞破。上限的绝对值因此只需要"比这一页的真实控件数宽裕"。
+#:
+#: 原先是写死的 60。这一轮把 22 个演示控件从 `/care` 和 `/trust` 合并到 `/stage`
+#: 之后，那一页光静态按钮就有 49 个，每按一个还会生出一个装原始响应的 `<summary>`
+#: ——遍历撞上 60 就报"可能有两个按钮在互相召唤"，而实际情况是这一页真的有那么多
+#: 控件。把 60 改成 160 能让它变绿，但那是拿一个页面的实际大小去调一个本该跟着页面
+#: 大小走的数。
+#:
+#: `2 × 载入时可见的 button/summary + 80` 的余量足够装下"每个结果卡再长一个折叠区"，
+#: 而互相召唤仍然会撞破它。
+PRESS_BUDGET_SLACK = 80
+PRESS_BUDGET_FACTOR = 2
 
 #: 每一页必须被按到的控件（按 id 匹配点击遍历记下的标签）。
 #:
@@ -99,15 +127,87 @@ MAX_PRESSES = 60
 #: ——58 和 60 都像是对的。
 REQUIRED_PRESSES = {
     "/elder": ("#saveProfile", "#repeatLast", "#companionEntry", "#logEntry"),
-    "/family": ("#scheduler",),
-    # /care 与 /trust 各有四个默认折叠的分区，里面共 17 个按钮只有按过 `.seg` 之后才
-    # 可达——而它们此前一个钉子都没有，也就是说这个字典的注释说自己在守的那件事，
-    # 对这两页完全没做。名单里点的是每个折叠分区里最深的那一个，其中包括 `#sosDemo`
-    # （模拟老人主动呼救）和 `#breakGlassDemo`（限时破窗）——SKIP_SELECTORS 的注释
-    # 明确说"真正做事的按钮一个都不放过，包括 SOS 和限时破窗"。
-    "/care": ("#monthlyReport", "#medicalDemo", "#sosDemo", "#capabilitiesDemo"),
-    "/trust": ("#policyAttack", "#syncDemo", "#breakGlassDemo", "#metricsDemo"),
+    # /stage 的四层里，「演示」「证明」「工程」三层默认收起，里面 23 个按钮只有按过
+    # `.seg` 之后才可达——而它们此前一个钉子都没有，也就是说这个字典的注释说自己在守
+    # 的那件事，对这一页完全没做。
+    #
+    # 这一整份名单原先分在 `/care`（四个）和 `/trust`（四个）下面。那 22 个控件已经
+    # 整体搬到了这一页（proof-demos.js）：`#sosDemo`（模拟老人主动呼救）、
+    # `#breakGlassDemo`（限时破窗）、`#scheduler`（推进到期待办）一个都没删，只换了
+    # 位置。名单跟着搬，钉的还是同一件事——SKIP_SELECTORS 的注释明确说"真正做事的
+    # 按钮一个都不放过，包括 SOS 和限时破窗"。
+    #
+    # `#depthTechnical` 也在名单里：「工程」那一层在产品模式下是 display:none 的，
+    # 不先切到技术模式，遍历根本看不见 `#syncDemo` 和 `#capabilitiesDemo`。
+    #
+    # 名单是**全部** 23 个搬过来的控件，不是抽样。
+    #
+    # 起因是一个数字：加上 `[hidden] { display: none !important }` 之后，这一页按到的
+    # 控件从 62 掉到 50。那条规则是对的（`.stage-proof .page-section { display: grid }`
+    # 原先压过了 `hidden` 属性，四层面板同时显示，遍历因此能一次看到所有面板里的东西），
+    # 但"掉了 12 个"这件事我只能靠推理去解释——而推理不是证据。
+    #
+    # 抽样式的名单本来就答不了这个问题。改成逐个点名之后，覆盖由**名字**保证：
+    # 少按了哪一个，闸门直接说出它叫什么，不需要有人去解释一个总数的变化。
+    "/stage": (
+        # 先切到技术模式，否则「工程」那一层是 display:none 的
+        "#depthTechnical",
+        # 演示（原 /care 十二个 + 原 /family 一个）
+        "#baselineDemo", "#coldRoomDemo", "#lateWakeDemo",
+        "#routineDemo", "#monthlyReport", "#interactionDemo",
+        "#emotionDemo", "#medicalDemo",
+        "#locationInside", "#locationOutside", "#sosDemo",
+        "#scheduler",
+        # 证明（原 /trust 六个 + 同意记忆三个）
+        "#voiceSafe", "#voiceConflict", "#policySafe", "#policyAttack",
+        "#breakGlassDemo", "#sagaCreate", "#sagaAdvance",
+        "#truthDemo", "#metricsDemo",
+        "#memoryPropose", "#memoryApprove", "#memoryList",
+        # 工程
+        "#syncDemo", "#capabilitiesDemo",
+    ),
+    # /care 现在**进页面就加载**，五段全是 JS 填的内容，一个按钮都没有；
+    # /trust 只剩一份凭证。两页在这里都不再有折叠层里的必按控件——
+    # 它们的按钮全在 /stage 上面那份名单里。
 }
+
+
+#: `_free_port()` 已经发出去的端口。见那个函数的说明。
+_ISSUED_PORTS: set[int] = set()
+
+
+def _free_port() -> int:
+    """向系统要一个此刻空闲、而且这一进程内没发过的端口。
+
+    这里原先是一个写死的端口号。两份检查同时跑（比如主进程和一个并发的 agent）会
+    连到同一个 DevTools 端点上，而失败模式有两种：好的那种是
+    `ConnectionResetError: [WinError 10054]`；**坏的那种是它不报错**——一个实例的
+    `Runtime.evaluate` 落进另一个实例的标签页，点击遍历因此少按几个控件，然后报一个
+    更小的控件数，看起来正好像一次覆盖回退。
+
+    这些脚本自己拉起浏览器、自己连上去，端口号只需要在这一次运行里成立，
+    所以没有理由写死它。
+
+    **但"bind 0、读号、close"连调两次会拿到同一个号。** 操作系统完全可以把刚释放的
+    临时端口立刻再发一遍——于是 uvicorn 占了它，Chrome 再也 bind 不上，DevTools 起不来。
+    第一版就是这样，`check_page_runtime` 改成动态端口之后直接 SKIP 了。
+    所以记住这一进程内发过的号，撞上就重取。
+
+    **不要"保持 socket 打开"来占位**——我试过，那样端口对自己也是锁着的：
+    uvicorn 随后 bind 同一个号会失败，检查报 `server did not start`。
+    一个为了防冲突加的保险，把服务器挡在了门外。去重这一半就够用：
+    第一个号被 uvicorn 立刻占住之后，操作系统本来也不会再发它。
+    """
+    import socket
+    for _ in range(50):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        if port in _ISSUED_PORTS:
+            continue
+        _ISSUED_PORTS.add(port)
+        return port
+    raise RuntimeError("连 50 次都没要到一个没发过的端口")
 
 
 class CDP:
@@ -502,8 +602,35 @@ def check_voice_orb_states(tab: "CDP", page: str, failures: list[str]) -> int:
     # 这个媒体查询下，量的就得是那一套。
     tab.send("Emulation.setEmulatedMedia",
              features=[{"name": "prefers-reduced-motion", "value": "reduce"}])
+
+    # ——并且要在**指针停在麦克风上**的情况下再量一遍。
+    #
+    # 这条闸门原先只量"没有指针悬停"的那一版，而那一版用户永远看不到。实际发生过：
+    #
+    #     .mic-big:hover:not(:disabled)              (0,3,0)
+    #     body[data-activity="speaking"] .mic-big    (0,2,1)
+    #
+    # 3 > 2，hover 全胜。于是 speaking 的 12px 光晕——它与 idle 的**唯一**非动效差别
+    # ——被抹掉，两态像素相同。而 speaking 是「我在说话，按一下会打断我」：分不清它
+    # 和 idle，老人就会按下去打断优活自己的话，正是这一页开头写明要修的那个缺陷。
+    # 触屏也躲不掉：sticky hover 让她点过一次麦克风之后 `:hover` 一直挂着。
+    #
+    # 闸门当时是绿的，因为它量的是一个不会发生的场景。
+    #
+    # 必须用 `CSS.forcePseudoState`，不能用 `Input.dispatchMouseEvent`——实测后者把
+    # **8 个祖先**送进了 `:hover`，唯独没有 `#mic`，于是"量到了一致"其实是"没造出状态"。
+    mic_node = 0
     try:
-        states = tab.send("Runtime.evaluate", returnByValue=True, expression="""
+        tab.send("DOM.enable")
+        tab.send("CSS.enable")
+        root = tab.send("DOM.getDocument")["root"]["nodeId"]
+        mic_node = tab.send("DOM.querySelector", nodeId=root, selector="#mic").get("nodeId", 0)
+    except Exception as exc:                                    # noqa: BLE001
+        failures.append(f"{page}  Voice Orb：拿不到 #mic 的 DOM 节点（{exc}）——"
+                        "悬停那一半没测到，这不是通过")
+
+    def sweep() -> dict:
+        return tab.send("Runtime.evaluate", returnByValue=True, expression="""
       (() => {
         const mic = document.querySelector('#mic');
         const dial = document.querySelector('.mic-dial');
@@ -543,29 +670,47 @@ def check_voice_orb_states(tab: "CDP", page: str, failures: list[str]) -> int:
         }
       })()
     """)["result"].get("value")
+
+    try:
+        passes: dict[str, dict] = {"指针在别处": sweep()}
+        if mic_node:
+            tab.send("CSS.forcePseudoState", nodeId=mic_node, forcedPseudoClasses=["hover"])
+            passes["指针停在麦克风上"] = sweep()
+            tab.send("CSS.forcePseudoState", nodeId=mic_node, forcedPseudoClasses=[])
     finally:
         tab.send("Emulation.setEmulatedMedia", features=[])
 
+    states = passes["指针在别处"]
     if not states or states.get("skip"):
         return 0
     if states.get("error"):
         failures.append(f"{page}  Voice Orb：{states['error']}")
         return 0
 
-    shots: dict[str, str] = states["shots"]
-    if len(shots) < 10:
-        failures.append(f"{page}  Voice Orb 只有 {len(shots)} 态，任务书要的是十态起")
-    seen: dict[str, str] = {}
-    for name, fingerprint in shots.items():
-        twin = seen.get(fingerprint)
-        if twin:
-            failures.append(
-                f"{page}  Voice Orb：关掉动效后「{twin}」和「{name}」长得一模一样"
-                f"——这两态里有一个只靠动画区分"
-            )
-        else:
-            seen[fingerprint] = name
-    return len(shots)
+    counted = 0
+    for where, result in passes.items():
+        if not result or result.get("skip") or result.get("error"):
+            continue
+        shots: dict[str, str] = result["shots"]
+        counted = max(counted, len(shots))
+        if len(shots) < 10:
+            failures.append(f"{page}  Voice Orb 只有 {len(shots)} 态，任务书要的是十态起")
+        seen: dict[str, str] = {}
+        for name, fingerprint in shots.items():
+            twin = seen.get(fingerprint)
+            if twin:
+                failures.append(
+                    f"{page}  Voice Orb（{where}）：关掉动效后「{twin}」和「{name}」"
+                    f"长得一模一样——这两态里有一个只靠动画区分"
+                )
+            else:
+                seen[fingerprint] = name
+
+    # 悬停那一遍必须真的跑过。少跑一遍和通过在结果里长得一样。
+    if len(passes) < 2:
+        failures.append(f"{page}  Voice Orb：只量了「指针在别处」这一种情形，"
+                        "悬停那一半没造出来——这不是通过")
+    return counted
 
 
 def check_judge_story(tab: "CDP", page: str, failures: list[str]) -> int:
@@ -723,10 +868,56 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     每次只问"还有哪个可见的没按过"，按掉它，再问一次。多花几十次 Runtime.evaluate，
     相比每次点击 1.6 秒的收网时间可以忽略，换来的是这个数字不再是假的。
     """
-    tab.send("Runtime.evaluate", expression="window.__pressed = new WeakSet();")
+    # 按过名单要有**两把**钥匙：元素本身，以及元素的稳定身份。
+    #
+    # 只用 WeakSet（元素身份）在有数据的页面上不收敛。实测：老人端种上三条待办之后，
+    # 遍历撞到 144 次上限还没停（载入时 32 个控件），报文写的是
+    # 「可能有两个按钮在互相召唤，不断造出新元素」——而它猜对了机制、猜错了主体：
+    # 没有人在互相召唤，是 `reminderAction` 每次都 `loadReminders()` 重渲染整段，
+    # 于是「我知道了 / 已完成」这些按钮变成**全新的对象**。WeakSet 认对象，
+    # 新对象自然不在名单里，于是同一个按钮被反复按。
+    #
+    # 空态下这件事看不见（没有待办就没有那些按钮），所以这道闸门一直是绿的——
+    # 又一次「空态掩盖问题」。
+    #
+    # 第二把钥匙用**稳定身份**：id / data-* / 祖先借用，和
+    # `build_control_inventory.py` 的 `_KEY_ATTRS` 同一套概念。刻意不用可见文字：
+    # 三条待办的按钮文字完全相同（都是「我知道了」），拿文字当钥匙会让第二条待办的
+    # 按钮一次都按不到——那是把不收敛换成了漏测，更糟。
+    tab.send("Runtime.evaluate", expression="""
+      window.__pressed = new WeakSet();
+      window.__pressedKeys = new Set();
+      window.__keyOf = (el) => {
+        for (const a of ['id', 'data-section', 'data-text', 'data-run', 'data-jump',
+                         'data-sheet-open', 'data-sheet-close', 'name']) {
+          if (el.getAttribute(a)) return a + '=' + el.getAttribute(a);
+          if (el.hasAttribute(a)) return a;
+        }
+        // 自己没身份就从最近一个有身份的祖先借，再带上「它是这个容器里第几个同类」。
+        // 序号在这里是安全的：同一次遍历里 DOM 顺序稳定，而重渲染出来的第 N 个
+        // 就是上一次那第 N 个的替身——那正是我们要认出来的东西。
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const own = p.getAttribute('id') || p.getAttribute('data-panel')
+                   || p.getAttribute('data-beat');
+          if (own) {
+            const kin = [...p.querySelectorAll(el.tagName)];
+            return own + '/' + el.tagName + '[' + kin.indexOf(el) + ']';
+          }
+        }
+        return '';
+      };
+    """)
+    # 上限按这一页自己的控件数算。见 PRESS_BUDGET_SLACK 那里的说明。
+    at_load = tab.send("Runtime.evaluate", expression=(
+        "document.querySelectorAll('button, summary').length"
+    ), returnByValue=True)["result"].get("value") or 0
+    budget = PRESS_BUDGET_FACTOR * int(at_load) + PRESS_BUDGET_SLACK
     seen: list[str] = []
     pressed = 0
-    while pressed < MAX_PRESSES:
+    #: 复位按钮的重按次数上限。它不是待测功能，只是让遍历能走出模态，所以要有个头
+    #: ——否则一个"关了又自己打开"的抽屉能把这个循环钉死在这里。
+    reopens = 0
+    while pressed < budget:
         label = tab.send("Runtime.evaluate", expression=(
             "(() => {"
             f"  const skip = new Set(document.querySelectorAll('{SKIP_SELECTORS}'));"
@@ -745,6 +936,10 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
             # 一下就到，照常入选。
             "   const usable = b => {"
             "     if (skip.has(b) || b.disabled || window.__pressed.has(b)) return false;"
+            # 关闭类允许重按（见下面那段注释），所以它们不查身份名单——
+            # 否则「把界面复位」这件事只能做一次，两层模态的页面永远走不完。
+            "     if (!closer.has(b) && window.__pressedKeys.has(window.__keyOf(b)))"
+            "       return false;"
             "     const s = getComputedStyle(b);"
             "     if (s.visibility === 'hidden' || parseFloat(s.opacity) < 0.05) return false;"
             "     b.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});"
@@ -760,17 +955,53 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
             # 生活日报的分项、每个结果卡里那份「原始响应」。折叠一段内容因此等于
             # 让它退出检查，而这正是我这几轮反复用来给页面减负的手法。
             "   const all = [...document.querySelectorAll('button, summary')];"
-            "   const el = all.find(b => !defer.has(b) && !closer.has(b) && usable(b))"
-            "           || all.find(b => defer.has(b) && usable(b))"
-            "           || all.find(b => closer.has(b) && usable(b));"
+            "   let el = all.find(b => !defer.has(b) && !closer.has(b) && usable(b))"
+            "        || all.find(b => defer.has(b) && usable(b))"
+            "        || all.find(b => closer.has(b) && usable(b));"
+            # 三层都空了，再给关闭类一次机会——**即使它已经按过**。
+            #
+            # 关闭类控件的职责不是"一个待测的功能"，是"把界面复位，让遍历能继续"。
+            # 它只能按一次的话，两层模态的页面就永远走不完。老人端实测就是这样：
+            # 按下麦克风进入 Focus Mode，里面的控件按完之后唯一的出口 `#focusBack`
+            # 已经在按过名单里，而 Focus Mode 下四个 Tab 是 `display: none`——
+            # 「记录」「家人」「我的」三个分区一次都没到过，而遍历安静地结束了，
+            # 只有 REQUIRED_PRESSES 那条点名把它抓出来。
+            #
+            # 复位按钮可以重按，但要防死循环：只在没有新东西可按时才走这一条，
+            # 而且由 Python 那边数次数、超过就停。
+            "   let reopened = false;"
+            "   if (!el) {"
+            "     el = all.find(b => closer.has(b) && !skip.has(b) && !b.disabled && (() => {"
+            "       const s = getComputedStyle(b);"
+            "       if (s.visibility === 'hidden' || parseFloat(s.opacity) < 0.05) return false;"
+            "       b.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});"
+            "       const r = b.getBoundingClientRect();"
+            "       if (r.width < 1 || r.height < 1) return false;"
+            "       const x = r.left + r.width / 2, y = r.top + r.height / 2;"
+            "       if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;"
+            "       const hit = document.elementFromPoint(x, y);"
+            "       return !!hit && (hit === b || b.contains(hit) || hit.contains(b));"
+            "     })());"
+            "     reopened = !!el;"
+            "   }"
             "   if (!el) return null;"
             "   window.__pressed.add(el);"
+            "   const k = window.__keyOf(el); if (k) window.__pressedKeys.add(k);"
             "   window.__next = el;"
-            "   return (el.textContent || '').trim().slice(0, 20) + '#' + (el.id || '?');"
+            "   return (reopened ? '复位:' : '')"
+            "     + (el.textContent || '').trim().slice(0, 20) + '#' + (el.id || '?');"
             "})()"
         ), returnByValue=True)["result"].get("value")
         if not label:
             break
+        if label.startswith("复位:"):
+            reopens += 1
+            if reopens > 4:
+                failures.append(
+                    f"{page}  复位按钮重按了 {reopens} 次还有控件没露面——"
+                    "可能有个模态关不掉，或者关掉之后又自己开了"
+                )
+                break
         tab.events.clear()
         tab.send("Runtime.evaluate", expression="window.__next.click()")
         tab.drain(CLICK_SETTLE_SECONDS)
@@ -778,7 +1009,10 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
         seen.append(label)
         pressed += 1
     else:
-        failures.append(f"{page}  点击遍历到达 {MAX_PRESSES} 次上限还没停——可能有两个按钮在互相召唤")
+        failures.append(
+            f"{page}  点击遍历到达 {budget} 次上限还没停（载入时有 {at_load} 个控件）"
+            "——可能有两个按钮在互相召唤，不断造出新元素"
+        )
 
     # 抽屉背后那一层必须真的被按到。
     #
@@ -793,7 +1027,142 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     return pressed
 
 
+
+#: Focus Mode 里说完一句话之后，那一屏必须还能用。
+#:
+#: 这道检查是一个 P0 换来的。原先所有检查都在**空**的 Focus Mode 上做——一进去就量，
+#: 那时玻璃盒卡还不存在，一列东西正好装得下。而缺陷只在"说了一句、卡出现之后"显形：
+#:
+#:     .elder-focus 638      #focusBack 48
+#:     #chat          0      ← scrollHeight 383，3 条气泡，全被裁掉
+#:     #relianceHost 893     ← 一张卡比整个视口还高，且 min-height: auto 拒绝收缩
+#:     .composer    222      ← top 1159，在 844 的视口之外
+#:
+#: 她既看不见刚说的话，也够不到输入框和发送键。而点击遍历是绿的：它对 `#send` 做
+#: `scrollIntoView` 之后命中测试通过——**脚本能滚 `overflow: hidden` 的容器，手指不能**。
+FOCUS_AFTER_SPEAKING = r"""
+(async () => {
+  const enter = document.getElementById('typeInstead');
+  if (!enter) return {skip: '这一页没有打字入口'};
+  if (document.body.dataset.focus !== 'on') {
+    enter.click();
+    await new Promise(r => setTimeout(r, 300));
+  }
+  if (document.body.dataset.focus !== 'on') return {fail: '按了打字入口也没进 Focus Mode'};
+
+  const text = document.getElementById('text');
+  const send = document.getElementById('send');
+  if (!text || !send) return {fail: 'Focus Mode 里没有输入框或发送键'};
+  text.value = '帮我交这个月的水费';
+  text.dispatchEvent(new Event('input', {bubbles: true}));
+  send.click();
+  // 一次真实往返，加上玻璃盒卡自己那一次请求。
+  await new Promise(r => setTimeout(r, 9000));
+
+  const stage = document.querySelector('.elder-layout .stage');
+  const focus = document.querySelector('.elder-focus');
+  const chat = document.getElementById('chat');
+  const composer = document.querySelector('.composer');
+  if (!stage || !focus || !chat || !composer) return {fail: 'Focus Mode 的结构变了'};
+
+  const sr = stage.getBoundingClientRect();
+  const cr = composer.getBoundingClientRect();
+  const kids = [...focus.children].map(el => ({
+    what: el.tagName + (el.id ? '#' + el.id : '.' + String(el.className).split(' ')[0]),
+    h: Math.round(el.getBoundingClientRect().height),
+  }));
+  return {
+    focus: document.body.dataset.focus,
+    bubbles: chat.children.length,
+    // 卡到底出没出现。Python 那边靠它判断"这一轮有没有造出被测状态"——
+    // 没有这个数，卡不出现时下面每条断言都会轻松通过，而它们其实什么都没量到。
+    relianceKids: (document.getElementById('relianceHost') || {children: []}).children.length,
+    chatH: Math.round(chat.getBoundingClientRect().height),
+    chatScrollH: chat.scrollHeight,
+    composerBottom: Math.round(cr.bottom),
+    composerTop: Math.round(cr.top),
+    stageBottom: Math.round(sr.bottom),
+    focusH: Math.round(focus.getBoundingClientRect().height),
+    kidsSum: kids.reduce((a, k) => a + k.h, 0),
+    kids,
+  };
+})()
+"""
+
+
+def check_focus_mode_after_speaking(tab: "CDP", page: str, failures: list[str]) -> None:
+    """说完一句话之后，她还看得见、还够得到。见 FOCUS_AFTER_SPEAKING 的说明。"""
+    if page != "/elder":
+        return
+    result = tab.send(
+        "Runtime.evaluate", expression=FOCUS_AFTER_SPEAKING,
+        awaitPromise=True, returnByValue=True,
+    )["result"].get("value") or {}
+    if result.get("skip"):
+        failures.append(f"{page} Focus Mode 检查跳过了：{result['skip']}——这一页应该有打字入口")
+        return
+    if result.get("fail"):
+        failures.append(f"{page} Focus Mode：{result['fail']}")
+        return
+    if not result.get("bubbles"):
+        failures.append(f"{page} Focus Mode：说了一句话之后对话区里一条气泡都没有")
+        return
+
+    # **没造出被测状态时要说出来，不能静默通过。**
+    #
+    # 这道检查真正要量的是"玻璃盒卡出现之后那一列还装不装得下"。而卡是否出现取决于
+    # 后端对这张账单的幂等判断：同一张账单第二次提交返回 `duplicate_blocked`，于是
+    # 没有 `task_id`、`showGlassBox` 直接清空、卡高度为 0——一列东西轻松装得下，
+    # 下面每一条断言都过，检查报绿。
+    #
+    # CDP 实测两种结果：卡不在时 relianceHost 高 0，卡在时 222。也就是说这道检查
+    # **是否测到东西，取决于数据库当前历史和执行顺序**。我为它写的两次变异都没红，
+    # 两次都是恰好落在"卡不在"那一边。
+    #
+    # 几何判据的权威已经搬到 `check_focus_geometry.py`（构造三组 card 直接调
+    # `renderGlassBox`，5 视口 × 3 Case，三路变异全红）。这一道留着，是因为它测的是
+    # "**真的**说一句话"这条端到端路径——那是另一件事，仍然值得每轮跑。
+    #
+    # 但它必须诚实：跑不到被测场景时要说"没造出来"，而不是把"什么都没测到"记成通过。
+    if not result.get("relianceKids"):
+        failures.append(
+            f"{page} Focus Mode：说完话之后玻璃盒卡没有出现（relianceHost 是空的），"
+            "这一轮没有造出被测状态——多半是这张账单已经被 duplicate_blocked。"
+            "几何判据看 check_focus_geometry.py（那一道是确定性的）；"
+            "这一条报红是为了不把「什么都没测到」记成通过。"
+        )
+        return
+
+    #: 她必须看得见自己刚说的那句话。80px ≈ 两行 17px 正文加行距，比这更少就只剩半句。
+    if result["chatH"] < 80:
+        failures.append(
+            f"{page} Focus Mode 说完一句话之后对话区只有 {result['chatH']}px"
+            f"（里面有 {result['bubbles']} 条气泡、内容 {result['chatScrollH']}px）"
+            "——她看不见自己刚说的话"
+        )
+    #: 输入行必须整块在容器内。`.stage` 是 overflow: hidden，掉出去就够不到。
+    if result["composerBottom"] > result["stageBottom"] + 1:
+        failures.append(
+            f"{page} Focus Mode 的输入行底边在 {result['composerBottom']}，"
+            f"而容器底边是 {result['stageBottom']}——超出 "
+            f"{result['composerBottom'] - result['stageBottom']}px，她够不到发送键。"
+            f"各块高度：{result['kids']}"
+        )
+    #: 通式：没有任何一块被裁掉。只查上面两条的话，下一个被挤出去的块会安静消失。
+    if result["kidsSum"] > result["focusH"] + 2:
+        failures.append(
+            f"{page} Focus Mode 里各块高度之和 {result['kidsSum']} > 容器 {result['focusH']}"
+            f"——有东西被 overflow: hidden 吃掉了：{result['kids']}"
+        )
+
+
 def main() -> int:
+    # 端口在这里才定下来。写死的端口会让两份同时跑的检查连到同一个 DevTools
+    # 端点上，而那种污染的失败模式是「控件数变小」，看起来像覆盖回退。
+    global PORT, DEVTOOLS_PORT, BASE
+    PORT = _free_port()
+    DEVTOOLS_PORT = _free_port()
+    BASE = f"http://127.0.0.1:{PORT}"
     try:
         import websocket  # type: ignore
     except ImportError:
@@ -841,6 +1210,9 @@ def main() -> int:
     browser_proc = None
     failures: list[str] = []
     clicked = 0
+    #: 每页按了多少。总数掉了的时候，只有这份分页明细能说出是哪一页掉的
+    #: ——而「哪一页」决定了那是修正还是新缺陷。
+    per_page: dict[str, int] = {}
     orb_states = 0
     beats = 0
     try:
@@ -871,8 +1243,18 @@ def main() -> int:
             except Exception:
                 time.sleep(0.4)
         if not ws_url:
-            print("SKIP page_runtime: browser devtools unavailable")
-            return 0
+            # **失败，不是跳过。**
+            #
+            # 上面那处 `if not chrome` 的 SKIP 是诚实的：一台没装 Chrome 的机器
+            # 确实跑不了这个检查。而走到这里意味着 Chrome **在**，只是 DevTools 没起来
+            # ——那是一个真的故障（端口被占、profile 被锁、上一次的进程没退干净）。
+            #
+            # 它原先打印 SKIP 然后 `return 0`，也就是在整条验证栈里留下一个永远绿的
+            # 格子。这个项目的规则是"禁止伪造 PASS"：跑不起来的检查必须响亮地红。
+            print(f"FAIL page_runtime: Chrome 在（{chrome}）但 DevTools 没起来"
+                  f"——端口 {DEVTOOLS_PORT} 上没有 /json/version。"
+                  "常见原因：上一次的 headless 进程没退干净，或者 profile 被锁。")
+            return 1
 
         browser = CDP(ws_url, websocket)
         for page in PAGES:
@@ -909,7 +1291,14 @@ def main() -> int:
                 check_glass_box(tab, page, failures)
                 failures.extend(collect(tab.events, f"{page} 玻璃盒"))
                 tab.events.clear()
-                clicked += press_every_control(tab, page, failures)
+                per_page[page] = press_every_control(tab, page, failures)
+                clicked += per_page[page]
+                # 说完一句话之后那一屏还能不能用。**必须在点击遍历之后**：
+                # 遍历会把界面按到各种状态，而这道检查要的是"她真的说了一句"之后的
+                # 那一屏，不是一个空的 Focus Mode。
+                tab.events.clear()
+                check_focus_mode_after_speaking(tab, page, failures)
+                failures.extend(collect(tab.events, f"{page} 说完一句话之后"))
                 orb_states += check_voice_orb_states(tab, page, failures)
                 beats += check_judge_story(tab, page, failures)
                 check_identity_self_heal(tab, page, failures)
@@ -941,6 +1330,8 @@ def main() -> int:
     if beats < 7:
         print(f"FAIL page_runtime: 评委页七拍只演了 {beats} 拍——检查没真的跑起来")
         return 1
+    print("  按到的控件（按页）：" + "、".join(
+        f"{page} {count}" for page, count in per_page.items()))
     print(f"OK page_runtime: {len(PAGES)} 个页面加载干净，{clicked} 个控件逐个按过，"
           f"Voice Orb {orb_states} 态在关掉动效后两两可辨，评委页 {beats} 拍演完且全中文，"
           f"手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求")

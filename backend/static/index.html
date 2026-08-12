@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
   <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo">
+<body data-mode="youhuo" data-surface="consumer">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段

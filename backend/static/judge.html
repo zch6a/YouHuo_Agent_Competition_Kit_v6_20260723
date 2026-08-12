@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
   <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fb" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
   <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body class="judge-body" data-mode="youhuo">
+<body class="judge-body" data-mode="youhuo" data-surface="professional">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -39,8 +39,9 @@
     <header class="topbar judge-header">
       <div>
         <h1>一位老人交一次水费，中间发生了七件事</h1>
-        <p class="lead">下面七拍跟着<strong>同一件事</strong>走，每一句都是真实接口的真实返回。
-          每一拍可以单独重跑，也可以展开看原始响应。</p>
+        <p class="lead">左边七拍跟着<strong>同一件事</strong>走，右边那台手机里跑的是
+          <strong>真实的应用本身</strong>——不是录屏，也不是截图。她的两句话是真的填进
+          输入框、真的按了发送；这一页写出来的每个数字都来自任务记录和审计链。</p>
       </div>
       <a class="back-link" href="/">← 返回首页</a>
     </header>
@@ -53,127 +54,164 @@
       <p class="notice good care-status" id="judgeStatus" aria-live="polite">正在建立评委演示环境……</p>
     </div>
 
-    <!-- 七拍，跟着**同一件事**走。
-         这一页原先是五个各自独立的机制演示：语音共识、认知负荷、安全预演、玻璃盒、
-         证据板。每一个都真、都能跑，但五个加起来不是一个故事——评委得自己把五段
-         拼成"一位老人交了一次水费"。而且 h2 上写的是机制名（「N-best语音共识」
-         「认知负荷治理器」），故事被压在 eyebrow 那行小字里。
+    <!-- 两栏：左边是七拍，右边是一台真手机。
+         ......................................................................
+         这一页原先只有左边这一列。七句话说的都是真的，但"真"这件事得由评委相信
+         我——他看不到那台手机上到此刻长什么样。设计稿第 36 节的判据因此是"左边点到
+         哪一拍，右边就得是那一步的真实界面"。
 
-         现在是七拍，讲一件事：她开口 → 听不清就不猜 → 一次只问一件 → 不听图片的
-         金额 → 复述 → 家人点头 → 办好并说清楚。
+         右边不是一张图，是一个同源 iframe，做法照抄 /stage：`--want-w` / `--want-h`
+         提尺寸需求，上限由 CSS 钳（JS 不知道窗口有多高，CSS 不知道这一页想要哪一档）。 -->
+    <div class="judge-story-layout">
+      <!-- 七拍，跟着**同一件事**走。
+           这一页原先是五个各自独立的机制演示：语音共识、认知负荷、安全预演、玻璃盒、
+           证据板。每一个都真、都能跑，但五个加起来不是一个故事——评委得自己把五段
+           拼成"一位老人交了一次水费"。而且 h2 上写的是机制名（「N-best语音共识」
+           「认知负荷治理器」），故事被压在 eyebrow 那行小字里。
 
-         每一拍两层：
-           Product 层（默认可见）——这一拍上真实发生了什么，用她听得懂的话说。
-                                   这句话由**真实响应**填写，不是写死的文案。
-           Proof 层（折叠）——机制名、接口、原始响应，以及单独重跑这一拍的按钮。
+           现在是七拍，讲一件事：她开口 → 听不清就不猜 → 一次只问一件 → 不听图片的
+           金额 → 复述 → 家人点头 → 办好并说清楚。
 
-         默认展开 Product 层，是因为"这东西是干什么的"必须先于"它怎么实现的"。 -->
-    <section class="story" aria-label="七拍演示">
-      <article class="beat" data-beat="01">
-        <div class="beat-index" aria-hidden="true">01</div>
-        <div class="beat-body">
-          <h2 class="beat-title">她开口</h2>
-          <p class="beat-say" id="say-01">「帮我交这个月的水费。」</p>
-          <p class="beat-why">这就是全部输入。没有表单，没有菜单，没有「请选择业务类型」。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">这一轮真的发给了 /v2/chat</p>
-            <button type="button" class="secondary" data-run="runOpen">单独跑这一拍</button>
-            <div class="result" id="beatOpen" aria-live="polite"></div>
-          </details>
+           每一拍两层：
+             Product 层（默认可见）——这一拍上真实发生了什么，用她听得懂的话说。
+                                     这句话由**真实响应**填写，不是写死的文案。
+             Proof 层（折叠）——机制名、接口、原始响应，以及单独重跑这一拍的按钮。
+
+           默认展开 Product 层，是因为"这东西是干什么的"必须先于"它怎么实现的"。
+
+           序号从 `<div>` 换成了 `<button>`：它本来就是这一拍的状态指示（演过的上色、
+           当前的带光晕），现在它同时是跳转控件——"当前那一拍高亮，可以点任意一拍跳
+           过去"里的"点"，落在那个已经代表这一拍的东西上，而不是再加一排按钮。
+           点它只换右边那台手机装到哪一步，**不重跑**这一拍；重跑的按钮在这一拍自己
+           的证据里，两个控件各做一件事。 -->
+      <section class="story" aria-label="七拍演示">
+        <article class="beat" data-beat="01">
+          <button type="button" class="beat-index beat-jump" data-jump="01"
+                  aria-label="第 1 拍，她开口：把右边那台手机装到这一步">01</button>
+          <div class="beat-body">
+            <h2 class="beat-title">她开口</h2>
+            <p class="beat-say" id="say-01">「帮我交这个月的水费。」</p>
+            <p class="beat-why">这就是全部输入。没有表单，没有菜单，没有「请选择业务类型」。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">手机里的老人端真的发了 /v2/chat；这一页读的是 /v2/tasks</p>
+              <button type="button" class="secondary" data-run="runOpen">单独跑这一拍</button>
+              <div class="result" id="beatOpen" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="02">
+          <button type="button" class="beat-index beat-jump" data-jump="02"
+                  aria-label="第 2 拍，听不清就不猜：把右边那台手机装到这一步">02</button>
+          <div class="beat-body">
+            <h2 class="beat-title">听不清，就不猜</h2>
+            <p class="beat-say" id="say-02">两路识别打起来了：一路听成「确认办理」，一路听成「取消办理」。</p>
+            <p class="beat-why">语音在老人身上本来就不准。系统这时候有两个选择——按置信度高的那个执行，或者停下来问。凡是有副作用的动作，优活一律停下来问。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">N-best 语音共识 · /v5/voice/resolve</p>
+              <button type="button" class="secondary" data-run="runVoice">单独跑这一拍</button>
+              <div class="result" id="demoVoiceOut" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="03">
+          <button type="button" class="beat-index beat-jump" data-jump="03"
+                  aria-label="第 3 拍，一次只问一件事：把右边那台手机装到这一步">03</button>
+          <div class="beat-body">
+            <h2 class="beat-title">一次只问一件事</h2>
+            <p class="beat-say" id="say-03">这一轮只呈现一个动作，并且要她复述，而不是给她四个按钮。</p>
+            <p class="beat-why">适老化不是把字号调大。四个选项对一位记忆力下降的老人不是「更自由」，是四倍的负担。风险越高，信息密度越要往下压。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">认知负荷治理 · /v6/interaction/plan</p>
+              <button type="button" class="secondary" data-run="runLoad">单独跑这一拍</button>
+              <div class="result" id="demoLoadOut" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="04">
+          <button type="button" class="beat-index beat-jump" data-jump="04"
+                  aria-label="第 4 拍，账单图片说 9999.99：把右边那台手机装到这一步">04</button>
+          <div class="beat-body">
+            <h2 class="beat-title">账单图片说 9999.99，优活不听它的</h2>
+            <p class="beat-say" id="say-04">图片里的金额和「直接支付」指令都被剥掉了，只有账单接口返回的数字进得了工具参数。</p>
+            <p class="beat-why">这是这个项目的安全主线：<strong>别人写的字，不算你的指令</strong>。OCR、网页、短信、模型自己的输出，全部只是数据。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">目的绑定安全预演 · /v6/actions/preview</p>
+              <button type="button" class="secondary" data-run="runPreview">单独跑这一拍</button>
+              <div class="result" id="demoPreviewOut" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="05">
+          <button type="button" class="beat-index beat-jump" data-jump="05"
+                  aria-label="第 5 拍，她得把金额念一遍：把右边那台手机装到这一步">05</button>
+          <div class="beat-body">
+            <h2 class="beat-title">她得把金额念一遍</h2>
+            <p class="beat-say" id="say-05">念对了才继续；念错了就停下，不会按听到的数字去付。</p>
+            <p class="beat-why">一句「好的」证明不了她听懂了金额。复述确认是这一步唯一算数的证据。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">复述确认 · 手机上真的念了一遍 · 事实取自 /v2/audit</p>
+              <button type="button" class="secondary" data-run="runTeachBack">单独跑这一拍</button>
+              <div class="result" id="beatTeach" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="06">
+          <button type="button" class="beat-index beat-jump" data-jump="06"
+                  aria-label="第 6 拍，第二个人点头：把右边那台手机装到这一步">06</button>
+          <div class="beat-body">
+            <h2 class="beat-title">第二个人点头</h2>
+            <p class="beat-say" id="say-06">女儿点了同意，而她同意的摘要和老人确认的是同一个。</p>
+            <p class="beat-why">高风险的事不由一个人拍板，也不由模型拍板。两个摘要对不上就不执行——这是「家庭共识」那条底线的实现，不是它的说法。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">家人接力 · /v2/family/approve</p>
+              <button type="button" class="secondary" data-run="runRelay">单独跑这一拍</button>
+              <div class="result" id="beatRelay" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+
+        <article class="beat" data-beat="07">
+          <button type="button" class="beat-index beat-jump" data-jump="07"
+                  aria-label="第 7 拍，办好了而且说得清为什么：把右边那台手机装到这一步">07</button>
+          <div class="beat-body">
+            <h2 class="beat-title">办好了，而且说得清为什么</h2>
+            <p class="beat-say" id="say-07">听到了什么、哪些来源核验过、谁做最终决定、下一步是什么、能不能撤。</p>
+            <p class="beat-why">玻璃盒不是给工程师看的日志，是给老人看的一段话。她要能从盲目信任变成知情依赖——知道什么时候该信，什么时候该问女儿。</p>
+            <details class="beat-proof">
+              <summary>看这一拍的证据</summary>
+              <p class="beat-proof-label">玻璃盒依赖校准卡 · /v6/reliance/card</p>
+              <button type="button" class="secondary" data-run="runCard">单独跑这一拍</button>
+              <div class="glass-card" id="glassCard" aria-live="polite"></div>
+            </details>
+          </div>
+        </article>
+      </section>
+
+      <!-- 手机。它不是插图，是这一页的第二个论点：左边说的话，在这台机器上能当场核对。
+           真 iframe，不是 transform: scale()——App 必须在 390px 视口里真的跑起来：
+           媒体查询、env(safe-area-inset-*)、100dvh、抽屉的 position: fixed 全都依赖
+           真实视口宽度。缩放只是把桌面布局拍小。 -->
+      <div class="stage-viewport judge-stage">
+        <div class="device" id="judgePhone">
+          <div class="device-screen">
+            <iframe id="judgePhoneFrame" src="/elder" title="优活老人端（框里跑的是真实应用）" allow="microphone"></iframe>
+          </div>
         </div>
-      </article>
-
-      <article class="beat" data-beat="02">
-        <div class="beat-index" aria-hidden="true">02</div>
-        <div class="beat-body">
-          <h2 class="beat-title">听不清，就不猜</h2>
-          <p class="beat-say" id="say-02">两路识别打起来了：一路听成「确认办理」，一路听成「取消办理」。</p>
-          <p class="beat-why">语音在老人身上本来就不准。系统这时候有两个选择——按置信度高的那个执行，或者停下来问。凡是有副作用的动作，优活一律停下来问。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">N-best 语音共识 · /v5/voice/resolve</p>
-            <button type="button" class="secondary" data-run="runVoice">单独跑这一拍</button>
-            <div class="result" id="demoVoiceOut" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-
-      <article class="beat" data-beat="03">
-        <div class="beat-index" aria-hidden="true">03</div>
-        <div class="beat-body">
-          <h2 class="beat-title">一次只问一件事</h2>
-          <p class="beat-say" id="say-03">这一轮只呈现一个动作，并且要她复述，而不是给她四个按钮。</p>
-          <p class="beat-why">适老化不是把字号调大。四个选项对一位记忆力下降的老人不是「更自由」，是四倍的负担。风险越高，信息密度越要往下压。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">认知负荷治理 · /v6/interaction/plan</p>
-            <button type="button" class="secondary" data-run="runLoad">单独跑这一拍</button>
-            <div class="result" id="demoLoadOut" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-
-      <article class="beat" data-beat="04">
-        <div class="beat-index" aria-hidden="true">04</div>
-        <div class="beat-body">
-          <h2 class="beat-title">账单图片说 9999.99，优活不听它的</h2>
-          <p class="beat-say" id="say-04">图片里的金额和「直接支付」指令都被剥掉了，只有账单接口返回的数字进得了工具参数。</p>
-          <p class="beat-why">这是这个项目的安全主线：<strong>别人写的字，不算你的指令</strong>。OCR、网页、短信、模型自己的输出，全部只是数据。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">目的绑定安全预演 · /v6/actions/preview</p>
-            <button type="button" class="secondary" data-run="runPreview">单独跑这一拍</button>
-            <div class="result" id="demoPreviewOut" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-
-      <article class="beat" data-beat="05">
-        <div class="beat-index" aria-hidden="true">05</div>
-        <div class="beat-body">
-          <h2 class="beat-title">她得把金额念一遍</h2>
-          <p class="beat-say" id="say-05">念对了才继续；念错了就停下，不会按听到的数字去付。</p>
-          <p class="beat-why">一句「好的」证明不了她听懂了金额。复述确认是这一步唯一算数的证据。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">复述确认 · 真实任务状态机</p>
-            <button type="button" class="secondary" data-run="runTeachBack">单独跑这一拍</button>
-            <div class="result" id="beatTeach" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-
-      <article class="beat" data-beat="06">
-        <div class="beat-index" aria-hidden="true">06</div>
-        <div class="beat-body">
-          <h2 class="beat-title">第二个人点头</h2>
-          <p class="beat-say" id="say-06">女儿点了同意，而她同意的摘要和老人确认的是同一个。</p>
-          <p class="beat-why">高风险的事不由一个人拍板，也不由模型拍板。两个摘要对不上就不执行——这是「家庭共识」那条底线的实现，不是它的说法。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">家人接力 · /v2/family/approve</p>
-            <button type="button" class="secondary" data-run="runRelay">单独跑这一拍</button>
-            <div class="result" id="beatRelay" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-
-      <article class="beat" data-beat="07">
-        <div class="beat-index" aria-hidden="true">07</div>
-        <div class="beat-body">
-          <h2 class="beat-title">办好了，而且说得清为什么</h2>
-          <p class="beat-say" id="say-07">听到了什么、哪些来源核验过、谁做最终决定、下一步是什么、能不能撤。</p>
-          <p class="beat-why">玻璃盒不是给工程师看的日志，是给老人看的一段话。她要能从盲目信任变成知情依赖——知道什么时候该信，什么时候该问女儿。</p>
-          <details class="beat-proof">
-            <summary>看这一拍的证据</summary>
-            <p class="beat-proof-label">玻璃盒依赖校准卡 · /v6/reliance/card</p>
-            <button type="button" class="secondary" data-run="runCard">单独跑这一拍</button>
-            <div class="glass-card" id="glassCard" aria-live="polite"></div>
-          </details>
-        </div>
-      </article>
-    </section>
+        <p class="device-caption" id="judgePhoneCaption">老人端 · 390 × 844</p>
+        <p class="stage-note" id="judgePhoneHint" role="status" aria-live="polite">框里是真实的应用本身。按「从头演一遍」，或者点左边任意一拍的序号。</p>
+      </div>
+    </div>
 
     <!-- 证据板从故事线里搬出来。
          它不是这件事的一拍——它是关于这个项目本身的元信息（四项评分各有什么证据、

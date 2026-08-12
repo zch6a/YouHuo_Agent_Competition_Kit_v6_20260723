@@ -13,6 +13,29 @@ from .security import SafetyPolicy
 from .utils import combine_date_time, new_id
 
 
+def _period_words(period: str) -> str:
+    """`2026-07` → `7 月`。
+
+    这句话会被念给一位视力在下降的老人听。`2026-07` 是给机器看的写法——
+    `speech.js` 会把它读成什么不好说，而屏幕上它也是一串需要她自己翻译的字符。
+    她关心的只是"哪个月"，而账单永远是当年的。
+
+    认不出格式就原样返回：宁可露出原值，也不要把一个没预料到的字符串猜成某个月份。
+    """
+    parts = str(period or "").split("-")
+    if len(parts) == 2 and parts[1].isdigit():
+        return f"{int(parts[1])} 月"
+    return str(period or "")
+
+
+def _date_words(value: str) -> str:
+    """`2026-07-28` → `7 月 28 日`。理由同 `_period_words`。"""
+    parts = str(value or "").split("-")
+    if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
+        return f"{int(parts[1])} 月 {int(parts[2])} 日"
+    return str(value or "")
+
+
 class Clock(Protocol):
     def now(self) -> datetime: ...
 
@@ -170,7 +193,10 @@ class BillingService:
                 "amount_cents": row["amount_cents"],
                 "due_date": row["due_date"],
             },
-            user_message=f"查到{row['period']}的{row['bill_type']}是{amount:.2f}元，截止日期是{row['due_date']}。",
+            user_message=(
+                f"查到{_period_words(row['period'])}的{row['bill_type']}是{amount:.2f}元，"
+                f"截止日期是{_date_words(row['due_date'])}。"
+            ),
         )
 
     def create_payment_request(self, slots: dict[str, Any], *, task_id: str) -> ToolResult:
@@ -358,7 +384,7 @@ class SchedulerService:
                 recipient_role=ActorRole.ELDER,
                 event_type="reminder_advance_notice",
                 entity_id=reminder.id,
-                message=f"提前提醒：{self._remaining_label(reminder.due_at, now)}就到“{reminder.title}”了。",
+                message=f"提前提醒：{self._remaining_label(reminder.due_at, now)}就到「{reminder.title}」了。",
             )
             sent += 1
         return sent
@@ -398,7 +424,7 @@ class SchedulerService:
                         recipient_role=ActorRole.FAMILY,
                         event_type="reminder_escalated",
                         entity_id=reminder.id,
-                        message=f"老人待办“{reminder.title}”到期后仍未确认完成，请及时联系。",
+                        message=f"老人待办「{reminder.title}」到期后仍未确认完成，请及时联系。",
                     )
                     if db.update_reminder_status(reminder.id, ReminderStatus.ESCALATED, "escalated_at", now):
                         escalated += 1

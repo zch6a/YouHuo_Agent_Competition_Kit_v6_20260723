@@ -20,6 +20,25 @@
    禁止。「CSS 藏、CSS 失效即现」是这个约束下唯一还能工作的机制。 */
 .needs-server { display: none; }
 
+/* `hidden` 属性必须赢。
+   ..........................................................................
+   `hidden` 的隐藏效果来自 UA 样式表的 `display: none`，而**任何**作者写的 `display`
+   都压过它。这个项目里 `initSections()` 就是靠 `panel.hidden = true` 切页内分区的
+   ——四个页面、十七个分区全走这一条。
+
+   实测撞到的那一次：我给老人端首页面板加了 `display: flex`（为了让麦克风在剩余高度
+   里居中），首页面板于是**永不隐藏**，麦克风的光环压在「我的」那一页的字号和保存
+   按钮上。CDP 量出来 `#fontScale` 和 `#saveProfile` 的命中测试落在 `DIV.mic-dial` 上。
+
+   而三道闸门里没有一道会红：对比度只读计算颜色，溢出探针只量横向，
+   截图看的是当前那一个 Tab。只有 `check_page_runtime` 的"这些控件必须被按到"
+   点名把它抓了出来。
+
+   `!important` 在这里是对的，而且是唯一对的：这条规则要表达的正是"它必须赢"。
+   逐个给选择器加 `:not([hidden])` 只能修已经知道的那一处，下一个人加 `display`
+   时同样的洞会再开一次。 */
+[hidden] { display: none !important; }
+
 /* Grid items default to min-width:auto, so a long placeholder or an unbreakable
    token can push a track past the viewport. Every grid in this file wants the
    track to shrink instead. */

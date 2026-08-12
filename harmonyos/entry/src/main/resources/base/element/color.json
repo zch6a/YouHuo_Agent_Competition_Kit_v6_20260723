@@ -1,6 +1,6 @@
 {
   "color": [
-    { "name": "start_window_background", "value": "#F5F7FB" },
+    { "name": "start_window_background", "value": "#F7F6F3" },
 
     { "name": "youhuo_blue", "value": "#4A90D9" },
     { "name": "youhuo_blue_deep", "value": "#2F6FB5" },
@@ -9,12 +9,12 @@
     { "name": "wuyou_orange_deep", "value": "#9E5D00" },
     { "name": "wuyou_tint", "value": "#FDF1DE" },
 
-    { "name": "bg", "value": "#F4F6FB" },
+    { "name": "bg", "value": "#F7F6F3" },
     { "name": "surface", "value": "#FFFFFF" },
-    { "name": "surface_2", "value": "#F7F9FD" },
-    { "name": "surface_3", "value": "#EEF2F9" },
-    { "name": "line", "value": "#E3E8F1" },
-    { "name": "line_strong", "value": "#CFD7E6" },
+    { "name": "surface_2", "value": "#FAF9F6" },
+    { "name": "surface_3", "value": "#F1EFEA" },
+    { "name": "line", "value": "#E6E3DC" },
+    { "name": "line_strong", "value": "#D3CEC3" },
 
     { "name": "ink", "value": "#0F1729" },
     { "name": "ink_2", "value": "#3F4B64" },

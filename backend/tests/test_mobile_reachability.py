@@ -246,9 +246,21 @@ REACH_VIEWPORTS = [
     (667, 375, "iPhone SE 横"),
 ]
 
+#: 探针要量的那个元素，按 Focus Mode 的开关分两种。
+#:
+#: 重构之后首页不再有输入行——它和对话一起搬进了 Focus Mode（`body[data-focus="on"]`）。
+#: 这条闸门守的性质**一个字没变**：打字是语音失败时唯一的退路，在 Firefox 上
+#: （没有 Web Speech）是唯一的入口，所以它必须永远够得到。
+#:
+#: 但"够得到"的判据跟着结构变成了两条：
+#:   ① 首页第一屏必须有一个**通往打字的可见入口**（`#typeInstead`），命中区 ≥48；
+#:   ② 按下它之后，Focus Mode 第一屏必须**整个**包含 `#text`。
+#:
+#: 只留其中任何一条都会漏掉一半：只查 ① 的话输入框可以在 Focus Mode 里也够不到；
+#: 只查 ② 的话首页可能根本没有入口，而 Focus Mode 永远进不去。
 REACH_PROBE = r"""
 (() => {
-  const el = document.querySelector('#text');
+  const el = document.querySelector(SELECTOR);
   if (!el) return JSON.stringify({missing: true});
   const cs = getComputedStyle(el);
   const r = el.getBoundingClientRect();
@@ -272,9 +284,13 @@ REACH_PROBE = r"""
 
 
 def test_the_typing_route_is_in_the_first_screen_on_every_viewport(tmp_path):
-    """七个视口下，`#text` 都必须整个在首屏里，而且中心点点得到。
+    """七个视口下，打字这条退路都必须在第一屏，两段都算。
 
-    实测（改之前）：
+    ① 首页第一屏必须有 `#typeInstead`（「用打字说」），整个在屏内、中心点点得到、
+       命中区 ≥48×48；
+    ② 按下它进入 Focus Mode 之后，第一屏必须**整个**包含 `#text`。
+
+    实测（这条闸门第一次建起来时，改之前）：
 
         1024×768 iPad 横      首屏外 156px
         1280×800 笔记本       首屏外 138px
@@ -282,6 +298,13 @@ def test_the_typing_route_is_in_the_first_screen_on_every_viewport(tmp_path):
 
     根因是那一整套定高处理挂在 `max-width: 760px` 下。把手机转 90°，宽度变成 844，
     整套失效——而宽度从来不是这件事的判据：一屏够不够放下家具，问的是高度。
+
+    重构把 `#text` 从首页搬进了 Focus Mode，所以判据从一段变成两段，**但守的性质
+    一个字没变**：打字是语音失败时唯一的退路（Web Speech 在 Firefox 上不存在，
+    权限被拒、没麦克风、网络不好时都会失败），它必须永远够得到。
+
+    只留其中一条都会漏掉一半：只查 ① 的话输入框可以在 Focus Mode 里也够不到；
+    只查 ② 的话首页可能根本没有入口，Focus Mode 永远进不去。
 
     "整个在首屏"而不是"露出一点"：一个只露出 4px 上边缘的输入框，对一位手抖、
     看不清小字的老人来说和不存在没有区别。
@@ -303,6 +326,17 @@ def test_the_typing_route_is_in_the_first_screen_on_every_viewport(tmp_path):
         "PYTHONPATH": str(ROOT / "backend"),
         "YOUHUO_DEMO_MODE": "true",
         "YOUHUO_DB_PATH": str(tmp_path / "reach_fold.db"),
+        # **必须量装着东西的首页，不是空的那个。**
+        #
+        # 这条闸门原先跑在一个没有待办的家庭上，于是首页只有麦克风和提示语——
+        # 而真实的首页在它们上面还有结论行和「下一件」卡片。当时它是绿的。
+        # 后来往演示家庭里放了三条待办，它当场红了：内容一进来，
+        # 「用打字说」就被顶出第一屏。
+        #
+        # 也就是说这套布局**是因为应用是空的才装得下**。而打字是语音失败时唯一的
+        # 退路（这一轮两条 P0 都绕着它转），它在真实使用中够不到，等于没有。
+        # 空态掩盖布局问题——这条闸门必须在有内容的那一侧量。
+        "YOUHUO_SEED_BASELINE": "true",
     }
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "youhuo.api:app", "--host", "127.0.0.1", "--port", str(port)],
@@ -355,13 +389,52 @@ def test_the_typing_route_is_in_the_first_screen_on_every_viewport(tmp_path):
                          deviceScaleFactor=1, mobile=width < 768)
                 tab.send("Page.navigate", url=base + "/elder")
                 time.sleep(2.4)
-                d = json.loads(tab.send("Runtime.evaluate", expression=REACH_PROBE,
-                                        returnByValue=True)["result"]["value"])
+
+                def probe(selector: str) -> dict:
+                    raw = tab.send(
+                        "Runtime.evaluate", returnByValue=True,
+                        expression=REACH_PROBE.replace("SELECTOR", repr(selector)),
+                    )["result"]["value"]
+                    return json.loads(raw)
+
+                # ① 首页的打字入口。
+                entry = probe("#typeInstead")
+                # ② 按下它，量 Focus Mode 里的输入框。
+                #    用真的点击而不是直接写 `data-focus`：写属性绕过了处理器，
+                #    量到的是一个用户走不到的状态。
+                tab.send("Runtime.evaluate",
+                         expression="document.querySelector('#typeInstead').click()")
+                time.sleep(0.6)
+                d = probe("#text")
+                focus_on = tab.send(
+                    "Runtime.evaluate", returnByValue=True,
+                    expression="document.body.dataset.focus",
+                )["result"].get("value")
             finally:
                 tab.close()
                 browser.send("Target.closeTarget", targetId=target)
 
             where = f"{label} {width}×{height}"
+
+            # ① 入口本身
+            if entry.get("missing"):
+                failures.append(f"{where}：首页没有 #typeInstead，打字这条退路没有入口")
+            elif entry["display"] == "none" or entry["visibility"] == "hidden":
+                failures.append(f"{where}：打字入口被藏起来了（display={entry['display']}）")
+            elif entry["bottom"] > entry["vh"] or entry["top"] < 0:
+                over = max(entry["bottom"] - entry["vh"], -entry["top"])
+                failures.append(f"{where}：打字入口不在首屏内，差 {over}px")
+            elif entry["hit"] != "ok":
+                failures.append(f"{where}：打字入口点不到，盖在上面的是 {entry['hit']}")
+            elif min(entry["w"], entry["h"]) < 48:
+                failures.append(
+                    f"{where}：打字入口命中区只有 {entry['w']}×{entry['h']}，下限是 48×48"
+                )
+
+            if focus_on != "on":
+                failures.append(f"{where}：按了打字入口之后没有进 Focus Mode（focus={focus_on}）")
+
+            # ② Focus Mode 里的输入框
             if d.get("missing"):
                 failures.append(f"{where}：页面上没有 #text，打字这条退路整个不见了")
                 continue

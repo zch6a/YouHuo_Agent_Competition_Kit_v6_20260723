@@ -10,7 +10,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time as dtime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -357,6 +357,115 @@ class Database:
             )
         return ids
 
+    #: 一次完整缴费的八拍，以及每一拍相对当天 08:00 的偏移（秒）。
+    #:
+    #: **偏移不是装饰。** 它们让事件在产生时就带真实间隔：
+    #:
+    #:     11:26:04 提出        11:27:02 老人确认金额    11:28:26 执行
+    #:     11:26:16 核对账单    11:27:38 请家人确认      11:28:41 拿到回执
+    #:     11:26:31 请复述      11:28:11 家人同意
+    #:
+    #: 八拍的类型必须是 `trust.js` 的 `RECEIPT_STEPS` 认得的那些，否则凭证会把它们
+    #: 渲染成「系统留下一条记录」——那条兜底是给未来新增事件类型留的，不是给这里用的。
+    _BILL_SCENARIO: tuple[tuple[int, str, str, dict[str, Any]], ...] = (
+        (12364, "TASK_CREATED", "elder",
+         {"task_type": "bill_payment", "risk": 3, "semantic_basis": "hybrid"}),
+        (12376, "TEACH_BACK_VERIFIED", "system", {"expected": "68.40", "heard": "68.40"}),
+        (12391, "ELDER_CONFIRMED", "elder", {"amount_yuan": "68.40"}),
+        (12422, "FAMILY_APPROVAL_RECORDED", "system", {"required": True}),
+        (12458, "NOTIFICATION_CREATED", "system",
+         {"recipient_role": "family", "event_type": "approval_required"}),
+        (12491, "FAMILY_APPROVED_AND_EXECUTED", "daughter",
+         {"amount_yuan": "68.40", "authority": "北京自来水公司"}),
+        (12506, "NOTIFICATION_CREATED", "system",
+         {"recipient_role": "elder", "event_type": "task_completed"}),
+    )
+
+    def seed_demo_scenario(self, ids: DemoIdentities, scenario: str) -> int:
+        """按**语义**播一个场景，不是撒十几条散落的 INSERT。
+
+        `normal` 状态那笔「已完成缴费」如果只写一行 `tasks.status='completed'`，
+        到了 Audit 页就会出现「UI 看起来完成了，但证据链残缺」——而那一页的全部价值
+        就是证据链。所以一次播完：任务记录 + 八拍审计事件，时间戳带真实间隔。
+
+        幂等：任务 id 是确定的，已存在就直接返回 0。
+        """
+        if scenario != "completed_bill_payment":
+            raise ValueError(f"没有这个场景：{scenario}")
+
+        task_id = f"task-seed-bill-{ids.suffix}"
+        with self.transaction() as conn:
+            exists = conn.execute("SELECT 1 FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if exists:
+            return 0
+
+        now = utcnow()
+        base = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+        slots = {"bill_type": "水费", "period": "2026-07", "amount_cents": 6840}
+        with self.transaction() as conn:
+            conn.execute(
+                """INSERT INTO tasks(id,family_id,elder_id,task_type,status,risk_level,
+                       slots_json,semantic_key,version,approval_digest,created_at,updated_at,
+                       deferred_topics_json,result_json)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (task_id, ids.family_id, ids.elder_id, "bill_payment", "completed", 3,
+                 canonical_json(slots), f"bill_payment:水费:2026-07", 1,
+                 self._event_hash(f"seed|{ids.suffix}|68.40")[:40],
+                 iso(base + timedelta(seconds=12364)),
+                 iso(base + timedelta(seconds=12506)),
+                 canonical_json([]),
+                 canonical_json({"paid": True, "authority": "北京自来水公司",
+                                 "amount_yuan": "68.40"})),
+            )
+
+        actors = {"elder": ids.elder_id, "daughter": ids.daughter_id, "system": ids.system_id}
+        for offset, event_type, who, payload in self._BILL_SCENARIO:
+            self.append_audit(
+                ids.family_id, actors[who], event_type, task_id,
+                {**payload, "task_id": task_id},
+                created_at=base + timedelta(seconds=offset),
+            )
+        return len(self._BILL_SCENARIO)
+
+    def seed_demo_reminders(self, ids: DemoIdentities) -> int:
+        """给演示家庭放三条待办，由女儿建立。
+
+        **刻意不放在 `seed_demo()` 里。** 试过一次：`seed_demo` 是**测试也在用**的那个
+        种子函数，往里塞待办当场红了 12 条——「取消」按名字找待办、裸「嗯」确认、
+        访客隔离计数，全都依赖"这个家庭一开始没有待办"。所以单独一个方法，
+        只从演示路径（`visitor_sandbox` 与启动时的默认家庭）调，且只在 `seed_history`
+        打开时调；真实部署与 pytest 默认都不会碰到它。
+
+        为什么需要：没有它，老人端首页第一屏永远写着「今天没有要办的事。」——而
+        `/v2/auth/visitor` 给**每个浏览器**开一个全新家庭，所以那是每一位打开演示链接
+        的人看到的第一屏（实测新访客 `/v2/reminders` 返回 0 条）。
+        这和 `api.py` 给作息历史做回填的理由是同一条：演示家庭需要一段过去，
+        才看得出产品在做什么。
+
+        锚在「今天 08:00 UTC」而不是 `now`：同一天里反复调用要落在同一个 `due_at` 上，
+        否则表上的 `UNIQUE(elder_id,title,due_at)` 挡不住重复，刷几次就堆出十几条。
+        用相对偏移而不是绝对日期，是为了它在比赛当天不会变成过去时——那样首页又空了，
+        只是这次以一种更难发现的方式。
+        """
+        now = utcnow()
+        midnight = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+        made = 0
+        with self.transaction() as conn:
+            for offset_h, title in ((3, "复诊前准备病历"),
+                                    (6, "下午四点吃降压药"),
+                                    (27, "明天上午去社区量血压")):
+                cursor = conn.execute(
+                    "INSERT OR IGNORE INTO reminders"
+                    "(id,family_id,elder_id,title,due_at,escalation_after_minutes,"
+                    " status,source,created_by,created_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (f"rem-seed-{offset_h}-{ids.suffix}", ids.family_id, ids.elder_id, title,
+                     iso(midnight + timedelta(hours=offset_h)), 60,
+                     "scheduled", "family", ids.daughter_id, iso(now)),
+                )
+                made += cursor.rowcount or 0
+        return made
+
     # --- actors/auth ---
     def actor(self, actor_id: str) -> sqlite3.Row | None:
         with self._lock:
@@ -575,9 +684,25 @@ class Database:
         return hmac.new(self._audit_key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def append_audit(
-        self, family_id: str, actor_id: str, event_type: str, entity_id: str | None, payload: dict[str, Any]
+        self, family_id: str, actor_id: str, event_type: str, entity_id: str | None,
+        payload: dict[str, Any], *, created_at: datetime | None = None
     ) -> AuditEvent:
-        created_at = utcnow()
+        """`created_at` 只给演示播种用——**它是 DemoClock 的钩子，不是显示层的美化。**
+
+        为什么需要这个参数：这个方法本来自己取 `utcnow()`，于是一次播种里连续追加的
+        事件全落在同一毫秒附近。实测审计链六条时间戳挤在 **20 毫秒**内，
+        「家人点了同意」与「他确认了这一笔」相隔 **8 毫秒**——而可信中心唯一的工作
+        就是让人相信这件事真实发生过，那串时间戳当场把它否掉了。
+
+        正确的修法是让事件在**产生时**就带真实间隔，而不是在前端渲染时改写显示值。
+        `displayTime = fakeTimeForPresentation(...)` 那种做法会伤害整个 Evidence
+        Platform 的可信度：三个表面读的是同一份事实，一旦其中一个开始美化，
+        它们就不再是同一份了。
+
+        安全性没有削弱：`created_at` 本来就在 `canonical` 串里参与哈希，
+        所以传进来的时间同样被链锁住，改一个时间戳后面全部对不上。
+        """
+        created_at = created_at or utcnow()
         payload_json = canonical_json(payload)
         with self.transaction() as conn:
             last = conn.execute(

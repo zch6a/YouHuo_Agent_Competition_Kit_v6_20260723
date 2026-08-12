@@ -233,12 +233,37 @@ def test_every_screen_has_some_way_out():
     assert not blanket, f"这些规则一刀切地藏掉了返回链接：{blanket}"
 
 
-def test_the_conversation_screen_has_no_tab_bar():
+def test_the_elder_tabs_never_compete_with_the_composer():
+    """老人端有标签栏，但它和输入行不许同时在场。
+
+    这条断言原先是 `assert 'class="tabbar"' not in elder.html`，理由写在里面：
+    "老人端是一整屏对话，底部是输入框；标签栏会挤掉发送按钮"。那个理由当时是**对的**
+    ——实测 320×568 下 `#chat` 的高度已经是 0px，再塞一条 64px 的栏，输入行会被推出屏幕。
+
+    重构把那个前提拆掉了：首页不再是对话屏。对话与输入行搬进 Focus Mode，而
+    `body[data-focus="on"]` 下标签栏是 `display: none`。两者不再争同一块地方。
+
+    所以断言从"不许有标签栏"改成"不许同时在场"——守的还是同一件事：**输入行不能被
+    挤掉**。放宽成"允许有标签栏"就把这条断言变成了空的；钉住互斥才是原来那个理由。
+    """
     html = (STATIC / "elder.html").read_text(encoding="utf-8")
-    assert 'class="tabbar"' not in html, (
-        "老人端是一整屏对话，底部是输入框；标签栏会挤掉发送按钮，"
-        "也会把唯一为这位用户做的那一屏变成一个可以走开的地方"
-    )
+    assert 'class="tabbar elder-tabs"' in html, "老人端应有四个页内 Tab"
+    # 输入行在 Focus Mode 里，标签栏在 Focus Mode 下必须被藏掉。
+    assert re.search(
+        r'body\[data-focus="on"\][^{]*\.elder-tabs[^{]*\{[^}]*display:\s*none',
+        CSS, re.S,
+    ) or re.search(
+        r'body\[data-focus="on"\][^{]*\{[^}]*display:\s*none[^}]*\}',
+        CSS,
+    ), "Focus Mode 下必须隐藏标签栏，否则它又会和输入行争底部那一块"
+    # 反向：输入行必须真的在 Focus Mode 那一段里，不能还留在首页。
+    focus_start = html.index('class="elder-focus"')
+    focus_end = html.index('data-panel="log"')
+    focus_block = html[focus_start:focus_end]
+    for control in ('id="text"', 'id="send"', 'id="chat"'):
+        assert control in focus_block, (
+            f"{control} 不在 Focus Mode 里——它留在首页就会和标签栏争底部"
+        )
 
 
 # --- 样式侧的三个约束 -----------------------------------------------------
@@ -252,19 +277,61 @@ def test_the_bar_is_only_a_phone_affordance():
     `.sheet-trigger { display: none; }`，两个子串都在，测试通过，而桌面上标签栏可见
     且宽 1200px——正好是 `shoot_pages.py` 注释里记着的那个溢出事故。
     现在要求的是 `.tabbar` **自己那条规则**里有 `display: none`。
+
+    第二次修：原写法取的是**第一个** `@media (min-width: 761px)` 块。老人端改成四 Tab
+    之后样式表里多了一个同宽度的块（让 Tab 在宽屏上变成顶部横排），排在前面——于是
+    这条断言去了一个根本不管拇指栏的块里找，红了。改成扫**所有**这个宽度的块。
+
+    另外 `.elder-tabs` 是**豁免**的，而且这个豁免必须写清楚：那四个是**页内**导航，
+    宽屏藏掉就没有任何东西能切到「记录」「家人」「我的」。家人端和照护端的标签是
+    跨页的 `<a>`，宽屏上由 `.back-link` 顶上，所以它们照旧要藏。
     """
-    wide = CSS[CSS.index("@media (min-width: 761px) {") :]
-    wide = wide[: wide.index("\n}")]
+    blocks = [
+        CSS[m.start():][: CSS[m.start():].index("\n}")]
+        for m in re.finditer(r"@media \(min-width: 761px\) \{", CSS)
+    ]
+    assert blocks, "样式表里没有 min-width: 761px 的块"
     rules = [
         (" ".join(sel.split()), body)
+        for wide in blocks
         for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", wide)
     ]
-    hidden = [
-        sel for sel, body in rules
+    # 判据是**这条规则管不管得到老人端**，不是"选择器里有没有 elder-tabs 这几个字"。
+    #
+    # 原写法要求隐藏规则的选择器里**不出现** `elder-tabs`。那在当时成立，因为唯一的
+    # 写法是裸 `.tabbar`。但正确的修复恰恰要提到这个词：`.tabbar:not(.elder-tabs)`
+    # ——它字面上含有 `elder-tabs`，却正是这条测试想要的东西（藏跨页栏、放过页内栏）。
+    #
+    # 为什么必须改成 `:not()`：老人端的四个 Tab 也叫 `.tabbar`，而前面那块专门写的
+    # 修复用的是 `.elder-tabs`，两者特异性同为 (0,0,1,0)、后者靠后 → 裸 `.tabbar` 赢，
+    # 那次修复一直是死的。实测 800×1200：四个 tab 命中 0 个，「记录」「家人」「我的」
+    # 三个分区在宽屏下没有任何入口，而「我的」装着语速和字号两个无障碍控件。
+    #
+    # 所以这里改成两条真判据：**藏得到跨页栏**，而且**藏不到老人端的页内栏**。
+    hides = [
+        (sel, body) for sel, body in rules
         if re.search(r"(?<![-\w])\.tabbar(?![-\w])", sel)
         and re.search(r"display\s*:\s*none", body)
     ]
-    assert hidden, f"宽屏不该出现拇指栏；这个块里 .tabbar 的规则是：{[s for s, _ in rules if '.tabbar' in s]}"
+    #: 排除掉老人端的写法：裸 `.tabbar`，或显式 `:not(.elder-tabs)`。
+    bare = [
+        sel for sel, _ in hides
+        if "elder-tabs" not in sel or ":not(.elder-tabs)" in sel.replace(" ", "")
+    ]
+    #: 反向：任何一条会把老人端页内栏一起藏掉的规则都是那次死路的复发。
+    catches_elder = [
+        sel for sel, _ in hides
+        if "elder-tabs" not in sel and ":not" not in sel
+    ]
+    assert not catches_elder, (
+        f"这些规则在宽屏下会把老人端的页内标签栏一起藏掉：{catches_elder}\n"
+        "  它们是页内主导航——藏掉之后「记录」「家人」「我的」在 ≥761px 下没有入口，"
+        "而「我的」装着语速和字号两个无障碍控件。用 `.tabbar:not(.elder-tabs)`。"
+    )
+    assert bare, (
+        "宽屏不该出现跨页拇指栏；这些块里 .tabbar 的规则是："
+        f"{[s for s, _ in rules if '.tabbar' in s]}"
+    )
 
 
 def test_the_bar_clears_the_home_gesture_area():
@@ -319,6 +386,23 @@ def test_the_current_tab_is_not_signalled_by_colour_alone():
     assert re.search(r"(?:width|height|inset|inline-size|block-size)\s*:", body), (
         "指示条没有尺寸，画不出任何东西"
     )
-    assert re.search(r"\.tab\.is-current svg \{[^}]*stroke-width", stripped), (
+    # 第三条通道：图标同时变粗。
+    #
+    # 这一条原先写的是 `\.tab\.is-current svg \{[^}]*stroke-width` —— 而那正是这个
+    # 函数自己的 docstring 警告的那件事：**选择器在，不等于它画得出东西**。
+    # 那条断言绿了很久，期间图标一次都没有真的变粗过：`icons/tabs.svg` 的每个
+    # `<symbol>` 自带 `stroke-width="1.8"`，而 `<use>` 影子树里元素**自身的表现属性**
+    # 赢过从宿主继承下来的值，所以 CSS 那个 2.3 从来没有生效。
+    # 实测（拿真实 sprite 光栅化）：宿主默认与宿主 2.3 的墨量都是 2698，一模一样；
+    # 删掉 symbol 上的 1.8 之后才变成 3348。
+    #
+    # 所以判据换成缺一不可的两条：CSS 里要有加粗规则，**并且** sprite 不许自己钉死线宽。
+    assert re.search(r"\.tab\.is-current\s+\.tab-icon\s*\{[^}]*stroke-width", stripped), (
         "当前项的图标应当同时变粗，作为第三条通道"
+    )
+    sprite = (STATIC / "icons" / "tabs.svg").read_text(encoding="utf-8")
+    assert 'stroke-width="' not in sprite, (
+        "tabs.svg 的 symbol 自己写了 stroke-width——它会盖掉 CSS 的加粗规则，\n"
+        "  「当前 Tab 图标变粗」这条通道于是又变成死的，而上面那条断言照样绿。\n"
+        "  线宽只能有一个来源：CSS。sprite 只留形状。"
     )

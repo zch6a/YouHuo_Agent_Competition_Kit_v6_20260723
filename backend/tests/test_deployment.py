@@ -108,6 +108,62 @@ def test_healthcheck_uses_the_same_port():
     assert "PORT" in healthcheck[0], "健康检查必须跟随 $PORT，否则平台上永远不健康"
 
 
+#: 唯一一条**给人**的启动路径：双击这个脚本，然后照着页面上那句话打开浏览器。
+DEMO_RUNNERS = ("run_demo.ps1", "run_demo.sh")
+
+
+def test_the_demo_runner_opens_the_port_the_pages_advertise():
+    """脚本开的端口，必须就是页面上印的那个端口。
+
+    每一页在没有服务器时会露出一段 `.needs-server`：「运行 run_demo.ps1，然后访问
+    http://127.0.0.1:8041/」。而两个脚本原先开的是 **8000**——照着屏幕上的指示做的
+    人得到一个连接被拒，而所有闸门都是绿的，因为闸门自己起服务器、自己选端口，
+    从来不读这两个脚本。
+
+    这就是「什么狗屎前端，什么都看不见」那次的同一个形状：仪器走的路和人走的路不是
+    同一条。所以判据是"两边的数字相等"，不是"两边各自看起来合理"。
+    """
+    advertised = set()
+    for page in sorted((ROOT / "backend/static").glob("*.html")):
+        block = re.search(r'class="needs-server".*?</p>', page.read_text(encoding="utf-8"), re.S)
+        if not block:
+            continue
+        advertised |= set(re.findall(r"127\.0\.0\.1:(\d+)", block.group(0)))
+    assert len(advertised) == 1, f"各页面印的端口不一致：{sorted(advertised)}"
+    want = advertised.pop()
+
+    for name in DEMO_RUNNERS:
+        text = (ROOT / name).read_text(encoding="utf-8")
+        ports = re.findall(r"--port\s+(\d+)", text)
+        assert ports, f"{name} 里找不到 --port"
+        assert set(ports) == {want}, (
+            f"{name} 开的是 {sorted(set(ports))}，而每一页都告诉用户去 {want}。"
+            "照着屏幕上的指示做的人会得到连接被拒。"
+        )
+
+
+def test_the_demo_runner_turns_on_the_baseline_history():
+    """演示脚本必须打开作息历史回填。
+
+    关着的时候，照护页五段全部读到「已记录 0 天 · 还不能说这是他的常态」——而那五段
+    讲的正是这个项目的核心创新（先学这位老人自己的规律，再判断今天）。任何人跑这个
+    脚本看到的都是"它什么都不知道"。
+
+    而 `check_page_runtime`、`run_feature_audit` 和 `render.yaml` 三处**都自己打开了
+    它**。也就是说所有仪器看的都是有数据的版本，只有人看的这一条路是空的——
+    这条断言存在的全部理由就是把那个缺口堵上。
+
+    它默认关闭仍然是对的：它写 `activity_events_v4`（一张运营表，无交互预警取其中的
+    MAX(occurred_at)），默认打开会让合成回填悄悄改掉真实功能的输入。所以判据不是
+    "改掉默认值"，而是"演示这条路上显式打开"。
+    """
+    for name in DEMO_RUNNERS:
+        text = (ROOT / name).read_text(encoding="utf-8")
+        assert re.search(r"YOUHUO_SEED_BASELINE\s*=\s*[\"']?true", text), (
+            f"{name} 没有打开 YOUHUO_SEED_BASELINE——跑起来照护页会是一片「已记录 0 天」"
+        )
+
+
 def test_compose_volume_does_not_shadow_packaged_data():
     import yaml
 

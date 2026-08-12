@@ -85,10 +85,32 @@ def test_the_touch_floor_it_states_matches_the_stylesheet():
     text = _text()
     assert "48" in text and "44" in text, "适配层没有同时提到 44 与 48（那是它存在的理由）"
     components = (STATIC / "components.css").read_text(encoding="utf-8")
-    floors = [int(m) for m in re.findall(
-        r"a,\s*button,\s*input,\s*textarea,\s*select\s*\{[^}]*?min-height:\s*(\d+)px",
-        components, re.S)]
-    assert floors, "components.css 里找不到全局触控下限那条规则"
+
+    # 值可能写成字面量 `48px`，也可能走令牌 `var(--tap)`——两种都要认。
+    #
+    # 第一版只认字面量。后来那条规则改成 `min-height: var(--tap)`（这是对的：
+    # 下限只该有一个来源），正则一个都没匹配到，于是断言变成「找不到这条规则」。
+    # 那时候真正的风险不是它红，是它**如果写成 `assert not violations` 就会绿**——
+    # 匹配不到任何东西的检查，和没有这个检查是一回事。
+    raw = re.findall(
+        r"a,\s*button,\s*input,\s*textarea,\s*select\s*\{[^}]*?min-height:\s*([^;}]+)",
+        components, re.S)
+    assert raw, "components.css 里找不到全局触控下限那条规则"
+
+    tokens = (STATIC / "tokens.css").read_text(encoding="utf-8")
+
+    def resolve(value: str) -> int:
+        value = value.strip()
+        hit = re.fullmatch(r"var\((--[\w-]+)\)", value)
+        if hit:
+            found = re.search(rf"{re.escape(hit.group(1))}:\s*(\d+)px", tokens)
+            assert found, f"下限引用了 {hit.group(1)}，而 tokens.css 里没有这个令牌"
+            return int(found.group(1))
+        found = re.fullmatch(r"(\d+)px", value)
+        assert found, f"看不懂的触控下限写法：{value!r}"
+        return int(found.group(1))
+
+    floors = [resolve(v) for v in raw]
     assert all(f >= 48 for f in floors), (
         f"样式表里的触控下限是 {floors}，而适配层写的是 48——两边对不上，改一边"
     )

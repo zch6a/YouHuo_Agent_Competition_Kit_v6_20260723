@@ -201,7 +201,7 @@ def build_v4_router(
         matches = store.search_items(actor.family_id, elder_id, q, actor.role)
         active = [item for item in matches if item.status == "active"]
         if not active:
-            answer = f"没有找到已获得您同意保存的“{q}”备忘。"
+            answer = f"没有找到已获得您同意保存的「{q}」备忘。"
         elif len(active) == 1:
             answer = f"{active[0].label}放在{active[0].location_text}。"
         else:

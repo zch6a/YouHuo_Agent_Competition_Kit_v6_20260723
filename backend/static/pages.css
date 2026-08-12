@@ -38,7 +38,7 @@
   border-radius: var(--r-2xl);
   font-size: 34px; font-weight: 800; line-height: 1;
   color: var(--ink-invert);
-  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-violet));
+  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
 .landing-brand h1 { margin: 0; font-size: clamp(30px, 7vw, 40px); }
 .landing-tagline { margin: 0; font-size: var(--text-lg); color: var(--ink-2); }
@@ -144,6 +144,29 @@
   margin-bottom: var(--space-4);
 }
 .fam-head h1 { font-size: clamp(26px, 5vw, 34px); line-height: var(--lh-tight); margin: 0; }
+
+/* 页头那一句结论按判定着色。
+   颜色不是唯一通道——那句话本身就是结论，「他今天和平常不太一样」在纯黑下照样
+   读得出来。`good` 刻意不上色：「和平常一样」是默认状态，一句绿色的大标题会
+   读成营销横幅。
+   两种状态都 ≥26px，所以适用大字号 3:1 的下限；混色比例与既有的 `.meta.bad`
+   和 `.metric.alert strong` 一致。 */
+.fam-verdict.warn { color: color-mix(in srgb, var(--warn) 76%, var(--ink)); }
+.fam-verdict.bad  { color: color-mix(in srgb, var(--danger) 78%, var(--ink)); }
+
+/* 320px 上页头竖排。
+   `.fam-head` 是 `justify-content: space-between`，于是「刷新」拿走右侧、标题只剩
+   约 180px——「他今天和平常差不多」折成 4/5 两行，`text-wrap: balance` 也救不回来。
+   同一个理由同一个做法在这个文件里已有先例（`.topbar { flex-direction: column }`），
+   `.fam-head` 当时漏了。
+
+   刻意不复用上面那个 `max-width: 360px` 块（它只管 `.seg` 的字号）：把不相关的规则
+   塞进同一个块，会让下一个人以为它们有关系。媒体查询不增加特异性，同宽度可以有多个块。 */
+@media (max-width: 360px) {
+  .fam-head { flex-direction: column; align-items: stretch; }
+  .fam-head .fam-refresh { align-self: flex-start; }
+}
+
 .fam-updated { margin: var(--space-1) 0 0; font-size: 14px; color: var(--ink-3); }
 .fam-refresh { flex: none; }
 /* `justify-content: space-between` 会把右边这个挤到只剩几个字宽——「← 返回首页」
@@ -152,7 +175,12 @@
 
 .segmented {
   display: flex;
-  gap: var(--space-1);
+  /* 4px 低于 8px 的相邻间距下限——两个 48px 高的目标之间只留 4px，手指抖一下就点错
+     隔壁分区。全站 29 对过近的可点元素里有 27 对出在这里。
+     换 8px 会把每个键压得更窄，所以下面配 `flex-wrap` + 宽度下限一起改：
+     窄屏上宁可换行，也不要把键缩到点不准。 */
+  flex-wrap: wrap;
+  gap: var(--space-2);
   padding: var(--space-1);
   margin-bottom: var(--space-5);
   background: var(--surface-2);
@@ -160,14 +188,20 @@
   border-radius: var(--r-md);
 }
 .seg {
-  flex: 1;
+  /* `flex: 1` 会让键无限缩：/care 五个分区在 320 上实测每个只有 52.4px 宽。
+     `flex-basis` 给一个下限，配上容器的 `flex-wrap`，装不下就换行。 */
+  flex: 1 1 var(--tap);
   /* 48px，不是 44px。
      `components.css` 的 `a, button, input, textarea, select { min-height: 48px }` 是
      元素选择器（特异性 0,0,1），`.seg` 是类（0,1,0），所以这里写 44 就是**悄悄退回**
      ——而那份注释明确写着立场：「48px rather than the 44px in Apple's HIG — the extra
      4px matters for tremor and for reading glasses」。这三页的分区按钮是唯一的换屏
-     控件，390px 下每个只有约 67px 宽，高度更不该省。 */
-  min-height: 48px;
+     控件，390px 下每个只有约 67px 宽，高度更不该省。
+
+     后来又提了一档到 56（`--tap-key`）：这三页的分区键在功能上就是 Tab，而
+     `/care` `/family` 底部那条真 Tab 栏是 56、老人端是 57。同一个产品里同一种控件
+     两套高度，是"这两处不是一起想的"最直接的证据。 */
+  min-height: var(--tap-key);
   padding: var(--space-2) var(--space-1);
   border: 1px solid transparent;
   border-radius: calc(var(--r-md) - 5px);
@@ -244,22 +278,504 @@
 }
 .promise > strong { font-size: var(--text-sm); font-weight: 800; color: var(--ink); }
 .promise > span { font-size: var(--text-sm); line-height: var(--lh-snug); color: var(--ink-2); }
-.promise::after {
+/* 只有**是链接**的那种才画箭头。
+   手机框里那四条底线现在是 `<li class="promise">`（框里没有可跳的分区了），
+   而箭头照样画在行尾——一个指向不存在去处的箭头比没有箭头更差，它明确承诺了
+   一次点击。对比度闸门、溢出探针、点击遍历（只按 button）三样都量不到这件事。 */
+a.promise::after {
   content: "→";
   align-self: center;
   font-size: var(--text-sm);
   color: var(--ink-3);
 }
-.promise:hover { background: var(--surface-2); }
-.promise:hover > strong { color: var(--youhuo-blue-ink); }
+a.promise:hover { background: var(--surface-2); }
+a.promise:hover > strong { color: var(--youhuo-blue-ink); }
 /* 窄屏：名字换到说明上面一行，箭头跟着名字。
    ::after 是最后一个网格子项，不显式定位的话会被自动排到第三行最左边——一个孤零零
    的箭头顶在行首。截图里就是这样。 */
 @media (max-width: 480px) {
   .promise { grid-template-columns: 1fr auto; }
-  .promise::after { grid-column: 2; grid-row: 1; align-self: baseline; }
+  a.promise::after { grid-column: 2; grid-row: 1; align-self: baseline; }
   .promise > span { grid-column: 1 / 3; margin-top: var(--space-1); }
 }
+
+/* ==========================================================================
+   老人端：四个 Tab 与 Focus Mode
+   ..........................................................................
+   首页只回答三个问题：今天有没有事、下一件是什么、怎么让优活帮我。
+   对话与输入行不在首页——它们在 Focus Mode 里，而 Focus Mode 是首页的一个**态**。
+
+   为什么是态而不是第五个 Tab：Voice Orb 只能有一个 `#mic`，按下它之后 orb 仍然在场。
+   做成并列分区就得复制一个 orb，两个 orb 的状态机会立刻分叉。
+
+   这一段的显隐**全部由 CSS 决定**，JS 只写 `body[data-focus]` 一个属性。
+   ========================================================================== */
+
+/* 默认（data-focus="off"）：首页可见，Focus Mode 整个藏起来。 */
+.elder-focus { display: none; }
+body[data-focus="on"] .elder-focus { display: flex; flex-direction: column; min-height: 0; }
+
+/* Focus Mode 打开时，首页那几块让位。
+   用 `display: none` 而不是 `visibility` / `opacity`：它们要真的从布局里退出，
+   否则定高框架里剩下的高度不够给对话区。 */
+body[data-focus="on"] #roleHeader,
+body[data-focus="on"] #todayLine,
+body[data-focus="on"] #nextItem,
+body[data-focus="on"] .today-block,
+body[data-focus="on"] .elder-tabs { display: none; }
+
+/* --- Focus Mode 那一列的高度分配 ----------------------------------------
+   CDP 在 390×844 上量到的（说过一句话、玻璃盒卡出现之后）：
+
+       .elder-focus     638      #focusBack  48
+       #chat              0      ← scrollHeight 383，里面有 3 条气泡
+       #relianceHost    893      ← 一张卡比整个视口还高
+       .composer        222      ← top 1159，**在 844 的视口之外**
+       #status           22                              合计 1185 塞进 638
+
+   `#chat` 是这一列里唯一会让的块（`flex: 1 1 0%` + `min-height: 0`），于是它吸收了
+   全部 547px 亏空、归零；而 `#relianceHost` 是 flex 项的默认 `min-height: auto`，
+   **拒绝**收缩到内容高度以下。
+
+   后果比"看不见自己说的话"更重：输入行被推到 top 1159，而 `.stage` 是
+   `overflow: hidden` —— 她既看不见刚说的话，也够不到输入框和发送键。问了一句之后，
+   这个产品的主界面上没有任何可以继续的东西。
+
+   为什么三道闸门都没红：点击遍历按的是 `#send`，而它此刻在 DOM 里、有布局盒、
+   `scrollIntoView` 之后命中测试也过——**脚本能滚 `overflow: hidden` 的容器，
+   手指不能**；对比度只读计算颜色，位置不参与；截图拍的是还没说话的首屏。
+   最后是一个 agent 在真浏览器里说完一句话之后量出来的。
+
+   修法：让那张卡也可收缩、可滚动，和对话按内容比例分剩下的空间。
+   `#chat` 再给 96px 下限——她必须永远看得见自己刚说的至少两行。
+   ------------------------------------------------------------------------ */
+
+body[data-focus="on"] .elder-focus > #chat {
+  flex: 1 1 auto;
+  /* 不是 0。这一行是这条修复的全部意义：无论那张卡多高，她都看得见自己刚说的话。 */
+  min-height: 96px;
+}
+body[data-focus="on"] .elder-focus > #relianceHost {
+  flex: 1 1 auto;
+  /* flex 项默认 `min-height: auto`，也就是"不许比内容矮"——那正是它把对话挤没、
+     把输入行顶出屏幕的原因。 */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* 输入行和状态行不参与收缩：它们是这一屏的出口，任何时候都必须在。 */
+body[data-focus="on"] .elder-focus > .composer,
+body[data-focus="on"] .elder-focus > #status { flex: 0 0 auto; }
+
+/* 矮屏上，输入行只留退路本身。
+   ......................................................................
+   `check_focus_geometry.py` 在 320×568 抓到的：**Case A**（连玻璃盒卡都没有、刚进
+   Focus Mode 的那一屏）输入行已经在容器外 63px —— 48 + 96 + 222 = 366 塞进 308。
+   也就是说最小的支持视口上，这个产品的**唯一打字退路**从一开始就够不到；而语音在
+   Firefox 上不存在，权限被拒、没有麦克风、网络不好时也都会失败。
+
+   量出来 222px 由四块组成：
+
+       P.say-label      「您可以说」       26 + 8
+       DIV.quick         四个例句 chip     48 + 8
+       DIV.controls      #text + #send     59 + 16   ← 退路只有这一块
+       BUTTON#openExtras 「更多说法」       49 + 8
+
+   收掉的是 `.say-label` 和 `.quick`：前者是后者的标签，而后者那四个例句和
+   「更多说法」抽屉里装的**是同一批问题**。输入框和发送键一个像素都没动，例句也仍然
+   够得到（就在抽屉里）。同一份内容在小屏上只留一个入口，不是静默删除。
+
+   720px 这个阈值：SE(568) 命中，360×800 及更高不命中。设计稿第七节把「您可以说」
+   明确列进 Focus Mode，所以高屏照旧保留，只在装不下的地方收。 */
+/* Voice Orb 在 Focus Mode 里缩一档：这时候屏幕上还要放对话和输入行，
+   而她已经知道自己按过了——orb 不再需要独占三分之一屏来吸引第一眼。 */
+body[data-focus="on"] .mic-dial { width: 132px; height: 132px; }
+body[data-focus="on"] .mic-big { width: 96px; height: 96px; }
+body[data-focus="on"] .mic-big svg { width: 38px; height: 38px; }
+
+.focus-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 48px;
+  padding-inline: var(--space-2);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+/* 打字入口。语音是首选，打字是**唯一的退路**——Web Speech 在 Firefox 上不存在，
+   权限被拒、没有麦克风、网络不好时都会失败。那些时候这个按钮是她进入这个产品的
+   唯一入口，所以它必须在首屏、看得见、命中区够大。
+   `>= 56px` 是关键操作的档位，比全站 48px 的下限再高一档。 */
+.keyboard-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  margin-top: var(--space-3);
+  padding-inline: var(--space-5);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* --- 首页的竖向分配 ------------------------------------------------------
+   截图上量出来的问题：没有待办的那一天，内容全堆在上半屏，「用打字说」下面还剩
+   约 45% 空白，而麦克风中心落在屏幕 33% 的高度。
+
+   麦克风是这一整个产品的入口，而一位老人举着手机时拇指落在屏幕下 2/3——
+   把它钉在上 1/3 等于每次使用都要换一次握姿，而空白就在下面。
+
+   不能靠加 margin：有待办的那天上面多两块内容，同一个 margin 会把麦克风推到
+   标签栏底下。要的是"占满剩下的高度、然后在其中居中"，让它自己适应上面有多少东西。
+
+   `min-height: 0` 是必须的：flex 项的默认 `min-height: auto` 会拒绝收缩到内容
+   高度以下，于是在 320×568 上这一列会把标签栏顶出屏幕——那正是 R20 修过的那个坑。
+   ------------------------------------------------------------------------ */
+
+.elder-panel[data-panel="home"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 这一条是第一版漏的，而少了它，上面整段注释说的事一件都没发生。
+     CDP 量出来的链条：`.stage` 高 746，`.elder-panel` 只有 **419**，
+     `.mic-stage` 在那 419 里面伸到 269——麦克风中心仍然停在屏幕 37% 的高度。
+     `.mic-stage: flex 1` 只能吃掉**它父级里**多出来的空间，而父级自己没长起来。
+     `.stage` 是 `display: flex; flex-direction: column`，所以面板必须显式 grow。
+
+     这就是"改了 CSS、闸门全绿、而屏幕上什么都没变"那一类：溢出、对比度、
+     可达性三样都不量"东西在竖向的哪个位置"。 */
+  flex: 1 1 auto;
+}
+.elder-panel[data-panel="home"] > .mic-stage {
+  flex: 1 1 auto;
+  /* `min-content`，**不是 0**。这一行修的是一个 P0。
+     ......................................................................
+     写 `0` 的意思是"这一块可以被压到比它自己的内容还矮"。而 `.mic-stage` 的
+     `overflow` 是 visible，所以压过头之后里面的东西不会被裁——它们**画到框外面**，
+     盖在下一块（「今天」）上。
+
+     实测（390×844、默认字号、首页有 1 条提醒）：
+
+         #mic          496→612
+         .today-block  555→780     ← 和 orb 垂直重叠 57px
+         #micHint      640→669     命中测试落在「时间：今天 11:11」
+         #typeInstead  689→745     命中测试落在 BUTTON「已完成」
+
+     后果不是"点不到"，是**误击**：她瞄准「用打字说」，点下去把自己的提醒标成了
+     已完成。而 `#typeInstead` 是这个产品自述的「唯一的退路」，还有一条测试钉着它。
+
+     而且没有任何仪器会红：`.stage` 是定高 + `overflow: hidden`，
+     `scrollHeight === clientHeight`，溢出探针量不到；点击遍历会先 `scrollIntoView`
+     再命中测试，而脚本滚得动 `overflow: hidden` 的容器、手指滚不动。
+     只有"在**有提醒**的状态下做命中测试"能发现它——这也是这一条的验收方式。
+
+     `min-content` 让它在空态下照常伸展居中，而有内容时不再被压到自己的内容以下。 */
+  min-height: min-content;
+  justify-content: center;
+}
+/* 首页也要能滚。
+   `.mic-stage` 不再被压缩之后，内容多的那一天（下一件 + 今天三条）总高会超过定高的
+   `.stage`，而 `.stage` 是 `overflow: hidden`——超出的部分会被**裁掉**，「今天」的
+   后几条谁也看不到、也滚不到。
+   上面那段注释里写的"首页不需要滚动"在当时是对的（那时 `.mic-stage` 会让），
+   现在它不让了，所以这一条必须补上。 */
+.elder-panel[data-panel="home"] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* 「今天」那一块在麦克风下面，不参与伸缩。 */
+.elder-panel[data-panel="home"] > .today-block { flex: 0 0 auto; }
+
+/* ==========================================================================
+   Task Space —— 这件事办到哪一步，用页面说
+   ..........................................................................
+   计划书第九至十三节。优活是 Task Agent 而不是聊天机器人：她说完
+   「帮我交这个月水费」之后，屏幕上该出现的是**这件事本身**，不是一串气泡。
+
+   `body[data-task-view]` 由 `task-space.js` 认出后端状态之后才写。认不出就不写，
+   那时下面这些规则一条都不匹配，聊天区照旧——**不猜**是这一段的默认行为。
+
+   聊天记录没有删（不得 silent delete），它退到 Task Space 下面：想回头看说过什么的人
+   仍然找得到，只是它不再是主画面。
+   ========================================================================== */
+#taskSpace:empty { display: none; }
+
+body[data-task-view] .elder-focus > #chat {
+  /* 从"这一列里唯一会让的块"降级成一条可选的回顾区。
+     不用 `display: none`：那会让 `addBubble` 末尾的 `scrollTop` 变成空操作，
+     而这一页已经因为"往不可见元素里写字"栽过两次（A-01 成功路径、A-04 失败路径）。 */
+  flex: 0 1 auto;
+  max-height: 22svh;
+  max-height: 22dvh;
+}
+
+.task-space {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-2), var(--ring-hairline);
+}
+/* 金额是这一屏最重的东西——她要念的就是它。等宽数字，因为它会被反复读。 */
+.task-amount {
+  margin: 0;
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.task-label { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--ink-3); }
+.task-headline { margin: 0; font-size: var(--text-xl); line-height: var(--lh-snug); }
+.task-where { margin: 0; font-size: var(--text-base); color: var(--ink-2); }
+/* 「请把金额念一遍」这类要她做的事。比金额小，但比来源重。 */
+.task-ask {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: var(--lh-snug);
+  color: var(--ink);
+}
+.task-note { margin: 0; font-size: var(--text-base); color: var(--ink-2); }
+/* 歧义态：把两个数并排摆出来，让她自己看出差在哪。 */
+.task-diff { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }
+.task-diff-heard, .task-diff-expected {
+  font-size: var(--text-base);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.task-diff-sep { color: var(--ink-3); }
+/* 完成态：一个对勾。这是全套里唯一一次用符号代替一句话——「办好了」这件事
+   不需要读，看一眼就够。 */
+.task-done-mark {
+  margin: 0;
+  font-size: var(--text-3xl);
+  line-height: 1;
+  color: var(--ok, var(--youhuo-blue-ink));
+}
+
+/* ==========================================================================
+   Orb 与打字入口钉在视口内（Phase B 的硬合同）
+   ..........................................................................
+   问题：一旦首页真的有待办（结论行 + 「下一件」卡片都出现），
+   `test_the_typing_route_is_in_the_first_screen_on_every_viewport` 就红了。实测：
+
+       iPhone SE 竖 320×568   打字入口在首屏外 139px
+       iPhone SE 横 667×375   外 306px
+       iPhone 14 横 844×390   外 275px
+       iPad 横  1024×768      点不到，盖在上面的是 button.tab.seg
+       笔记本   1280×800      同上
+
+   也就是说**这套布局是因为应用是空的才装得下**。而打字是语音失败时唯一的退路
+   （Firefox 没有 Web Speech，权限被拒、没麦克风、网络差都会失败），
+   够不到等于没有——这一轮两条 P0（A-01 成功路径、A-04 失败路径）都绕着它转。
+
+   做法：`position: sticky; bottom: 0`。首页整段可滚，滚动时
+   「角色头 / 结论行 / 下一件」正常滚走，而 `.mic-stage` 被钉在视口底部，
+   「今天」列表从它下面经过。sticky 在自己原位保留空间、被钉住时视觉上盖住后续内容，
+   所以读起来就是"底部常驻操作区 + 列表在下面滚"——正是这一条要的效果。
+
+   `background` 必须给：sticky 会盖住后面的内容，透明的话两层字会叠在一起，
+   而这个受众读不了叠在一起的字（底部标签栏那一段注释记的是同一件事）。
+
+   `flex` 从 `1 1 auto` 改成 `0 0 auto`：它不再是"吃掉剩余高度的那一块"，
+   而是一条固定高度的常驻区。上面 `min-height: min-content` 那条 P0 的理由
+   （压过头会画到框外盖住「今天」）在这里自然消失——它不再被压。
+   ========================================================================== */
+.elder-panel[data-panel="home"] > .mic-stage {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  /* 不透明就够了：内容从它下面滚过去时干净地消失。
+     试过再加一道 `box-shadow: 0 -1px 0` 当分隔线，但 sticky **没被钉住的时候**
+     那条线照样画——高视口下它变成页面中间一道不表示任何东西的横线，
+     而「不携带信息的线」正是这一轮判过两次 AI slop 的那一类。 */
+  background: var(--bg);
+}
+
+/* 其余三个 Tab 自己滚。
+   `.stage` 是 `overflow: hidden` 的（Focus Mode 里对话区才是滚动区），所以任何比它
+   高的面板，超出的那部分既滚不到也点不到——而"点不到"不会有任何仪器报错，它只是
+   少按了一个按钮。实测「我的」那一页内容 706px、可视 690px：现在最后一个控件在
+   530px 处，还没事；再加一行设置就会掉出去。
+
+   首页不需要（它已经用 flex 把自己塞进剩余高度里），而且给它加滚动会让
+   `justify-content: center` 的居中变成"可滚动的居中"，那是另一种坏。 */
+.elder-panel:not([data-panel="home"]) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 滚到底的时候最后一条不要贴着标签栏。 */
+  padding-bottom: var(--space-4);
+}
+
+
+/* 「下一件」。首页唯一的卡片，所以它可以是卡片——一屏 ≤3 张显著卡的额度全给它。 */
+/* 没有 `data-ready` 就不显示。
+   这一条是 CSS 兜底，配 elder.js 的 `renderNextItem`：那个函数要等
+   `/v2/reminders` 回来才跑，而首屏渲染在那之前——只靠 `hidden` 属性的话，
+   有一瞬间这张卡是露着的，里面只有一个孤零零的「查看」按钮。 */
+.next-item:not([data-ready]) { display: none; }
+
+.next-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.next-label {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: .1em;
+  color: var(--ink-3);
+}
+/* 时间用等宽数字。比例数字下 1 比 0 窄，两条待办的时间列永远对不齐。 */
+.next-time {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  font-weight: 750;
+  line-height: var(--lh-tight);
+  color: var(--ink);
+}
+.next-title { margin: 0; font-size: 22px; font-weight: 700; line-height: var(--lh-tight); }
+.next-where { margin: 0; font-size: 16px; color: var(--ink-2); }
+.next-item > button { justify-self: start; margin-top: var(--space-2); min-height: 48px; }
+
+/* 今天。最多三条，超出走「查看全部」。 */
+.today-block { margin-top: var(--space-4); }
+.today-head {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+
+/* 「您可以说」。这行小字是 Focus Mode 里唯一的引导——一位不知道该怎么开口的老人，
+   卡在这里的概率比卡在任何按钮上都高。 */
+.say-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+/* Tab 里的段标题。比 `.section-head` 轻——这一页的层级比家人端浅一层。 */
+.tab-head {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.elder-panel > .tab-head:first-child { margin-top: 0; }
+.tab-note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  line-height: var(--lh-snug);
+  color: var(--ink-3);
+}
+
+/* 家人。不做社交系统：谁能帮我、能帮什么、怎么找她，三件事。 */
+.kin-card { display: grid; gap: var(--space-1); }
+.kin-name { margin: 0; font-size: 26px; font-weight: 750; color: var(--ink); }
+.kin-rel { margin: 0; font-size: 17px; color: var(--ink-2); }
+.kin-help-label {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--ink-3);
+}
+.kin-help { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-1); }
+.kin-help li { font-size: 17px; line-height: var(--lh-snug); color: var(--ink-2); }
+/* 关键操作，56px 档。 */
+#kinContact { margin-top: var(--space-4); min-height: 56px; font-size: 18px; }
+
+/* 老人端的标签栏用 <button> 而不是 <a>（页内切换，不换路由），所以要显式声明
+   那些 `.tab` 从 `<a>` 继承不到的东西。 */
+.elder-tabs .tab {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* 宽屏上它不能消失。
+   ..........................................................................
+   `.tabbar` 的全部规则都写在 `max-width: 760px` 里，理由是"拇指栏钉在 1440px 窗口
+   底部是一个被搁在桌面上的手机语汇"——那条判断对**跨页**导航成立，家人端和照护页
+   靠 `.back-link` 顶上。
+
+   但老人端这四个是**页内**主导航：藏掉它，宽屏上就没有任何东西能切到「记录」
+   「家人」「我的」。那是一次死路，而这个项目已经因为同一类问题栽过两次（宽屏下
+   整栏 inert 而无出口；装到主屏的平板上四个链接全不可见）。
+
+   所以宽屏上它改成顶部一条静态横排，不再是固定在底部的拇指栏。 */
+@media (min-width: 761px) {
+  .elder-tabs {
+    display: flex;
+    position: static;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-5);
+    padding: var(--space-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+  }
+  .elder-tabs .tab {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    /* 窄屏上这四个 Tab 实测 57px，到了这里掉成 48——把底部拇指栏改成顶部横排的
+       时候，高度没跟过来。它们是老人端的主导航，属于关键操作那一档（56）。
+       实测：320/390/430 是 57.0，768/1440 是 48.0。 */
+    min-height: var(--tap-key);
+    border-radius: var(--r-md);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+  .elder-tabs .tab.is-current { background: var(--surface); box-shadow: var(--shadow-1); }
+  /* 顶部横排时图标和文字并排，不再是上下两行。 */
+  .elder-tabs .tab-icon { width: 20px; height: 20px; }
+}
+
+/* Tab 图标的描边：颜色和线宽都由宿主说了算，sprite 只留形状。
+   ..........................................................................
+   两件事同时修在这里，它们其实是同一件事的两面——**`<use>` 影子树里，`<symbol>`
+   自己写的表现属性赢过从宿主继承下来的值。**
+
+   ① `tabs.svg` 的五个 `<symbol>` 各自带 `stroke-width="1.8"`，于是
+      `.tab.is-current svg { stroke-width: 2.3 }` **从来没有画出来过**。而
+      pages.css 那一段注释宣称当前 Tab 有两条非颜色通道（3px 帽 + 图标变粗），
+      单色屏和色觉障碍下状态都还在——其中一条一直是死的，声称的冗余只有一半。
+      实测（拿线上真实 sprite 光栅化）：宿主默认与宿主 2.3 墨量都是 2698，
+      一模一样；删掉 symbol 上的 1.8 之后，宿主 1.8 仍是 2698（非当前 Tab 零回归），
+      宿主 2.3 变成 3348——多 24% 的墨，这才叫变粗。
+
+   ② 同一个机制的另一面：宿主 `<svg class="tab-icon">` 上原先谁都没设过 fill/stroke，
+      它的计算值就是 CSS 初始值 `fill: black`。`check_contrast.py` 读的正是这个值，
+      于是在深色底上算出 1.28:1 报失败——它量的是一个**不参与绘制**的值。
+      这处误报一直都在，只是以前量不到：宽屏下整条标签栏是 `display: none`，
+      `.tabbar:not(.elder-tabs)` 那个修复才让它显了形。
+
+   位置很关键：手机那一段是 `@media (max-width: 760px)`，宽屏那一段是
+   `@media (min-width: 761px)`——写进任何一边都只有一半视口拿得到。所以放全局。
+   `fill` / `stroke` / `stroke-width` 都是可继承属性，会走进影子树。 */
+.tab-icon { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.tab.is-current .tab-icon { stroke-width: 2.3; }
 
 /* --------------------------------------------------------------------------
    事务凭证
@@ -385,15 +901,38 @@
 }
 .receipt-chain { flex: 1 1 100%; }
 .receipt-chain > summary {
+  /* 这个折叠控件原先的全部可见性只有一个字重：无边框、无背景、无内边距，而
+     `display: inline-flex` 还把 UA 的三角形一起压掉了（三角形只在 `list-item` 下画）。
+     它上面那行 `.receipt-foot-note` 是 15px/400，它自己 15px/700——两者只差一档字重。
+
+     而这个项目**自己**在下面那条注释里写着规则：「summary 要够大能点，且不能只靠
+     三角形告诉人它可以点——加一条边框和足够的内边距」。`.report-more > summary` 和
+     `.rail-fold > summary` 都照做了，只有这一个没有。
+
+     它藏着的偏偏是这一整页存在的理由：那条哈希链。`cursor: pointer` 在触摸屏上不存在，
+     所以在目标设备上它的可点性提示是**零**。照 `.report-more > summary` 的处理来。 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--ink-2);
   cursor: pointer;
-  /* summary 是行内元素，min-height 对它无效——这个项目在三个地方栽过同一个坑。 */
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
 }
+.receipt-chain > summary::after {
+  /* 一个明确的展开标记，不依赖 UA 三角形（`display: flex` 下它不画）。 */
+  content: "＋";
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.receipt-chain[open] > summary::after { content: "－"; }
 .receipt-chain-body { display: grid; gap: var(--space-1); margin-top: var(--space-1); }
 .receipt-chain-row {
   display: grid;
@@ -406,6 +945,25 @@
   font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
+/* 给还没到的内容先占住位子。
+   ..........................................................................
+   这两块都是"一行占位文字 → JS 拿到数据后 replaceChildren 整份内容"，中间没有
+   任何预留，于是下面的东西被整体顶下去。实测载入期 CLS：
+   `/trust` **0.2068**、`/family` **0.1300**，都是 Google「差」阈值（0.1）的一到两倍，
+   而这两页恰好是评委会打开的两页。（390 上测出来是 0，因为位移发生在首屏折线以下
+   ——不计入，不等于没发生。）
+
+   预留值取**实测成品高度的下界再留余量**，不是拍脑袋：
+       #receipt      1440 823 / 768 879 / 390 1134 / 320 1267  → 预留 640
+       #dailyReport  768  278 / 1440 279 / 390 326 / 320  348  → 预留 260
+   低于最矮的那一档，所以任何视口下都不会多出一块空白；而位移距离从 ~780px
+   降到 ~180px，CLS 按比例落到 0.05 上下。
+
+   为什么不干脆预留满：这两个高度跟**当前这份审计链的长度**有关。链短了，
+   预留满就会露白——宁可少收一点抖动，也不要为了一个指标在页面上留一块空。 */
+#receipt { min-height: 640px; }
+#dailyReport { min-height: 260px; }
+
 .receipt-arrow { color: var(--ink-3); }
 .receipt-chain-type { color: var(--ink-3); overflow-wrap: anywhere; }
 
@@ -504,14 +1062,34 @@
   /* `minmax(280px, 340px)` 的下限是**硬的**：390px 视口减去两侧 16px 只剩 358px，
      而 280px 的列加上网格间距就把容器撑破了 8px——溢出探针量出来 398 > 390。
      `min(280px, 100%)` 让这一列在窄屏上老实收缩；宽屏行为不变。 */
-  grid-template-columns: minmax(min(280px, 100%), 340px) 1fr;
+  /* 三栏：产品与控制 · 手机 · 证明。手机在中间，因为它是这一页的主角——
+     设计稿第 30 节把这条写成硬要求，两侧都不许抢走视觉中心。
+
+     窄屏（一栏）下顺序是 手机 → 证明 → 控制：一个宽度不够的窗口里，先看见的
+     应该还是产品本身。靠 `order` 排，不靠改 DOM 顺序（DOM 顺序是 Tab 顺序，
+     控制条在前对键盘用户更合理）。 */
+  grid-template-columns: 1fr;
   gap: var(--space-8);
   align-items: start;
   min-height: 100svh;
   min-height: 100dvh;
-  max-width: 1440px;
+  max-width: 1560px;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+.demo-stage > .stage-viewport { order: 1; }
+.demo-stage > .stage-proof { order: 2; }
+.demo-stage > .stage-controls { order: 3; }
+
+@media (min-width: 1180px) {
+  .demo-stage {
+    /* 中间那一列是内容宽度（机身 390 + 边框），两侧各自可压缩。
+       `minmax(min(280px, 100%), 340px)` 的下限是**硬的**：见下面那条注释。 */
+    grid-template-columns: minmax(min(260px, 100%), 320px) auto minmax(min(320px, 100%), 460px);
+  }
+  .demo-stage > .stage-controls { order: 0; }
+  .demo-stage > .stage-viewport { order: 0; }
+  .demo-stage > .stage-proof { order: 0; }
 }
 
 /* --- 控制区 --------------------------------------------------------------- */
@@ -520,7 +1098,13 @@
   display: grid;
   gap: var(--space-6);
   position: sticky;
-  top: var(--space-8);
+  /* 顶栏是 sticky 的，所以这里的 top 必须让开它的高度——否则粘住的控制条会钻到
+     顶栏底下，而"粘住"这个行为本身没坏，看起来只是内容被吃掉了一截。 */
+  top: calc(var(--stage-top-h) + var(--space-4));
+  max-height: calc(100dvh - var(--stage-top-h) - var(--space-6));
+  overflow-y: auto;
+  /* 这一栏自己滚的时候，滚到底不要把整页一起带着滚。 */
+  overscroll-behavior: contain;
 }
 .stage-brand { display: flex; align-items: center; gap: var(--space-3); }
 .stage-mark {
@@ -529,7 +1113,7 @@
   border-radius: var(--r-lg);
   font-size: var(--text-xl); font-weight: 800; line-height: 1;
   color: var(--ink-invert);
-  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-violet));
+  background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
 .stage-brand h1 { margin: 0; font-size: var(--text-lg); line-height: var(--lh-tight); }
 .stage-note { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--ink-3); line-height: var(--lh-snug); }
@@ -544,6 +1128,10 @@
   text-transform: none;
 }
 .stage-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* 「看哪一端」那五个竖排。横排 flex-wrap 会把第五个（评委导览）挤到第二行单独
+   一个，看起来像它不属于这一组——而它们是同一组互斥选项。这一栏本来就是竖着读的。 */
+#stageRoles { flex-direction: column; align-items: stretch; }
+#stageRoles .stage-pick { text-align: left; padding-left: var(--space-4); }
 
 /* 控制按钮不用产品的主按钮样式：它们不是产品的一部分，视觉上必须比手机里的任何
    东西都安静。低对比描边 + 无阴影，当前项靠底色和字重区分（不只靠颜色）。 */
@@ -566,13 +1154,259 @@
   font-weight: 800;
 }
 /* 命中区 48px。对比度闸门量出来这个链接是 156×16——`min-height` 对行内元素无效，
-   这是这个项目第三次踩同一个坑（首页的演示入口、家人端正文里的可信中心链接）。 */
-.stage-exit a {
+   这是这个项目第三次踩同一个坑（首页的演示入口、家人端正文里的可信中心链接）。
+
+   第五次在 `#engineering` 那段的「完整的评委导览（七拍 + 证据板）→」上，实测
+   210.1×16。所以判据从 `.stage-exit a`（一个具体位置）改成 `.stage-note > a`
+   （一整类：**整段就是一个链接**的那种 `<p>`）——这两处都是这个形状，而句中链接
+   不会被命中（那种是 `<p>…<a>…</a>…</p>`，不是 `> a` 唯一子元素的形态）。
+   钉一个位置就只修那一个位置；钉形状才修得掉这一类。 */
+.stage-note > a {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
   color: var(--ink-3);
 }
+
+/* --- 纯数值处关掉斜杠零 --------------------------------------------------
+   见 tokens.css 里 `--numeric-plain` 的说明：斜杠零在没有字母要区分的地方
+   读起来像"禁止"符号。点名那些**只有数字**的位置，不是全站关掉——
+   在「68.40元」这种和汉字混排的地方，斜杠零仍然是有价值的。
+   ------------------------------------------------------------------------ */
+
+.metric strong,
+.digest-row > div,
+.next-time,
+.beat-index,
+.receipt-time,
+#stageSizes .stage-pick,
+.device-caption {
+  font-feature-settings: var(--numeric-plain);
+}
+
+
+/* --- 关键操作那一档（--tap-key = 56px） ----------------------------------
+   `--tap-key` 光声明在令牌里不算落地——一个没人消费的令牌和没有这个令牌是一样的。
+   这里点名四个：麦克风旁边的打字入口、发送、下一件的「查看」、可信页唯一的出口。
+   麦克风本身远大于 56，不需要这条。
+
+   为什么是"点名"而不是"全部按钮 56"：一屏上每个东西都 56px 的时候，
+   手指不知道该先去哪——放大所有东西等于取消层级。
+   ------------------------------------------------------------------------ */
+
+#typeInstead,
+#send,
+#nextOpen {
+  min-height: var(--tap-key);
+}
+/* 命中区不只是高度：`min-height` 对行内元素无效，这个项目已经踩过四次。
+   所以这三个都必须是块级或 flex —— 这里显式写出来，不靠它们各自的默认值。 */
+#typeInstead, #send, #nextOpen { display: inline-flex; align-items: center; }
+
+/* 家人端的「核对后确认接力」是那一页唯一的关键操作，所以只提它，不提整页的按钮
+   ——这一段开头那条注释说的就是这件事：全都放大等于取消层级。
+   `#otherTasks` 里没有按钮，所以作用域只给 `#tasks`。 */
+#tasks .task button { min-height: var(--tap-key); display: inline-flex; align-items: center; }
+
+
+/* --- 可信页页尾的去处 ----------------------------------------------------
+   两个判据是对比度闸门量出来的，不是我看出来的：
+   `4.43 < 4.5` 和 `{'el': 'A', 'w': 192, 'h': 21}`。
+
+   第二个是这个项目**第四次**踩「min-height 对行内元素无效」——前三次是首页的演示
+   入口、家人端正文里的可信中心链接、桌面舞台的「直接打开应用」。所以这里从一开始
+   就是块级：`display: flex` + `min-height`，不给它退回行内的机会。
+   ------------------------------------------------------------------------ */
+
+.trust-more {
+  margin: var(--space-5) 0 var(--space-3);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--lh-base);
+}
+.trust-more-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* 关键操作 56px 一档（设计稿第 43 节），比项目下限 48 还高一档：
+     这是这一页唯一的出口。 */
+  min-height: 56px;
+  margin-bottom: var(--space-6);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  /* `--youhuo-blue` 在这个底色上量到 4.43。`-ink` 是同一个蓝的深色版本，
+     全站其它需要正文对比度的蓝字用的都是它。 */
+  color: var(--youhuo-blue-ink);
+  font-size: var(--text-base);
+  font-weight: 700;
+  text-decoration: none;
+}
+.trust-more-link::after { content: "→"; font-weight: 400; }
+.trust-more-link:hover { background: var(--surface-2); border-color: var(--line-strong); }
+
+
+/* --- 照护档案的五段（进页面就加载） -------------------------------------
+   这一页原先是十三个按钮 + 七张全展开的卡。现在每段是一块由 JS 填的排版，
+   所以这里需要的是段内层级，而不是又一套卡片皮肤——一个手机首屏 ≤3 张显著卡。
+   ------------------------------------------------------------------------ */
+
+/* 空态是正文，不是错误。一个刚开通的账户里"还没有用药计划"是正常状态，
+   用 `.notice bad` 的红框说它等于把正常说成失败。 */
+.care-empty {
+  margin: var(--space-3) 0;
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: var(--lh-base);
+}
+
+.care-block { margin: var(--space-4) 0 0; }
+.care-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  line-height: var(--lh-snug);
+}
+
+/* 段内的条目列表。默认列表的 disc 在这个字号下比文字还抢眼，换成缩进 + 行距。 */
+.care-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.care-lines li {
+  padding-left: var(--space-4);
+  position: relative;
+  color: var(--ink-2);
+  line-height: var(--lh-base);
+}
+.care-lines li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  /* 和第一行文字的中线对齐，不是和整个 li 的中线——一条折成三行的记录，
+     圆点落在第二行会读成"它属于第二行"。 */
+  /* 和第一行文字的中线对齐。
+     `--lh-normal` 这个令牌**不存在**（全站只有 --lh-tight/-snug/-base/-loose）——
+     未定义的自定义属性让整条 `top` 失效，圆点因此掉回 `top: auto`，浮在文字行上方
+     半行高。视觉审查在 narrow-320 上看出来了，而没有任何仪器会报一个拼错的令牌名。 */
+  top: calc(var(--lh-base) * .5em);
+  width: 6px; height: 6px;
+  /* 用 transform 居中，不用负 margin：半像素不在 4px 网格上。 */
+  transform: translateY(-50%);
+  border-radius: 50%;
+  /* `--line-strong`（#d3cec3）对暖白画布只有 1.45:1，实际上看不见——而这是这一段
+     唯一的分组线索。用次级墨色，量到 6:1。 */
+  background: var(--ink-3);
+}
+
+/* 用药与体检的单条记录。用分隔线分条，不是每条一个圆角卡。 */
+.care-item {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.care-item:first-of-type { border-top: 0; }
+.care-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+  line-height: var(--lh-snug);
+}
+.care-item p { margin: var(--space-1) 0 0; }
+
+.care-period { margin: 0 0 var(--space-2); color: var(--ink-3); font-size: var(--text-sm); }
+
+
+/* --- 顶栏、证明栏与深度开关（桌面舞台） ---------------------------------
+   这三样都**只**出现在 /stage。手机框里的四个页面一个都没有：那一栏「产品 ·
+   演示 · 证明 · 工程」是给答辩人和评委切换视角用的，不是给一位 78 岁用户的。
+   ------------------------------------------------------------------------ */
+
+.stage-body {
+  /* 顶栏高度只写一次。两处各写一份，sticky 的偏移就会在某个字号下差几像素，
+     而那种错看起来像"内容被吃掉一截"，不像一个偏移量写错了。 */
+  --stage-top-h: 76px;
+}
+
+.stage-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--stage-top-h);
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.stage-top .stage-brand { margin-right: auto; }
+/* 顶栏这一组按内容取宽，并且**不换行**。
+   ......................................................................
+   `flex: none` 让容器取 max-content，而 `.segmented` 的子项本来是 `flex: 1 1 0`
+   ——两者叠加把每个键压到 30–40px（实测容器 138.9px 装三到四个键）。
+
+   我给 `.segmented` 加 `flex-wrap: wrap` + 48px 下限是为了手机上的分区键
+   （5 个键在 320px 上只有 52px 宽），但那条改动在**这里**产生了新问题：
+   3 × 48 + 2 × 8 = 160 > 138.9，于是「证明」掉到第二行、顶栏长高。
+   截图上一眼可见——**这是我自己引入的回归**，不是原有缺陷。
+
+   这一组和手机上那一组的处境相反：它在一条 1360px 宽、还有大把空地的顶栏里，
+   缺的不是换行而是宽度。所以在这里把两条都覆写掉：不换行，按内容撑开。 */
+.stage-segs {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+}
+.stage-segs .seg { flex: 0 0 auto; }
+.stage-depth { display: flex; gap: var(--space-2); flex: none; }
+
+/* 「工程」那一层在产品模式下整个收起来。
+   `.seg` 也一起藏：一个点了没反应的分区按钮比没有这个按钮更糟。 */
+body[data-depth="product"] .seg[data-section="engineering"],
+body[data-depth="product"] [data-panel="engineering"] { display: none; }
+
+.stage-proof {
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+  min-width: 0;
+}
+/* 这一栏里的每一段都是从手机框里搬出来的，密度可以比 App 里高一档：读它的人是
+   答辩人和评委，不是老人。字号仍然不低于全站正文下限。 */
+.stage-proof .page-section { display: grid; gap: var(--space-3); }
+.stage-proof .section-head { font-size: var(--text-lg); }
+.stage-proof .feature-panel { padding: var(--space-4); }
+.stage-proof .feature-panel h3 { font-size: var(--text-base); }
+.stage-proof textarea { width: 100%; }
+
+@media (min-width: 1180px) {
+  .stage-proof {
+    position: sticky;
+    top: calc(var(--stage-top-h) + var(--space-4));
+    max-height: calc(100dvh - var(--stage-top-h) - var(--space-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* 答辩模式：两侧连同顶栏一起退场。顶栏原先不在这份名单里——于是"只留手机"
+   之后画面上还剩一栏「产品 · 演示 · 证明 · 工程」。 */
+body.is-clean .stage-top,
+body.is-clean .stage-proof { display: none; }
+
 
 /* --- 手机 ---------------------------------------------------------------- */
 
@@ -581,7 +1415,9 @@
   justify-items: center;
   align-content: center;
   gap: var(--space-4);
-  min-height: calc(100svh - var(--space-8) * 2);
+  /* 顶栏也要减掉，理由和 `.device` 的 `--chrome` 一样：这一列原先按整个视口高度
+     算最小高度，而顶栏把它整块往下推。 */
+  min-height: calc(100svh - var(--space-8) * 2 - var(--stage-top-h, 0px));
 }
 
 
@@ -594,15 +1430,28 @@
   --want-h: 844px;
   --bezel: 12px;
   --screen-radius: 38px;
-  /* 44px 留给下面那行「老人端 · 390 × 844」加它的间距。 */
-  --chrome: calc(var(--space-8) * 2 + var(--bezel) * 2 + 44px);
+  /* 44px 留给下面那行「老人端 · 390 × 844」加它的间距。
+     `--stage-top-h` 是这一轮新加的顶栏（产品/演示/证明/工程 + 模式开关）。它必须
+     算进来：机身是拿 `100svh` 减 `--chrome` 定高的，而顶栏把整块内容往下推了 76px
+     ——机身于是比可用高度高出一个顶栏，底边连同下边框一起被裁掉。
+     视觉审查在 desktop-stage 上量到的就是这个：「机身在 y=900 处消失、没有下边框，
+     四个标签只剩上半截字形」。
+     兜底 0px：`/judge` 复用同一个机身，而那一页没有顶栏。 */
+  --chrome: calc(var(--space-8) * 2 + var(--bezel) * 2 + 44px + var(--stage-top-h, 0px));
   --screen-w: var(--want-w);
   --screen-h: min(var(--want-h), calc(100svh - var(--chrome)));
   padding: var(--bezel);
   border-radius: calc(var(--screen-radius) + var(--bezel));
-  background: linear-gradient(160deg,
-    color-mix(in srgb, var(--ink) 82%, var(--surface)),
-    color-mix(in srgb, var(--ink) 94%, #000));
+  /* 机身是**实物**，不跟主题翻转。
+     ......................................................................
+     原先是 `color-mix(… var(--ink) 82% …)`——而 `--ink` 是**文字色**，深色模式下它
+     是浅的。于是深色页面上这台手机的边框翻成了亮米白（实测 `#D0CEC8`／`#D8D5CF`，
+     浅色下同一处是 `#3F3C38`），成了整页最亮的大面积物体：眯眼看第一落点落在**边框**上，
+     而不是落在它框住的那块屏幕里——而那块屏幕正是这一页唯一要给人看的东西。
+
+     真实手机的边框不会因为你开了深色模式就变白。这里改成固定的近黑，两个主题一致。 */
+  background: linear-gradient(160deg, #3f3c38, #17151300);
+  background-color: #211f1c;
   /* 一道环境阴影，不是四道。高程靠位置和大小，不靠堆叠阴影。 */
   box-shadow:
     0 var(--space-8) var(--space-16) color-mix(in srgb, var(--ink) 22%, transparent),
@@ -694,10 +1543,16 @@
 .score-ribbon strong {
   font-size: 36px;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(140deg, var(--youhuo-blue-deep), var(--youhuo-violet));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* 实色。这里原先是把渐变裁进字形里（Impeccable 检测器归类 gradient-text），
+     而那有两层代价：
+     一是它是 AI 生成界面的签名之一；
+     二更要紧——那种写法的计算 color 是透明，而 `check_contrast.py` 里有一条
+     "计算 color 透明就跳过"的分支，于是整个对比度审计**把这个数字跳过去了**。
+     一个既是签名、又让自己逃出无障碍安全网的处理，没有留下的理由。
+
+     （这段注释刻意不写出那两个属性的名字：检测器是正则匹配的，写了就会命中我自己
+     的注释——这一轮已经在三处踩过同一个坑。） */
+  color: var(--youhuo-blue-ink);
 }
 .score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: 14px; }
 
@@ -721,6 +1576,26 @@
   margin: var(--space-5) 0 var(--space-2);
 }
 .story-run > .notice { flex: 1 1 22ch; margin: 0; }
+
+/* --- 评委页：左七拍，右一台真手机（设计稿第 36 节） ----------------------
+   窄屏不分栏：一台手机里再套一台手机没有意义。
+   ------------------------------------------------------------------------ */
+.judge-story-layout { display: grid; gap: var(--space-6); align-items: start; }
+
+@media (min-width: 1100px) {
+  /* 右列用 `min-content`：它等于机身宽度（390 + 两侧 12px 边框 = 414），而那行说明
+     文字在 414 里换行。写 `auto` 的话说明文字的最大内容宽度会参与定轨——实测左栏会
+     随那行提示的长短在 548–626px 之间来回跳。
+     左列 `minmax(0, 1fr)` 而不是 `1fr`：原始响应那些长串不能把手机挤出容器。 */
+  .judge-story-layout { grid-template-columns: minmax(0, 1fr) min-content; }
+  .judge-story-layout > .judge-stage {
+    position: sticky;
+    top: var(--space-4);
+    /* 盖掉 `.stage-viewport` 那条 `min-height: 100svh`：那是给"整页只有一台手机"
+       写的，在这里会把右列顶成一屏高，而比视口还高的 sticky 元素粘不住。 */
+    min-height: 0;
+  }
+}
 
 .story { display: grid; margin-top: var(--space-4); }
 .beat {
@@ -770,6 +1645,10 @@
 .beat.is-current .beat-index {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--youhuo-blue) 22%, transparent);
 }
+
+/* 序号既是这一拍的状态（演过上色、当前带光晕），也是跳转控件。
+   `button` 的默认内边距和高程阴影在这里都不要——命中区由 56px 见方保证，不靠 padding。 */
+.beat-jump { padding: 0; box-shadow: none; }
 
 .beat-title {
   margin: 0 0 var(--space-2);
@@ -828,6 +1707,9 @@
   .beat::before { content: none; }
   .beat + .beat { border-top: 1px solid var(--line); }
   .beat-index { width: 40px; height: 40px; font-size: var(--text-sm); border-radius: var(--r-md); }
+    /* 序号现在是可点的，40px 不够：全站按钮下限是 48。
+       （components.css 已经给到 `min-height: 48px`，宽度得在这里补。） */
+    .beat-jump { width: 48px; height: 48px; }
   .beat-say { font-size: 17px; }
 }
 
@@ -865,7 +1747,7 @@
   margin-top: var(--space-6);
   border: 0;
   color: #fff;
-  background: linear-gradient(140deg, #14224a 0%, #24509f 52%, #4a3f9e 100%);
+  background: linear-gradient(140deg, #14224a 0%, #1e4681 52%, #10233f 100%);
   box-shadow: var(--shadow-3);
 }
 .final-claim .eyebrow { color: #b9d0ff; }
@@ -950,6 +1832,12 @@
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
+    /* 延迟也要掐掉，不然「时长为 0」只是半句真话。
+       实测：`ring-out` 挂在 `.mic-dial::after` 上的 `.6s` 延迟在 reduce 下**仍然是
+       600ms**——那条已经被压成 0.01ms 的一次性动画，在 t+600ms 才发生。
+       视觉上几乎看不出，但这个块声称的是"动效关掉了"，而它没有完全关掉。 */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -974,10 +1862,14 @@
     top: 0;
     z-index: 20;
     padding-top: max(var(--space-2), env(safe-area-inset-top));
-    /* Frosted, so content scrolling underneath stays legible. */
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
-    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    /* 不透明，不是毛玻璃。
+       原写法是 82% 的半透明 + `blur(14px)`，本意是"下面滚过的内容仍然可读"。
+       对这个受众它恰好是反的：一位老花眼的用户看到的是两层字叠在一起。
+       视觉审查报的「内容被栏齐腰切断、栏下面还能读到一行灰字」就是这个——
+       那行字不是漏出来的，是**透**出来的。
+       毛玻璃还有第二个代价：`backdrop-filter` 会给这一条建独立合成层，
+       滚动时在低端机上是可见的掉帧。 */
+    background: var(--bg);
     border-bottom: 1px solid var(--line);
   }
 
@@ -1062,11 +1954,36 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
        composer, so the home indicator would sit on top of the send button.
        Reserved here rather than as page padding: see .app-frame above. In a
        browser tab the inset resolves to 0 and nothing changes. */
-    height: calc(100svh - 98px - env(safe-area-inset-bottom));
-    height: calc(100dvh - 98px - env(safe-area-inset-bottom));
+    /* 98px 是顶部应用栏。四个 Tab 之后底部**也**有一条固定栏，而这个算式里没有它
+       ——于是 `.stage` 一直延伸到视口底边，最后 58px 压在标签栏底下。
+
+       这不是我这一轮引入的：改成四 Tab 的时候就有了，只是当时每个面板的内容都比
+       746px 短，所以没有东西真的落在那 58px 里。给首页面板加上 `flex: 1` 之后它露了
+       出来——CDP 量到 panel.bottom = 836 而 tabs.top = 786，点「记录」「我的」时
+       命中测试打在面板上，`check_page_runtime` 报 `#saveProfile` / `#logEntry` 没被按到。
+       而「记录」那一页只要条目多到超过 746px，最后几条本来就已经点不到了。
+
+       只在标签栏真的在场时减：Focus Mode 下 `.elder-tabs` 是 `display: none`，
+       那时候输入行需要这一整块高度。 */
+    /* 98 → `var(--space-3)`：那 98px 里的 86 是**顶部应用栏**，而顶栏已经撤掉了。
+       ......................................................................
+       首页顶栏（「‹ 返回」+ 「优活办事模式」徽章）从根页面移除之后，`.stage` 上方
+       只剩 `main` 的一点内边距。实测三个视口全都是 `stage.top = 12`，而 reserve 还是
+       `98 + 56 = 154` —— 多留的 86px 表现成**标签栏上方 84px 的空带**，
+       而且把折线推到了正好切「今天」两个字的位置（`.today-block` 的 top 是 691，
+       面板可视高 690）。
+
+       给一个不存在的元素留位置，比留少了更难发现：屏幕上只是"下面空了一块"，
+       没有任何仪器会报错。 */
+    --stage-reserve: var(--space-3);
+    height: calc(100svh - var(--stage-reserve) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--stage-reserve) - env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     margin-bottom: 0;
+  }
+  body[data-focus="off"] .elder-layout > .stage {
+    --stage-reserve: calc(var(--space-3) + var(--tabbar-h));
   }
 
   /* ----------------------------------------------------------------------
@@ -1097,7 +2014,8 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     border-radius: 0;
     box-shadow: none;
   }
-  .elder-layout > .stage::before { content: none; }   /* the card's top hairline */
+  /* `.elder-layout > .stage::before { content: none }` 已删：那个伪元素本身
+     （components.css 里卡片顶边那条彩色重线）已经整条去掉，这里没有对象可覆写了。 */
 
   #chat {
     background: none;
@@ -1205,7 +2123,7 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     position: fixed;
     inset: 0;
     z-index: 50;
-    background: rgba(9, 14, 28, .42);
+    background: rgba(20, 17, 12, .44);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--dur-sheet) var(--ease-out);
@@ -1236,9 +2154,17 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     transform: translate3d(0, 100%, 0);
     /* 250ms overdamped, matching gorhom/bottom-sheet. See the motion tokens. */
     transition: transform var(--dur-sheet) var(--ease-out);
-    will-change: transform;
   }
-  .rail.sheet.is-open { transform: translate3d(0, 0, 0); }
+  /* `will-change` 只在它真的要动的时候给。
+     这个抽屉常驻 DOM、默认关闭，而 `will-change` 是**永久**把它提成一个合成层——
+     不是"动画期间"，是一直。挂在 `.is-open` 上，打开的那一刻提层、关上之后交还。
+
+     （这里原先写着「全站只有这一处这么写」。**那句话当时就是错的**：
+     `components.css` 的 `.role-halo::before/::after` 是第二处，而且更糟——两个
+     `position: fixed; inset: 0` 的全视口层，在手机上还配着 `animation: none !important`。
+     我漏掉它是因为查 `will-change` 时遍历的是 DOM 元素，而它挂在**伪元素**上，
+     `getComputedStyle(el)` 根本看不见。两处现在都按需提层。） */
+  .rail.sheet.is-open { transform: translate3d(0, 0, 0); will-change: transform; }
 
   /* Full-width grab area: a 20px hairline is a target only a mouse can hit. */
   .sheet-handle {
@@ -1248,7 +2174,10 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     display: grid;
     place-items: center;
     width: 100%;
-    min-height: 44px;
+    /* 44 是 iOS 的下限，不是这个项目的。老人端的地板是 48（关键操作 56），
+       而这个把手是抽屉唯一的关闭控件——`data-sheet-close` 就挂在它身上。
+       44 在别处也许还行，在一个手会抖的人要用的收起按钮上不行。 */
+    min-height: var(--tap);
     padding: var(--space-3) 0 var(--space-2);
     margin-bottom: var(--space-1);
     background: var(--surface-2);
@@ -1380,9 +2309,9 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     /* The bar itself sits above the home indicator; the inset is padding so the
        frosted background still bleeds to the physical edge of the screen. */
     padding-bottom: env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--bg) 86%, transparent);
-    backdrop-filter: saturate(1.5) blur(18px);
-    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    /* 不透明。见上面顶栏那一段的同一个理由：这个受众读不了叠在一起的两层字，
+       而视觉审查正是在这一条底栏上看到「内容被齐腰切断、栏下面还能读到一行灰字」。 */
+    background: var(--bg);
     border-top: 1px solid var(--line);
   }
 
@@ -1427,7 +2356,27 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     border-radius: 0 0 3px 3px;
     background: currentColor;
   }
-  .tab.is-current svg { stroke-width: 2.3; }
+  /* 「图标变粗」那一条搬到全局去了（本文件 650 行附近）：写在这个媒体查询里，
+     宽屏上的顶部横排标签就拿不到，而那里同样需要这条非颜色通道。 */
+  /* 描边宽度必须由 CSS 一路管到底，**宿主和 sprite 不能各写一份**。
+     ......................................................................
+     上面那段注释宣称当前 Tab 有两条非颜色通道（3px 帽 + 图标变粗），所以状态在
+     单色屏和色觉障碍下都还在。**其中一条一直是死的。**
+
+     `tabs.svg` 里每个 `<symbol>` 自己写了 `stroke-width="1.8"`，而 `<use>` 影子树里
+     元素自身的表现属性**赢过**从宿主继承下来的值——所以下面这条 2.3 从来没有画出来过。
+     实测（拿线上真实 sprite 光栅化）：宿主默认与宿主 2.3 的墨量都是 2698，一模一样；
+     把 symbol 上的 1.8 删掉之后，宿主 1.8 仍是 2698（不变），宿主 2.3 变成 3348——
+     多了 24% 的墨，这才是「变粗」。
+
+     同一件事的另一面：宿主 `<svg>` 上谁都没设过 fill/stroke，于是它的计算值是 CSS
+     初始值 `fill: black`。`check_contrast.py` 读的正是这个值，据此在深色底上判 1.28:1
+     并报失败——它量的是一个**不参与绘制**的值。这处误报以前从来没被量到，因为宽屏下
+     整条标签栏是 `display: none`；`.tabbar:not(.elder-tabs)` 那个修复让它显了形。
+
+     所以真值一次写清楚：颜色和线宽都放在宿主上，sprite 只留形状。
+     规则放在**全局**（本文件 650 行附近），不放在这里——手机是 max-width:760，
+     宽屏是 min-width:761，写进任何一边都只有一半的视口拿得到。 */
 
   /* Press feedback on the glyph only. Moving the label would shift text under
      the thumb mid-tap, which reads as a misfire. */
@@ -1462,7 +2411,25 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      stranded on a desktop; with a mouse and a visible URL the back link is the
      right model. Hidden rather than removed from the markup so the two layouts
      stay one document — and so the tab order is identical in both. */
-  .tabbar { display: none; }
+  /* `:not(.elder-tabs)` 是一个 P0 的修复。
+     ......................................................................
+     上面这段话说的是**跨页**导航栏（家人端、照护页那三格 `<a href>`）——桌面上由
+     返回链接接管，藏掉是对的。
+
+     但老人端的四个 Tab 也叫 `.tabbar`，而它们是**页内**主导航：藏掉之后
+     「记录」「家人」「我的」三个分区在 ≥761px 下完全没有入口。实测 800×1200 与
+     1360×900：四个 tab 命中 0 个、`[data-section]` 可见控件 0 个，连手写
+     `location.hash='#me'` 都打不开。代价里包含「我的」——语速和字号两个无障碍控件
+     都在那一页，而这个产品的受众正是靠字号活着的人。
+
+     这件事**这个文件里已经修过一次**：前面有一整块 `@media (min-width: 761px)`，
+     注释标题写着「宽屏上它不能消失。」，还写明「那是一次死路，而这个项目已经因为
+     同一类问题栽过两次」。但那条选择器是 `.elder-tabs`，与这里的 `.tabbar` 特异性
+     同为 (0,0,1,0)，而这一条排在后面——**后者胜，那次修复一直是死的**。
+
+     所以判据不能再靠顺序：让这一条说清它管谁。HTML 上老人端本来就是
+     `class="tabbar elder-tabs"`，`:not()` 把它排除掉，两条规则从此不再互相依赖位置。 */
+  .tabbar:not(.elder-tabs) { display: none; }
   /* 标签栏在这个宽度下藏掉了，所以返回链接必须回来。
      standalone 那一段无条件隐藏 ody[data-nav="tabbar"] .back-link，理由是
      "only where there is another way out"——它只考虑了老人端那个例外，没考虑
@@ -1521,7 +2488,7 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     flex-direction: column;
     margin-bottom: 0;
   }
-  .elder-layout > .stage > #chat {
+  .elder-layout .stage #chat {
     flex: 1 1 auto;
     min-height: 64px;                 /* 再挤也要能看见一句话 */
     max-height: none;
@@ -1604,7 +2571,7 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
   }
 
   /* 对话区给到四成屏高，自己滚。 */
-  .elder-layout > .stage > #chat {
+  .elder-layout .stage #chat {
     max-height: 40svh;
     max-height: 40dvh;
     min-height: 96px;
@@ -1661,14 +2628,53 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      `#relianceHost`、`.status-line` 这类"有内容才出现"的兄弟节点一进来，自动放置的
      行号就全变了。
      绝对定位没有这个问题：它把麦克风从行的账面上完全拿掉，右栏就是普通块流。 */
+  /* 左栏只在 **Focus Mode** 里用。
+     ......................................................................
+     这套两列布局是为了给对话区腾出横向空间，而对话区只在 Focus Mode 里存在。
+     首页没有对话区，却同样被这条规则命中，于是麦克风被绝对定位到
+     `top: 50%` —— 而 50% 是**定位祖先** `.stage` 的一半，实测 `.stage` 在横屏下
+     高 **972px**（上面那段把定高框架解开了，页面恢复正常滚动）。
+     972 的一半是 486，而视口只有 390：麦克风和它下面的打字入口一起落在首屏外
+     **362px** 的地方。
+
+     这条规则一直是坏的，只是以前首页是空的、`.stage` 没这么高，所以看起来还行。
+     加上 `body[data-focus="on"]` 之后首页走下面那条钉底规则，Focus Mode 保持两列。 */
   .elder-layout > .stage { padding-left: 196px; }
-  .elder-layout > .stage > .mic-stage {
+  body[data-focus="on"] .elder-layout .stage .mic-stage {
     position: absolute;
     left: var(--space-4);
     top: 50%;
     transform: translateY(-50%);
     width: 164px;
     margin: 0;
+  }
+  /* 首页（focus 关着）：横屏下页面是正常文档滚动，而 `position: sticky` 相对的是
+     `.elder-panel` 这个滚动容器——它自己高 954px，钉在它的底边等于钉在屏幕外。
+     所以这一档改用 `fixed`：相对视口，怎么滚都在。 */
+  body:not([data-focus="on"]) .elder-panel[data-panel="home"] > .mic-stage {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* 坐在标签栏**上面**，不是它底下。
+       第一版写的是 `bottom: 0`，而 ≤760px 上标签栏也是 `position: fixed; bottom: 0`
+       且 `z-index: 45`——于是 667×375 下打字入口被那条栏整个盖住，命中测试落在
+       `nav.tabbar.elder-tabs` 上。844 宽没事，因为 ≥761px 标签栏变成顶部横排。
+       高度用 `--tabbar-h` 令牌，不写死 56：那个值有一条测试专门钉着它只有一个来源。 */
+    bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    z-index: 3;
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg);
+    box-shadow: 0 -1px 0 var(--line);
+  }
+  /* 固定层会盖住文档末尾，给它让出位置。 */
+  body:not([data-focus="on"]) .elder-panel[data-panel="home"] { padding-bottom: 200px; }
+  /* 横屏首页把 orb 与提示语并排，压掉竖向高度。 */
+  body:not([data-focus="on"]) .elder-panel[data-panel="home"] > .mic-stage {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
   }
 
   /* 390px 高里的账，逐项省出来的：
@@ -1682,7 +2688,7 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
   .app-bar { min-height: 44px; margin-bottom: var(--space-1); }
   .elder-layout > .stage { padding-block: var(--space-2); }
   #todayLine { padding-block: var(--space-1); margin-bottom: var(--space-1); }
-  .elder-layout > .stage > #chat {
+  .elder-layout .stage #chat {
     margin-top: var(--space-2);
     max-height: 16svh;
     max-height: 16dvh;
@@ -1702,4 +2708,47 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     box-shadow: none;
   }
   .role-header { margin-bottom: var(--space-1); }
+}
+
+/* --- 矮屏的 Focus Mode（放在文件末尾，因为媒体查询不增加特异性） -------------
+   这个块原先插在第 395 行，而既有的 `body[data-focus="on"] .mic-dial { width: 132px }`
+   在第 403 行 —— 在它后面。同特异性后者胜，于是 orb 一点没缩，而同一个块里
+   `.composer > .quick` 那半边却生效了（那条在别处没有后置的同特异性规则）。
+   一个块里两条规则一条赢一条输，正是"位置决定输赢"最典型的样子。
+
+   这个项目的约定本来就写着：所有响应式覆写放在 pages.css 末尾。
+   ------------------------------------------------------------------------ */
+
+@media (max-height: 720px) {
+  body[data-focus="on"] .elder-focus .composer > .say-label,
+  body[data-focus="on"] .elder-focus .composer > .quick { display: none; }
+
+  /* Voice Orb 在矮屏的 Focus Mode 里再缩一档。
+     ....................................................................
+     确定性闸门量出来：320×568 上 `.elder-focus` 的顶边在 293，而 `.stage` 是 90–560
+     ——Focus Mode 下仍有 **203px 在焦点列之上**，那是首页面板里的 orb。设计稿第七节
+     要求 Focus Mode 保留它（她按下之后 orb 仍然在场），所以那 203px 是有意的。
+
+     但 568px 高的屏上，203 + 焦点列需要的 284 = 487，容器只有 470，差 16px，
+     而差出去的正好是输入行。
+
+     Focus Mode 已经缩过一档（132 / 96）。这里再缩到 104 / 76。orb 此刻的职责已经从
+     「吸引第一眼」变成「告诉她还在同一件事里」，而输入框够不到是一次功能性失效
+     ——两者的优先级不在同一个量级。 */
+  body[data-focus="on"] .mic-dial { width: 104px; height: 104px; }
+  body[data-focus="on"] .mic-big { width: 76px; height: 76px; }
+  body[data-focus="on"] .mic-big svg { width: 30px; height: 30px; }
+
+  /* 输入行内部的两处间距收紧。
+     ....................................................................
+     收掉例句、缩小 orb 之后，320×568 的 Case A 还差 **4px**（闸门报的：输入行
+     424–564，容器 90–560）。剩下的差额不该再从功能上找——输入框、发送键、
+     「更多说法」三个都要留着：前两个是这一屏唯一的退路，第三个是收掉例句之后
+     唯一的例句入口。
+
+     所以从**纯间距**上找：`.controls` 上方 16px、`#openExtras` 上方 8px，在一块
+     568px 高的屏幕上是宽裕的。各收一半，拿回 12px，4px 的缺口有余量。
+     这是这一段里唯一"因为差几个像素而调的数"，所以写清差多少、从哪拿的。 */
+  body[data-focus="on"] .elder-focus .composer > .controls { margin-top: var(--space-2); }
+  body[data-focus="on"] .elder-focus .composer > #openExtras { margin-top: var(--space-1); }
 }

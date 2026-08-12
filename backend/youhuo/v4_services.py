@@ -231,8 +231,8 @@ class EmotionAnalyzer:
 
 class MedicalReportInterpreter:
     _glossary = {
-        "高密度脂蛋白": "通常被称为“好胆固醇”，但单项结果不能代替医生判断。",
-        "低密度脂蛋白": "通常被称为“坏胆固醇”，需要结合整体心血管风险由医生评估。",
+        "高密度脂蛋白": "通常被称为「好胆固醇」，但单项结果不能代替医生判断。",
+        "低密度脂蛋白": "通常被称为「坏胆固醇」，需要结合整体心血管风险由医生评估。",
         "甘油三酯": "血脂检查的一项，受饮食、代谢等多种因素影响。",
         "空腹血糖": "空腹状态下的血糖值，需要结合复查和医生意见判断。",
         "糖化血红蛋白": "反映过去一段时间平均血糖水平的指标。",
@@ -292,7 +292,7 @@ class MedicalReportInterpreter:
             nested = cls.analyze(kind=MedicalDocumentKind.APPOINTMENT_NOTICE, text=follow_match.group(1), today=today)
             follow_up_date = nested.dates[0] if nested.dates else None
         elif any(token in cleaned for token in ("复查", "复诊", "随访")):
-            # Reports often place the date before the verb: “建议2026年8月20日复查”。
+            # Reports often place the date before the verb: 「建议2026年8月20日复查」。
             reverse_match = re.search(
                 r"(20\d{2}[年\-/\.]\d{1,2}[月\-/\.]\d{1,2}日?|\d{1,2}月\d{1,2}日)[^。；\n]{0,12}?(?:复查|复诊|随访)",
                 cleaned,
@@ -303,9 +303,9 @@ class MedicalReportInterpreter:
 
         caution_flags: list[str] = []
         for token, flag in (
-            ("急诊", "报告文字中出现“急诊”，请尽快由医护人员确认。"),
-            ("立即就医", "报告文字中出现“立即就医”，请不要仅依赖AI解释。"),
-            ("危急值", "报告文字中出现“危急值”，应立即联系医疗机构。"),
+            ("急诊", "报告文字中出现「急诊」，请尽快由医护人员确认。"),
+            ("立即就医", "报告文字中出现「立即就医」，请不要仅依赖AI解释。"),
+            ("危急值", "报告文字中出现「危急值」，应立即联系医疗机构。"),
             ("恶性", "报告包含高风险医学用语，必须由医生解释。"),
         ):
             if token in cleaned:

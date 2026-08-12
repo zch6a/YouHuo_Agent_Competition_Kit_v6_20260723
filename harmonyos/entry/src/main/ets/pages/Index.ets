@@ -272,10 +272,15 @@ struct Index {
         .margin({ top: Dim.SPACE_3, bottom: Dim.SPACE_3 })
 
       // ---- 输入区：吸底，且始终在安全区之上 ----
+      //
+      // 打字入口和发送键走 `TOUCH_KEY`（56）而不是 `TOUCH_MIN`（48）。这两个是设计稿
+      // 第 43 节点名的关键操作：麦克风之外，它们是这一屏唯一的两个出口。原先整屏
+      // 一律 48，等于告诉手指"这里每个东西都一样重要"——而在一个语音产品里，
+      // 打字是退路，退路必须比旁边那些次要按钮更好按中，否则语音失败时人就卡住了。
       Row({ space: Dim.SPACE_2 }) {
         TextInput({ placeholder: '也可以打字', text: $$this.inputText })
           .fontSize(Dim.TEXT_BODY)
-          .height(Dim.TOUCH_MIN)
+          .height(Dim.TOUCH_KEY)
           .layoutWeight(1)
           .borderRadius(Dim.RADIUS_MD)
           .backgroundColor($r('app.color.surface'))
@@ -284,7 +289,7 @@ struct Index {
         Button(this.busy ? '稍等' : '发送')
           .fontSize(Dim.TEXT_BODY)
           .fontWeight(FontWeight.Bold)
-          .height(Dim.TOUCH_MIN)
+          .height(Dim.TOUCH_KEY)
           .constraintSize({ minWidth: 84 })
           .borderRadius(Dim.RADIUS_MD)
           .backgroundColor(this.accent())
@@ -371,13 +376,23 @@ struct Index {
 struct TrustTab {
   @State section: number = 0;
 
+  // 选中态的填充用 `youhuo_blue_deep` 而不是 `youhuo_blue`。
+  //
+  // 这不是配色偏好，是量出来的：白字（`ink_invert`）压在品牌蓝 #4A90D9 上只有
+  // 3.34:1，而这行分段标签是小字号，AA 要求 4.5。换成 #2F6FB5 是 5.17:1。
+  // 全工程其它填充控件（发送键、麦克风）本来就用 `*_deep`，这一处是唯一的例外——
+  // 既是对比度缺陷，也是不一致。
+  //
+  // 会漏这么久的原因和 tokens.css 里记的那次一样：对比度审计只盯文字颜色令牌，
+  // 而这里错的是**背景**令牌，前景是对的。`youhuo_blue` 因此不再有消费者，
+  // 但令牌保留——它是品牌主色，删掉会让下一个人以为这个产品没有主色。
   @Builder
   private SegmentButton(index: number, label: string) {
     Button(label)
       .layoutWeight(1)
       .constraintSize({ minHeight: Dim.TOUCH_MIN })
       .backgroundColor(this.section === index
-        ? $r('app.color.youhuo_blue') : $r('app.color.surface'))
+        ? $r('app.color.youhuo_blue_deep') : $r('app.color.surface'))
       .fontColor(this.section === index
         ? $r('app.color.ink_invert') : $r('app.color.ink_2'))
       .fontWeight(this.section === index ? FontWeight.Bold : FontWeight.Medium)

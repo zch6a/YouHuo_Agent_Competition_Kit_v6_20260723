@@ -13,7 +13,7 @@ from starlette.datastructures import MutableHeaders
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 
-from .database import Database, IdempotencyConflict
+from .database import Database, DemoIdentities, IdempotencyConflict
 from .engine import AuthorizationError, EngineError, YouHuoEngine, semantic_model_configured
 from .privacy import elder_activity_entries, task_view
 from .document_guard import DocumentAnalysis, DocumentAnalysisRequest, DocumentGuard
@@ -86,8 +86,33 @@ def create_app(
         if seed_baseline_history is not None
         else os.getenv("YOUHUO_SEED_BASELINE", "false").lower() == "true"
     )
+    # 三个数据状态。空态掩盖布局问题，所以「补数据」不是锦上添花的收尾项。
+    #
+    #   empty      什么都不种。pytest 默认——一整批对话流程测试依赖
+    #              「这个家庭一开始没有待办」（取消按名字找、裸「嗯」确认、访客隔离计数）。
+    #   normal     3 条提醒 + 一笔**完整证据链**的已完成缴费 + 21 天作息基线。
+    #   attention  normal 之上再有需要注意的偏离。
+    #
+    # `YOUHUO_SEED_BASELINE=true` 等价于 `normal`，保留兼容：`run_demo.ps1` 和四个
+    # 闸门脚本都在用它。
+    demo_state = os.getenv("YOUHUO_DEMO_STATE", "").lower()
+    if not demo_state:
+        demo_state = "normal" if seed_history else "empty"
+    if demo_state not in {"empty", "normal", "attention"}:
+        raise RuntimeError(
+            f"YOUHUO_DEMO_STATE={demo_state!r} 不认识，只有 empty|normal|attention"
+        )
+    seed_history = demo_state in {"normal", "attention"}
+
     if seed_history:
+        demo_ids = DemoIdentities.for_suffix("demo")
         baseline_store.seed_demo_for()
+        # 没有待办，老人端首页第一屏永远是「今天没有要办的事。」
+        # ——这个产品最重要的一屏在演示里是空的。
+        db.seed_demo_reminders(demo_ids)
+        # 一笔完整的已完成缴费。只写 `status='completed'` 的话，Trust Receipt 和
+        # Audit 都会拿到一条残缺的链，而那两页的全部价值就是链本身。
+        db.seed_demo_scenario(demo_ids, "completed_bill_payment")
     # Optional offline neural voice; absent package or model simply means the
     # elder client keeps using the browser's own speech synthesis.
     neural_voice = NeuralVoice(Path(__file__).resolve().parents[2])
@@ -343,6 +368,8 @@ def create_app(
         # 与默认家庭同一个开关：合成回填只在演示部署里发生。
         if seed_history:
             baseline_store.seed_demo_for(suffix)
+            db.seed_demo_reminders(ids)
+            db.seed_demo_scenario(ids, "completed_bill_payment")
         elder_token, elder, expires_at = engine.demo_login(ids.elder_id)
         family_token, _, _ = engine.demo_login(ids.daughter_id)
         return VisitorSandboxResponse(

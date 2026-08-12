@@ -86,7 +86,14 @@ def test_every_receipt_step_speaks_chinese():
         assert not re.search(r"[A-Za-z]", who), f"「{name}」的 who 里有英文：{who}"
 
     # 认不出的类型走兜底分支，而兜底分支不许把 event_type 拼进正文。
-    fallback = re.search(r"} else \{(.*?)\n    \}", js, re.S)
+    #
+    # 从**时间轴那个循环**里面开始找，不是从文件开头。
+    # 原写法是整份文件上的第一个 `} else {`——`renderReceipt` 前面新增一个分支
+    # （"链上已经有这件事就读它，否则真的办一次"）之后，它匹配到的是那一个，
+    # 于是这条断言去一段跟未知事件毫无关系的代码里找中文说法，红了。
+    # 这不是兜底分支坏了，是这条断言假设"文件里第一个 else 就是它要找的那个"。
+    loop = js.index("for (const event of mine)")
+    fallback = re.search(r"} else \{(.*?)\n    \}", js[loop:], re.S)
     assert fallback, "找不到未知事件的兜底分支"
     assert "event.event_type" not in fallback.group(1), (
         "兜底分支把事件枚举名印到了凭证正文里"

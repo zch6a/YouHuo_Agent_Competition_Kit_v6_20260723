@@ -26,7 +26,14 @@
      那些控件变浅；而在深色模式下不提亮，文字和图标就读不出来。实测 #2F6FB5 在
      深色表面上只有 2.77–3.66:1，小字号要求 4.5。 */
   --youhuo-blue-ink: var(--youhuo-blue-deep);
-  --youhuo-violet: #7B61D9;
+  /* 蓝的更深一端，专门给渐变的暗端用。
+     这里原先是 `--youhuo-violet: #7B61D9`，而六处渐变（品牌标、麦克风、进度条、
+     评委页抬头…）都是蓝→紫。设计稿第 45 节点名禁止 purple→blue 渐变，理由不是
+     "紫色不好看"，是那个组合已经成了 AI 生成界面的签名——一位评委看一眼就知道
+     这个界面是谁做的。
+     换成同色相的深浅两端：渐变还在（一个物体从上到下有明暗是真的），
+     跨色相的霓虹没了。 */
+  --youhuo-blue-shade: #2A5E9E;
   --wuyou-orange: #F5A623;
   --wuyou-orange-deep: #D8860B;
   --wuyou-orange-ink: #9E5D00;   /* 白底上 5.22:1；#D8860B 只有 2.86:1，做文字不够 */
@@ -35,8 +42,9 @@
   /* Role accent is swapped by [data-mode] and inherited by every component. */
   --role-accent: var(--youhuo-blue);
   --role-accent-deep: var(--youhuo-blue-deep);
-  --role-accent-2: var(--youhuo-violet);
-  --role-tint: #e9f2fd;
+  --role-accent-2: var(--youhuo-blue-shade);
+  /* 不支持 `oklch(from …)` 的浏览器用这个兜底值；它必须和上面那个派生值同色温。 */
+  --role-tint: #eef2f7;
   --role-glow: rgba(74, 144, 217, .32);
   /* --role-ink 此前只在 components.css 的 body[data-mode=…] 里出现，`:root` 没有
      兜底值。它被 `.head-icon` 和 `.tab.is-current` 消费——任何一页漏写或写错
@@ -44,22 +52,43 @@
   --role-ink: var(--youhuo-blue-ink);
 
   /* --- neutrals ----------------------------------------------------------- */
-  --bg: #f4f6fb;
-  --bg-mesh-1: rgba(74, 144, 217, .16);
-  --bg-mesh-2: rgba(123, 97, 217, .13);
-  --bg-mesh-3: rgba(245, 166, 35, .11);
+  /* 画布从冷白（#f4f6fb，蓝味）改成暖中性白。设计稿第 42 节：Warm Ivory。
+     蓝味的白让整页显得像一个工具；暖白让它像一件家里的东西。中性面一起微调，
+     否则卡片和画布之间会有一道冷暖接缝——那比两边都冷更难看。 */
+  --bg: #f7f6f3;
+  /* 三团 radial-gradient 的背景网格（mesh）整体退场：设计稿第 45 节点名禁止。
+     令牌保留并置为透明，因为 base.css 里那三个 radial-gradient 仍然引用它们——
+     删令牌会让那三条静默退化成 `transparent`…实际上是 `initial`，行为未定义。
+     置为透明是显式的"什么都不画"，而且 `check_no_ai_slop_gradients` 那条闸门
+     直接查这三个值。 */
+  --bg-mesh-1: transparent;
+  --bg-mesh-2: transparent;
+  --bg-mesh-3: transparent;
   --surface: #ffffff;
-  --surface-2: #f7f9fd;
-  --surface-3: #eef2f9;
-  --surface-inset: #f2f5fa;
-  --line: #e3e8f1;
-  --line-strong: #cfd7e6;
-  --ink: #0f1729;
-  --ink-2: #3f4b64;
-  /* Muted text still has to clear WCAG AA 4.5:1 on --surface and --surface-2;
-     the previous #6d7a92 measured 4.33 and 4.11. */
-  --ink-3: #59657d;
-  --ink-invert: #ffffff;
+  --surface-2: #faf9f6;
+  --surface-3: #f1efea;
+  --surface-inset: #f4f2ee;
+  --line: #e6e3dc;
+  --line-strong: #d3cec3;
+  /* 墨色跟着纸一起转暖。
+     ......................................................................
+     这一族原先是蓝味的板岩灰：`--ink-2: #3f4b64` 的 R−B = **−37**，而画布
+     `#f7f6f3` 的 R−B = +4。文字偏冷的幅度是画布偏暖幅度的九倍——暖白纸上印着
+     冷灰蓝的字，这是"画布转暖"那一轮漏得最大的一块。
+
+     对比度闸门查不出来：#3f4b64 在 #f7f6f3 上是 8.9:1，完全达标，只是色温不对。
+     它量的是明暗，而这里错的是色相。
+
+     取法：**保持明度**（也就是保持对比度），只把色相挪到暖中性侧。
+     每个值后面标的是在 `--surface`(#fff) 上的对比度。 */
+  --ink: #1a1712;        /* 16.5:1 */
+  --ink-2: #4a443a;      /*  8.9:1，与旧值 8.9 持平 */
+  /* 次级文字仍然要在 --surface 和 --surface-2 上都过 AA 4.5:1。
+     视觉审查同时指出旧的浅色次级文字在暖画布上只有 3.16:1——那不是色温问题，
+     是这一族里有一个更浅的值（`#848b9a`）被别处用作正文小字。这里把 -3 压深，
+     顺带把那一处也带过 4.5。 */
+  --ink-3: #605848;      /*  6.0:1；#faf9f6 上 5.8:1 */
+  --ink-invert: #fffdf9;
 
   --ok: #1f8a51;
   --ok-bg: #e8f7ee;
@@ -176,18 +205,103 @@
      and the gap between them above the 48px touch floor. */
   --tabbar-h: 56px;
 
+  /* Atkinson 的斜杠零，在**纯数值**语境里要关掉。
+     斜杠零是这个字体的易读性特性，为的是把 0 和 O 分开。而"到期 0 项"「390 × 844」
+     「01/02/03」里没有字母 O 要区分，只剩下副作用：一个带斜杠的 0 读起来像 Ø，
+     也就是"空集/禁止"。视觉审查在家人端三张统计卡上看到的是三个大号 Ø。
+     用 `font-feature-settings: "zero" 0` 在那些位置关掉它，字体本身不换。 */
+  --numeric-plain: "zero" 0, "tnum" 1;
+
+  /* 触控两档。
+     `--tap` 是全站下限（48，已经高于 Apple 的 44）；`--tap-key` 是**关键操作**
+     那一档（56，设计稿第 43 节）——麦克风、发送、打字入口、页面唯一的出口。
+     两档而不是一档，是因为"全都放大"等于没有层级：一屏上每个东西都 56px 的时候，
+     手指不知道该先去哪。 */
+  --tap: 48px;
+  --tap-key: 56px;
+
   --mode-fade: 1s;
   --elder-font-scale: 1.25;
 
   color-scheme: light;
-  font-family: "HarmonyOS Sans SC", "PingFang SC", "MiSans", "Source Han Sans SC",
-    "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui,
-    -apple-system, "Segoe UI", sans-serif;
+  /* Atkinson 在最前，但它只覆盖上面 @font-face 里那几个区间（拉丁与数字）；
+     汉字落到后面的中文栈。字重从不使用 light——细笔画是老花眼最先看不见的东西。 */
+  font-family: "Atkinson Hyperlegible", "HarmonyOS Sans SC", "PingFang SC", "MiSans",
+    "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
   font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   color: var(--ink);
   background: var(--bg);
+}
+
+/* --- 桌面平台那一档：只改密度，不改品牌 ---------------------------------
+   设计稿第 41 节要两套设计系统，而"两套"很容易做成两套**品牌**——那样手机框里
+   和框外看起来就像两个产品，而它们是同一个产品的两面。
+
+   所以这一层只动三样东西：间距、字阶、圆角。颜色、字体、阴影、动效令牌一个都不覆写。
+   读它的人是答辩人和评委（坐在 1360px 的屏幕前，一次要看很多信息），
+   而不是一位 78 岁的用户（举着 390px 的手机，一次只看一件事）。
+
+   字阶只往下调**一档**，而且下限守住 15px：密一点不等于小到看不清，
+   而这一页上还有需要现场读出来的原始响应。
+   ------------------------------------------------------------------------ */
+
+[data-surface="platform"] {
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-8: 24px;
+  --space-10: 32px;
+  --space-12: 40px;
+  --space-16: 48px;
+
+  --text-base: 0.9375rem;                            /* 15px，全站下限 */
+  --text-lg: 1.0625rem;                              /* 17px */
+  --text-xl: 1.1875rem;                              /* 19px */
+  --text-2xl: 1.375rem;                              /* 22px */
+  --text-3xl: 1.625rem;                              /* 26px */
+
+  --lh-base: 1.6;
+  --lh-loose: 1.7;
+
+  --r-lg: 14px;
+  --r-xl: 16px;
+  --r-2xl: 18px;
+}
+
+/* --- 自托管拉丁字体 -------------------------------------------------------
+   Atkinson Hyperlegible（Braille Institute，OFL）只用在**拉丁字母与数字**上。
+
+   为什么值得多两个请求：这个受众读的数字全是要紧的数字——68.40 元、14:00、
+   还剩 4 天。Atkinson 是专门为低视力设计的，`0/O`、`1/l/I`、`6/9` 在它里面互相
+   不像；系统中文字体的拉丁部分不做这件事。
+
+   `unicode-range` 不是优化，是**必须**的：这个字体没有汉字。不限制区间的话，
+   浏览器会为每一个汉字先来这里找字形，找不到再回退，而回退期间那些字不可见
+   （FOIT）。加上区间之后，汉字连请求都不会触发它。
+
+   严格 CSP 下这是唯一合法的做法：文件自托管在 /static/fonts/（`default-src 'self'`
+   覆盖 font-src），没有 CDN、没有 Google Fonts。
+   ------------------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/static/fonts/AtkinsonHyperlegible-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  /* swap 而不是默认的 block：这一页上先看到系统字形、再换成 Atkinson，
+     比先看到一片空白好——尤其是当那片空白正好是金额的时候。 */
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+2018-201F, U+2032-2033, U+2212, U+2260, U+2264, U+2265;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/static/fonts/AtkinsonHyperlegible-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+2018-201F, U+2032-2033, U+2212, U+2260, U+2264, U+2265;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -205,19 +319,34 @@
        4.02，四处全部低于 AA 的 4.5。同一个坑修了一半。 */
     --youhuo-blue-deep: #8FBDEE;   /* 深色表面上 7.1–9.3:1 */
     --wuyou-orange-ink: #F0B856;   /* 7.96–10.54:1 */
-    --bg: #0b1020;
-    --bg-mesh-1: rgba(74, 144, 217, .22);
-    --bg-mesh-2: rgba(123, 97, 217, .20);
-    --bg-mesh-3: rgba(245, 166, 35, .12);
-    --surface: #141b2e;
-    --surface-2: #1a2337;
-    --surface-3: #202a41;
-    --surface-inset: #101728;
-    --line: #26314a;
-    --line-strong: #35415e;
-    --ink: #eef2fa;
-    --ink-2: #b3bdd1;
-    --ink-3: #8d99b2;
+    --bg: #0f0e0c;
+    --bg-mesh-1: transparent;
+    --bg-mesh-2: transparent;
+    --bg-mesh-3: transparent;
+    /* 渐变的暗端在深色下要**提亮**，否则控件在深底上变成一个洞。
+       和 `--youhuo-blue-ink` 是同一个道理，只是那个给文字、这个给填充。 */
+    --youhuo-blue-shade: #1F4D85;
+    /* 深色下的中性面也跟着转暖。
+       ......................................................................
+       浅色那一族改成暖白之后，这里如果留着 #141b2e / #1a2337（蓝味的深灰），
+       深色模式就还是原来那套冷调——而且更隐蔽：一块蓝味的深灰在纯黑旁边看不出来，
+       在暖近黑（#0f0e0c）旁边就是一道接缝。
+
+       另外这三个面原先在 components.css 里被 `oklch(from --role-accent …)` 覆写掉，
+       所以**改这里根本不生效**，冷暖接缝的真正来源在那边。那三行已经删了
+       （只留 `--role-tint`），现在这三个值才真的落地。 */
+    --surface: #1a1917;
+    --surface-2: #211f1c;
+    --surface-3: #2a2724;
+    --surface-inset: #141311;
+    --line: #322f2a;
+    --line-strong: #46423b;
+    /* 深色下同理：暖黑底上不该印淡紫灰的字。
+       旧值 --ink-2 #b3bdd1 的 R−B = −30，而 --bg #0f0e0c 是 +3。
+       括号里是在 --surface(#1a1917) 上的对比度。 */
+    --ink: #f6f3ec;        /* 15.0:1 */
+    --ink-2: #cfc8bb;      /* 10.0:1，旧值 10.1 */
+    --ink-3: #a49b8c;      /*  6.2:1 */
     --role-tint: #17253c;
     --ok: #4fd08a;
     --ok-bg: #12301f;

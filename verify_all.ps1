@@ -35,6 +35,12 @@ $Log = Join-Path $Root "reports/verify_all_v6.txt"
   Write-Host "START page_runtime_v6"; python backend/scripts/check_page_runtime.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS page_runtime_v6"
   Write-Host "START arkts_v6"; python backend/scripts/check_arkts.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS arkts_v6"
   Write-Host "START accessibility_v6"; python backend/scripts/check_contrast.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS accessibility_v6"
+  # Focus Mode 的几何是确定性的：三组构造好的卡直接喂给 renderGlassBox，
+  # 不依赖"这次有没有真的缴过费"。上面那些闸门在这个缺陷上全是绿的。
+  Write-Host "START focus_geometry_v6"; python backend/scripts/check_focus_geometry.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS focus_geometry_v6"
+  # 载入期不许跳。这一条只在**桌面**视口显形（手机上位移落在首屏折线以下、
+  # 不计入 CLS），而这个项目其余的浏览器闸门都以手机为主。
+  Write-Host "START layout_stability_v6"; python backend/scripts/check_layout_stability.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS layout_stability_v6"
   Remove-Item -Force -ErrorAction SilentlyContinue data/youhuo.db, data/youhuo.db-wal, data/youhuo.db-shm, data/youhuo.db.audit.key
   python backend/scripts/check_artifacts_v6.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
   Write-Host "ALL V6 DETERMINISTIC VERIFICATION STAGES PASSED"
