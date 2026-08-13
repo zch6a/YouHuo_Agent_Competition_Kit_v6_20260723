@@ -64,6 +64,23 @@ SURFACES: dict[str, RouteSurface] = {
     "/judge":  RouteSurface("professional", "evidence", None,   "judge.html"),
 }
 
+#: 每条路由的**默认分区名**（`data-panel` 的值），`None` = 这一页没有分区。
+#:
+#: 为什么单独一张表：`RouteSurface.entry` 是**导航格名**，`data-panel` 是**分区名**，
+#: 两者是不同的命名空间。`/care` 的 entry 是 `care`，而它的默认分区叫 `today`——
+#: 把这两个当成一个，就会算出 `#care` 这个不存在的锚点（那个 bug 真的发生过，
+#: 见 `href_from()`）。`/family` 那边两者恰好都是 `today`，所以它掩盖了这件事。
+DEFAULT_PANEL: dict[str, str | None] = {
+    "/":       None,
+    "/elder":  "home",
+    "/family": "today",
+    "/care":   "today",
+    "/trust":  None,    # 一张凭证没有分区
+    "/stage":  "product",
+    "/judge":  None,
+}
+
+
 class NavItem(NamedTuple):
     #: 这一格在 shell 里的名字。和 `RouteSurface.entry` 是同一套词。
     entry: str
@@ -73,9 +90,15 @@ class NavItem(NamedTuple):
     #:
     #: 不写成 `href`：那样会漏掉一半情况。从 `/care` 上点「待办」不可能是页内切换——
     #: `/care` 根本没有 `todo` 那个面板。所以链接目标取决于**你现在在哪个文档**：
-    #: 承载它的文档就是自己 ⇒ 页内切换（`#entry`）；不是自己 ⇒ 跨文档
-    #: （`owner#entry`）。`href_from()` 算这件事。
+    #: 承载它的文档就是自己 ⇒ 页内切换（`#panel`）；不是自己 ⇒ 跨文档
+    #: （`owner#panel`）。`href_from()` 算这件事。
     owner: str
+    #: 这一格在**它的 owner 文档里**对应哪个 `data-panel`。
+    #:
+    #: 和 `entry` 分开，因为它们是两个命名空间：「照护」这一格的 entry 是 `care`
+    #: （shell 里的格名），而它在 `care.html` 里落到的分区是 `today`。
+    #: hash 必须命名分区——`initSections` 拿 hash 去找 `[data-panel]`。
+    panel: str
 
 
 #: Family App 的底部导航，**四项，永远四项**。
@@ -93,32 +116,40 @@ class NavItem(NamedTuple):
 #: 所以：markup 复制三份，**由闸门保证它们一致**——漂移才是「定义一次」真正要
 #: 解决的风险，而闸门直接解决它。
 FAMILY_NAV: tuple[NavItem, ...] = (
-    NavItem("today", "今天", "/family"),
-    NavItem("todo", "待办", "/family"),
-    NavItem("care", "照护", "/care"),
-    NavItem("mine", "我的", "/family"),
+    NavItem("today", "今天", "/family", "today"),
+    NavItem("todo", "待办", "/family", "todo"),
+    # entry 是 `care`，落点是 care.html 的 `today` 分区——这一对不同名的值就是
+    # 上面 `panel` 那段注释说的两个命名空间。
+    NavItem("care", "照护", "/care", "today"),
+    NavItem("mine", "我的", "/family", "mine"),
 )
 
 
 def href_from(item: NavItem, current_route: str) -> str:
     """站在 `current_route` 这一页，这一格的链接该写什么。
 
-    两条规则，顺序要紧：
+    **hash 里写的一律是 `item.panel`（分区名），不是 `item.entry`（导航格名）。**
+    这两个曾经被当成一个，代价是「照护」被算成 `#care`——而 `care.html` 根本没有叫
+    `care` 的分区（它的分区是 today/med/body/mood/safety/trend）。那个 hash 会让
+    `initSections` 退回默认分区，或者更糟：被 `resolve()` 的 id 兜底解析成别的东西。
+    `/family` 那边 entry 与 panel 恰好都叫 `today`，所以这个错误只在 `/care` 一条
+    路径上显形，三份 markup 各写一遍时谁也不会去核对。
+    `test_every_nav_cell_lands_somewhere_real` 现在钉住它。
 
-    ① 这一格就是承载它那个文档的**默认分区** ⇒ 写裸路由，不带 hash。
-       这一条不只是为了好看。第一版没有它，于是「照护」被算成 `/care#care`——
-       而 `/care` **没有**叫 `care` 的面板（它的面板是 today/med/body/mood/safety），
-       那个 hash 会让 `initSections` 退回默认分区，或者更糟：被 `resolve()` 的
-       id 兜底解析成别的东西。同一条规则顺带覆盖了 `/family` 的 `today`。
-    ② 否则：承载它的文档是自己就写 `#entry`（页内切换），不是自己就写
-       `owner#entry`（跨文档，并且带上 hash——不带会落到那个文档的默认分区，
-       而用户点的是「待办」）。
+    三条规则：
+
+    ① 承载它的文档就是当前这一页 ⇒ 写 `#panel`，**页内切换**。
+       不写裸路由：那会整页重载，而用户点的是同一个文档里的另一个分区——
+       重载会丢掉滚动位置、重跑一遍所有请求。
+    ② 跨文档、而且这一格就是那个文档的**默认分区** ⇒ 写裸路由，不带 hash。
+    ③ 跨文档、不是默认分区 ⇒ 写 `owner#panel`。不带 hash 会落到那个文档的
+       默认分区，而用户点的是「待办」。
     """
-    if item.entry == SURFACES[item.owner].entry:
-        return f"#{item.entry}" if item.owner == current_route else item.owner
     if item.owner == current_route:
-        return f"#{item.entry}"
-    return f"{item.owner}#{item.entry}"
+        return f"#{item.panel}"
+    if item.panel == DEFAULT_PANEL.get(item.owner):
+        return item.owner
+    return f"{item.owner}#{item.panel}"
 
 
 def nav_for(current_route: str) -> tuple[tuple[NavItem, str, bool], ...]:

@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 146 |
+| 总数 | 153 |
 |---|---|
-| 有 id | 146 |
+| 有 id | 153 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 1 |
@@ -61,9 +61,11 @@
 | `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
 | `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
 | `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
@@ -74,6 +76,11 @@
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |

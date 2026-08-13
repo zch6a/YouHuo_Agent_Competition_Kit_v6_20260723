@@ -625,3 +625,54 @@ Family 变成页内 tab 之后，「是不是 `.elder-tabs`」不再等于「是
 `trust.html` 现在**没有**这个属性，加上会第一次继承到 76px 的幽灵空白——
 而 `pages.css:1785-1788` 的注释正是为了去掉那段空白才把判据从 `:not(.app-frame)`
 改成 `data-nav` 的。
+
+---
+
+## Phase C 落地记录：三个文档换上四格导航（2026-08-14）
+
+清单在 `youhuo/surfaces.py:FAMILY_NAV`，**四项，永远四项**：今天 / 待办 / 照护 / 我的。
+三份 markup 复制而不用 JS 渲染，理由写在那个常量上面（首屏不能先闪一下没有导航）。
+
+| 站在 | 今天 | 待办 | 照护 | 我的 |
+|---|---|---|---|---|
+| `/family` | `#today` ◀ | `#todo` | `/care` | `#mine` |
+| `/care` | `/family` | `/family#todo` | `#today` ◀ | `/family#mine` |
+| `/trust` | `/family` | `/family#todo` ◀ | `/care` | `/family#mine` |
+
+`/trust` 第一次有了底部导航，`<body>` 也第一次带上 `data-nav="tabbar"`。它高亮
+「待办」而不是自己：一笔办完的事属于待办这个模块，而不是一个叫「凭证」的一级分区。
+
+### 三个在这一轮抓到的缺陷，都是「看起来完全正常」的那一类
+
+**① hash 命名的是分区，不是导航格。** `entry`（导航格名）和 `data-panel`（分区名）
+原先被当成一个，于是「照护」在 `/care` 上被算成 `#care`——而 `care.html` 没有叫
+`care` 的分区。`/family` 那边两者恰好都叫 `today`，所以它**只在一条路径上显形**。
+`NavItem` 现在带 `panel` 字段，`DEFAULT_PANEL` 记每个文档的默认分区，
+`test_every_nav_cell_lands_somewhere_real` 逐格核对落点（变异证明：还原成旧算法时
+它只在 `/care` 报红）。
+
+**② 底部导航的高亮不跟着页内切换走。** `initSections` 只更新 `.seg`。实测：点「待办」
+分区切了、顶部条跟上了，而底部仍高亮「今天」、`aria-current="page"` 还挂在它身上
+——读屏用户被告知自己在「今天」。页内那三格补上 `seg` + `data-section` 之后复测通过。
+
+**③ Shell 槽位和 Panel 是两层，一个控件不能同时当两层的指示灯。** 修 ② 的第一版给
+`/care` 的「照护」也加了 `data-section="today"`，后果是点顶部「用药」时
+`show('med')` 会把它的高亮撤掉——人还在照护里，底部四格一格都不亮。所以那一格
+**故意不带** `seg`：它代表槽位，而这一页有六个分区。
+
+### 退役的控件：底部导航里的「首页」
+
+四格没有「首页」这一格，那是对的——`/` 只是一个选身份的入口，装成 App 之后没人会
+想「回到首页」。但它**不能就这么消失**：
+
+| 原位置 | 去处 |
+|---|---|
+| `family.html` 底部导航第 1 格 → `/` | 「我的」分区的 `.fam-links` 里新增「换一个人用」→ `/`（措辞与位置照 `elder.html` 的 `#leaveApp`） |
+| `care.html` 底部导航第 1 格 → `/` | 这一页本来就有 `.back-link` → `/`（宽屏可见），出口未减少 |
+| `trust.html`（原先没有导航） | 这一页本来就有 `.back-link` → `/` |
+
+`build_control_inventory.py --diff` 抓到的唯一一处「代码里消失」就是
+`care.html:href=/#2`，也就是这一格；控件总数 145 → 153。
+
+`family.html` 原先 **0 个** back-link，那正是 900×1200 那次死路的一半原因；
+现在它在「我的」里有了落点，而 `check_exits.py` 在 5 个宽度上确认三个文档都走得出去。

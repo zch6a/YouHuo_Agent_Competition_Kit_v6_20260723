@@ -21,6 +21,7 @@ import re
 from pathlib import Path
 
 from .helpers import read_stylesheet
+from youhuo.surfaces import FAMILY_NAV, SURFACES, nav_for
 
 import pytest
 
@@ -36,11 +37,41 @@ CSS = read_stylesheet()
 # test_the_landing_page_has_no_tab_bar 单独钉住。
 # trust 与 judge 也不在这里：可信实验室和评委导览是工程世界，把它们放进老人与家属
 # 的动线上，和把「评委」做成一格标签是同一个错误。它们仍可直达，用返回链接回首页。
-PAGES = [
-    ("family.html", "/family"),
-    ("care.html", "/care"),
-]
-EXPECTED_HREFS = ["/", "/family", "/care"]
+# 页面文件清单**从 surfaces.py 推导**，不再手抄。
+#
+# 这里原先是一份手写表加一份手写 href 清单
+# （`EXPECTED_HREFS = ["/", "/family", "/care"]`）。四格导航一落地，三条判据同时
+# 报红，而它们红的原因是**这份手抄本过期**，不是页面坏了。`surfaces.py` 的开头
+# 用一整段说明写着为什么它必须是唯一事实源（七条路由曾散在 8 个文件里、`/stage`
+# 已在四处被漏掉），而这份测试自己留着一份副本。
+#
+# index.html 仍然不在这里：它已经不是"控制台页面"，而是一张角色选择页——只问
+# "你是老人还是家人"，然后送你去对应的那一端。一张只有两个动作的选择页不需要常驻
+# 导航，给它加一条反而是在说"这里还有别处可去"。它的"没有标签栏"由
+# test_the_landing_page_has_no_tab_bar 单独钉住。
+#
+# `/trust` **现在在这里了**：它属于 family shell 的「待办」（`surfaces.py` 里
+# `/trust` 的 entry 是 `todo`——一笔办完的事就在待办里），此前它没有底部导航，
+# 出口只有一个返回首页链接，而用户从一张凭证出去想回的是他刚才那一列待办。
+# `/judge` 仍然不在：那是专业审计表面，不在消费者动线上。
+_ROUTES_WITH_BAR = ["/family", "/care", "/trust"]
+PAGES = [(SURFACES[route].page, route) for route in _ROUTES_WITH_BAR]
+
+
+def expected_hrefs(route: str) -> list[str]:
+    """这一页四格的 href，按顺序。由 `nav_for()` 算，不手写。"""
+    return [href for _item, href, _current in nav_for(route)]
+
+
+def expected_current(route: str) -> str:
+    """这一页应当高亮的那一格的 href。
+
+    **不等于这一页的路由。** 站在 `/trust` 上高亮的是「待办」，它的 href 是
+    `/family#todo`——凭证属于待办这个模块，而不是一个叫「凭证」的一级分区。
+    """
+    current = [href for _item, href, is_current in nav_for(route) if is_current]
+    assert len(current) == 1, f"{route} 的四格里有 {len(current)} 个当前项"
+    return current[0]
 
 
 def bar(page: str) -> str:
@@ -60,11 +91,18 @@ def test_the_bar_is_a_labelled_landmark(page: str, _: str):
     assert 'aria-label="主要分区"' in bar(page), "标签栏应是一个有名字的导航地标"
 
 
-@pytest.mark.parametrize("page,_", PAGES)
-def test_the_same_five_destinations_in_the_same_order(page: str, _: str):
+@pytest.mark.parametrize("page,route", PAGES)
+def test_the_same_four_destinations_in_the_same_order(page: str, route: str):
+    """四格、同一个顺序，三份 markup 逐字一致。
+
+    名字里原先写的是 `five`，而参数表里当时只有三格——一个从来没对过的数字。
+    现在数量由 `FAMILY_NAV` 说了算（它自己的注释：**四项，永远四项**）。
+    """
     hrefs = re.findall(r'<a href="([^"]+)"', bar(page))
-    assert hrefs == EXPECTED_HREFS, (
-        f"{page} 的标签顺序或数量不对：{hrefs}。顺序在每一页都必须一致——"
+    assert hrefs == expected_hrefs(route), (
+        f"{page} 的标签顺序或数量不对：{hrefs}\n"
+        f"  surfaces.py 说应该是 {expected_hrefs(route)}\n"
+        "  顺序在每一页都必须一致——"
         "位置就是肌肉记忆，换一页挪一格就等于没有导航"
     )
 
@@ -74,7 +112,8 @@ def test_exactly_one_tab_is_current_and_it_is_this_page(page: str, expected: str
     markup = bar(page)
     current = re.findall(r'<a href="([^"]+)"[^>]*aria-current="page"', markup)
     assert len(current) == 1, f"{page} 有 {len(current)} 个当前项，必须恰好 1 个：{current}"
-    assert current[0] == expected, f"{page} 高亮的是 {current[0]}，应该是 {expected}"
+    want = expected_current(expected)
+    assert current[0] == want, f"{page} 高亮的是 {current[0]}，应该是 {want}"
 
 
 @pytest.mark.parametrize("page,expected", PAGES)
@@ -86,7 +125,8 @@ def test_the_visual_and_the_accessible_current_state_agree(page: str, expected: 
     markup = bar(page)
     painted = re.findall(r'<a href="([^"]+)"[^>]*class="[^"]*is-current', markup)
     announced = re.findall(r'<a href="([^"]+)"[^>]*aria-current="page"', markup)
-    assert painted == announced == [expected], (
+    want = expected_current(expected)
+    assert painted == announced == [want], (
         f"{page}: 画出来的是 {painted}，读出来的是 {announced}"
     )
 
@@ -101,8 +141,8 @@ def test_no_tab_is_icon_only(page: str, _: str):
     """
     markup = bar(page)
     anchors = re.findall(r"<a\b[^>]*>.*?</a>", markup, re.S)
-    assert len(anchors) == len(EXPECTED_HREFS), (
-        f"{page} 只解析出 {len(anchors)} 个标签（应有 {len(EXPECTED_HREFS)} 个）"
+    assert len(anchors) == len(FAMILY_NAV), (
+        f"{page} 只解析出 {len(anchors)} 个标签（应有 {len(FAMILY_NAV)} 个）"
         "——属性顺序变了吗？"
     )
     for anchor in anchors:
@@ -119,8 +159,8 @@ def test_tab_icons_are_decorative_not_announced(page: str, _: str):
     返回空列表，循环不执行。断言"至少有这么多个图标"是必需的。
     """
     svgs = re.findall(r"<svg[^>]*>", bar(page))
-    assert len(svgs) == len(EXPECTED_HREFS), (
-        f"{page} 的标签栏里有 {len(svgs)} 个图标，应有 {len(EXPECTED_HREFS)} 个"
+    assert len(svgs) == len(FAMILY_NAV), (
+        f"{page} 的标签栏里有 {len(svgs)} 个图标，应有 {len(FAMILY_NAV)} 个"
     )
     for svg in svgs:
         assert 'aria-hidden="true"' in svg, "标签栏里的图标必须 aria-hidden"
@@ -471,3 +511,46 @@ def test_the_current_tab_is_not_signalled_by_colour_alone():
         "  「当前 Tab 图标变粗」这条通道于是又变成死的，而上面那条断言照样绿。\n"
         "  线宽只能有一个来源：CSS。sprite 只留形状。"
     )
+
+def _panels_of(page: str) -> set[str]:
+    """这个文档真实存在的分区名。剥注释——注释里出现过的名字不算。"""
+    source = re.sub(r"<!--.*?-->", "", (STATIC / page).read_text(encoding="utf-8"),
+                    flags=re.S)
+    return set(re.findall(r'data-panel="([^"]+)"', source))
+
+
+@pytest.mark.parametrize("route", ["/family", "/care", "/trust"])
+def test_every_nav_cell_lands_somewhere_real(route: str) -> None:
+    """四格底部导航算出来的每个 href，在目标文档里必须真有落点。
+
+    这条判据是被一个真实缺陷换来的，而那个缺陷**写在它自己函数的 docstring 里**：
+    `href_from()` 的注释说「这一格就是承载它那个文档的默认分区 ⇒ 写裸路由，不带
+    hash」，并且明确写着「`/care` **没有**叫 `care` 的面板」。而代码在
+    `owner == current_route` 时返回的正是 `#care`。
+
+    根因是两个命名空间被当成了一个：`SURFACES["/care"].entry` 是**导航格名**，
+    `data-panel` 是**分区名**。`/family` 那边两者恰好都叫 `today`，所以这个错误
+    只在 `/care` 这一条路径上显形——三份 markup 各写一遍时，谁也不会去核对。
+
+    一个指向不存在锚点的导航格，点下去什么都不会发生，而它看起来完全正常。
+    """
+    from youhuo.surfaces import SURFACES, nav_for
+
+    for item, href, _is_current in nav_for(route):
+        if href.startswith("#"):
+            page, anchor = SURFACES[route].page, href[1:]
+        elif "#" in href:
+            target_route, anchor = href.split("#", 1)
+            page = SURFACES[target_route].page
+        else:
+            # 裸路由：落在该文档的默认分区，没有锚点要核。
+            assert href in SURFACES, f"{route} 的「{item.label}」指向 {href}，那不是一条路由"
+            continue
+
+        have = _panels_of(page)
+        assert anchor in have, (
+            f"{route} 的「{item.label}」→ {href}，但 {page} 没有 "
+            f'data-panel="{anchor}"\n'
+            f"  它真实有的分区是 {sorted(have)}\n"
+            "  点下去什么都不会发生，而这一格看起来完全正常。"
+        )

@@ -8,22 +8,22 @@ START pytest_v6
 ........................................................................ [ 10%]
 ........................................................................ [ 16%]
 ........................................................................ [ 21%]
-........................................................................ [ 27%]
+........................................................................ [ 26%]
 ........................................................................ [ 32%]
 ........................................................................ [ 37%]
-........................................................................ [ 43%]
+........................................................................ [ 42%]
 ........................................................................ [ 48%]
-........................................................................ [ 54%]
-........................................................................ [ 59%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
 ........................................................................ [ 64%]
-........................................................................ [ 70%]
+........................................................................ [ 69%]
 ........................................................................ [ 75%]
-........................................................................ [ 81%]
-........................................................................ [ 86%]
+........................................................................ [ 80%]
+........................................................................ [ 85%]
 ........................................................................ [ 91%]
-........................................................................ [ 97%]
-.....................................                                    [100%]
-1333 passed in 243.93s (0:04:03)
+........................................................................ [ 96%]
+...............................................                          [100%]
+1343 passed in 159.78s (0:02:39)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
@@ -50,7 +50,7 @@ backend\youhuo\provenance.py             10      0   100%
 backend\youhuo\security.py              181     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
 backend\youhuo\services.py              184     22    88%
-backend\youhuo\surfaces.py               34      8    76%
+backend\youhuo\surfaces.py               36      1    97%
 backend\youhuo\teach_back.py            119     11    91%
 backend\youhuo\tool_registry.py          85     11    87%
 backend\youhuo\tts.py                    99     50    49%
@@ -69,7 +69,7 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7738    697    91%
+TOTAL                                  7740    690    91%
 PASS coverage_v6
 {
   "total": 34,
@@ -389,11 +389,11 @@ START layout_stability_v6
   ok / 390×844  CLS 0.0000
   ok /elder 1440×900  CLS 0.0033
   ok /elder 390×844  CLS 0.0000
-  ok /family 1440×900  CLS 0.0589
+  ok /family 1440×900  CLS 0.0590
   ok /family 390×844  CLS 0.0000
-  ok /care 1440×900  CLS 0.0123
+  ok /care 1440×900  CLS 0.0121
   ok /care 390×844  CLS 0.0000
-  ok /trust 1440×900  CLS 0.0187
+  ok /trust 1440×900  CLS 0.0155
   ok /trust 390×844  CLS 0.0000
   ok /judge 1440×900  CLS 0.0000
   ok /judge 390×844  CLS 0.0000
@@ -409,17 +409,21 @@ START exits_v6
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
-  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+  ✓ /family   出口 5 · 一步可用 1 · 首屏 1 · 两步 4   
         － /trust      可信中心       不画   [inline-tap]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /care       照护档案       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /trust      可信中心       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
-  ✓ /care     出口 3 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /           换一个人用      不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 4 · 一步可用 3 · 首屏 3 · 两步 0   
         － /           ← 返回首页     不画   [back-link]
              ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
-  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  ✓ /trust    出口 6 · 一步可用 5 · 首屏 4 · 两步 0   
+        － /           ← 返回首页     不画   [back-link]
+             ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
   · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2692 / 文档 2740）
         － /judge      完整的评委导览（七拍 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
@@ -432,17 +436,21 @@ START exits_v6
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
-  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+  ✓ /family   出口 5 · 一步可用 1 · 首屏 1 · 两步 4   
         － /trust      可信中心       不画   [inline-tap]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /care       照护档案       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /trust      可信中心       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
-  ✓ /care     出口 3 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /           换一个人用      不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 4 · 一步可用 3 · 首屏 3 · 两步 0   
         － /           ← 返回首页     不画   [back-link]
              ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
-  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  ✓ /trust    出口 6 · 一步可用 5 · 首屏 4 · 两步 0   
+        － /           ← 返回首页     不画   [back-link]
+             ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
   · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2532 / 文档 2596）
         － /judge      完整的评委导览（七拍 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
@@ -455,15 +463,17 @@ START exits_v6
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
-  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+  ✓ /family   出口 5 · 一步可用 1 · 首屏 1 · 两步 4   
         － /trust      可信中心       不画   [inline-tap]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /care       照护档案       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /trust      可信中心       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
-  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
-  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+        － /           换一个人用      不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
   · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2335 / 文档 2399）
         － /judge      完整的评委导览（七拍 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
@@ -476,15 +486,17 @@ START exits_v6
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
-  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+  ✓ /family   出口 5 · 一步可用 1 · 首屏 1 · 两步 4   
         － /trust      可信中心       不画   [inline-tap]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /care       照护档案       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /trust      可信中心       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
-  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
-  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+        － /           换一个人用      不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
   · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2513 / 文档 2577）
         － /judge      完整的评委导览（七拍 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
@@ -497,15 +509,17 @@ START exits_v6
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
-  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+  ✓ /family   出口 5 · 一步可用 1 · 首屏 1 · 两步 4   
         － /trust      可信中心       不画   [inline-tap]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /care       照护档案       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
         － /trust      可信中心       不画   [fam-link]
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
-  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
-  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+        － /           换一个人用      不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
   ✓ /stage    出口 2 · 一步可用 1 · 首屏 1 · 两步 0   
         － /judge      完整的评委导览（七拍 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）

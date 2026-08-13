@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo" data-surface="consumer">
+<body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -112,6 +112,21 @@
     </p>
     <a class="trust-more-link" href="/judge">在电脑上看完整证明</a>
 
+    <!-- 这一页此前**没有**底部导航，出口只有一个 back-link。而它属于 family shell
+         的「待办」（`surfaces.py` 里 `/trust` 的 entry 是 `todo`：一笔办完的事就在
+         待办里），所以它要和另外两个文档挂同一条四格导航——否则从凭证页出去的唯一
+         办法是返回首页，而用户想回的是他刚才那一列待办。
+
+         ⚠ 这一页的 `<body>` 也因此第一次带上了 `data-nav="tabbar"`，那个属性一口气
+         绑着三条规则（`pages.css`：底部让位 76px、窄屏藏 back-link、≥761px 恢复），
+         其中「底部让位」在没有导航条的时候是一块幽灵空白——现在有导航条了，
+         那块空白正是它该留的位置。 -->
+    <nav class="tabbar" aria-label="主要分区">
+      <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-today" /></svg><span>今天</span></a>
+      <a href="/family#todo" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-todo" /></svg><span>待办</span></a>
+      <a href="/care" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
+      <a href="/family#mine" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-me" /></svg><span>我的</span></a>
+    </nav>
 </main>
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>

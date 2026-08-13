@@ -22,7 +22,7 @@ backend\youhuo\provenance.py             10      0   100%
 backend\youhuo\security.py              181     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
 backend\youhuo\services.py              184     22    88%
-backend\youhuo\surfaces.py               34      8    76%
+backend\youhuo\surfaces.py               36      1    97%
 backend\youhuo\teach_back.py            119     11    91%
 backend\youhuo\tool_registry.py          85     11    87%
 backend\youhuo\tts.py                    99     50    49%
@@ -41,4 +41,4 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7738    697    91%
+TOTAL                                  7740    690    91%

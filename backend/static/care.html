@@ -114,10 +114,24 @@
       <p class="section-note">和他<strong>自己</strong>的常态比，不和别人比。聊天原文不会出现在这里，只有汇总。</p>
       <div id="weekly" aria-live="polite"></div>
     </section>
+    <!-- 四格，和 family.html / trust.html 逐字一致（清单见 surfaces.py:FAMILY_NAV）。
+         `/care` 没有叫 `todo` / `mine` 的分区，所以这两格是跨文档并带 hash——
+         不带 hash 会落到 family 的默认分区，而用户点的是「待办」。
+         这一页保留 `.back-link`（宽屏可见），所以「首页」这个出口不必再进导航。 -->
     <nav class="tabbar" aria-label="主要分区">
-      <a href="/" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg><span>首页</span></a>
-      <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-family" /></svg><span>家人</span></a>
-      <a href="/care" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
+      <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-today" /></svg><span>今天</span></a>
+      <a href="/family#todo" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-todo" /></svg><span>待办</span></a>
+      <!-- 这一格**故意不带** `seg` / `data-section`，尽管它指向本文档。
+           因为它代表的是 shell 里的**槽位**，不是某一个分区：这一页有六个分区
+           （今天/用药/身体/心情/安全/趋势），无论看的是哪一个，人都还在「照护」里。
+           给它 `data-section="today"` 试过一版，后果是用户点顶部「用药」时
+           `show('med')` 会把这一格的高亮撤掉——底部四格一格都不亮，而他明明在照护里。
+           `Route → Surface → Shell → Module → Panel` 里 Shell 和 Panel 是两层，
+           一个控件不能同时当两层的指示灯。
+           href 仍写 `#today`：再点一次「照护」回到这一页的默认分区，那是 App 里
+           点当前 Tab 的常规行为，而且 `initSections` 的 hashchange 会接住它。 -->
+      <a href="#today" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
+      <a href="/family#mine" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-me" /></svg><span>我的</span></a>
     </nav>
   </main>
   <script src="/static/identity.js"></script>

@@ -141,13 +141,33 @@
       <div class="fam-links">
         <a href="/care" class="fam-link">照护档案</a>
         <a href="/trust" class="fam-link">可信中心</a>
+        <!-- 「首页」从底部导航搬到这里，**不是删掉**。
+             底部导航改成四格（今天/待办/照护/我的）之后没有「首页」这一格了，
+             那是对的：`/` 只是一个选身份的入口，装成 App 之后没人会想"回到首页"。
+             但它是这一页通向 `/` 的**唯一**链接（family.html 没有 back-link，
+             那正是 900px 下那次死路的一半原因），所以必须有一个落点。
+             位置和措辞都照 `elder.html` 的 `#leaveApp`：同一件事在两个壳里
+             说同一句话。 -->
+        <a href="/" class="fam-link">换一个人用</a>
       </div>
     </section>
 
+    <!-- 四格，永远四格。清单在 `youhuo/surfaces.py:FAMILY_NAV`，闸门拿它核对三份
+         markup 一致；每一格的 href 由 `href_from()` 算，`test_tabbar.py` 的
+         `test_every_nav_cell_lands_somewhere_real` 保证它落在真实分区上。 -->
     <nav class="tabbar" aria-label="主要分区">
-      <a href="/" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg><span>首页</span></a>
-      <a href="/family" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-family" /></svg><span>家人</span></a>
+      <!-- 页内那三格带 `seg` + `data-section`，**不是可选的**。
+           `initSections`（common.js）只更新 `.seg` 的 `is-current` / `aria-current`。
+           第一版这三格只是 `<a class="tab">`，实测：点「待办」分区确实切了、顶部
+           分区条也跟上了，而**底部导航的高亮留在「今天」不动，`aria-current="page"`
+           也还挂在它身上**——读屏用户被告知自己在「今天」，实际在「待办」。
+           一个看起来完全正常的无障碍缺陷。
+           「照护」是跨文档的，它不能带 `data-section`：那个分区名在这个文档里
+           不存在，会被 `resolve()` 兜底解析到别处去。 -->
+      <a href="#today" class="tab seg is-current" data-section="today" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-today" /></svg><span>今天</span></a>
+      <a href="#todo" class="tab seg" data-section="todo"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-todo" /></svg><span>待办</span></a>
       <a href="/care" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
+      <a href="#mine" class="tab seg" data-section="mine"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-me" /></svg><span>我的</span></a>
     </nav>
   </main>
   <script src="/static/identity.js"></script>
