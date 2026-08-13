@@ -18,8 +18,10 @@ import subprocess
 import sys
 import time
 import urllib.error
-import urllib.request
 from pathlib import Path
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 ROOT = Path(__file__).resolve().parents[2]
 #: /stage 也要查：它是答辩时投在大屏上的那一页，控制条的对比度和触控尺寸和产品
@@ -229,7 +231,7 @@ def main() -> int:
     try:
         for _ in range(80):
             try:
-                with urllib.request.urlopen(f"{BASE}/ping", timeout=2):
+                with open_local(f"{BASE}/ping", timeout=2):
                     break
             except Exception:
                 time.sleep(0.4)
@@ -256,7 +258,7 @@ def main() -> int:
         ws_url = None
         for _ in range(80):
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json/version", timeout=2) as r:
+                with open_local(f"http://127.0.0.1:{DEVTOOLS_PORT}/json/version", timeout=2) as r:
                     ws_url = json.loads(r.read())["webSocketDebuggerUrl"]
                 break
             except Exception:
@@ -270,7 +272,7 @@ def main() -> int:
             mode = "dark" if dark else "light"
             for page in PAGES:
                 target = browser.send("Target.createTarget", url="about:blank")["targetId"]
-                with urllib.request.urlopen(f"http://127.0.0.1:{DEVTOOLS_PORT}/json/list", timeout=5) as r:
+                with open_local(f"http://127.0.0.1:{DEVTOOLS_PORT}/json/list", timeout=5) as r:
                     pages = json.loads(r.read())
                 tab = CDP(next(p["webSocketDebuggerUrl"] for p in pages if p["id"] == target), websocket)
                 tab.send("Page.enable")

@@ -80,9 +80,21 @@ UNVERIFIABLE_KITS = {
 
 def kit_symbol_index() -> tuple[dict[str, set[str]], Path | None]:
     """符号 -> 导出它的 kit 集合。没装 SDK 就返回空表。"""
-    root = os.environ.get("YOUHUO_OHOS_SDK") or r"F:\ohos-sdk\sdk\ets"
-    configs = Path(root) / "build-tools" / "ets-loader" / "kit_configs"
-    if not configs.is_dir():
+    # 候选路径不止一个，**因为写死一个的代价是整层检查静默消失**：SDK 从
+    # `F:\ohos-sdk` 搬到 `F:\YouHuo\ohos-sdk` 之后，这里的默认值指向一个不存在的
+    # 目录，于是 `kit_symbol_index()` 返回空表、这一层检查跳过，而验证链照样打印
+    # PASS。这个项目已经因为「跳过分支让一整层验证消失」栽过好几次。
+    candidates = [Path(p) for p in (
+        os.environ.get("YOUHUO_OHOS_SDK"),
+        r"F:\YouHuo\ohos-sdk\sdk\ets",
+        r"F:\ohos-sdk\sdk\ets",
+        r"D:\YouHuo\toolchain\ohos-sdk\sdk\ets",
+    ) if p]
+    for root in candidates:
+        configs = root / "build-tools" / "ets-loader" / "kit_configs"
+        if configs.is_dir():
+            break
+    else:
         return {}, None
     index: dict[str, set[str]] = {}
     for config in sorted(configs.glob("@kit.*.json")):

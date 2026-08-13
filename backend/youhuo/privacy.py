@@ -140,14 +140,25 @@ def elder_activity_entries(
                 who=who,
                 what=_ELDER_ACTIVITY_TEXT[event.event_type],
                 kind=kind,
+                about_id=event.entity_id,
             )
         )
     entries.sort(key=lambda item: item.id, reverse=True)
     # Collapse runs of the same line: a retried turn should read as one event,
     # not as the same sentence repeated down the page.
+    #
+    # `about_id` 也要参与比较。少了它，**两笔不同的事务**只要产生同一句话就会被
+    # 合并成一行——`_ELDER_ACTIVITY_TEXT` 是每个事件类型一句固定的话，所以连着
+    # 办两次缴费，第二笔会安静地消失。原先这个字段还没有，所以看不出来；
+    # 现在它在了，这一行就该修。
+    #
+    # `None` 参与比较是对的：两条都取不到主体时，它们确实无法区分，
+    # 折叠成一条比显示两条一样的话更好。
     deduped: list[ElderActivityEntry] = []
     for entry in entries:
-        if deduped and deduped[-1].what == entry.what and deduped[-1].who == entry.who:
+        if (deduped and deduped[-1].what == entry.what
+                and deduped[-1].who == entry.who
+                and deduped[-1].about_id == entry.about_id):
             continue
         deduped.append(entry)
     return deduped

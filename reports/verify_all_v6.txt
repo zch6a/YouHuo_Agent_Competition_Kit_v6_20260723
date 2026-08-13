@@ -4,49 +4,53 @@ START openapi_v6
 {"output": "F:\\优活\\YouHuo_Agent_Competition_Kit_v6_20260723\\xiaoyi\\plugin_openapi_v6.generated.json", "paths": 99, "version": "6.0.0"}
 PASS openapi_v6
 START pytest_v6
-........................................................................ [  7%]
-........................................................................ [ 14%]
+........................................................................ [  5%]
+........................................................................ [ 10%]
+........................................................................ [ 16%]
 ........................................................................ [ 21%]
-........................................................................ [ 29%]
-........................................................................ [ 36%]
+........................................................................ [ 27%]
+........................................................................ [ 32%]
+........................................................................ [ 37%]
 ........................................................................ [ 43%]
-........................................................................ [ 51%]
-........................................................................ [ 58%]
-...............................s........................................ [ 65%]
-........................................................................ [ 73%]
-........................................................................ [ 80%]
-........................................................................ [ 87%]
-........................................................................ [ 95%]
-.................................................                        [100%]
-=========================== short test summary info ===========================
-SKIPPED [1] backend\tests\test_release_hygiene.py:44: 纯 ASCII，不需要 BOM
-984 passed, 1 skipped in 112.59s (0:01:52)
+........................................................................ [ 48%]
+........................................................................ [ 54%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 91%]
+........................................................................ [ 97%]
+.....................................                                    [100%]
+1333 passed in 243.93s (0:04:03)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
 ---------------------------------------------------------
 backend\youhuo\__init__.py                1      0   100%
-backend\youhuo\api.py                   333     55    83%
-backend\youhuo\baseline.py              164      8    95%
+backend\youhuo\api.py                   344     56    84%
+backend\youhuo\baseline.py              174      8    95%
 backend\youhuo\baseline_api.py           77      7    91%
 backend\youhuo\baseline_models.py        97      2    98%
-backend\youhuo\baseline_services.py     219     16    93%
-backend\youhuo\baseline_store.py        160     20    88%
+backend\youhuo\baseline_services.py     219     15    93%
+backend\youhuo\baseline_store.py        160     14    91%
 backend\youhuo\care_voice.py            170     15    91%
 backend\youhuo\companion.py              63      0   100%
-backend\youhuo\database.py              338     26    92%
+backend\youhuo\database.py              365     26    93%
 backend\youhuo\document_guard.py        179      6    97%
 backend\youhuo\elderbench.py             97      7    93%
-backend\youhuo\engine.py                846     66    92%
+backend\youhuo\engine.py                846     62    93%
 backend\youhuo\llm.py                    38     17    55%
 backend\youhuo\memory_vault.py           92      2    98%
-backend\youhuo\models.py                204      0   100%
+backend\youhuo\models.py                205      0   100%
 backend\youhuo\orchestration.py         157      4    97%
-backend\youhuo\privacy.py                78     17    78%
+backend\youhuo\privacy.py                78     16    79%
 backend\youhuo\provenance.py             10      0   100%
 backend\youhuo\security.py              181     10    94%
 backend\youhuo\semantic_router.py        64      1    98%
-backend\youhuo\services.py              174     20    89%
+backend\youhuo\services.py              184     22    88%
+backend\youhuo\surfaces.py               34      8    76%
 backend\youhuo\teach_back.py            119     11    91%
 backend\youhuo\tool_registry.py          85     11    87%
 backend\youhuo\tts.py                    99     50    49%
@@ -65,7 +69,7 @@ backend\youhuo\v6_models.py             237      0   100%
 backend\youhuo\v6_services.py           323     49    85%
 backend\youhuo\v6_store.py               65      1    98%
 ---------------------------------------------------------
-TOTAL                                  7645    698    91%
+TOTAL                                  7738    697    91%
 PASS coverage_v6
 {
   "total": 34,
@@ -156,7 +160,7 @@ PASS reliance: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 1
 PASS study: Counter({'cognitive_load_governor': 100000, 'semantic_gateway': 100000, 'safe_action_preview': 100000, 'reliance_glass_box': 100000, 'study_and_competition_evidence': 100000})
 {"version": "6.0.0", "seed": 20260723, "deterministic_assertions": 500000, "passed": 500000, "failed": 0, "categories": {"cognitive_load_governor": 100000, "semantic_gateway": 100000, "safe_action_preview": 100000, "reliance_glass_box": 100000, "study_and_competition_evidence": 100000}, "failures": [], "scope_note": "These are deterministic software assertions, not real older-adult participants or real hospital/payment calls."}
 Secret scan passed: no credential-like values detected.
-All YAML/JSON contracts OK (30 JSON files)
+All YAML/JSON contracts OK (71 JSON files)
 START feature_audit_v6
 
 === 基础服务与鉴权 ===
@@ -342,16 +346,20 @@ START browser_javascript_v6
   ok identity.js [script]
   ok judge.js [script]
   ok landing.js [script]
+  ok proof-demos.js [script]
   ok register-sw.js [script]
   ok sheet.js [script]
   ok speech.js [module]
   ok stage.js [script]
   ok sw.js [script]
+  ok task-detail.js [module]
+  ok task-space.js [module]
   ok trust.js [script]
-PASS browser_javascript_v6: 14 file(s)
+PASS browser_javascript_v6: 17 file(s)
 PASS speech_text_v6: 34 项朗读文本断言通过
 START page_runtime_v6
-OK page_runtime: 7 个页面加载干净，99 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
+  按到的控件（按页）：/ 0、/elder 49、/family 5、/care 6、/trust 1、/judge 29、/stage 50
+OK page_runtime: 7 个页面加载干净，140 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
 PASS page_runtime_v6
 START arkts_v6
 PASS check_arkts: 18 个 .ets 文件，20 个颜色令牌，已按 SDK 核对 1159 个 kit 符号
@@ -373,6 +381,151 @@ START accessibility_v6
   ok /stage [dark]
 PASS contrast_v6: 14 个页面/模式全部满足 WCAG AA 与触控尺寸
 PASS accessibility_v6
+START focus_geometry_v6
+OK focus_geometry: 5 个视口 × 3 个 Case（无卡/正常卡/最大卡）= 15 组，七条几何约束全过；对话区可见、输入行与发送键够得到、没有块被裁掉
+PASS focus_geometry_v6
+START layout_stability_v6
+  ok / 1440×900  CLS 0.0000
+  ok / 390×844  CLS 0.0000
+  ok /elder 1440×900  CLS 0.0033
+  ok /elder 390×844  CLS 0.0000
+  ok /family 1440×900  CLS 0.0589
+  ok /family 390×844  CLS 0.0000
+  ok /care 1440×900  CLS 0.0123
+  ok /care 390×844  CLS 0.0000
+  ok /trust 1440×900  CLS 0.0187
+  ok /trust 390×844  CLS 0.0000
+  ok /judge 1440×900  CLS 0.0000
+  ok /judge 390×844  CLS 0.0000
+  ok /stage 1440×900  CLS 0.0170
+  ok /stage 390×844  CLS 0.0000
+PASS layout_stability: 14 组（7 路由 × 2 视口）载入期 CLS 全部 < 0.1
+PASS layout_stability_v6
+START exits_v6
+============================================================================
+320×568
+============================================================================
+  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
+        － /           换一个人用      不画   [fam-link]
+             ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
+  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+        － /trust      可信中心       不画   [inline-tap]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /care       照护档案       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /trust      可信中心       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 3 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /           ← 返回首页     不画   [back-link]
+             ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
+  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2692 / 文档 2740）
+        － /judge      完整的评委导览（七拍 不画   []
+             ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
+  ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
+
+============================================================================
+390×844
+============================================================================
+  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
+        － /           换一个人用      不画   [fam-link]
+             ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
+  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+        － /trust      可信中心       不画   [inline-tap]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /care       照护档案       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /trust      可信中心       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 3 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /           ← 返回首页     不画   [back-link]
+             ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
+  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2532 / 文档 2596）
+        － /judge      完整的评委导览（七拍 不画   []
+             ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
+  ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
+
+============================================================================
+768×1024
+============================================================================
+  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
+        － /           换一个人用      不画   [fam-link]
+             ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
+  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+        － /trust      可信中心       不画   [inline-tap]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /care       照护档案       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /trust      可信中心       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
+  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2335 / 文档 2399）
+        － /judge      完整的评委导览（七拍 不画   []
+             ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
+  ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
+
+============================================================================
+900×1200
+============================================================================
+  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
+        － /           换一个人用      不画   [fam-link]
+             ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
+  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+        － /trust      可信中心       不画   [inline-tap]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /care       照护档案       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /trust      可信中心       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
+  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2513 / 文档 2577）
+        － /judge      完整的评委导览（七拍 不画   []
+             ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
+  ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
+
+============================================================================
+1440×900
+============================================================================
+  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
+        － /           换一个人用      不画   [fam-link]
+             ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
+  ✓ /family   出口 5 · 一步可用 2 · 首屏 2 · 两步 3   
+        － /trust      可信中心       不画   [inline-tap]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /care       照护档案       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+        － /trust      可信中心       不画   [fam-link]
+             ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
+  ✓ /care     出口 3 · 一步可用 3 · 首屏 3 · 两步 0   
+  ✓ /trust    出口 2 · 一步可用 2 · 首屏 1 · 两步 0   
+  ✓ /stage    出口 2 · 一步可用 1 · 首屏 1 · 两步 0   
+        － /judge      完整的评委导览（七拍 不画   []
+             ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
+  ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
+
+============================================================================
+KNOWN exits_v6: 5 处出口要先切一次页内分区才露出来
+        /elder @ 320×568
+        /elder @ 390×844
+        /elder @ 768×1024
+        /elder @ 900×1200
+        /elder @ 1440×900
+KNOWN exits_v6: 4 处出口在首屏之外（Phase C 要修的「静态导航排在 main 最后一个孩子」）
+        /stage @ 320×568
+        /stage @ 390×844
+        /stage @ 768×1024
+        /stage @ 900×1200
+PASS exits_v6: 7 条路由 × 5 个宽度，每一格都至少有一个真的可用的出口
+============================================================================
+PASS exits_v6
 {
   "version": "6.0.0",
   "passed": true,

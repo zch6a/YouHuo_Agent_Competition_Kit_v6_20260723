@@ -28,6 +28,8 @@ rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.
   echo "START accessibility_v6"; python backend/scripts/check_contrast.py
   echo "START focus_geometry_v6"; python backend/scripts/check_focus_geometry.py; echo "PASS focus_geometry_v6"
   echo "START layout_stability_v6"; python backend/scripts/check_layout_stability.py; echo "PASS layout_stability_v6"
+  # 见 verify_all.ps1 同一行的注释：按宽度量「走不走得出去」。
+  echo "START exits_v6"; python backend/scripts/check_exits.py; echo "PASS exits_v6"
   rm -f data/youhuo.db data/youhuo.db-wal data/youhuo.db-shm data/youhuo.db.audit.key
   echo "START artifact_check_v6"; python backend/scripts/check_artifacts_v6.py; echo "PASS artifact_check_v6"
   echo "ALL V6 DETERMINISTIC VERIFICATION STAGES PASSED"

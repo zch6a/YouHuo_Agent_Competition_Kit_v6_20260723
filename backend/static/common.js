@@ -414,6 +414,203 @@
     return 'good';
   }
 
+  //: 平台抛的错，和后端写的错，不是一回事。
+  //:
+  //: 这个文件第 41 行已经记着一条事实：`login()` 抛的 Error「会被各页 catch 之后
+  //: 原样写到屏幕上（老人端还会念出来）」。当时的对策是把**我们自己撰写**的那些
+  //: 消息洗干净。但错误有两个来源，只治了一个：
+  //:
+  //:   后端写的   `api()` 对 HTTP 失败抛 `new Error(data.detail || …)` 并带 `.status`。
+  //:             `detail` 是后端用中文写给人看的，直接上屏没问题。
+  //:   平台抛的   `fetch` 自己失败时抛 `TypeError: Failed to fetch`，**没有 `.status`**。
+  //:             源头在浏览器里，洗不掉。而它会被写进状态行，然后**被念给老人听**。
+  //:
+  //: 实测有 7 处把 `${e.message}` 直接拼进消费者面的文案：`elder.js` 三处
+  //: （`:759` `:863` `:894`）、`care.js:461`、`trust.js:21`（连前缀都没有）、
+  //: `family.js` 两处（`:428` `:632`）。
+  //:
+  //: `test_app_surface_speaks_no_engineering.py` 扫的是**静态字面量**，而
+  //: `${e.message}` 是个模板——它运行时装进来什么，静态扫描无从得知。所以
+  //: 「消费者面不许有工程词」这条规则在运行时是没有闸门的，这个函数就是那道闸门
+  //: 的落点：只要所有 catch 都经过它，运行时也就守住了。
+  //:
+  //: 四型各配**一条仍然走得通的路**。一个错误提示最要紧的不是解释原因，是给出路——
+  //: 老人看不懂「加载失败」，但看得懂「家里网不通」，更要紧的是知道接下来能干什么。
+  const ERROR_WORDS = {
+    offline: {say: '家里网不通', then: '等一下我再试试'},
+    notfound: {say: '没有找到这一条', then: '回到记录看看'},
+    server: {say: '我这边出了点问题', then: '过一会儿再试'},
+    unknown: {say: '这一步没成', then: '再试一次'},
+  };
+
+  /** 错误 → 四型之一，或 `backend`（后端写好了人话，用它自己的）。 */
+  function errorKind(error) {
+    const status = error && error.status;
+    if (typeof status === 'number') {
+      if (status === 404) return 'notfound';
+      if (status >= 500) return 'server';
+      return 'backend';
+    }
+    // 浏览器自己知道没网的时候，那是比异常形状更硬的信号：一个 TypeError 也可能
+    // 是别的原因，而 `onLine === false` 是确定的。
+    //
+    // `elder.js` 的 send() 里本来就有 `navigator.onLine === false ? 'offline'`
+    // 这一行，用来决定屏幕停在哪一态——但同一处的**文案**却写死成
+    // 「系统暂时不可用」，也就是说这个判断已经做过一次，只是没用在说给人听的那句话上。
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return 'offline';
+    }
+    // `fetch` 失败在所有主流浏览器里都是 TypeError；超时被 AbortController 掐断
+    // 时是 AbortError。两者对用户是同一件事：这一趟没出去。
+    const name = (error && error.name) || '';
+    if (name === 'TypeError' || name === 'AbortError') return 'offline';
+    return 'unknown';
+  }
+
+  /** 给人看的一句话。
+   *
+   * @param error   catch 到的那个东西
+   * @param subject 这次没成的是哪件事（「待办」「记录」「这份凭证」），可省
+   * @returns `{kind, say, then, text}`——`text` 是拼好的默认说法，
+   *          `say` / `then` 给需要自己拼的地方（比如状态行只容得下一句）。
+   */
+  function errorWords(error, subject) {
+    const kind = errorKind(error);
+    if (kind === 'backend') {
+      const detail = String((error && error.message) || '').trim();
+      // 兜底文案是 `请求失败（403）`，里面有状态码——那是工程词，不给消费者看。
+      if (detail && !/请求失败（\d+）/.test(detail)) {
+        return {kind, say: detail, then: '', text: detail};
+      }
+      const w = ERROR_WORDS.unknown;
+      return {kind: 'unknown', say: w.say, then: w.then,
+              text: subject ? `${subject}${w.say}。${w.then}` : `${w.say}。${w.then}`};
+    }
+    const w = ERROR_WORDS[kind];
+    return {
+      kind, say: w.say, then: w.then,
+      text: subject ? `${subject}暂时看不了：${w.say}。${w.then}`
+                    : `${w.say}。${w.then}`,
+    };
+  }
+
+  //: 跨文档回到原处。
+  //:
+  //: `/family` `/care` `/trust` 是同一个 App 的三个 deep link，但它们是三个**文档**。
+  //: 每次跳转都是一次完整的文档加载：JS 上下文重建、滚动归零。实测：在 /family
+  //: 滚到 y=204，去 /care，回来 y=0。
+  //:
+  //: 这一条是 Phase C/D 的前置判据之一（`09_consumer_app_architecture.md`）。
+  //: Medito 靠 `IndexedStack` 让四个 tab 页同时活着，切走再切回什么都没变；
+  //: 七个文档做不到那个，只能把「回到原处」这件事显式地做出来。做法本身也照它抄——
+  //: `bottom_navigation_bar_view.dart:39-41` 把上次的 tab 存进 SharedPreferences
+  //: 并在启动时恢复。
+  //:
+  //: **难点不在存，在恢复的时机。** 这三页的内容是异步取的，`load` 那一刻文档还
+  //: 只有一屏高，此时 `scrollTo(0, 204)` 会被浏览器夹到 0——朴素实现就死在这里，
+  //: 而且它失败得很安静（看起来就是"没恢复"，和没写这段代码一样）。所以要等到
+  //: 文档真的够高了再滚，并且有个上限，不能无限等一个永远不会长高的页面。
+  const PLACE_KEY = 'youhuo_place_v1';
+  const PLACE_TTL_MS = 30 * 60 * 1000;   // 半小时之前的位置就不要了
+  const RESTORE_WINDOW_MS = 2500;        // 最多等内容 2.5 秒
+
+  //: 按**路径**分槽，不是一个槽。
+  //:
+  //: 第一版是单槽（`{path, y}` 一份），实测不恢复。原因是中间那一页把它覆盖了：
+  //: 离开 /family 存 `{path:'/family', y:204}`，离开 /care 又存
+  //: `{path:'/care', y:0}` 盖掉它——回到 /family 时读出来的 path 是 /care，
+  //: 不匹配，于是什么都不做。
+  //:
+  //: 而这正是这个功能唯一的使用场景：**A → B → A**。单槽在它自己要解决的那条
+  //: 路径上必然失效，而且失效得毫无声音（看起来就是"没恢复"）。
+  function readPlaces() {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem(PLACE_KEY) || '{}');
+      return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+    } catch (_) { return {}; }
+  }
+
+  function rememberPlace() {
+    try {
+      const places = readPlaces();
+      places[location.pathname] = {
+        hash: location.hash,
+        y: Math.round(window.scrollY || 0),
+        t: Date.now(),
+      };
+      // 只留最近的几页，别让它无限长。七条路由，留八个够了。
+      const keys = Object.keys(places)
+        .sort((a, b) => (places[b].t || 0) - (places[a].t || 0))
+        .slice(8);
+      keys.forEach(k => delete places[k]);
+      sessionStorage.setItem(PLACE_KEY, JSON.stringify(places));
+    } catch (_) { /* 隐私模式 */ }
+  }
+
+  function restorePlace() {
+    const saved = readPlaces()[location.pathname];
+    if (!saved || !saved.y || Date.now() - saved.t > PLACE_TTL_MS) return;
+
+    // 浏览器自己的滚动恢复只在前进/后退时生效；点一条 tab 链接是**全新导航**，
+    // 它不管。关掉它是为了两边不互相打架。
+    try { history.scrollRestoration = 'manual'; } catch (_) { /* 老浏览器 */ }
+
+    const target = saved.y;
+    const deadline = Date.now() + RESTORE_WINDOW_MS;
+    let settled = false;
+
+    const tryScroll = () => {
+      if (settled) return;
+      const reachable = document.documentElement.scrollHeight - window.innerHeight;
+      if (reachable >= target) {
+        window.scrollTo(0, target);
+        // 真的到了才算完。夹住的时候不算——留着下一帧再试。
+        if (Math.abs((window.scrollY || 0) - target) <= 2) {
+          settled = true;
+          observer?.disconnect();
+          return;
+        }
+      }
+      if (Date.now() > deadline) {
+        // 等不到就放弃，**不要**滚到一个半途的位置：停在顶部是可理解的，
+        // 停在内容中间一个不属于任何东西的地方不是。
+        settled = true;
+        observer?.disconnect();
+        return;
+      }
+      requestAnimationFrame(tryScroll);
+    };
+
+    // 内容是异步长出来的，所以既监听尺寸变化也逐帧重试：
+    // ResizeObserver 抓「一次性长高一大块」，rAF 抓「一点一点长」。
+    let observer = null;
+    if (typeof ResizeObserver === 'function') {
+      observer = new ResizeObserver(tryScroll);
+      observer.observe(document.documentElement);
+    }
+    requestAnimationFrame(tryScroll);
+  }
+
+  // `pagehide` 而不是 `beforeunload`：后者在移动端浏览器里经常不触发，而且它会
+  // 让页面失去进入后退/前进缓存的资格。`visibilitychange` 补 iOS 那一路——
+  // 用户直接切走 App 时只会有这一个事件。
+  addEventListener('pagehide', rememberPlace);
+  addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') rememberPlace();
+  });
+
+  // 这个文件按注释是**经典脚本、在 `<head>` 里执行**，所以此刻 `<body>` 还不存在，
+  // `document.documentElement.scrollHeight` 量出来没有意义。等 DOM 就绪再开始。
+  //
+  // 「定义了但没人调」是这个项目反复出现的失效方式，而它和「功能正常但没数据」
+  // 在屏幕上一模一样——同一个会话里 `loadActivity()` 和 `renderKin()` 各踩过一次。
+  // 所以这一行不能省，而且下面那道闸门会核对它真的存在。
+  if (document.readyState === 'loading') {
+    addEventListener('DOMContentLoaded', restorePlace, {once: true});
+  } else {
+    restorePlace();
+  }
+
   // --- 页内分区 --------------------------------------------------------------
   //
   // 一页装了太多东西的时候，答案是把它切成几段、一次只显示一段，而不是加一个路由。
@@ -465,5 +662,6 @@
   window.YouHuo = {
     ready, login, api, forget, token,
     byId, pretty, VERDICT, verdictOf, renderResult, initSections, once, toneOf,
+    errorKind, errorWords,
   };
 })();

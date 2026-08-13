@@ -6582,6 +6582,17 @@
           "kind": {
             "type": "string",
             "title": "Kind"
+          },
+          "about_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About Id"
           }
         },
         "additionalProperties": false,

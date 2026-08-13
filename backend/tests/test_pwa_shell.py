@@ -353,7 +353,15 @@ def test_the_family_page_never_prints_a_raw_event_code():
     assert not leaks, f"家人端把原始事件码印给了家属：{leaks}"
 
 
-@pytest.mark.parametrize("page,least", [("family.html", 4), ("care.html", 5)])
+#: 每页分区数的**下限**。数字随设计变，配对关系不变——这条测试的价值在下面那句
+#: 「按钮与内容一一对应」，下限只是「别把分区整段删掉」的兜底。
+#:
+#: family 4 → 3、care 5 → 6：Phase C 把「趋势」从家人端的一级分区搬进了照护档案。
+#: 它读 `/v4/reports/emotion`，而 `/care` 已经有「心情」那一格读同一个端点，
+#: 两者是同一件事的今天与这一周。搬迁登记在
+#: `test_control_inventory_is_the_fact_source.py` 的 `MIGRATIONS` 里——那条判据比的是
+#: `(文件, panel)` 二元组，所以这次 **app → app** 的搬迁它看得见（旧的并集判据看不见）。
+@pytest.mark.parametrize("page,least", [("family.html", 3), ("care.html", 6)])
 def test_every_section_button_has_a_panel_to_show(page, least):
     """页内分区：几个按钮，几块内容，一一对应。
 

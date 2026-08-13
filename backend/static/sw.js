@@ -14,7 +14,11 @@
 //: 上一版把 /v7/* 当成外壳缓存了下来，那些条目此刻还躺在已安装设备的 v1 缓存里。
 //: activate 只删除 key 不等于 VERSION 的缓存——不改这个字符串，被污染的条目就会
 //: 一直留着，改了 isApi() 也救不回已经装好的那批。
-const VERSION = 'youhuo-shell-v8';
+//: v8 → v9：外壳清单漏了 `task-space.js`（这个会话早些时候加的），现在又要加
+//: `task-detail.js`。不升这个字符串，已安装的设备会继续用 v8 那份**缺两个模块**
+//: 的清单——而 `elder.js` 是 `type="module"`，一个 import 取不到就是整个模块图
+//: 一起失败，离线的老人端不是降级而是白屏。
+const VERSION = 'youhuo-shell-v9';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -44,9 +48,17 @@ const SHELL = [
   '/static/speech.js',
   '/static/glassbox.js',
   '/static/sheet.js',
+  // `elder.js` 用 `import` 拉这两个。ES module 的 import 失败不是"少个功能"，
+  // 是整个模块图一起不执行——漏缓存它们，离线的老人端会白屏。
+  // `test_the_shell_covers_every_module_it_imports` 从此守着这条。
+  '/static/task-space.js',
+  '/static/task-detail.js',
   '/static/register-sw.js',
   '/stage',
   '/static/stage.js',
+  // `/stage` 的证明演示。这一条也是新建的闸门抓出来的——它和上面两个模块一样，
+  // 被页面加载却不在外壳里。
+  '/static/proof-demos.js',
   // 标签栏图标的外部 sprite。不缓存它，离线时五个标签会变成一排空白——而且不报错。
   '/static/icons/tabs.svg',
   '/static/icons/icon-192.png',

@@ -22,6 +22,9 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 ROOT = Path(__file__).resolve().parents[2]
 ELDER = "elder-demo"
@@ -49,7 +52,7 @@ class Http:
         self.touched.add((method.upper(), path.split("?")[0]))
         content_type = ""
         try:
-            with urllib.request.urlopen(req, timeout=60) as response:
+            with open_local(req, timeout=60) as response:
                 status, raw = response.status, response.read()
                 content_type = response.headers.get("Content-Type", "")
         except urllib.error.HTTPError as exc:
@@ -151,10 +154,30 @@ def run(base: str) -> int:
             http("POST", "/v2/chat",
                  {"session_id": session, "text": text, "request_id": None},
                  a["elder_token"])
-        mine = [r["title"] for r in http("GET", "/v2/reminders", token=a["elder_token"])]
-        theirs = [r["title"] for r in http("GET", "/v2/reminders", token=b["elder_token"])]
-        assert any("访客隔离检查" in t for t in mine), f"A 自己的待办丢失：{mine}"
-        assert theirs == [], f"B 看到了 A 的待办：{theirs}"
+        mine = http("GET", "/v2/reminders", token=a["elder_token"])
+        theirs = http("GET", "/v2/reminders", token=b["elder_token"])
+        my_titles = [r["title"] for r in mine]
+        their_titles = [r["title"] for r in theirs]
+        assert any("访客隔离检查" in t for t in my_titles), f"A 自己的待办丢失：{my_titles}"
+        # 判据从「B 的列表是空的」改成「B 看不到 A 那一条」。
+        #
+        # 旧写法 `assert theirs == []` 编码的是「新沙箱一开始一定是空的」，而这个
+        # 前提已经不成立：`Database.seed_demo_reminders()` 的 docstring 明写着它
+        # **故意**给每个访客沙箱播三条待办，否则每一位打开演示链接的人第一屏都是
+        # 「今天没有要办的事。」。于是这条判据报的是「B 看到了 A 的待办」，而 B 看到的
+        # 三条根本不是 A 建的（A 建的是「访客隔离检查」）——**失败信息本身在指错方向**。
+        #
+        # 要守的性质是跨家庭不可见，不是空。所以直接查那一条，并且核对 B 拿到的每一行
+        # 都属于 B 自己的家庭——后者比原来那条更强：空列表也能是"接口坏了返回空"。
+        assert not any("访客隔离检查" in t for t in their_titles), \
+            f"B 看到了 A 建的那一条：{their_titles}"
+        # 不写 `r.get("family_id") not in (None, ...)`：那个兜底会把「接口不再返回
+        # family_id」当成通过——这个项目刚为同一个形状付过代价
+        #（`(retrieval or {}).get(..., False)` 把"从没测过"变成"测过且失败"）。
+        assert all("family_id" in r for r in theirs), \
+            f"/v2/reminders 不再返回 family_id，这条判据失去依据：{theirs[:1]}"
+        stray = [r for r in theirs if r["family_id"] != b["family_id"]]
+        assert not stray, f"B 的列表里有不属于 B 家庭的行：{stray}"
 
         # And cannot reach across families.
         http("GET", f"/v6/profiles/{a['elder_id']}", token=b["elder_token"], expect=403)

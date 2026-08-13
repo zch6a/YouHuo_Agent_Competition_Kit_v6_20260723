@@ -987,13 +987,47 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   background: var(--surface-2);
   border: 1px solid var(--line);
 }
-.profile-tools label { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: 14px; }
+/* 每一行是「文字块 + 控件」两格，而文字块里是「名字 + 后果」两行。
+
+   这里原先是 `label` 直接 flex 装「文字 + select」两个孩子。加上说明行之后就是
+   三个孩子，flex 会把说明行排到 select 旁边；而下面 `.rail` 那条
+   `grid-template-columns: 76px 1fr` 会把第三个孩子甩到下一行的 76px 那一格里，
+   挤成一条竖着的字。所以文字先包一层 `.tool-text`，行数变化不再影响外层布局。 */
+.profile-tools label { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: 14px; }
+.profile-tools .tool-text { display: grid; gap: 0; flex: 1 1 auto; min-width: 0; }
+.profile-tools .tool-name { font-weight: 700; }
+/* `.meta` 自带 `margin-top: var(--space-1)`，在这里两行之间已经够开了，收掉。 */
+.profile-tools .tool-text .meta { margin-top: 0; }
 .profile-tools select { width: auto; min-width: 108px; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); border-radius: var(--r-sm); }
 .profile-tools button { padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
 /* In the narrow rail the two settings read better as aligned rows. */
 .rail .profile-tools { display: grid; gap: var(--space-3); }
-.rail .profile-tools label { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: var(--space-3); }
-.rail .profile-tools select { width: 100%; min-width: 0; }
+/* 名字那一格原先固定 76px，那是「语速」两个字的宽度。现在左边要装一句话，
+   改成 `1fr auto`：文字块拿走剩下的宽度，select 保持它自己的尺寸。 */
+.rail .profile-tools label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3); }
+.rail .profile-tools select { width: auto; min-width: 108px; }
+/* 320 宽以下，控件掉到文字下面。
+
+   并排的时候 select 拿走 108px + 12px 间距，文字块只剩 124px——实测那句
+   「选「慢」的时候，优活会一字一句地说」折成三行，末行只剩一个孤字「说」；
+   「屏幕上的字会变大，按钮也跟着变大」同样以一个孤字「大」结尾。
+   一行一个字读起来是断的，而这一页的读者是一位老人。
+
+   掉下来之后文字块拿到整幅 244px，两句话各占两行以内；select 顺便变成整行宽，
+   触摸目标更大。360 这个断点是项目里已经在用的（`pages.css:165` 的 `.fam-head`
+   就是同一个做法）。
+
+   **`.rail` 那一条必须显式再写一遍**：media query 不增加特异性，
+   而 `.rail .profile-tools label` 是 (0,2,1)，光写 `.profile-tools label` 的
+   (0,1,1) 盖不住它——侧栏里就会保持并排，而那正是最窄的那种上下文。 */
+@media (max-width: 360px) {
+  .profile-tools label,
+  .rail .profile-tools label {
+    display: grid; grid-template-columns: 1fr; align-items: stretch; gap: var(--space-2);
+  }
+  .profile-tools select,
+  .rail .profile-tools select { width: 100%; min-width: 0; }
+}
 
 .trust-line { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .trust-pill {
@@ -1117,6 +1151,36 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 }
 .log-item time { display: block; color: var(--ink-3); font-size: var(--text-xs); margin-top: var(--space-1); }
 .log-item .who { font-weight: 800; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
+
+/* 有主体的记录行是**真按钮**（点进去看这件事的经过），没有主体的仍是 div。
+
+   上面那段已经把 background / border / color / font-size 都设过了，但 `<button>`
+   还有三个默认值不受它管，少一条就会露出来：
+     · `font-family` **不继承**——按钮默认用系统 UI 字体，于是一行记录的字体
+       和旁边的不一样
+     · `text-align` 默认 center——两栏内容会各自居中
+     · `appearance` 在部分平台会画出原生按钮的边框
+   宽度不用管：`.log-list` 是 grid，子项默认 stretch。 */
+button.log-item {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; text-align: left; cursor: pointer;
+  /* 令牌名是从 tokens.css 抄的，不是编的：第一版写了 `var(--dur-1, .14s)`，
+     而 `--dur-1` 从未声明——那个兜底会让它看起来正常工作。
+     `test_no_undefined_custom_properties.py` 当场抓到，抓得对：
+     「兜底把拼写错误藏起来了」。真名是 --dur-fast / --dur-base / --dur-sheet / --dur-slow。 */
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+button.log-item:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--youhuo-blue) 30%, var(--line));
+}
+/* 焦点环显式给：这一页的读者里有只用键盘和开关控制的人，而
+   `appearance: none` 会在部分浏览器里连默认焦点环一起去掉。 */
+button.log-item:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--youhuo-blue) 60%, transparent);
+  outline-offset: 2px;
+}
 
 /* --------------------------------------------------------------------------
    Family day-grouped calendar (design §4.5)

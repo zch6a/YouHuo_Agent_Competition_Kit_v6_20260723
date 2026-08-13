@@ -36,8 +36,10 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.request
 from pathlib import Path
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 #: 端口在运行时向系统要，不写死——见 `_free_port()` 的说明。
 DEVTOOLS_PORT = 0
@@ -189,7 +191,21 @@ def main() -> int:
     global DEVTOOLS_PORT
     DEVTOOLS_PORT = _free_port()
     base = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8041"
-    out_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "shots")
+    # 输出目录：命令行参数 > `YOUHUO_SHOT_ROOT` 环境变量 > 相对路径 `shots`。
+    #
+    # 为什么默认仍然是相对路径：这个仓库要交给别人在别的机器上跑，把某个盘符写死
+    # 进代码在那边会直接坏掉。而一次完整重拍是 252 张、约 115 MB——这台机器上
+    # F 盘曾经因为六批这样的截图（667 MB）连同别的数据一起写满到 0 字节，
+    # 写文件直接 ENOSPC。所以留一个环境变量的钩子，把产物引到别处：
+    #
+    #     $env:YOUHUO_SHOT_ROOT = 'D:\YouHuo\artifacts\shots'
+    #
+    # `.gitignore` 里 `shots*/` 与 `screenshots/` 两条按名字挡住这类目录，
+    # 无论它落在哪个位置。
+    out_dir = Path(
+        sys.argv[2] if len(sys.argv) > 2
+        else os.environ.get("YOUHUO_SHOT_ROOT") or "shots"
+    )
     args = sys.argv[3:]
     # `dark` / `light` 作为一个可选的位置参数混在设备名里，用完就从设备列表里摘掉。
     scheme = next((a for a in args if a in ("dark", "light")), None)
@@ -229,7 +245,7 @@ def main() -> int:
         ws_url = None
         for _ in range(60):
             try:
-                with urllib.request.urlopen(
+                with open_local(
                     f"http://127.0.0.1:{DEVTOOLS_PORT}/json/version", timeout=2
                 ) as r:
                     ws_url = json.loads(r.read())["webSocketDebuggerUrl"]
@@ -261,7 +277,7 @@ def main() -> int:
                 continue
             for page in PAGES:
                 target = browser.send("Target.createTarget", url="about:blank")["targetId"]
-                with urllib.request.urlopen(
+                with open_local(
                     f"http://127.0.0.1:{DEVTOOLS_PORT}/json/list", timeout=5
                 ) as r:
                     tabs = json.loads(r.read())

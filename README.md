@@ -189,7 +189,12 @@ curl -L -o ohos-sdk.tar.gz \
   https://repo.huaweicloud.com/openharmony/os/6.1-Release/ohos-sdk-windows_linux-public.tar.gz
 ```
 
-解开其中的 `ets-windows-x64`，用 `YOUHUO_OHOS_SDK` 指向它即可（默认 `F:\ohos-sdk\sdk\ets`）。
+解开其中的 `ets-windows-x64`，用 `YOUHUO_OHOS_SDK` 指向它即可。不设这个变量时，
+脚本会依次试 `F:\YouHuo\ohos-sdk\sdk\ets`、`F:\ohos-sdk\sdk\ets`、
+`D:\YouHuo\toolchain\ohos-sdk\sdk\ets`——**候选路径不止一个是故意的**：
+2026-08-14 SDK 从 `F:\ohos-sdk` 搬到 `F:\YouHuo\ohos-sdk` 之后，原先写死的那一个
+默认值指向了一个不存在的目录，符号表变成空表、这一层核对静默跳过，而验证链
+照样打印 PASS。
 它带着 `ets-loader/kit_configs/`——47 个 kit 的完整符号表，共 1159 个符号。于是
 **每一个 `@kit.*` import 都能逐个核对"这个符号确实由这个 kit 导出"**，写错 kit 会
 直接失败而不是等到编译。上一轮我无法确认 `vibrator` 属于哪个 kit，只能猜；现在这件事

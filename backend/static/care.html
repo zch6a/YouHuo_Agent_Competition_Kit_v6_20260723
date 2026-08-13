@@ -56,6 +56,10 @@
       <button type="button" class="seg" data-section="body">身体</button>
       <button type="button" class="seg" data-section="mood">心情</button>
       <button type="button" class="seg" data-section="safety">安全</button>
+      <!-- 「趋势」从 /family 搬来。理由写在 09_consumer_app_architecture.md：
+           它是照护档案的一部分，不是家人端的一级分区。搬迁登记在
+           test_control_inventory_is_the_fact_source.py 的 MIGRATIONS 里。 -->
+      <button type="button" class="seg" data-section="trend">趋势</button>
     </nav>
 
     <!-- 五段都是**进页面就加载**，不是点按钮才出数据。
@@ -101,6 +105,14 @@
       <div id="safetyBody" aria-live="polite">
         <p class="care-empty">正在读安全设置……</p>
       </div>
+    </section>
+    <!-- 「趋势」：从 /family 的一级分区搬进照护档案。
+         它读的是 /v4/reports/emotion——情绪周汇总，而这一页已经有「心情」那一格，
+         两者本来就是同一件事的今天与这一周。 -->
+    <section class="page-section" data-panel="trend" aria-label="趋势" hidden>
+      <h2 class="section-head">这一周</h2>
+      <p class="section-note">和他<strong>自己</strong>的常态比，不和别人比。聊天原文不会出现在这里，只有汇总。</p>
+      <div id="weekly" aria-live="polite"></div>
     </section>
     <nav class="tabbar" aria-label="主要分区">
       <a href="/" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-home" /></svg><span>首页</span></a>

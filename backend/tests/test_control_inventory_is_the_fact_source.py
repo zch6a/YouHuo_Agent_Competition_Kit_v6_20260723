@@ -140,7 +140,21 @@ def test_the_consumer_surface_has_exactly_two_app_shells() -> None:
 #: 旧的 dst 只到**文件**（`"stage.html"`），而且兜底判据是四页 id 的**并集**，
 #: 所以 app → app 的搬迁恒为绿。这里的 dst 是 `(文件, panel)` 二元组，且判据是
 #: **相等**而不是**存在**。
-MIGRATIONS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {}
+MIGRATIONS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    # Phase C 的第一次搬迁，而且它正是这条判据升级要抓的那一路：**app → app**。
+    #
+    # 「趋势」从 /family 的一级分区搬进 /care 的照护档案。旧判据（四页 id 的并集）
+    # 对这一路恒为绿——搬完之后 `data-section=trend` 仍然在四页之一里。
+    # 新判据比的是 `(文件, panel)` 二元组，所以它看得见。
+    #
+    # 为什么搬：它读 `/v4/reports/emotion`，而 /care 已经有「心情」那一格读同一个
+    # 端点（不同窗口）。两者是同一件事的今天与这一周。
+    #
+    # 搬迁时还修掉了一件事：family.js 那份 `EMOTION_LABEL` 缺 positive /
+    # low_mood / urgent、多出后端没有的 sad / happy / distressed，于是这一格会把
+    # 最要紧的 `urgent` 印成英文码。care.js 里已有修好的 `EMOTION_WORD`，用了那份。
+    "data-section=trend": (("family.html", ""), ("care.html", "")),
+}
 
 
 def _location_of(controls: list[dict], key: str) -> tuple[str, str] | None:
@@ -222,4 +236,90 @@ def test_the_family_deep_links_share_one_shell(route: str, shell: str) -> None:
     assert controls, f"{route} 一个控件都没有——清单没覆盖到它"
     assert {c["shell"] for c in controls} == {shell}, (
         f"{route} 的控件不全属于 {shell} shell：{ {c['shell'] for c in controls} }"
+    )
+
+
+#: 各列当前的填充数，作为**下界**。参考产品研究那一轮量出来的。
+#:
+#: 为什么要有这张表：清单报告「145/145 可追踪」，那句话**只对身份成立**。
+#: 而这一轮矩阵的升级点是「dst 是 `(文件, panel)` 二元组，判据是**相等**」，
+#: 它依赖的 `panel` 列只填了 55/145。对另外 90 个控件，判据在拿
+#: `(file, "")` 和 `(file, "")` 比——**panel 那一半是惰性的**。
+#:
+#: 这和这个项目反复踩的是同一个坑：读到的那个值不一定是决定结果的那个值。
+#: 「145 个控件全部可追踪」是真的，但可追踪 ≠ 位置可比较。
+_COVERAGE_FLOOR = {
+    "key": 145,
+    "source_file": 145,
+    "surface": 145,
+    "shell": 145,
+    "module": 145,
+    "visibility": 145,
+    "panel": 55,
+    "interaction_type": 102,
+    "handler_file": 117,
+    "handler": 117,
+    "apis": 5,
+}
+
+
+def _is_filled(control: dict, column: str) -> bool:
+    value = control.get(column)
+    if isinstance(value, list):
+        return len(value) > 0
+    return bool(value) and str(value).strip() != ""
+
+
+@pytest.mark.parametrize("column", sorted(_COVERAGE_FLOOR))
+def test_no_inventory_column_gets_emptier(column: str) -> None:
+    """每一列的填充数只许涨，不许跌。
+
+    加这条是因为空列是**静默**的失效：矩阵会照着一列空值去断言「位置相等」，
+    然后全绿。这正是它替换掉的那份手写点击地图的毛病——缺文件就 `pytest.skip`。
+    """
+    controls = _load()
+    filled = sum(1 for c in controls if _is_filled(c, column))
+    floor = _COVERAGE_FLOOR[column]
+    assert filled >= floor, (
+        f"`{column}` 列的填充数从 {floor} 掉到 {filled}。"
+        "清单是矩阵的事实源，一列变空会让依赖它的断言静默变成恒真。"
+    )
+
+
+def test_the_apis_column_is_known_to_be_unimplemented() -> None:
+    """`apis` 只填了 5/145，其中 3 个还是同一个端点——这一列等于没实现。
+
+    这条测试**不是**要求它变好，是要求这件事**不被忘记**。产品有近百个 API，
+    而 `/judge` 上七拍每一拍的可见文案都点名了一个端点
+    （`/v2/chat` `/v2/tasks` `/v5/voice/resolve` `/v6/interaction/plan`），
+    清单里那 27 个控件的 `apis` 却全是空数组。
+
+    也就是说迁移矩阵**追踪不了「这个控件背后的 API 有没有跟着搬」**。
+    计划书里矩阵的形状是「现有控件 → handler → API → 新位置」，
+    中间那一环现在是空的。修它之前，不许声称矩阵覆盖了 API 这一维。
+    """
+    controls = _load()
+    with_api = [c for c in controls if _is_filled(c, "apis")]
+    assert len(with_api) <= 8, (
+        f"`apis` 列已经填到 {len(with_api)} 个了——好事。"
+        "把这条测试改成正向断言（比如要求 handler 里出现 fetch 的控件都要有 apis），"
+        "并把 `_COVERAGE_FLOOR['apis']` 抬上去。"
+    )
+
+
+def test_a_declared_move_must_be_detectable_by_the_criterion() -> None:
+    """声明的搬迁必须是这个判据**测得出来**的那种。
+
+    `panel` 空了 90 个，所以存在一类搬迁：同一个文件内、两侧 panel 都为空——
+    这时 `(file, panel)` 两侧完全相等，断言恒真，等于没测。
+    B–H 每加一行 MIGRATIONS 都要先过这一关。
+    """
+    inert = [
+        key for key, (src, dst) in MIGRATIONS.items()
+        if src[0] == dst[0] and not src[1] and not dst[1]
+    ]
+    assert not inert, (
+        f"这些搬迁声明是判据测不出来的：{inert}。"
+        "同文件、两侧 panel 均为空 ⇒ `(file, panel)` 相等恒成立。"
+        "要么给源和目标标上 `data-panel`，要么这次搬迁本来就没有跨越任何边界。"
     )

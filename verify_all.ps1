@@ -41,6 +41,11 @@ $Log = Join-Path $Root "reports/verify_all_v6.txt"
   # 载入期不许跳。这一条只在**桌面**视口显形（手机上位移落在首屏折线以下、
   # 不计入 CLS），而这个项目其余的浏览器闸门都以手机为主。
   Write-Host "START layout_stability_v6"; python backend/scripts/check_layout_stability.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS layout_stability_v6"
+  # 每一页在**每一个宽度**下走不走得出去。`test_every_screen_has_some_way_out`
+  # 查的是 markup 里有没有 `class="tabbar"`，从不问那个出口在哪个宽度下可见——
+  # 同一份 markup 在两个宽度下一个能走一个走不了，只有在浏览器里按宽度各量一次
+  # 才测得到。变异证明见 frontend_redesign/final-polish/MUTATION_PROOF_EXITS.md。
+  Write-Host "START exits_v6"; python backend/scripts/check_exits.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }; Write-Host "PASS exits_v6"
   Remove-Item -Force -ErrorAction SilentlyContinue data/youhuo.db, data/youhuo.db-wal, data/youhuo.db-shm, data/youhuo.db.audit.key
   python backend/scripts/check_artifacts_v6.py; if ($LASTEXITCODE) { exit $LASTEXITCODE }
   Write-Host "ALL V6 DETERMINISTIC VERIFICATION STAGES PASSED"

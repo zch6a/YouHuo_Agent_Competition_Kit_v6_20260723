@@ -3,6 +3,7 @@ import {
 } from '/static/speech.js';
 import {renderGlassBox} from '/static/glassbox.js';
 import {renderTaskSpace, taskViewModel} from '/static/task-space.js';
+import {renderTaskDetail, taskDetailViewModel} from '/static/task-detail.js';
 
 // Resolved from identity.js: on a public deployment each browser gets its own
 // isolated demo household, so visitors do not share one elder's data. Falls back
@@ -702,7 +703,14 @@ async function send(text) {
     settled = activityFor(data);
   } catch (e) {
     recentRetries += 1;
-    addBubble(`系统暂时不可用：${e.message}`, 'agent');
+    // 原先是 `系统暂时不可用：${e.message}`。两个毛病：
+    //
+    //   ① `e.message` 在断网时是 `Failed to fetch`——一句英文，而这一句会被念出来。
+    //   ② 「系统暂时不可用」是**错的诊断**。她自己家里断网时，说的是我们坏了。
+    //      而下面第三行已经在用 `navigator.onLine` 区分这两种情形了——判断做过，
+    //      只是没用在说给她听的那句话上。
+    const words = window.YouHuo.errorWords(e);
+    addBubble(`${words.say}。${words.then}`, 'agent');
     setStatus('没有执行任何操作，请稍后再试。');
     settled = navigator.onLine === false ? 'offline' : 'error';
   } finally {
@@ -756,7 +764,11 @@ async function reminderAction(id, action) {
     // 老人端尤其不能弹 `alert()`：装到主屏后那是一个带 "127.0.0.1 显示" 字样的
     // 系统灰框，会盖住整屏、冻住页面，而且只有一个"确定"可按。这一页其余的失败
     // 都写在状态行里，这一处也照做。
-    setStatus(`这条待办没能更新：${e.message}`);
+    //
+    // 状态行只容得下一句，所以取 `say` 而不是拼好的 `text`——但**这一行会被念出来**，
+    // 所以它同样不能是 `e.message`（那可能是 `Failed to fetch`）。
+    const words = window.YouHuo.errorWords(e);
+    setStatus(`这条待办没能更新：${words.say}`);
   }
 }
 
@@ -860,7 +872,11 @@ async function loadReminders() {
     const toggle = document.querySelector('#toggleReminders');
     toggle.hidden = reminders.length <= 3;
     toggle.textContent = showAllReminders ? '只看最要紧的三件' : `查看全部待办（共${reminders.length}件）`;
-  } catch (e) { remindersEl.textContent = `待办加载失败：${e.message}`; }
+  } catch (e) {
+    // 原先是 `待办加载失败：${e.message}`——`e.message` 可能是
+    // `Failed to fetch`，而这一行会被念给老人听。见 common.js 的 errorWords。
+    remindersEl.textContent = window.YouHuo.errorWords(e, '待办').text;
+  }
 }
 
 /** Design §4.4 log entry point; §6.3 keeps companion chat out of the log. */
@@ -869,8 +885,24 @@ async function loadActivity() {
     const entries = await api('/v2/elder/activity?limit=30');
     activityLogEl.replaceChildren();
     entries.forEach(entry => {
-      const row = document.createElement('div');
+      // 有主体的行是**真按钮**，没有的仍是 div。
+      //
+      // 为什么不是一律做成按钮：allow-list 里有些事件不挂在任务上（`about_id`
+      // 为 null），那种行按下去无处可去。一个看起来能按、按了没反应的控件
+      // 比一行纯文字糟——它让人以为是坏的。
+      //
+      // `<button>` 而不是给 div 加 click：键盘能到、读屏报得出角色、
+      // 焦点环免费。这一页的读者里有只用键盘和开关控制的人。
+      const clickable = !!entry.about_id;
+      const row = document.createElement(clickable ? 'button' : 'div');
       row.className = 'log-item';
+      if (clickable) {
+        row.type = 'button';
+        // id 只进 dataset，**永远不渲染成文字**。它是
+        // `task-2a2728fe86f54c06b52e` 这种东西，手机框里只放「哪件事、到哪一步」。
+        row.dataset.about = entry.about_id;
+        row.setAttribute('aria-label', `${entry.what} ${entry.who}，看这件事的经过`);
+      }
       const left = document.createElement('div');
       const who = document.createElement('div');
       who.className = 'who'; who.textContent = entry.who;
@@ -891,8 +923,96 @@ async function loadActivity() {
         '办过的事会按时间记在这里，谁确认过也看得到。',
       );
     }
-  } catch (e) { activityLogEl.textContent = `记录加载失败：${e.message}`; }
+  } catch (e) {
+    activityLogEl.textContent = window.YouHuo.errorWords(e, '记录').text;
+  }
 }
+
+/* ==========================================================================
+   事务详情：压在四个 Tab 之上的一层
+   ==========================================================================
+   四个行为照抄 `sheet.js`（这一页最精细的无障碍代码）：背后整体 `inert`、
+   焦点存取、Escape、真按钮做出口。**没有**照抄它的甩动关闭——一笔事务的记录
+   是用来读的，而 sheet.js 自己的注释写着「Gesture-only UI fails this audience
+   first」，所以出口就是底部那个按钮。
+
+   也没有复用 sheet.js 本体：那个抽屉在 ≥761px 会变成常驻侧栏（`isDrawer()`），
+   而详情层在任何宽度下都是模态。共用一个模块就得给那个双形态再加开关。
+   两份实现之间由 `test_both_overlays_behave_the_same` 钉住不许漂移。 */
+
+const detailLayer = document.querySelector('#taskDetail');
+const detailBackdrop = document.querySelector('#detailBackdrop');
+const detailBody = document.querySelector('#taskDetailBody');
+let detailLastFocus = null;
+
+/** 详情层背后要被隔离的那些层。
+ *
+ * 和 `sheet.js:60-63` 同一个理由：背板拦得住鼠标，拦不住 Tab。
+ * 少了这一步，键盘用户会 Tab 进一个被完全盖住的输入框和麦克风。
+ */
+function detailOutsideLayers() {
+  return [...document.querySelectorAll('main > *, .elder-layout > *')]
+    .filter(el => el !== detailLayer && el !== detailBackdrop && !el.contains(detailLayer));
+}
+
+function setDetailOpen(open) {
+  if (!detailLayer || !detailBackdrop) return;
+  detailLayer.classList.toggle('is-open', open);
+  detailBackdrop.classList.toggle('is-open', open);
+  detailLayer.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (open) detailLayer.removeAttribute('inert');
+  else detailLayer.setAttribute('inert', '');
+  document.body.classList.toggle('detail-open', open);
+  detailOutsideLayers().forEach(el => {
+    if (open) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+  });
+  if (open) {
+    detailLastFocus = document.activeElement;
+    // 焦点送到出口上，不是送到第一段文字上：她按开这一层通常是想看一眼就走，
+    // 而键盘用户按一下空格就能出来。
+    document.querySelector('#taskDetailClose')?.focus({preventScroll: true});
+  } else if (detailLastFocus) {
+    detailLastFocus.focus({preventScroll: true});
+    detailLastFocus = null;
+  }
+}
+
+/** 按主体 id 打开详情。
+ *
+ * 读的是 `/v2/tasks`（`TaskView`），**不是 `/v2/audit`**。这是那条
+ * 「取证与叙事是两个模型」的落地：审计链留给 `/judge`，消费者面读任务本身。
+ * 服务端已按 `actor.actor_id` 把列表收窄到她自己的任务，所以在客户端按 id 找是安全的。
+ */
+async function openTaskDetail(aboutId) {
+  if (!aboutId || !detailBody) return;
+  renderTaskDetail(detailBody, null);   // 先清空，避免闪出上一笔的内容
+  setDetailOpen(true);
+  try {
+    const tasks = await api('/v2/tasks?limit=100');
+    const task = (tasks || []).find(item => item.id === aboutId);
+    renderTaskDetail(detailBody, taskDetailViewModel(task));
+  } catch (e) {
+    detailBody.replaceChildren();
+    detailBody.textContent = window.YouHuo.errorWords(e, '这件事的经过').text;
+  }
+}
+
+if (activityLogEl) {
+  // 事件委托：行是每次 loadActivity() 重新造的，逐行绑会随着刷新累积监听器。
+  activityLogEl.addEventListener('click', event => {
+    const row = event.target.closest('.log-item[data-about]');
+    if (row) openTaskDetail(row.dataset.about);
+  });
+}
+document.querySelector('#taskDetailClose')?.addEventListener('click', () => setDetailOpen(false));
+detailBackdrop?.addEventListener('click', () => setDetailOpen(false));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && detailLayer?.classList.contains('is-open')) {
+    setDetailOpen(false);
+  }
+});
+// 初始状态：关。`inert` 已经写在 HTML 里，这一行让 class 和它对齐。
+setDetailOpen(false);
 
 document.querySelector('#send').addEventListener('click', () => send());
 input.addEventListener('keydown', e => {
@@ -1151,11 +1271,106 @@ document.querySelector('#kinContact').addEventListener('click', () => {
 // Tab 切换。`initSections` 在 common.js 里，家人端和照护页用的是同一套约定。
 // 切 Tab 一律退出 Focus Mode：她已经离开那件事了，屏幕不该还停在对话上。
 window.YouHuo.initSections('home');
+
+/* ==========================================================================
+   家人：谁能帮我、怎么找她
+   ==========================================================================
+   原先这一屏写死「李晴 / 女儿」——产品里唯一一个人名，而它不在任何数据里。
+   现在读真数据；读不到就只说角色，**不编名字**。 */
+
+//: 身份里的家庭成员字段 → 说给人听的关系词。
+//:
+//: 为什么从身份的字段名推：`/v4/contacts/{elder}` 在演示数据下是空的（实测），
+//: 而身份里的 `daughter_id` / `son_id` 是这个家庭**真实存在**的行动者——
+//: 种子场景那条「家人确认了一次，还在等其他家人」正是它们两个。
+//: 与其编一个名字，不如说清有几位、各是什么关系。
+const KIN_RELATION = {daughterId: '女儿', sonId: '儿子'};
+
+async function renderKin() {
+  const host = document.querySelector('#kinList');
+  if (!host) return;
+  const ids = await resolveIdentity();
+
+  /** 家庭里真实存在的那几位，按关系。 */
+  const fallback = Object.entries(KIN_RELATION)
+    .filter(([key]) => ids && ids[key])
+    .map(([, relation]) => ({relation, name: ''}));
+
+  let people = fallback;
+  try {
+    // 真数据优先：家属那一侧添过、老人批准过的亲友档案。
+    const contacts = await api(`/v4/contacts/${encodeURIComponent(ELDER_ID)}`);
+    const approved = (contacts || []).filter(c => c.status !== 'proposed');
+    if (approved.length) {
+      people = approved.map(c => ({relation: c.relation || '家人', name: c.display_name || ''}));
+    }
+  } catch (_) {
+    // 取不到就用 fallback。这一屏的价值是「谁能帮我」，那一条不依赖这个接口。
+  }
+
+  host.replaceChildren();
+  if (!people.length) {
+    // 连行动者都没有：说实话。不写「李晴」。
+    const empty = document.createElement('p');
+    empty.className = 'kin-rel';
+    empty.textContent = '还没有家人和您连在一起。';
+    host.appendChild(empty);
+    return;
+  }
+  people.forEach(person => {
+    const row = document.createElement('div');
+    row.className = 'kin-person';
+    // 有名字就把名字放主位、关系放次位；没名字就只有关系，**不留一个空的主位**。
+    if (person.name) {
+      const name = document.createElement('p');
+      name.className = 'kin-name';
+      name.textContent = person.name;
+      row.appendChild(name);
+    }
+    const rel = document.createElement('p');
+    rel.className = person.name ? 'kin-rel' : 'kin-name';
+    rel.textContent = person.relation;
+    row.appendChild(rel);
+    host.appendChild(row);
+  });
+}
+
+/** 这个 Tab 需要什么数据，就在进去的时候取。
+ *
+ * 修一个一直都在的缺陷：`loadActivity()` 原先只有三个调用点——`send()` 与
+ * `reminderAction()` 里带 `if (dataset.tab === 'log')` 的两处，加上「刷新我的记录」
+ * 那个按钮。而 Tab 切换处理器**只设 `dataset.tab`，从不取数**。
+ *
+ * 于是「记录」这一页是**打开即空**：不是空态，是一个白框——`emptyState()` 也没跑，
+ * 因为 `loadActivity()` 根本没被调用。深链到 `/elder#log` 更糟：`dataset.tab`
+ * 连值都没有，之后任何一次对话轮次也不会顺带加载它。
+ *
+ * 唯一能看到内容的办法是按那个叫「**刷新**我的记录」的按钮——而「刷新」这个词
+ * 暗示屏幕上本来有东西。实测就是这样：走到 `#log`，0 条记录、0 条控制台错误。
+ */
+function enterTab(name) {
+  document.body.dataset.tab = name;
+  if (name === 'log') loadActivity();
+  if (name === 'kin') renderKin();
+}
+
 document.querySelectorAll('.elder-tabs .seg').forEach(tab => {
   tab.addEventListener('click', () => {
     setFocus(false);
-    document.body.dataset.tab = tab.dataset.section;
+    enterTab(tab.dataset.section);
   });
+});
+
+// 首屏与刷新：当前是哪个 Tab 由 `initSections` 按 hash 定，所以从**它的结果**读，
+// 不自己再解析一遍 hash（两处各写一份判据必然漂移，这个项目为此吃过亏）。
+const initialPanel = document.querySelector('.elder-panel[data-panel]:not([hidden])');
+enterTab(initialPanel?.dataset.panel || 'home');
+
+// 浏览器前进/后退也会换 Tab。`initSections` 自己监听 hashchange 换面板，
+// 但它不知道哪个面板需要取数。
+addEventListener('hashchange', () => {
+  const shown = document.querySelector('.elder-panel[data-panel]:not([hidden])');
+  if (shown) enterTab(shown.dataset.panel);
 });
 
 // 断网。这一页做的每一件事都要过后端——缴费、挂号、查用药——所以断网不是"某个请求

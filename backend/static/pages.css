@@ -363,6 +363,26 @@ body[data-focus="on"] .elder-focus > #relianceHost {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* Task Space 和 `#relianceHost` 是同一个形状，所以给同一副规则。
+   ......................................................................
+   它是这一轮新加进这一列的块，而它**重复了上面那段注释记着的错误**：flex 项默认
+   `min-height: auto`，于是 156px 的卡一寸不让，把 `.composer` 顶出 `overflow: hidden`
+   的 `.stage`。CDP 实测 390×844：六块合计 544 > 容器 527，超 17px。
+
+   为什么 17px 不能让 `#chat` 吸收：它此刻正好是 96px，也就是上面那条
+   `min-height: 96px` 的地板——那一行的注释写着「这一行是这条修复的全部意义：
+   无论那张卡多高，她都看得见自己刚说的话」。再让就跌破它。所以只能由这张卡
+   自己内部滚动。
+
+   `flex: 0 1 auto` 而不是 `1 1 auto`：这张卡不该在列高有余时被拉长，它只需要
+   在列高不够时会让。 */
+body[data-focus="on"] .elder-focus > #taskSpace {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* 输入行和状态行不参与收缩：它们是这一屏的出口，任何时候都必须在。 */
 body[data-focus="on"] .elder-focus > .composer,
 body[data-focus="on"] .elder-focus > #status { flex: 0 0 auto; }
@@ -691,6 +711,14 @@ body[data-task-view] .elder-focus > #chat {
 .kin-card { display: grid; gap: var(--space-1); }
 .kin-name { margin: 0; font-size: 26px; font-weight: 750; color: var(--ink); }
 .kin-rel { margin: 0; font-size: 17px; color: var(--ink-2); }
+/* 一位家人一格。多于一位时用缩进的发丝线分开——这个家庭真实有两位
+   （身份里的 daughter_id 与 son_id），而这一屏原先只写死了一位。
+   缩进而不通栏：通栏的线把列表切开，缩进的线让它读起来是分组。 */
+.kin-list { display: grid; }
+.kin-person + .kin-person {
+  margin-top: var(--space-3); padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
 .kin-help-label {
   margin: var(--space-4) 0 var(--space-1);
   font-size: var(--text-sm);
@@ -721,9 +749,26 @@ body[data-task-view] .elder-focus > #chat {
    「家人」「我的」。那是一次死路，而这个项目已经因为同一类问题栽过两次（宽屏下
    整栏 inert 而无出口；装到主屏的平板上四个链接全不可见）。
 
-   所以宽屏上它改成顶部一条静态横排，不再是固定在底部的拇指栏。 */
+   所以宽屏上它改成顶部一条静态横排，不再是固定在底部的拇指栏。
+
+   ── 选择器从 `.elder-tabs` 放宽到 `.tabbar`（2026-08-13）──────────────────
+
+   上面「靠 `.back-link` 顶上」这句在 `/family` 上是假的：那一页**没有**
+   back-link（实测 0 个），所以 ≥761px 下它既没有底部栏也没有返回链接，而
+   manifest 是 `display: standalone`——没有地址栏、iOS 上没有系统返回手势。
+   详细的量与那道漏掉它的闸门写在下面 `.tabbar:not(.elder-tabs)` 原址。
+
+   而 Phase C 之后家人端那条栏也是壳的主导航（今天/待办/照护/我的，四格），
+   和老人端同一性质，所以同样的处理。选择器放宽之后 `.elder-tabs` 那些更具体的
+   规则仍然可以在需要时覆盖它——那是层叠本来的用法，不再依赖顺序。
+
+   **这里仍然留着一个两个壳共有的缺陷，没有在这一步修**：这条栏在 DOM 里是
+   `<main>` 的最后一个孩子，`position: static` 之后它落在**内容之后**。实测
+   `/elder` 在 900×900 下这条栏在 y=1635、文档高 1748——注释说的「顶部一条横排」
+   在实际渲染里是**底部**，要滚 1635px 才够得到主导航。修它要动 DOM 顺序或者
+   给 `<main>` 加 flex `order`，那是下一步，先把死路补上。 */
 @media (min-width: 761px) {
-  .elder-tabs {
+  .tabbar {
     display: flex;
     position: static;
     gap: var(--space-2);
@@ -733,7 +778,7 @@ body[data-task-view] .elder-focus > #chat {
     border-radius: var(--r-lg);
     background: var(--surface-2);
   }
-  .elder-tabs .tab {
+  .tabbar .tab {
     flex: 1 1 0;
     display: inline-flex;
     align-items: center;
@@ -747,9 +792,33 @@ body[data-task-view] .elder-focus > #chat {
     font-size: var(--text-sm);
     font-weight: 700;
   }
-  .elder-tabs .tab.is-current { background: var(--surface); box-shadow: var(--shadow-1); }
+  .tabbar .tab.is-current { background: var(--surface); box-shadow: var(--shadow-1); }
   /* 顶部横排时图标和文字并排，不再是上下两行。 */
-  .elder-tabs .tab-icon { width: 20px; height: 20px; }
+  .tabbar .tab-icon { width: 20px; height: 20px; }
+
+  /* 让「顶部一条横排」这句话在渲染里也成立。
+     ......................................................................
+     上面那段注释说这一步「要动 DOM 顺序或者给 `<main>` 加 flex `order`，那是下一步」。
+     一条 CLS 回归把下一步变成了现在：把 `.tabbar:not(.elder-tabs){display:none}` 删掉
+     之后，`/care` 在 1440×900 的载入期 CLS 从 **0.0117 涨到 0.3687**（预算 0.1），
+     位移源就是 `main.shell / nav.tabbar` —— 这条栏排在六个 `section` **之后**，
+     而那六块是一次 6 路 `Promise.all` 填出来的，内容一到就把整条栏推下去。
+     归因是量出来的：把那条隐藏规则临时放回去，同一道闸门就绿（0.0117）。
+
+     所以它不能留在内容之后。用 flex `order` 而不改 DOM：三份 markup 的 Tab 顺序
+     和键盘 Tab 序保持一致，控件清单也不用重排。
+
+     **范围就是 `data-nav="tabbar"` 这两个文档**（`family.html`、`care.html`）——
+     它们是唯一有跨页导航条的两页。`/elder` 不带这个属性，它那条 `.elder-tabs` 是
+     页内主导航、CLS 只有 0.0033，这一段碰不到它；它「在文档底部」的问题属于
+     Phase C 的老人端布局，不在这里顺手改。
+
+     `order: -2 / -1` 而不是只给 `.tabbar` 一个 `-1`：`.shell` 的第一个孩子是
+     `header.fam-head`，只写 `-1` 会把跨页导航顶到应用标题**之上**，层级就反了。
+     渲染次序：标题 → 跨页导航 → 状态行 → 页内分区 → 六块内容。 */
+  body[data-nav="tabbar"] .shell { display: flex; flex-direction: column; }
+  body[data-nav="tabbar"] .shell > .fam-head { order: -2; }
+  body[data-nav="tabbar"] .shell > .tabbar { order: -1; }
 }
 
 /* Tab 图标的描边：颜色和线宽都由宿主说了算，sprite 只留形状。
@@ -776,6 +845,104 @@ body[data-task-view] .elder-focus > #chat {
    `fill` / `stroke` / `stroke-width` 都是可继承属性，会走进影子树。 */
 .tab-icon { fill: none; stroke: currentColor; stroke-width: 1.8; }
 .tab.is-current .tab-icon { stroke-width: 2.3; }
+
+/* --------------------------------------------------------------------------
+   事务详情（老人端，压在四个 Tab 之上的一层）
+   ..........................................................................
+   **整段写在全局作用域，这不是随手放的。**
+
+   `.sheet-backdrop` 的样式整段在 `@media (max-width: 760px)` 里，而 ≥761px 是
+   `display: none`——那个抽屉在宽屏会变成常驻侧栏，所以它不需要背板。而这一层在
+   任何宽度下都是模态：复用那个类的结果是它在桌面上没有背板，一个静默失效的模态。
+
+   这个项目在「规则的位置决定它生不生效」上咬过四次，`.tab-icon`（就在上面）
+   连错两回。所以这一段的每一条都不进 media query，只有纯尺寸的微调才允许分屏。
+
+   z-index 阶梯（查过，不是猜的）：tabbar 45 → sheet 背板 50 → sheet 51。
+   这一层必须盖住 tabbar（那是「压在 Tab 之上」的字面含义），也要在 sheet 之上。 */
+.detail-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: color-mix(in srgb, var(--ink) 46%, transparent);
+  opacity: 0; pointer-events: none;
+  /* `--dur-sheet` 而不是我第一版编的 `--dur-2`（那个名字从未声明过，
+     而带兜底的写法会让它看起来能用）。这一层就是一个 sheet 形态的东西，
+     用它自己那个时长令牌，和 #extrasSheet 的节奏对齐。 */
+  transition: opacity var(--dur-sheet) var(--ease-out);
+}
+.detail-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+.detail-layer {
+  position: fixed; z-index: 61;
+  left: 0; right: 0; bottom: 0;
+  /* 高度跟着内容走，最多到 88dvh。
+     顶上永远留一条，让她看得见下面还压着别的东西——这一层是「压上来的」不是
+     「换页了」，那是 Medito 那个做法的要点（详情 push 到栈上，不替换整个壳）。
+
+     原先写的是 `top: max(var(--space-6), 8dvh)`，也就是**从固定的顶部撑到底**。
+     实测三行内容的时候，下面留出一大片空白——一屏看起来是没做完，而不是
+     「这件事就这么多」。内容长了由 `.detail-layer-body` 自己滚。 */
+  max-height: 88dvh;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -12px 40px -12px color-mix(in srgb, var(--ink) 30%, transparent);
+  transform: translate3d(0, 100%, 0);
+  transition: transform var(--dur-sheet) var(--ease-out);
+}
+.detail-layer.is-open { transform: translate3d(0, 0, 0); }
+
+.detail-layer-title {
+  margin: 0; padding: var(--space-4) var(--space-4) var(--space-2);
+  font-size: var(--text-lg); color: var(--ink-2);
+}
+/* 内容滚动，出口不滚。`min-height: 0` 是必须的：flex 子项默认 `min-height: auto`，
+   于是内容长了之后它会把出口那一条挤出视口——而那正是这一层唯一的出路。 */
+.detail-layer-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 0 var(--space-4) var(--space-4);
+}
+/* 出口在**底部**，整行宽，带安全区。
+   75 岁单手持机的人碰不到左上角；而这是 display:standalone 的 PWA，
+   iOS 下没有系统返回手势，所以这一条是这一层唯一的出路，不能是次要控件。 */
+.detail-layer-exit {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4)
+           calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.detail-layer-exit button { min-height: 56px; }
+
+.detail-head { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); }
+.detail-subject { margin: 0; font-size: var(--text-lg); }
+.detail-amount {
+  margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+/* 状态不只靠颜色：文字和颜色同时给。MedCore 与 Medito 独立得出同一条结论，
+   两边都实测过（前者的 e2e 刻意钉住文案「so a colour-swap regression surfaces here」）。 */
+.detail-status { margin: 0; font-weight: 750; }
+.detail-status.good { color: color-mix(in srgb, var(--ok) 42%, var(--ink)); }
+.detail-status.warning { color: color-mix(in srgb, var(--warn) 46%, var(--ink)); }
+.detail-status.bad { color: color-mix(in srgb, var(--danger) 46%, var(--ink)); }
+.detail-status.neutral { color: var(--ink-2); }
+
+/* 一行一件事：左边问题，右边答案。
+   分隔线**缩进**到与文字左端对齐、不通栏——通栏的线把列表切开，缩进的线让它读起来
+   是分组。这一条来自实测 Medito 的 RowItemWidget。 */
+.detail-rows { display: grid; grid-template-columns: auto 1fr; gap: 0; margin: 0; }
+.detail-rows dt {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  color: var(--ink-3); white-space: nowrap;
+}
+.detail-rows dd {
+  margin: 0; padding: var(--space-3) 0;
+  text-align: right; font-weight: 600;
+}
+.detail-rows dt:not(:first-of-type), .detail-rows dd:not(:first-of-type) {
+  border-top: 1px solid var(--line);
+}
 
 /* --------------------------------------------------------------------------
    事务凭证
@@ -2428,8 +2595,33 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      同为 (0,0,1,0)，而这一条排在后面——**后者胜，那次修复一直是死的**。
 
      所以判据不能再靠顺序：让这一条说清它管谁。HTML 上老人端本来就是
-     `class="tabbar elder-tabs"`，`:not()` 把它排除掉，两条规则从此不再互相依赖位置。 */
-  .tabbar:not(.elder-tabs) { display: none; }
+     `class="tabbar elder-tabs"`，`:not()` 把它排除掉，两条规则从此不再互相依赖位置。
+
+     ── 2026-08-13 这一条整个删掉了，理由在下面 ──────────────────────────────
+
+     ① **它在 `/family` 上就是那条注释说的死路，而那次修复没盖住它。**
+        上面写着「宽屏下藏掉、由 `.back-link` 接管」。实测：
+
+            family.html   back-link **0 个**   ≥761px 的 .tabbar → display:none
+            care.html     back-link 1 个 → /   （接管成立）
+            trust.html    back-link 1 个 → /
+
+        所以 900×900 打开 `/family`：没有底部导航、没有返回链接，而
+        `manifest.webmanifest` 是 `display: standalone`——没有地址栏、iOS 上也没有
+        系统返回手势。**一条真正的死路**，和这条注释自己描述的那次一模一样。
+
+        `test_every_screen_has_some_way_out` 没抓到它，因为那条判据查的是
+        **markup 里有没有** `class="tabbar"`——family.html 有，于是算「有出口」。
+        它从不问「这个出口在哪个宽度下可见」。那条测试的 docstring 写着自己是
+        「被一次真实的死路换来的」，而它看不见这一次。
+
+     ② **判据的前提消失了。** 「跨页 vs 页内」原先能区分两条栏：老人端四格是页内、
+        家人端三格是跨页。Phase C 之后家人端那条栏是**混合**的——今天/待办/我的
+        走 `#hash` 页内切换，照护走 `/care` 跨文档。同一条栏里两种都有，
+        这个判据不再能把它归到任何一边。
+
+        真正的判据是「**这条栏是不是这个壳的主导航**」。Phase C 之后两条都是，
+        所以两条都不该在宽屏消失。 */
   /* 标签栏在这个宽度下藏掉了，所以返回链接必须回来。
      standalone 那一段无条件隐藏 ody[data-nav="tabbar"] .back-link，理由是
      "only where there is another way out"——它只考虑了老人端那个例外，没考虑

@@ -70,7 +70,11 @@
     <nav class="segmented" aria-label="家人分区">
       <button type="button" class="seg is-current" data-section="today" aria-current="true">今天</button>
       <button type="button" class="seg" data-section="todo">待办</button>
-      <button type="button" class="seg" data-section="trend">趋势</button>
+      <!-- 「趋势」搬去了 /care（照护档案里的一格）。不是删除——它读的是
+           /v4/reports/emotion，而 /care 已经有「心情」那一格读同一个端点，
+           两者是同一件事的今天与这一周。搬迁登记在
+           test_control_inventory_is_the_fact_source.py 的 MIGRATIONS 里，
+           而「我的」那一段末尾的「照护档案」链接是通往它的路。 -->
       <button type="button" class="seg" data-section="mine">我的</button>
     </nav>
 
@@ -123,12 +127,6 @@
       <p class="section-note">添好之后，会在提前一天、提前半天和提前一小时各提醒他一次。</p>
       <h2 class="section-head">通知</h2>
       <div id="notices"></div>
-    </section>
-
-    <section class="page-section" data-panel="trend" aria-label="趋势" hidden>
-      <h2 class="section-head">这一周</h2>
-      <p class="section-note">和他<strong>自己</strong>的常态比，不和别人比。聊天原文不会出现在这里，只有汇总。</p>
-      <div id="weekly"></div>
     </section>
 
     <section class="page-section" data-panel="mine" aria-label="我的" hidden>

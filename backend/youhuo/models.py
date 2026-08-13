@@ -271,6 +271,17 @@ class ElderActivityEntry(StrictModel):
     who: str
     what: str
     kind: str
+    #: 这一行**说的是哪件事**——任务 id 或提醒 id，取不到时为 None。
+    #:
+    #: 为什么不叫 `entity_id`：审计事件那边叫 `entity_id`，而这个模型是同一个事实的
+    #: **叙事投影**（`privacy.py` 的 allow-list 决定哪些事件配得上一行人话）。
+    #: 两侧本来就该用不同的词汇，混用会让人以为这两个模型可以互相替代。
+    #:
+    #: 谁需要它：这一行现在是纯文本，点不动，语音也指不到它。而语音的表达空间没有
+    #: 上限、底部导航只有四格，所以「上个月的水费交了没」必须能落到那笔事务本身——
+    #: 它得先有个地址。**这个 id 只进 `dataset`，永远不渲染成文字**
+    #: （`test_the_app_surface_never_renders_a_raw_identifier` 守这一条）。
+    about_id: str | None = None
 
 
 class ToolResult(StrictModel):

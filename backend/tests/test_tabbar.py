@@ -269,26 +269,56 @@ def test_the_elder_tabs_never_compete_with_the_composer():
 # --- 样式侧的三个约束 -----------------------------------------------------
 
 
-def test_the_bar_is_only_a_phone_affordance():
-    """宽屏上不该出现拇指栏。
+def test_no_wide_viewport_rule_hides_a_shell_primary_nav():
+    """宽屏下不许有任何规则把某个壳的主导航藏掉。
 
-    原判据是"这个 media 块里同时出现 `.tabbar` 和 `display: none` 两个子串"——它们
-    可以在**不同的规则**里。实测反例：块内写 `.tabbar { min-width: 1200px; }` 加
-    `.sheet-trigger { display: none; }`，两个子串都在，测试通过，而桌面上标签栏可见
-    且宽 1200px——正好是 `shoot_pages.py` 注释里记着的那个溢出事故。
-    现在要求的是 `.tabbar` **自己那条规则**里有 `display: none`。
+    ## 这条测试换过一次**政策**，不只是判据（2026-08-13）
 
-    第二次修：原写法取的是**第一个** `@media (min-width: 761px)` 块。老人端改成四 Tab
-    之后样式表里多了一个同宽度的块（让 Tab 在宽屏上变成顶部横排），排在前面——于是
-    这条断言去了一个根本不管拇指栏的块里找，红了。改成扫**所有**这个宽度的块。
+    它原来叫 `test_the_bar_is_only_a_phone_affordance`，断言两件事：
+    ① 存在一条在 ≥761px 隐藏跨页拇指栏的规则；② 那条规则藏不到老人端的页内栏。
 
-    另外 `.elder-tabs` 是**豁免**的，而且这个豁免必须写清楚：那四个是**页内**导航，
-    宽屏藏掉就没有任何东西能切到「记录」「家人」「我的」。家人端和照护端的标签是
-    跨页的 `<a>`，宽屏上由 `.back-link` 顶上，所以它们照旧要藏。
+    ①**的前提是假的**。它依赖「家人端和照护端宽屏上由 `.back-link` 顶上」，
+    而实测：
+
+        family.html   back-link **0 个**
+        care.html     back-link 1 个 → /
+        trust.html    back-link 1 个 → /
+
+    所以 900×900 打开 `/family`：底部栏被藏、没有返回链接，而 manifest 是
+    `display: standalone`——没有地址栏，iOS 上也没有系统返回手势。**一条真正的
+    死路**，和 `pages.css` 那条注释自己描述过的那次一模一样。
+
+    而 `test_every_screen_has_some_way_out` 没抓到它：那条判据查的是 markup 里
+    有没有 `class="tabbar"`——family.html 有，于是算「有出口」。它从不问
+    「这个出口在哪个宽度下可见」。
+
+    ②**保留并放宽**。Phase C 之后家人端那条栏也是壳的主导航（今天/待办/照护/我的），
+    而且是**混合**的：今天/待办/我的 走 `#hash` 页内切换，照护走 `/care` 跨文档。
+    原来那个「跨页 vs 页内」的判据因此不再能把它归到任何一边。真正的判据是
+    「**这条栏是不是这个壳的主导航**」——两条都是，所以两条都不该在宽屏消失。
+
+    覆盖的性质没有减少，是加强了：从「不许藏老人端那一条」变成「不许藏任何一条」。
+
+    ## 原判据踩过的两个坑，判法照旧保留
+
+    ① 「块里同时出现 `.tabbar` 和 `display: none` 两个子串」——它们可以在**不同的
+       规则**里。实测反例：`.tabbar { min-width: 1200px }` 加
+       `.sheet-trigger { display: none }`，两个子串都在、测试通过，而桌面上标签栏
+       可见且宽 1200px。所以要求的是 `.tabbar` **自己那条规则**。
+    ② 只取**第一个** `@media (min-width: 761px)` 块——样式表里有多个同宽度的块，
+       断言会跑到一个不管这件事的块里去。所以扫**所有**这个宽度的块。
     """
+    # 去注释**必须在解析之前**。变异测试抓到过这一条：只把
+    # `/* .tabbar:not(.elder-tabs) { display: none; } */` 写进注释，这条断言就红，
+    # 而样式表里根本没有那条规则。而上面那段 `pages.css` 的注释**恰好**在解释
+    # 为什么删掉它——不去注释的话，这条测试会被那段解释永久卡红。
+    #
+    # 同一个坑这个项目踩过四次以上（测试匹配到自己写的注释），同一个会话里
+    # 下面那条 `test_the_bar_clears_the_home_gesture_area` 也刚补过。
+    css = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
     blocks = [
-        CSS[m.start():][: CSS[m.start():].index("\n}")]
-        for m in re.finditer(r"@media \(min-width: 761px\) \{", CSS)
+        css[m.start():][: css[m.start():].index("\n}")]
+        for m in re.finditer(r"@media \(min-width: 761px\) \{", css)
     ]
     assert blocks, "样式表里没有 min-width: 761px 的块"
     rules = [
@@ -296,49 +326,84 @@ def test_the_bar_is_only_a_phone_affordance():
         for wide in blocks
         for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", wide)
     ]
-    # 判据是**这条规则管不管得到老人端**，不是"选择器里有没有 elder-tabs 这几个字"。
+    # 任何一条在宽屏下把 `.tabbar` 设成 `display: none` 的规则都不许存在。
     #
-    # 原写法要求隐藏规则的选择器里**不出现** `elder-tabs`。那在当时成立，因为唯一的
-    # 写法是裸 `.tabbar`。但正确的修复恰恰要提到这个词：`.tabbar:not(.elder-tabs)`
-    # ——它字面上含有 `elder-tabs`，却正是这条测试想要的东西（藏跨页栏、放过页内栏）。
-    #
-    # 为什么必须改成 `:not()`：老人端的四个 Tab 也叫 `.tabbar`，而前面那块专门写的
-    # 修复用的是 `.elder-tabs`，两者特异性同为 (0,0,1,0)、后者靠后 → 裸 `.tabbar` 赢，
-    # 那次修复一直是死的。实测 800×1200：四个 tab 命中 0 个，「记录」「家人」「我的」
-    # 三个分区在宽屏下没有任何入口，而「我的」装着语速和字号两个无障碍控件。
-    #
-    # 所以这里改成两条真判据：**藏得到跨页栏**，而且**藏不到老人端的页内栏**。
+    # 判据是「这条规则管不管得到某条 `.tabbar`」，不是「选择器里有没有 elder-tabs
+    # 这几个字」。所以 `.tabbar:not(.elder-tabs)` 也算——它正是那条造成 `/family`
+    # 死路的规则，字面上含有 `elder-tabs` 却恰恰藏掉了另一条主导航。
     hides = [
-        (sel, body) for sel, body in rules
+        sel for sel, body in rules
         if re.search(r"(?<![-\w])\.tabbar(?![-\w])", sel)
         and re.search(r"display\s*:\s*none", body)
     ]
-    #: 排除掉老人端的写法：裸 `.tabbar`，或显式 `:not(.elder-tabs)`。
-    bare = [
-        sel for sel, _ in hides
-        if "elder-tabs" not in sel or ":not(.elder-tabs)" in sel.replace(" ", "")
-    ]
-    #: 反向：任何一条会把老人端页内栏一起藏掉的规则都是那次死路的复发。
-    catches_elder = [
-        sel for sel, _ in hides
-        if "elder-tabs" not in sel and ":not" not in sel
-    ]
-    assert not catches_elder, (
-        f"这些规则在宽屏下会把老人端的页内标签栏一起藏掉：{catches_elder}\n"
-        "  它们是页内主导航——藏掉之后「记录」「家人」「我的」在 ≥761px 下没有入口，"
-        "而「我的」装着语速和字号两个无障碍控件。用 `.tabbar:not(.elder-tabs)`。"
+    assert not hides, (
+        f"这些规则在 ≥761px 下把标签栏藏掉了：{hides}\n"
+        "  Phase C 之后两个壳的 `.tabbar` 都是**主导航**：老人端四格（首页/记录/"
+        "家人/我的），家人端四格（今天/待办/照护/我的）。藏掉任何一条都会让那个壳\n"
+        "  在宽屏下失去导航，而 `.back-link` 顶不上——实测 family.html 的 back-link\n"
+        "  是 0 个，且 manifest 是 display:standalone（无地址栏、iOS 无返回手势）。\n"
+        "  宽屏上正确的做法是改形态（`position: static` 的横排），不是隐藏。"
     )
-    assert bare, (
-        "宽屏不该出现跨页拇指栏；这些块里 .tabbar 的规则是："
-        f"{[s for s, _ in rules if '.tabbar' in s]}"
+    # 反向：`.tabbar` 在这个宽度下必须**真的被改过形态**，不能什么都不做。
+    # 少了这一条，把上面那条隐藏规则删掉就能变绿，而底部拇指栏会原样留在
+    # 1440px 的窗口底部——那正是这条测试最初存在的理由。
+    restyled = [
+        sel for sel, body in rules
+        if re.search(r"(?<![-\w])\.tabbar(?![-\w])", sel)
+        and re.search(r"position\s*:\s*static", body)
+    ]
+    assert restyled, (
+        "≥761px 下没有任何规则把 `.tabbar` 从固定拇指栏改成静态横排。"
+        "拇指栏钉在 1440px 窗口底部是一个被搁在桌面上的手机语汇——"
+        f"这些块里 .tabbar 的规则是：{[s for s, _ in rules if '.tabbar' in s]}"
     )
 
 
 def test_the_bar_clears_the_home_gesture_area():
-    block = CSS[CSS.index("  .tabbar {") :]
-    rule = block[: block.index("}")]
-    assert "env(safe-area-inset-bottom)" in rule, "标签栏必须避开 home 指示条"
-    assert "position: fixed" in rule and "bottom: 0" in rule
+    """钉在底部那条栏必须避开 home 指示条。
+
+    ## 判据从「字符串首次出现」改成「在它该在的 media query 里找」
+
+    原写法是 `CSS[CSS.index("  .tabbar {"):]`——按 `.tabbar {` 在文件里**第一次
+    出现**的位置取规则。它对 media query 一无所知，所以它读到哪条规则完全取决于
+    两条规则在文件里的先后。
+
+    2026-08-13 它就是这样红的：宽屏那一段的选择器从 `.elder-tabs` 放宽成 `.tabbar`
+    之后，文件里第一个 `  .tabbar {` 变成了 ≥761px 那条（约 751 行，而底部钉住那条
+    在 2300 行之后）。于是这条断言去一条 `position: static` 的规则里找
+    `env(safe-area-inset-bottom)`，当然找不到——而被测的那件事根本没变。
+
+    「规则的位置决定它生不生效」这件事在这个项目里咬过四次。判据必须说清它问的是
+    **哪个 media query 里**的规则：底部钉住的形态住在 `max-width: 760px`。
+    """
+    # 去注释**必须在解析之前**。第一版没做，于是注释里的 `{` `}` 把规则正则撕碎，
+    # 报出来的「选择器」里有一条是 `')` 会把目标顶到滚动容器的 顶边…`——
+    # 一段中文注释被当成了选择器。
+    css = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+
+    # 扫**所有** `max-width: 760px` 的块，不是第一个。这个样式表里有好几个同宽度的
+    # 块，而第一个里根本没有 `.tabbar`——上一版就是这样红的，和被测的事情无关。
+    blocks = [
+        css[m.start():][: css[m.start():].index("\n}")]
+        for m in re.finditer(r"@media \(max-width: 760px\) \{", css)
+    ]
+    assert blocks, "样式表里没有 max-width: 760px 的块"
+    rules = {
+        " ".join(sel.split()): body
+        for block in blocks
+        for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", block)
+    }
+    rule = rules.get(".tabbar")
+    assert rule is not None, (
+        f"`max-width: 760px` 块里没有 `.tabbar` 自己那条规则。"
+        f"块里的选择器有：{sorted(rules)[:12]}"
+    )
+    assert "env(safe-area-inset-bottom)" in rule, (
+        f"标签栏必须避开 home 指示条，而这条规则里没有 safe-area：{rule.strip()[:160]}"
+    )
+    assert "position: fixed" in rule and "bottom: 0" in rule, (
+        f"窄屏下它必须是钉在底部的：{rule.strip()[:160]}"
+    )
 
 
 def test_the_bar_height_is_a_single_token():

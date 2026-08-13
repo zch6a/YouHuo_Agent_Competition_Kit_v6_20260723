@@ -35,7 +35,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +42,9 @@ ROOT = Path(__file__).resolve().parents[2]
 # 溢出探针与 shoot_pages 共用一份：那边出图给人看，这边每轮都判。两份会漂。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shoot_pages import OVERFLOW_PROBE  # noqa: E402
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 #: 端口在运行时向系统要，不写死——见 `_free_port()` 的说明。
 PORT = 0
@@ -101,7 +103,13 @@ DEFER_SELECTORS = ".seg, summary, [data-sheet-open]"
 #: （`#mic`、`#typeInstead`、`#nextOpen`、`#kinContact`）都会把界面推进这一层——
 #: 于是遍历会反复被关进去，而 `#focusBack` 只能按一次的话就再也出不来，
 #: 最后那个 Tab 里的控件永远到不了。
-CLOSER_SELECTORS = "[data-sheet-close], #focusBack"
+#: `#taskDetailClose` 是这一轮新加的第二层模态（事务详情，`role="dialog"`
+#: `aria-modal="true"`，打开时给其余层加 `inert`）。它和 `#focusBack` 是同一个形状：
+#: 「记录」分区里每一条 `.log-item` 现在都是一个 `<button>`，按下去就把这一层推上来，
+#: 而 `inert` 让底下的 `#saveProfile` 一类控件点不到。不放进这一档的话，遍历会被关在
+#: 这一层里，最后报的是「`#saveProfile`、`#repeatLast`、`#companionEntry`、`#logEntry`
+#: 没有被按到（抽屉/分区没被真的打开？）」——**那个提示指向错误的原因**，实测就是这样。
+CLOSER_SELECTORS = "[data-sheet-close], #focusBack, #taskDetailClose"
 
 #: 点击遍历的次数上限**由页面自己的控件数算出来**，不是一个固定数字。
 #:
@@ -798,7 +806,7 @@ def check_multi_tab_identity(browser: "CDP", ws_host: str, websocket, failures: 
     try:
         for _ in range(2):
             target = browser.send("Target.createTarget", url="about:blank")["targetId"]
-            with urllib.request.urlopen(f"{ws_host}/json/list", timeout=5) as reply:
+            with open_local(f"{ws_host}/json/list", timeout=5) as reply:
                 listing = json.loads(reply.read())
             tab = CDP(
                 next(t["webSocketDebuggerUrl"] for t in listing if t["id"] == target), websocket
@@ -916,6 +924,15 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
     pressed = 0
     #: 复位按钮的重按次数上限。它不是待测功能，只是让遍历能走出模态，所以要有个头
     #: ——否则一个"关了又自己打开"的抽屉能把这个循环钉死在这里。
+    #:
+    #: 数的是**连续**多少次复位、中间一次真正的进展都没有，不是全页复位的总次数。
+    #: 原先是"总次数 > 4"，而这一轮「记录」分区里每一条 `.log-item` 都变成了一个会
+    #: 推起事务详情层的 `<button>`：N 条记录就要 N 次开-关循环，于是一个完全健康的
+    #: 页面撞上 4 就报「可能有个模态关不掉」。那是拿一个页面的实际内容条数去调一个
+    #: 本该跟着行为走的数——这个文件刚为同一件事把写死的 60 改成按控件数算的公式。
+    #:
+    #: 而「关不掉 / 关掉又自己开了」这句话说的本来就是**连续**：真出那种毛病时，
+    #: 两次复位之间永远夹不进一次普通按压。所以这个计数器一有进展就归零。
     reopens = 0
     while pressed < budget:
         label = tab.send("Runtime.evaluate", expression=(
@@ -998,10 +1015,12 @@ def press_every_control(tab: "CDP", page: str, failures: list[str]) -> int:
             reopens += 1
             if reopens > 4:
                 failures.append(
-                    f"{page}  复位按钮重按了 {reopens} 次还有控件没露面——"
-                    "可能有个模态关不掉，或者关掉之后又自己开了"
+                    f"{page}  连着按了 {reopens} 次复位、中间一次别的控件都没按到"
+                    "——可能有个模态关不掉，或者关掉之后又自己开了"
                 )
                 break
+        else:
+            reopens = 0
         tab.events.clear()
         tab.send("Runtime.evaluate", expression="window.__next.click()")
         tab.drain(CLICK_SETTLE_SECONDS)
@@ -1218,7 +1237,7 @@ def main() -> int:
     try:
         for _ in range(80):
             try:
-                with urllib.request.urlopen(f"{BASE}/ping", timeout=2):
+                with open_local(f"{BASE}/ping", timeout=2):
                     break
             except Exception:
                 time.sleep(0.4)
@@ -1235,7 +1254,7 @@ def main() -> int:
         ws_url = None
         for _ in range(80):
             try:
-                with urllib.request.urlopen(
+                with open_local(
                     f"http://127.0.0.1:{DEVTOOLS_PORT}/json/version", timeout=2
                 ) as r:
                     ws_url = json.loads(r.read())["webSocketDebuggerUrl"]
@@ -1259,7 +1278,7 @@ def main() -> int:
         browser = CDP(ws_url, websocket)
         for page in PAGES:
             target = browser.send("Target.createTarget", url="about:blank")["targetId"]
-            with urllib.request.urlopen(
+            with open_local(
                 f"http://127.0.0.1:{DEVTOOLS_PORT}/json/list", timeout=5
             ) as r:
                 tabs = json.loads(r.read())

@@ -31,10 +31,12 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 
 import websocket
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -111,7 +113,7 @@ def main() -> int:
     base = f"http://127.0.0.1:{port}"
     for _ in range(60):
         try:
-            urllib.request.urlopen(f"{base}/health", timeout=1)
+            open_local(f"{base}/health", timeout=1)
             break
         except Exception:
             time.sleep(0.5)
@@ -135,7 +137,7 @@ def main() -> int:
         ws_url = None
         for _ in range(40):
             try:
-                with urllib.request.urlopen(
+                with open_local(
                         f"http://127.0.0.1:{cdp_port}/json/version", timeout=2) as response:
                     ws_url = json.loads(response.read())["webSocketDebuggerUrl"]
                 break

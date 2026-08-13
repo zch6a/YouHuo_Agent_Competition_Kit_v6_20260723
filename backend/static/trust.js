@@ -18,7 +18,12 @@ async function bootstrap() {
       window.YouHuo.login('elder'), window.YouHuo.login('family'), window.YouHuo.login('system'),
     ]);
     byId('status').textContent = '正在为您办一件真的事……';
-  } catch (error) { byId('status').textContent = error.message; }
+  } catch (error) {
+    // 这里原先是 `= error.message`——**连前缀都没有**，把异常消息整条当成文案。
+    // 这一页是手机上的消费者凭证，`Failed to fetch` 出现在这儿等于把浏览器的
+    // 内部说法当成产品文案。
+    byId('status').textContent = window.YouHuo.errorWords(error, '这份凭证').text;
+  }
   // 凭证放在身份之后、并且不阻塞它：身份没建起来时凭证也办不成，但身份的状态行
   // 不该等一次完整缴费才更新。
   // 成功之后把状态行收起来。

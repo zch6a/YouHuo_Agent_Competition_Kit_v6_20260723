@@ -208,18 +208,28 @@
              不做社交系统。一位老人在这里只需要知道：谁能帮我、能帮什么、怎么找她。 -->
         <div class="elder-panel" data-panel="kin" aria-label="家人" hidden>
           <h2 class="tab-head">我的家人</h2>
+          <!-- 这里原先写死「李晴 / 女儿」。
+               那是整个产品里**唯一一个人名**，而它不在任何数据里：
+               `elder.js` 从不写这两个元素，后端 `/v4/contacts/{elder}` 在演示数据下
+               返回空列表，而全系统的词汇是**角色**（活动记录里的 who 就是「家人」）。
+
+               更糟的是它和产品自己的行为矛盾：身份里有 `daughter_id` **和**
+               `son_id`，种子场景那条记录写着「家人确认了一次，还在等其他家人」——
+               系统承认有两位家人，而这一屏说有一位叫李晴的。
+
+               现在由 `renderKin()` 填：有真实联系人档案就显示它的名字，
+               没有就只显示这个家庭真实存在的角色。**不编名字。** -->
           <section class="panel rail-card kin-card">
-            <p class="kin-name" id="kinName">李晴</p>
-            <p class="kin-rel" id="kinRel">女儿</p>
-            <p class="kin-help-label">她可以帮您</p>
+            <div id="kinList" class="kin-list" aria-live="polite"></div>
+            <p class="kin-help-label">家人可以帮您</p>
             <ul class="kin-help">
               <li>重要付款的第二次确认</li>
               <li>紧急的时候第一个知道</li>
               <li>替您添一件要记的事</li>
             </ul>
-            <button type="button" id="kinContact" class="block">联系她</button>
+            <button type="button" id="kinContact" class="block">联系家人</button>
           </section>
-          <p class="tab-note">高一点风险的事，优活会先问您，再问她。两个人都同意才办。</p>
+          <p class="tab-note">高一点风险的事，优活会先问您，再问家人。两边都同意才办。</p>
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════════
@@ -228,15 +238,29 @@
         <div class="elder-panel" data-panel="me" aria-label="我的" hidden>
           <h2 class="tab-head">我的习惯</h2>
           <section class="panel rail-card">
+            <!-- 每一行都是「名字 + 它会造成什么」，不只有名字。
+                 「语速」是名字，「优活说话的快慢」才是后果——一个控件的后果不是
+                 自明的时候，就得写出来，而她不该靠拨一次再观察来推断它做了什么。
+                 形状来自 Medito 的 RowItemWidget（实测：粗体标题 + 小一号暗一档的
+                 说明 + 右侧控件），记在 12_reference_study.md 第二节 ⑦-b。
+                 说明行复用 `.meta`：它已经在全项目用着、对比度过了那道零容差闸门。 -->
             <div class="profile-tools" aria-label="看得清、听得懂">
-              <label>语速
+              <label>
+                <span class="tool-text">
+                  <span class="tool-name">语速</span>
+                  <span class="meta">选「慢」的时候，优活会一字一句地说</span>
+                </span>
                 <select id="speechRate">
                   <option value="0.72">慢</option>
                   <option value="0.88" selected>舒适</option>
                   <option value="1.0">正常</option>
                 </select>
               </label>
-              <label>文字大小
+              <label>
+                <span class="tool-text">
+                  <span class="tool-name">文字大小</span>
+                  <span class="meta">屏幕上的字会变大，按钮也跟着变大</span>
+                </span>
                 <select id="fontScale">
                   <option value="1.1">较大</option>
                   <option value="1.25" selected>大</option>
@@ -309,6 +333,36 @@
           </div>
           <p class="rail-note">这些只念记录，不做医学判断。</p>
         </section>
+      </aside>
+
+      <!-- 事务详情：压在四个 Tab 之上的一层。
+           从「记录」点一行进来，或者由语音直接到达。
+
+           为什么不是第五个 Tab、也不是跳去 /trust：
+           `/trust` 属于家属壳（见 surfaces.py），让老人跳过去是表面越界。
+           三个参考产品都把详情压在 tab 之上的栈里，见
+           frontend_redesign/ia/12_reference_study.md。
+
+           为什么不复用 #extrasSheet 那一套：那个抽屉在 ≥761px 会变成常驻侧栏
+           （sheet.js 的 isDrawer()），而一笔事务的详情在任何宽度下都该是模态。
+           两者共用同一个模块就得给那个双形态再加开关，而 sheet.js 是这一页最精细的
+           无障碍代码。改成各自一份，另配一道闸门钉住两者的四个行为不许漂移
+           （test_both_overlays_behave_the_same）。
+
+           出口在**底部**：75 岁单手持机的人碰不到左上角，而这是一个
+           display:standalone 的 PWA，iOS 下没有系统返回手势。 -->
+      <!-- 背板用自己的类，**不复用 `.sheet-backdrop`**：那个类的样式整段写在
+           `@media (max-width: 760px)` 里，并且在 ≥761px 被 `display: none`。
+           复用它的结果是这一层在宽屏上没有背板——一个在桌面上静默失效的模态。
+           这一层在任何宽度下都是模态，所以它的样式必须在全局作用域。 -->
+      <div id="detailBackdrop" class="detail-backdrop" aria-hidden="true"></div>
+      <aside id="taskDetail" class="detail-layer" role="dialog" aria-modal="true"
+             aria-labelledby="taskDetailTitle" aria-hidden="true" inert>
+        <h2 id="taskDetailTitle" class="detail-layer-title">这件事的经过</h2>
+        <div id="taskDetailBody" class="detail-layer-body" aria-live="polite"></div>
+        <div class="detail-layer-exit">
+          <button id="taskDetailClose" type="button" class="primary block">知道了</button>
+        </div>
       </aside>
     </div>
 

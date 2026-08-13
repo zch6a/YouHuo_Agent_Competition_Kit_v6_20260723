@@ -37,37 +37,21 @@ const NOTICE_TITLE = {
 };
 
 // Redacted companion digest: Chinese labels for the report's summary keys.
-const WEEKLY_LABEL = {
-  event_count: '记录到的情绪信号',
-  label_counts: '情绪类别分布',
-  average_distress: '平均压力指数',
-  trend: '与上一周期相比',
-  safe_suggestions: '可以做的小事',
-  raw_text_included: '是否包含聊天原文',
-  diagnosis_provided: '是否给出医学诊断',
-};
-
-const WEEKLY_TREND = {
-  distress_increasing: '压力上升，建议多陪伴',
-  distress_decreasing: '压力下降',
-  stable_or_insufficient: '平稳或样本不足',
-};
-
-const EMOTION_LABEL = {
-  calm: '平静', lonely: '孤单', anxious: '焦虑', sad: '低落',
-  happy: '开心', angry: '生气', distressed: '明显不适',
-};
-
-function weeklyValue(key, value) {
-  if (key === 'trend') return WEEKLY_TREND[value] || value;
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  if (Array.isArray(value)) return value.length ? value.join('；') : '暂无';
-  if (value && typeof value === 'object') {
-    const parts = Object.entries(value).map(([k, v]) => `${EMOTION_LABEL[k] || k} ${v}次`);
-    return parts.length ? parts.join('，') : '本周期没有记录';
-  }
-  return String(value);
-}
+/* 「趋势」那一格搬去了 /care，这里原先的三张表和 `weeklyValue()` 一起走了。
+ *
+ * 不是简单搬走——那三张表里有两张是**坏的**，而 care.js 里已经有修好的版本：
+ *
+ *   后端 EmotionLabel 共 7 个值：positive / calm / lonely / low_mood /
+ *                                anxious / angry / urgent
+ *   这里原来的表：calm / lonely / anxious / sad / happy / angry / distressed
+ *                 ↑ 缺 positive / low_mood / urgent
+ *                 ↑ 多出后端根本没有的 sad / happy / distressed
+ *
+ * 于是这一格会把 `positive`、`low_mood`、`urgent` 印成英文码——而 `urgent`
+ * （「急着要人帮忙」）恰恰是最要紧的那一个。care.js 的 `EMOTION_WORD` 注释里
+ * 记着这次修复，但当时只修了那一个文件，这里留着坏的那份，两页读**同一个端点**
+ * 却各有一套词汇。搬迁时用了 care.js 那份，坏的这份不带走。
+ */
 
 const tasksEl = document.querySelector('#tasks');
 const otherTasksEl = document.querySelector('#otherTasks');
@@ -75,7 +59,8 @@ const auditEl = document.querySelector('#audit');
 const chainEl = document.querySelector('#chain');
 const calendarEl = document.querySelector('#calendar');
 const noticesEl = document.querySelector('#notices');
-const weeklyEl = document.querySelector('#weekly');
+// `#weekly` 的引用一起去掉：那个元素现在住在 care.html。留着它会得到一个
+// 永远是 null 的常量，而下一个人读到这一行会以为这一页还有那一格。
 const dailyEl = document.querySelector('#dailyReport');
 const updatedEl = document.querySelector('#famUpdated');
 const verdictEl = document.querySelector('#famVerdict');
@@ -256,7 +241,7 @@ async function approve(taskId, approvalDigest, approveValue, trigger) {
       // 家属无法把它和真的批准成功区分开。
       notify(data.message, window.YouHuo.toneOf(data));
       load();
-    } catch (e) { notify(e.message, 'warning'); }
+    } catch (e) { notify(window.YouHuo.errorWords(e).text, 'warning'); }
   });
 }
 
@@ -293,7 +278,7 @@ async function createReminder(e) {
       // 一个空表单。
       if (tone === 'good') e.target.reset();
       load();
-    } catch (err) { notify(err.message, 'warning'); }
+    } catch (err) { notify(window.YouHuo.errorWords(err).text, 'warning'); }
   });
 }
 
@@ -392,41 +377,9 @@ function renderCalendar(reminders) {
   });
 }
 
-/** Design §4.5: only a redacted companion digest reaches the family. */
-async function loadWeekly() {
-  const end = new Date();
-  const start = new Date(end.getTime() - 6 * 24 * 3600 * 1000);
-  // 按**本地**日期切，不是 UTC。
-  //
-  // 原先是 `d.toISOString().slice(0, 10)`。在 UTC+8，那等于把一天切在早上八点：
-  // 北京时间 8 月 10 日 07:30 打开「趋势」，窗口是 08-03 至 08-09，页面上却写着
-  // 8 月 10 日——今天全部的情绪信号被排除在外；08:00 一到，同一次刷新变成 08-04
-  // 至 08-10。后端 baseline_api.py 里对这个模式有明确警告，而同一文件里
-  // renderMetrics 和 renderCalendar 用的都是本地 toDateString()，只有这里是 UTC。
-  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    + `-${String(d.getDate()).padStart(2, '0')}`;
-  try {
-    const report = await api(
-      `/v4/reports/emotion/${ELDER_ID}?period_start=${iso(start)}&period_end=${iso(end)}`
-    );
-    weeklyEl.replaceChildren();
-    line(weeklyEl, `${report.period_start} 至 ${report.period_end}`, 'meta');
-    const table = document.createElement('div');
-    table.className = 'digest';
-    Object.entries(report.summary).forEach(([key, value]) => {
-      const row = document.createElement('div');
-      row.className = 'digest-row';
-      const label = document.createElement('strong');
-      label.textContent = WEEKLY_LABEL[key] || key;
-      const cell = document.createElement('div');
-      cell.textContent = weeklyValue(key, value);
-      row.append(label, cell);
-      table.appendChild(row);
-    });
-    weeklyEl.appendChild(table);
-    line(weeklyEl, report.privacy_guarantee, 'notice good');
-  } catch (e) { weeklyEl.textContent = `周报加载失败：${e.message}`; }
-}
+/* `loadWeekly()` 整体搬到 care.js（那里叫同一个名字，读同一个端点）。
+ * 那段关于「按本地日期切、不是 UTC」的注释一起带过去了——它记着一个真实缺陷，
+ * 留在这里没有代码配它，搬过去才有人看得见。 */
 
 // 生活日报（设计稿 核心创新点 ②）。
 //
@@ -629,7 +582,7 @@ async function loadDailyReport() {
     CONCLUSION.reportFailed = true;
     renderConclusion();
     dailyEl.replaceChildren();
-    dailyEl.textContent = `今天的情况暂时取不到：${e.message}`;
+    dailyEl.textContent = window.YouHuo.errorWords(e, '今天的情况').text;
   }
 }
 
@@ -691,15 +644,18 @@ async function load() {
     // 的位置，日历加载失败会显示成记录出了问题。分区改版之后 #chain 默认还是折叠
     // 的，再写那里就等于整条失败无人可见。写进 #familyNotice：它一直在屏幕上，
     // 而且带 aria-live。
-    notify(`没能取到最新情况：${e.message}`, 'bad');
-    updatedEl.textContent = '暂时没连上';
+    notify(window.YouHuo.errorWords(e, '最新情况').text, 'bad');
+    // 这一行原先固定写「暂时没连上」，而它罩着的四个请求也可能是后端拒绝或
+    // 500——那时说"没连上"是错的诊断。分型之后由 errorWords 说对。
+    updatedEl.textContent = window.YouHuo.errorWords(e).say;
     // 这一轮不知道有几件事在等她点头，就必须说"不知道"，不能留着上一轮的数字：
     // 页头照旧写着"今天有一件事要您点头"，而底下那张卡这一轮根本没画出来。
     // 不知道的时候由紧接着的 loadDailyReport() 收尾——它成功就写日报的结论，
     // 它也失败就写「暂时取不到今天的情况」。
     CONCLUSION.needYou = null;
   }
-  loadWeekly();
+  // `loadWeekly()` 不在这里了——「趋势」那一格搬去了 /care，由那一页的
+  // 六段并发里加载。
   loadDailyReport();
 }
 

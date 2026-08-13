@@ -21,6 +21,9 @@ import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime, timedelta, timezone
+# 本机请求一律绕开系统代理，理由见 localhttp.py（一次真实的
+# 「服务未能启动」其实是代理把请求挂死了）。
+from localhttp import open_local
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8041"
 
@@ -40,13 +43,13 @@ def post(path: str, payload: dict, token: str | None = None) -> dict:
     request = urllib.request.Request(
         f"{BASE}{path}", data=json.dumps(payload).encode("utf-8"),
         headers=headers, method="POST")
-    with urllib.request.urlopen(request, timeout=10) as response:
+    with open_local(request, timeout=10) as response:
         return json.loads(response.read() or b"{}")
 
 
 def main() -> int:
     try:
-        with urllib.request.urlopen(f"{BASE}/v2/identity/visitor", timeout=10) as response:
+        with open_local(f"{BASE}/v2/identity/visitor", timeout=10) as response:
             ids = json.loads(response.read())
     except Exception as exc:                                     # noqa: BLE001
         print(f"FAIL seed_reminders: 取不到演示身份（{exc}）——服务器起了吗？")

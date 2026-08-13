@@ -23,7 +23,7 @@
  * 整页停在正在加载"。
  */
 
-const {api, byId} = window.YouHuo;
+const {api, byId, errorWords} = window.YouHuo;
 const state = {elderId: 'elder-demo', daughterId: 'daughter-demo', systemId: 'system-demo'};
 
 const verdictOf = window.YouHuo.verdictOf;
@@ -66,7 +66,10 @@ function empty(host, lead, blocks = [], footnote) {
 }
 
 function failed(host, error) {
-  host.replaceChildren(el('p', 'notice bad', `这一段暂时没取到：${error.message}`));
+  // 原先是 `这一段暂时没取到：${error.message}`。`error.message` 在网络失败时是
+  // `Failed to fetch`——手机框里的一段英文，而这一页是给家属看的消费者面。
+  // 分型与「还能做什么」由 common.js 的 errorWords 统一给。
+  host.replaceChildren(el('p', 'notice bad', errorWords(error, '这一段').text));
 }
 
 /* ==========================================================================
@@ -396,6 +399,88 @@ async function loadMood() {
 }
 
 /* ==========================================================================
+   趋势（这一周）—— 从 /family 的一级分区搬进照护档案
+   ==========================================================================
+   `09_consumer_app_architecture.md`：「趋势」退出一级导航，它住在照护里。
+
+   ## 搬过来时**没有**照搬 family.js 那两张表，那是刻意的
+
+   family.js 的 `EMOTION_LABEL` 是上面「心情」那段注释记录过、并且已经在这个文件里
+   被修好的那张**旧表**：
+
+     后端 EmotionLabel 共 7 个值：positive / calm / lonely / low_mood /
+                                  anxious / angry / urgent
+     family.js 的表：calm / lonely / anxious / sad / happy / angry / distressed
+                     ↑ 缺 positive / low_mood / urgent
+                     ↑ 多出后端根本没有的 sad / happy / distressed
+
+   于是 `/family` 的趋势面板会把 `positive`、`low_mood`、`urgent` 印成英文码——
+   而 `urgent`（「急着要人帮忙」）恰恰是最要紧的那一个。修复当时只落在 care.js，
+   family.js 留着坏的那份，两个页面读**同一个端点**却各有一套词汇。
+
+   所以这一段复用本文件已有的 `EMOTION_WORD` 与 `TREND_WORD`，只带来 family.js
+   独有的那张字段名表（`WEEKLY_LABEL`）。趋势词也用本文件的：family.js 那版
+   「压力上升，建议多陪伴」带着建议，而这一格讲的是情绪**趋势**，给建议越界了。
+
+   窗口是 7 天，而「心情」那一格是 14 天——同一个端点两个窗口，一套词汇。 */
+
+const WEEKLY_LABEL = {
+  event_count: '记录到的情绪信号',
+  label_counts: '情绪类别分布',
+  average_distress: '平均压力指数',
+  trend: '与上一周期相比',
+  safe_suggestions: '可以做的小事',
+  raw_text_included: '是否包含聊天原文',
+  diagnosis_provided: '是否给出医学诊断',
+};
+
+function weeklyValue(key, value) {
+  if (key === 'trend') return TREND_WORD[value] || value;
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (Array.isArray(value)) return value.length ? value.join('；') : '暂无';
+  if (value && typeof value === 'object') {
+    const parts = Object.entries(value).map(([k, v]) => `${EMOTION_WORD[k] || k} ${v}次`);
+    return parts.length ? parts.join('，') : '这一周没有记录';
+  }
+  return String(value);
+}
+
+async function loadWeekly() {
+  const host = byId('weekly');
+  if (!host) return;
+  const end = new Date();
+  const start = new Date(end.getTime() - 6 * 24 * 3600 * 1000);
+  try {
+    // `ymd()` 是本文件已有的：按**本地**日期切，不是 UTC。
+    //
+    // 这一条从 family.js 一起带过来，因为它记着一个真实缺陷：
+    // `toISOString().slice(0, 10)` 在 UTC+8 等于把一天切在早上八点——北京时间
+    // 8 月 10 日 07:30 打开，窗口是 08-03 至 08-09，页面上却写着 8 月 10 日，
+    // 今天全部的情绪信号被排除在外；08:00 一到，同一次刷新变成 08-04 至 08-10。
+    // 后端 baseline_api.py 里对这个模式有明确警告。
+    const report = await api(
+      `/v4/reports/emotion/${state.elderId}?period_start=${ymd(start)}&period_end=${ymd(end)}`,
+      {}, 'family',
+    );
+    host.replaceChildren();
+    host.appendChild(el('p', 'meta', `${report.period_start} 至 ${report.period_end}`));
+    const table = el('div', 'digest');
+    Object.entries(report.summary).forEach(([key, value]) => {
+      const row = el('div', 'digest-row');
+      row.append(el('strong', null, WEEKLY_LABEL[key] || key),
+                 el('div', null, weeklyValue(key, value)));
+      table.appendChild(row);
+    });
+    host.appendChild(table);
+    if (report.privacy_guarantee) {
+      host.appendChild(el('p', 'notice good', report.privacy_guarantee));
+    }
+  } catch (error) {
+    failed(host, error);
+  }
+}
+
+/* ==========================================================================
    安全
    ========================================================================== */
 
@@ -458,12 +543,20 @@ async function bootstrap() {
     status.hidden = true;
   } catch (error) {
     status.hidden = false;
-    status.textContent = `暂时没连上：${error.message}`;
+    // 「暂时没连上」这个前缀原先固定写死，然后拼上 `error.message`——于是网络正常
+    // 而后端拒绝时，它也说"没连上"，那是错的诊断。分型之后由 errorWords 说对。
+    status.textContent = errorWords(error, '照护档案').text;
     return;
   }
-  // 五段并发。一段失败只让那一段说话，另外四段照常显示——这一页最不该有的性质
+  // 六段并发。一段失败只让那一段说话，另外五段照常显示——这一页最不该有的性质
   // 就是"一个接口慢了，整页停在正在加载"。
-  await Promise.all([loadToday(), loadMedications(), loadHealth(), loadMood(), loadSafety()]);
+  //
+  // 第六段是「趋势」，从 /family 搬来。它和「心情」读同一个端点（不同窗口），
+  // 并发发两个请求是刻意的：合成一次会让两格互相拖累，而这一页的原则正是
+  // 一段一段独立。
+  await Promise.all([
+    loadToday(), loadMedications(), loadHealth(), loadMood(), loadSafety(), loadWeekly(),
+  ]);
 }
 
 // 页内分区，与家人端同一套实现（common.js）。

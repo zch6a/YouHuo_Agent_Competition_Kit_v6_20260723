@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 145 |
+| 总数 | 146 |
 |---|---|
-| 有 id | 145 |
+| 有 id | 146 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 1 |
@@ -23,36 +23,36 @@
 | `#typeInstead` | elder | home | button | click | elder.js:setFocus | — | consumer | elder | home | secondary |
 | `#toggleReminders` | elder | home | button | — | elder.js:loadReminders | — | consumer | elder | home | secondary |
 | `#focusBack` | elder | — | button | click | elder.js:setFocus | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
 | `#text` | elder | — | input | — | elder.js:writeStore | — | consumer | elder | shell | primary |
-| `#send` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | primary |
+| `#send` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
 | `#openExtras` | elder | — | button | — | —:— | — | consumer | elder | shell | secondary |
-| `#repeatLast` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
-| `#stepBack` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
-| `#logEntry` | elder | log | button | click | elder.js:loadActivity | — | consumer | elder | log | hidden-until-state |
+| `#repeatLast` | elder | log | button | click | elder.js:task | — | consumer | elder | log | hidden-until-state |
+| `#stepBack` | elder | log | button | click | elder.js:task | — | consumer | elder | log | hidden-until-state |
+| `#logEntry` | elder | log | button | click | elder.js:task | — | consumer | elder | log | hidden-until-state |
 | `#kinContact` | elder | kin | button | click | elder.js:open | — | consumer | elder | kin | hidden-until-state |
 | `#speechRate` | elder | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
 | `#fontScale` | elder | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
-| `#saveProfile` | elder | me | button | click | elder.js:loadActivity | — | consumer | elder | me | hidden-until-state |
-| `#companionEntry` | elder | me | button | click | elder.js:loadActivity | — | consumer | elder | me | hidden-until-state |
+| `#saveProfile` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#companionEntry` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#leaveApp` | elder | me | a | navigate | —:— | — | consumer | elder | me | hidden-until-state |
 | `#` | elder | — | button | — | sheet.js:(顶层) | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
-| `#` | elder | — | button | click | elder.js:loadActivity | — | consumer | elder | shell | secondary |
-| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
-| `#` | elder | — | button | click | common.js:code | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | secondary |
+| `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | secondary |
+| `#taskDetailClose` | elder | — | button | — | elder.js:setDetailOpen | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#refresh` | family | — | button | click | family.js:load | — | consumer | family | shell | secondary |
-| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | family | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | family | today | summary | details-toggle | common.js:code | — | consumer | family | today | primary |
+| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | family | today | summary | details-toggle | common.js:tryScroll | — | consumer | family | today | primary |
 | `#reminderForm` | family | todo | form | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
 | `#reminderTitle` | family | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
 | `#reminderDue` | family | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
@@ -65,20 +65,21 @@
 | `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
-| `#` | care | — | button | click | common.js:code | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | common.js:code | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
 | `#depthProduct` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#depthTechnical` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |

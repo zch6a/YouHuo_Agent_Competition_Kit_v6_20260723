@@ -30,4 +30,68 @@
     <path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" />
     <circle cx="12" cy="8" r="6" />
   </symbol>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       补齐：一个概念一个字形
+       ══════════════════════════════════════════════════════════════════════
+       上面五个 symbol 要服务**两个壳一共七个**导航概念：
+
+           Elder   首页 / 记录 / 家人 / 我的
+           Family  今天 / 待办 / 照护 / 我的
+
+       于是出现了一字形兼两职：`tab-care`（心形）在 /elder 上表示「记录」、
+       在 /care 上表示「照护」；`tab-trust`（盾形带勾）在 /elder 上表示「我的」。
+       图标的语义本来就比文字弱，同一个形状指两件事，读者只能靠位置猜。
+
+       判据来自参考产品研究（frontend_redesign/ia/12_reference_study.md 第二节 ③）：
+       Medito 的 55 个图标里 `heart` / `health` / `home` / `privacy` / `profile` /
+       `settings` 各是各的名字，**没有一个字形兼两职**；填充与描边才是同一概念的
+       两个状态，用 `book`/`bookSolid` 这种显式配对表示。
+
+       补下面四个之后：`tab-care` 只表示照护，`tab-trust` 只表示凭证。
+
+       画法与上面五个完全一致（Lucide 24×24 描边，不写 stroke-width——那是
+       第 10-12 行记着的那个坑：`<symbol>` 自己的表现属性会赢过宿主继承的值）。 -->
+
+  <!-- 今天（Family）。日历带日期格子。elder.html 抽屉里「今天有什么事」那个
+       内联图标用的是同一个形状，两处一致。 -->
+  <symbol id="tab-today" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2v4" />
+    <path d="M16 2v4" />
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M3 10h18" />
+    <path d="M8 14h.01" />
+    <path d="M12 14h.01" />
+    <path d="M16 14h.01" />
+    <path d="M8 18h.01" />
+    <path d="M12 18h.01" />
+  </symbol>
+
+  <!-- 待办（Family）。两个勾 + 三条列表线：这一格的内容就是
+       「待我确认 / 进行中 / 已完成」。 -->
+  <symbol id="tab-todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m3 7 2 2 4-4" />
+    <path d="m3 17 2 2 4-4" />
+    <path d="M13 6h8" />
+    <path d="M13 12h8" />
+    <path d="M13 18h8" />
+  </symbol>
+
+  <!-- 记录（Elder）。原先借用 `tab-care` 的心形。
+       这个形状不是新画的——它就是 elder.js 里「还没有记录」那个空态用的图标，
+       所以标签和空态从此是同一个形状。 -->
+  <symbol id="tab-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 3.4h11a1.6 1.6 0 0 1 1.6 1.6v14a1.6 1.6 0 0 1-1.6 1.6h-11A1.6 1.6 0 0 1 4.9 19V5a1.6 1.6 0 0 1 1.6-1.6z" />
+    <path d="M8.4 9h7.2" />
+    <path d="M8.4 13h7.2" />
+    <path d="M8.4 17h4.4" />
+  </symbol>
+
+  <!-- 我的（两个壳共用）。原先借用 `tab-trust` 的盾形带勾——那个形状讲的是
+       「查得清、对得上」，是凭证的意思，不是「这是我」。 -->
+  <symbol id="tab-me" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="10" r="3" />
+    <path d="M7 20.7V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.7" />
+  </symbol>
 </svg>

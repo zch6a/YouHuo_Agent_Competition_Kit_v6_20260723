@@ -1,5 +1,5 @@
 {
-  "count": 145,
+  "count": 146,
   "controls": [
     {
       "key": "href=/elder",
@@ -177,7 +177,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -195,7 +195,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -213,7 +213,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -249,7 +249,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -285,7 +285,7 @@
       "module": "log",
       "visibility": "hidden-until-state",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -303,7 +303,7 @@
       "module": "log",
       "visibility": "hidden-until-state",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -321,7 +321,7 @@
       "module": "log",
       "visibility": "hidden-until-state",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -329,7 +329,7 @@
       "key": "id=kinContact",
       "id": "kinContact",
       "tag": "button",
-      "text": "联系她",
+      "text": "联系家人",
       "source_file": "elder.html",
       "route": "/elder",
       "panel": "kin",
@@ -393,7 +393,7 @@
       "module": "me",
       "visibility": "hidden-until-state",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -411,7 +411,7 @@
       "module": "me",
       "visibility": "hidden-until-state",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -465,7 +465,7 @@
       "module": "shell",
       "visibility": "secondary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -483,7 +483,7 @@
       "module": "shell",
       "visibility": "secondary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -501,7 +501,7 @@
       "module": "shell",
       "visibility": "secondary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
       "apis": []
     },
@@ -519,8 +519,26 @@
       "module": "shell",
       "visibility": "secondary",
       "handler_file": "elder.js",
-      "handler": "loadActivity",
+      "handler": "task",
       "interaction_type": "click",
+      "apis": []
+    },
+    {
+      "key": "id=taskDetailClose",
+      "id": "taskDetailClose",
+      "tag": "button",
+      "text": "知道了",
+      "source_file": "elder.html",
+      "route": "/elder",
+      "panel": "",
+      "hidden": false,
+      "surface": "consumer",
+      "shell": "elder",
+      "module": "shell",
+      "visibility": "primary",
+      "handler_file": "elder.js",
+      "handler": "setDetailOpen",
+      "interaction_type": "",
       "apis": []
     },
     {
@@ -537,7 +555,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -555,7 +573,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -573,7 +591,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -591,7 +609,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -627,7 +645,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -645,25 +663,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
-      "interaction_type": "click",
-      "apis": []
-    },
-    {
-      "key": "data-section=trend",
-      "id": "",
-      "tag": "button",
-      "text": "趋势",
-      "source_file": "family.html",
-      "route": "/family",
-      "panel": "",
-      "hidden": false,
-      "surface": "consumer",
-      "shell": "family",
-      "module": "shell",
-      "visibility": "primary",
-      "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -681,7 +681,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -699,7 +699,7 @@
       "module": "today",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "details-toggle",
       "apis": []
     },
@@ -939,7 +939,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -957,7 +957,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -975,7 +975,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -993,7 +993,7 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -1011,7 +1011,25 @@
       "module": "shell",
       "visibility": "primary",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
+      "interaction_type": "click",
+      "apis": []
+    },
+    {
+      "key": "data-section=trend",
+      "id": "",
+      "tag": "button",
+      "text": "趋势",
+      "source_file": "care.html",
+      "route": "/care",
+      "panel": "",
+      "hidden": false,
+      "surface": "consumer",
+      "shell": "family",
+      "module": "shell",
+      "visibility": "primary",
+      "handler_file": "common.js",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -1119,7 +1137,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -1137,7 +1155,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -1155,7 +1173,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
@@ -1173,7 +1191,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "common.js",
-      "handler": "code",
+      "handler": "tryScroll",
       "interaction_type": "click",
       "apis": []
     },
