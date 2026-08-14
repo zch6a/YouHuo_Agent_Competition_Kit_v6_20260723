@@ -374,8 +374,24 @@ def test_every_section_button_has_a_panel_to_show(page, least):
     """
     source = (STATIC / page).read_text(encoding="utf-8")
     source = re.sub(r"<!--.*?-->", "", source, flags=re.S)
-    sections = re.findall(r'class="seg[^"]*"[^>]*data-section="([a-z]+)"', source)
-    sections += re.findall(r'data-section="([a-z]+)"[^>]*class="seg[^"]*"', source)
+    # 先取标签，再在标签内部判断，**不要写一条同时锁住属性顺序和类名位置的正则**。
+    #
+    # 原先是两条 `class="seg[^"]*"[^>]*data-section=...` / 反过来一条。两条都要求
+    # class 值**以 `seg` 开头**。Phase C 把页内分区切换搬到底部四格上之后，那三格是
+    # `class="tab seg is-current"`（和老人端的 Tab 一直以来的写法一样），于是两条正则
+    # 一个都不匹配，`sections` 变成空列表——而这一条测试的下一句
+    # `sorted(set(sections)) == sorted(set(panels))` 会因此报「按钮 [] 与内容对不上」，
+    # 指向一个不存在的缺陷。
+    #
+    # 这正是这一份文件里 `test_no_tab_is_icon_only` 的 docstring 记着的那件事：
+    # 「原先要求 `href` 紧跟 `<a`，属性顺序完全合法地一变就一条都匹配不到」。
+    tags = re.findall(r"<(?:button|a)\b[^>]*>", source)
+    sections = [
+        re.search(r'data-section="([a-z]+)"', tag).group(1)
+        for tag in tags
+        if re.search(r'data-section="[a-z]+"', tag)
+        and re.search(r'class="[^"]*(?<![\w-])seg(?![\w-])[^"]*"', tag)
+    ]
     panels = re.findall(r'data-panel="([a-z]+)"', source)
     assert len(sections) >= least, f"{page} 的分区按钮少于 {least} 个：{sections}"
     assert sorted(set(sections)) == sorted(set(panels)), f"按钮 {sections} 与内容 {panels} 对不上"

@@ -1,5 +1,5 @@
 {
-  "count": 153,
+  "count": 150,
   "controls": [
     {
       "key": "href=/elder",
@@ -632,60 +632,6 @@
       "apis": []
     },
     {
-      "key": "data-section=today",
-      "id": "",
-      "tag": "button",
-      "text": "今天",
-      "source_file": "family.html",
-      "route": "/family",
-      "panel": "",
-      "hidden": false,
-      "surface": "consumer",
-      "shell": "family",
-      "module": "shell",
-      "visibility": "primary",
-      "handler_file": "common.js",
-      "handler": "tryScroll",
-      "interaction_type": "click",
-      "apis": []
-    },
-    {
-      "key": "data-section=todo",
-      "id": "",
-      "tag": "button",
-      "text": "待办",
-      "source_file": "family.html",
-      "route": "/family",
-      "panel": "",
-      "hidden": false,
-      "surface": "consumer",
-      "shell": "family",
-      "module": "shell",
-      "visibility": "primary",
-      "handler_file": "common.js",
-      "handler": "tryScroll",
-      "interaction_type": "click",
-      "apis": []
-    },
-    {
-      "key": "data-section=mine",
-      "id": "",
-      "tag": "button",
-      "text": "我的",
-      "source_file": "family.html",
-      "route": "/family",
-      "panel": "",
-      "hidden": false,
-      "surface": "consumer",
-      "shell": "family",
-      "module": "shell",
-      "visibility": "primary",
-      "handler_file": "common.js",
-      "handler": "tryScroll",
-      "interaction_type": "click",
-      "apis": []
-    },
-    {
       "key": "data-panel=today/summary",
       "id": "",
       "tag": "summary",
@@ -872,7 +818,7 @@
       "apis": []
     },
     {
-      "key": "data-section=today#2",
+      "key": "data-section=today",
       "id": "",
       "tag": "a",
       "text": "今天",
@@ -890,7 +836,7 @@
       "apis": []
     },
     {
-      "key": "data-section=todo#2",
+      "key": "data-section=todo",
       "id": "",
       "tag": "a",
       "text": "待办",
@@ -926,7 +872,7 @@
       "apis": []
     },
     {
-      "key": "data-section=mine#2",
+      "key": "data-section=mine",
       "id": "",
       "tag": "a",
       "text": "我的",

@@ -65,18 +65,27 @@
          灰框，会冻住整页，而且读屏软件读不到。aria-live 让它对读屏可见。 -->
     <p id="familyNotice" class="notice good" role="status" aria-live="polite" hidden></p>
 
-    <!-- 分区是页内的，不换路由：切换零延迟，service worker 外壳、start_url 和
-         六条路由全部不动。当前分区写进 URL 的 hash，刷新后还在原地。 -->
-    <nav class="segmented" aria-label="家人分区">
-      <button type="button" class="seg is-current" data-section="today" aria-current="true">今天</button>
-      <button type="button" class="seg" data-section="todo">待办</button>
-      <!-- 「趋势」搬去了 /care（照护档案里的一格）。不是删除——它读的是
-           /v4/reports/emotion，而 /care 已经有「心情」那一格读同一个端点，
-           两者是同一件事的今天与这一周。搬迁登记在
-           test_control_inventory_is_the_fact_source.py 的 MIGRATIONS 里，
-           而「我的」那一段末尾的「照护档案」链接是通往它的路。 -->
-      <button type="button" class="seg" data-section="mine">我的</button>
-    </nav>
+    <!-- 这里原先有一条顶部 `.segmented`（今天 / 待办 / 我的）。**它退役了，不是被删。**
+         ......................................................................
+         底部四格现在承担同样三个分区的切换（`#today` / `#todo` / `#mine`，
+         带 `seg` + `data-section`，由 `initSections` 维护高亮），于是这一条成了
+         同一组目的地的第二份导航——计划书里叫「双层导航」，一页两条导航条会让
+         「我现在在哪儿」有两个答案。
+
+         三个 `data-section` 键没有消失，它们搬到了底部那三格上；控件清单里
+         `data-section=today/todo/mine` 仍在 family.html。
+
+         ⚠ `/care` 的那条 `.segmented` **不能照做**：它有六个分区
+         （今天/用药/身体/心情/安全/趋势），四格底部导航替代不了它。那是 Module 层，
+         底部四格是 Shell 层——两层各有各的导航才是对的，重复的才要删。
+         照护页的分区改造在 Phase D（Care Overview + Detail）。
+
+         分区仍然是页内的，不换路由：切换零延迟，service worker 外壳、start_url
+         和七条路由全部不动。当前分区写进 URL 的 hash，刷新后还在原地。
+
+         「趋势」早先搬去了 /care（读同一个 /v4/reports/emotion，两者是同一件事的
+         今天与这一周），登记在 test_control_inventory_is_the_fact_source.py 的
+         MIGRATIONS 里；「我的」那一段末尾的「照护档案」链接是通往它的路。 -->
 
     <!-- 今天：这一页存在的理由。打开它的人想知道三件事——他今天怎么样、有没有
          需要我拍板的、今天还有什么。别的都往后排。 -->

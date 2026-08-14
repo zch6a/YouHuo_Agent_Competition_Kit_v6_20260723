@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 153 |
+| 总数 | 150 |
 |---|---|
-| 有 id | 153 |
+| 有 id | 150 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 1 |
@@ -49,9 +49,6 @@
 | `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#refresh` | family | — | button | click | family.js:load | — | consumer | family | shell | secondary |
-| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
-| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
-| `#` | family | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | family | today | summary | details-toggle | common.js:tryScroll | — | consumer | family | today | primary |
 | `#reminderForm` | family | todo | form | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
 | `#reminderTitle` | family | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |

@@ -23,7 +23,7 @@ START pytest_v6
 ........................................................................ [ 91%]
 ........................................................................ [ 96%]
 ...............................................                          [100%]
-1343 passed in 159.78s (0:02:39)
+1343 passed in 234.81s (0:03:54)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
@@ -358,8 +358,8 @@ START browser_javascript_v6
 PASS browser_javascript_v6: 17 file(s)
 PASS speech_text_v6: 34 项朗读文本断言通过
 START page_runtime_v6
-  按到的控件（按页）：/ 0、/elder 49、/family 5、/care 6、/trust 1、/judge 29、/stage 50
-OK page_runtime: 7 个页面加载干净，140 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
+  按到的控件（按页）：/ 0、/elder 49、/family 3、/care 6、/trust 1、/judge 28、/stage 50
+OK page_runtime: 7 个页面加载干净，137 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
 PASS page_runtime_v6
 START arkts_v6
 PASS check_arkts: 18 个 .ets 文件，20 个颜色令牌，已按 SDK 核对 1159 个 kit 符号
@@ -389,7 +389,7 @@ START layout_stability_v6
   ok / 390×844  CLS 0.0000
   ok /elder 1440×900  CLS 0.0033
   ok /elder 390×844  CLS 0.0000
-  ok /family 1440×900  CLS 0.0590
+  ok /family 1440×900  CLS 0.0505
   ok /family 390×844  CLS 0.0000
   ok /care 1440×900  CLS 0.0121
   ok /care 390×844  CLS 0.0000
