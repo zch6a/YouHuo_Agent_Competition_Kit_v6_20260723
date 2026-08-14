@@ -64,7 +64,7 @@ const RECEIPT_STEPS = {
   TASK_CREATED: {
     who: '优活',
     what: '立了一件事，并去查了这个月该交多少',
-    proof: p => `${TASK_WORD[p.task_type] || '一件事'} · ${RISK_WORD[p.risk] || '未标风险'}`
+    proof: p => `${taskWord(p.task_type)} · ${RISK_WORD[p.risk] || '未标风险'}`
       + ` · ${BASIS_WORD[p.semantic_basis] || '照他说的话'}`,
   },
   TEACH_BACK_VERIFIED: {
@@ -120,7 +120,14 @@ const RECEIPT_STEPS = {
     proof: p => NOTIFY_WORD[p.event_type] || '一条通知',
   },
 };
-const TASK_WORD = {bill_payment: '缴费', appointment: '挂号', medication: '用药'};
+//: 任务类型的说法从 `common.js` 拿，不在这里再写一份。
+//:
+//: 这里原先是 `{bill_payment: '缴费', appointment: '挂号', medication: '用药'}`
+//: ——`appointment` 和 `medication` **不是后端的值**（`TaskType` 是
+//: hospital_registration / bill_payment / reminder / form_assistance），
+//: 所以那两个键永远命中不了，而真实的挂号任务在这张凭证上退成「一件事」。
+//: 同样的表在 elder.js / task-space.js / task-detail.js 各有一份，都带着同一个错。
+const taskWord = window.YouHuo.taskWord;
 //: 风险等级的说法**必须和家属端一致**。/family 的 RISK_WORD 已经把 1–4 翻成了
 //: 「信息查询 / 低风险 / 敏感操作 / 高风险」，而这一页原先印的是裸数字「风险级 4」。
 //: 同一件事在两页上有两个名字（一个是词、一个是数），读者要自己做换算。

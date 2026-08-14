@@ -39,10 +39,11 @@ export function viewKindOf(data) {
   return null;
 }
 
-//: 任务类型 → 给人看的名字。和 `elder.js` 的 `TASK_TYPE_WORD`、`trust.js` 的
-//: `TASK_WORD` 是同一张表的第三份——这三份要在 Phase C 收敛到一处。
-//: 现在先各自带着，但**不许**兜底成原始枚举：认不出就说「这件事」。
-const TASK_WORD = {bill_payment: '缴费', appointment: '挂号', medication: '用药'};
+//: 任务类型 → 给人看的名字。**已经收敛到 `common.js`**（上面那句「三份要在
+//: Phase C 收敛到一处」就是这一步）。
+//:
+//: 收敛的时候发现它们不只是重复：这三份里写的 `appointment` / `medication`
+//: 都不是后端的值，所以挂号任务从来没被认出来过，一直显示「这件事」。
 
 /** 完成态那个对勾。内联 SVG，照 `elder.js` 的 `svgIcon()` 那个写法。
  *
@@ -112,7 +113,7 @@ export function taskViewModel(data) {
     // `amount_yuan` / `due_date` / `teach_back_required`，所以第一版按
     // `data.data.task_type` 取永远是空，屏幕上一直显示「这件事」。
     // 那三个字段本来就在 `task.slots` 里，只是没被带进响应——已在 `engine.py` 补上。
-    subject: payload.bill_type || TASK_WORD[payload.task_type] || '这件事',
+    subject: payload.bill_type || window.YouHuo.taskWord(payload.task_type),
     amount: yuan(payload.amount_yuan ?? slots.amount_yuan
       ?? (slots.amount_cents != null ? slots.amount_cents / 100 : null)),
     authority: payload.authority || slots.authority || '',

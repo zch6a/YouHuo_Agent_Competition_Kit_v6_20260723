@@ -197,6 +197,33 @@ Phase C 把 `/family` 顶部那条 `.segmented` 退役之后，这两行之间�
 
 排期：和 Phase D 的照护页文案一起收，那一轮本来就要动后端日报。
 
+## P2 · 只有缴费会在聊天响应里带 task_type，所以挂号在状态行上是「这件事」
+
+实测（打接口，不是猜）：
+
+    「帮我交这个月的水费」 → data.task_type = 'bill_payment'
+    「我想去医院挂个号」   → data.task_type = None   （走完整整四轮都没出现，
+                                                    data 里只有 current_slots / missing）
+    「提醒我明天吃药」     → data.task_type = None
+
+`engine.py:769` 那段把 `task_type` 放进响应 `data` 的代码在**缴费分支里面**。
+于是两个读聊天响应的地方拿不到类型：
+
+    elder.js  状态行  「正在办**这件事**」，而不是「正在办：挂号」
+    task-space.js     主体退成「这件事」
+
+**这一条不是词表的问题。** 四份分叉的任务类型词表已经收敛进 `common.js`
+（它们写的 `appointment` / `medication` 都不是后端的值），而收敛之后这一处
+**照样**是「这件事」——表再正确也拿不到值。读 `/v2/tasks` 的那两处
+（老人端记录详情层、可信中心凭证）确实修好了，那里 `task_type` 是全的。
+
+修法在后端：让 `task_type` 在收集阶段也进 `data`，和 `current_slots` / `missing`
+一起给。那是 `backend/youhuo/engine.py`，一改就让重型报告的源码指纹作废、
+要重跑一整轮百万级验证——所以和别的后端改动一起批，不单独做。
+
+顺带：这大概也解释了那四份词表为什么会写出 `appointment` / `medication` 这种
+后端没有的键——**写表的人没见过真实的值**。
+
 ## 记录：鸿蒙端未编译验证
 
 `harmonyos/` 这一轮同步了 14 个颜色令牌、加了 `Dim.TOUCH_KEY = 56`、修了一个真的低于

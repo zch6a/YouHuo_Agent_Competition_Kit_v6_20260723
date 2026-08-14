@@ -53,12 +53,15 @@ const STATUS_TONE = {
   failed: 'bad',
 };
 
-const TASK_WORD = {
-  bill_payment: '缴费',
-  hospital_registration: '挂号',
-  reminder: '提醒',
-  medication: '用药',
-};
+//: 任务类型的说法**已经收敛到 `common.js`**（上面那段注释说的「第四份」就是它）。
+//:
+//: 这一份原先漏了 `form_assistance`、多了一个后端没有的 `medication`。
+//: 四份表凑齐之后才看清：它们不只是重复，而是各错各的。
+//:
+//: 这里读 `window.YouHuo` 而不是 `import`：`common.js` 是普通脚本、不是 ES module
+//: （`trust.js` / `task-space.js` 也要用它，而把它改成 module 会牵动 SW SHELL 与
+//: 每个页面的 `<script>` 类型）。取值放在函数体里而不是模块顶层——模块的求值时机
+//: 早于普通脚本执行完，在顶层取会拿到 undefined。
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -118,7 +121,7 @@ function subjectWords(task, details) {
   if (type === 'reminder') return details.title || '提醒';
   // 认不出来的类型：用类型词，再不行说「这件事」。**不回退到 `summary`**——
   // 那里面可能带着 `2026-07` 这种原始值，而这一层的定义之一就是不给她看那些。
-  return TASK_WORD[type] || '这件事';
+  return window.YouHuo.taskWord(type);
 }
 
 /** `TaskView` → 这一屏要用的字段。

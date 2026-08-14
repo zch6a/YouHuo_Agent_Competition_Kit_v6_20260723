@@ -102,9 +102,24 @@ def test_unknown_task_type_says_something_human() -> None:
 
     `TASK_WORD[x] || x` 那种写法会把 `bill_payment` 直接印在屏幕上——
     而「界面上不许出现英文枚举值」是这个项目的硬约束。
+
+    **判据搬家了，性质没变。** 这一条原先在这个文件里找
+    `TASK_WORD[...] || '这件事'`，而那张表已经收敛进 `common.js`
+    （四份表里的 `appointment` / `medication` 都不是后端的值，挂号任务从来没被
+    认出来过）。逐项对照：
+
+      旧：本文件里有一行 `TASK_WORD[x] || '这件事'`
+      新：本文件**调用**共享的 `taskWord()`，而兜底与「表里不许有英文/不许发明键」
+          由 `common.js` 和 `test_task_words_cover_the_real_enums.py` 保证——
+          后者拿 `models.py` 的枚举核对，比在一个文件里找一行字符串强
     """
-    assert re.search(r"TASK_WORD\[[^\]]+\]\s*\|\|\s*'这件事'", SOURCE), (
-        "任务类型的兜底不是中文——检查 `TASK_WORD[...] || ...` 那一行"
+    assert re.search(r"window\.YouHuo\.taskWord\(", SOURCE), (
+        "Task Space 不再用共享的 `taskWord()` 了——"
+        "任务类型的说法必须只有一份，否则它会再漂一次"
+    )
+    common = (ROOT / "backend" / "static" / "common.js").read_text(encoding="utf-8")
+    assert re.search(r"TASK_WORD\[[^\]]+\]\s*\|\|\s*'这件事'", common), (
+        "共享的 `taskWord()` 兜底不是「这件事」——检查 common.js"
     )
 
 

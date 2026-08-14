@@ -659,9 +659,80 @@
     show(location.hash.slice(1) || first, false);
   }
 
+  /* ==========================================================================
+     任务词汇：一处定义，四个地方用
+     ..........................................................................
+     这三张表原先在 `elder.js`、`task-space.js`、`task-detail.js`、`trust.js` 里
+     各有一份，而那三处的注释各自写着「这是第三份 / 第四份，要在 Phase C 收敛」。
+     收敛的理由不是整洁，是**它们已经漂了**：
+
+         后端 TaskType（models.py）  hospital_registration / bill_payment
+                                     / reminder / form_assistance
+         三份前端表里写的             appointment / bill_payment / medication
+
+     `appointment` 和 `medication` **不是后端的值**（`engine.py:769` 放进聊天响应
+     `data.task_type` 的就是 `TaskType` 枚举本身），所以那两个键永远命中不了；
+     而三个真实类型里有三个不在表里。实测后果：一件挂号任务在老人端的状态行是
+     「正在办**这件事**」而不是「正在办：**挂号**」——表声称它处理挂号，靠的是
+     一个不会触发的键。
+
+     没有英文泄漏（兜底都是中文），所以它躲过了「界面不许出现枚举值」那道闸门。
+     这类分叉这个项目栽过一次：`family.js` 的 `EMOTION_LABEL` 缺三个值、多三个
+     后端没有的值，把最要紧的 `urgent` 印成了英文。
+
+     放在 `common.js` 而不是新开一个模块：四个调用点里 `trust.js` / `task-space.js`
+     是普通脚本、不是 ES module，改成 module 会牵动 SW SHELL 与 CSP；而 common.js
+     每一页都加载、本来就是共享词汇层（`verdictOf`、`toneOf`、`errorWords` 都在这里）。
+
+     `test_task_words_cover_the_real_enums.py` 拿 `models.py` 核对这三张表，
+     并禁止任何页面再私藏一份。
+     ========================================================================== */
+
+  //: 任务类型 → 给人看的名字。键必须是 `TaskType` 的值。
+  const TASK_WORD = {
+    bill_payment: '缴费',
+    hospital_registration: '挂号',
+    reminder: '提醒',
+    form_assistance: '帮您填表',
+  };
+
+  //: 任务状态 → 给人看的话。键必须是 `TaskStatus` 的值。
+  const STATUS_WORD = {
+    collecting: '还在问清楚',
+    awaiting_elder_confirmation: '等您确认',
+    awaiting_family_approval: '等家人点头',
+    executing: '正在办',
+    completed: '办好了',
+    cancelled: '已经取消',
+    failed: '没办成，已经停下',
+  };
+
+  //: 状态 → 语气。只列需要着色的那几个，其余保持中性——这是有意的，
+  //: 不是漏了：给每一个状态都上色等于没有颜色。
+  const STATUS_TONE = {
+    completed: 'good',
+    failed: 'bad',
+    cancelled: 'warning',
+  };
+
+  /** 任务类型的中文说法。认不出**不许**回落到原始枚举值。
+   *
+   * 兜底成「这件事」而不是把 `form_assistance` 印出去：这一层翻译存在的全部理由
+   * 就是遇到没见过的类型时也不漏内部词，而那正是它最容易失效的时候。
+   */
+  function taskWord(type) {
+    return TASK_WORD[String(type || '')] || '这件事';
+  }
+
+  /** 任务状态的中文说法。同上，认不出说「还在办」。 */
+  function statusWord(status) {
+    return STATUS_WORD[String(status || '')] || '还在办';
+  }
+
   window.YouHuo = {
     ready, login, api, forget, token,
     byId, pretty, VERDICT, verdictOf, renderResult, initSections, once, toneOf,
     errorKind, errorWords,
+    TASK_WORD, STATUS_WORD, STATUS_TONE, taskWord, statusWord,
   };
 })();

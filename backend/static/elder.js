@@ -537,14 +537,25 @@ const CARE_WORD = {
   repeat: '重复上一句',
 };
 
-//: 任务类型 → 一位老人听得懂的说法。状态行用它代替原始任务 ID（见 postChat 里那段）。
-//: 认不出的类型不兜底成原始值——兜底成 `bill_payment` 等于这层翻译在遇到新类型时
-//: 自动失效，而那正是它该起作用的时候。认不出就说「这件事」。
-const TASK_TYPE_WORD = {
-  bill_payment: '缴费',
-  appointment: '挂号',
-  medication: '用药',
-};
+//: 任务类型 → 一位老人听得懂的说法，现在从 `common.js` 拿（`window.YouHuo.TASK_WORD`）。
+//:
+//: 这里原先有一张自己的表，写的是 `{bill_payment, appointment, medication}`——
+//: 而后端 `TaskType` 是 hospital_registration / bill_payment / reminder /
+//: form_assistance。`appointment` 与 `medication` **不是后端的值**，两个键永远
+//: 命中不了。同一张表在 task-space.js / task-detail.js / trust.js 各有一份，
+//: 都带着同一个错，三处注释还各自写着「要在 Phase C 收敛到一处」。
+//:
+//: ⚠ **但这一处的「正在办这件事」并没有因为收敛而修好，别读成已经修好了。**
+//: 实测（打接口，不是猜）：引擎只在**缴费**分支往响应的 `data` 里放 `task_type`
+//: （`engine.py:769`）。挂号走完整整四轮，`data` 里始终只有 `current_slots` 与
+//: `missing`，`task_type` 一次都没出现。所以这一行拿到的是 undefined，
+//: 表再正确也没用——真正的修法在后端。记在 KNOWN_ISSUES 里。
+//:
+//: 收敛真正修好的是读 `/v2/tasks`（TaskView）的那两处：老人端记录的详情层
+//: （task-detail.js）和可信中心的凭证（trust.js）——那里 `task_type` 是全的。
+//:
+//: 兜底仍然是「这件事」，不是原始值：兜底成枚举名等于这层翻译在遇到新类型时
+//: 自动失效，而那正是它该起作用的时候。
 
 const STATE_WORD = {
   collecting: '正在收集信息',
@@ -694,7 +705,10 @@ async function send(text) {
     //
     // 这个缺陷先在 /family 被视觉审查抓到（那边把任务 ID 印在卡片上），
     // 顺着同一条规则建的运行时标识符闸门把这里也点了出来——同一个错，受众更差。
-    const doing = TASK_TYPE_WORD[data.data?.task_type];
+    // `taskWord()` 认不出时给的是「这件事」，而这一行下面本来就有「这件事」那个
+    // 分支，所以这里要的是「认出来了吗」——拿原始值查表，不是拿兜底后的字。
+    const type = data.data?.task_type;
+    const doing = type && window.YouHuo.TASK_WORD[type];
     setStatus(data.task_id
       ? `正在办${doing ? '：' + doing : '这件事'}。您随时可以说「再说一遍」或「取消」。`
       : '办事可留痕；陪伴默认不向家属展示聊天全文。');
