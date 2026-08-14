@@ -745,11 +745,28 @@ class Database:
         with self._lock:
             return int(self._conn.execute("SELECT COUNT(*) FROM audit_events WHERE family_id=?", (family_id,)).fetchone()[0])
 
-    def list_audit(self, family_id: str, limit: int = 200) -> list[AuditEvent]:
+    def list_audit(
+        self, family_id: str, limit: int = 200, entity_id: str | None = None
+    ) -> list[AuditEvent]:
+        """审计事件，按时间正序。给了 `entity_id` 就只取那一件事的。
+
+        为什么需要按事务过滤：可信中心的凭证要的是**一件事的完整链**，而它原先的
+        做法是取最近 200 条再在客户端按 `entity_id` 筛。那两件事不一样——一个家庭
+        用久了，第 201 条之前的事务就再也拼不出完整的链，而页面上看不出来：
+        它会渲染出一份**少了前几步**的凭证，而凭证的全部价值就是「每一步都在」。
+
+        过滤放在 SQL 里而不是取完再筛：limit 要作用在**这一件事的事件**上，
+        不是作用在整个家庭的流水上。
+        """
+        sql = "SELECT * FROM audit_events WHERE family_id=?"
+        params: list[Any] = [family_id]
+        if entity_id is not None:
+            sql += " AND entity_id=?"
+            params.append(entity_id)
+        sql += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
         with self._lock:
-            rows = self._conn.execute(
-                "SELECT * FROM audit_events WHERE family_id=? ORDER BY id DESC LIMIT ?", (family_id, limit)
-            ).fetchall()
+            rows = self._conn.execute(sql, tuple(params)).fetchall()
         rows = list(reversed(rows))
         return [self._row_to_audit(row) for row in rows]
 

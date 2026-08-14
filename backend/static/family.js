@@ -434,13 +434,29 @@ function renderConclusion() {
     verdictEl.textContent = sentence;
     verdictEl.className = `fam-verdict ${tone}`.trim();
   }
-  // 结论下面一行是后端那句完整判断，原样放。
-  // 结论只说"是什么"，依据在这里：「今天和他平常不太一样：起床比平常晚了 96 分钟。」
+  // 结论下面一行放**依据**，不是再说一遍结论。
+  //
+  // 这里原先放的是整句 `report.headline`，而 <h1> 已经用一句短的说了结论
+  // （短句是有意的：完整 headline 最长 38 字，390px 上按 26px 排是四行、吃掉
+  // 四分之一首屏，而「需要您确认」必须留在第一屏）。后果是屏幕上同一句话说两遍：
+  //
+  //     H1     今天该有的记录还没出现
+  //     紧接着 今天该有的记录还没出现（外出：今天还没有有效记录），建议打个电话问一声。
+  //
+  // 每个状态都在复述，`unknown` 那一条**逐字**相同，而演示数据正好停在那个状态。
+  //
+  // 修法不在这里截字符串——那是对一个结构化句子做字符串手术，措辞一变就错。
+  // 后端这一轮开始同时给 `headline_detail`（只有依据的那半句），这里取它。
+  // 老响应没有这个字段时退回整句：不能因为字段缺失就让这一行消失。
   if (!headlineEl) return;
-  if (report && report.headline) {
-    headlineEl.textContent = report.headline;
+  const detail = report
+    && (report.headline_detail !== undefined ? report.headline_detail : report.headline);
+  if (detail) {
+    headlineEl.textContent = detail;
     headlineEl.hidden = false;
   } else {
+    // 空字符串是**有意义的**：结论本身就是全部（「今天和他平常差不多。」），
+    // 没有额外的依据可说，那就不画这一行，而不是画一行空的。
     headlineEl.hidden = true;
   }
 }

@@ -489,12 +489,26 @@ def create_app(
     def list_audit(
         actor: AuthContext = Depends(current_actor),
         limit: int = Query(default=200, ge=1, le=2000),
+        entity_id: str | None = Query(default=None, max_length=128),
     ) -> dict[str, Any]:
+        """完整办事审计。给了 `entity_id` 就只回那一件事的链。
+
+        `entity_id` 是**加法**：不给就和以前完全一样。加它的理由是可信中心那份凭证
+        ——它要的是一件事的完整链，而原先只能「取最近 200 条再在客户端筛」。
+        一个家庭用久了，第 201 条之前的事务就再也拼不出完整的链，而页面看不出来：
+        它会渲染一份**少了前几步**的凭证，而凭证的全部价值就是「每一步都在」。
+
+        权限一行没动：仍然只对绑定家属开放，过滤发生在 `family_id` 之内，
+        所以它不可能变成一条跨家庭读取的路。
+        """
         if actor.role != ActorRole.FAMILY:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="完整办事审计仅向绑定家属开放。")
+        events = db.list_audit(actor.family_id, limit=limit, entity_id=entity_id)
         return {
+            # 链自校验始终针对**整条**家庭链，不是过滤后的子集：一条被截出来的
+            # 子序列里 `prev_hash` 本来就接不上，拿它做自校验会永远报「链断了」。
             "chain_valid": db.verify_audit_chain(actor.family_id),
-            "events": [event.model_dump(mode="json") for event in db.list_audit(actor.family_id, limit=limit)],
+            "events": [event.model_dump(mode="json") for event in events],
         }
 
     @app.get("/v2/elder/activity", response_model=list[ElderActivityEntry])

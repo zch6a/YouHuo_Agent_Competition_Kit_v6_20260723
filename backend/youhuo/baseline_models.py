@@ -113,6 +113,18 @@ class BaselineSnapshot(StrictModel):
     day: date
     overall: Verdict
     headline: str
+    #: `headline` 里**只有依据**的那半句；结论那半句由页头自己说。
+    #:
+    #: 家人端的页头已经用一句短的说了结论（完整 headline 最长 38 字，在 390px 上
+    #: 排四行、吃掉四分之一首屏），然后紧接着又把整句原样放在下面一行，于是屏幕上
+    #: 是同一句话说两遍——`unknown` 那一条**逐字**相同。分成两半之后，页头取结论、
+    #: 下面一行取这个。
+    #:
+    #: 空字符串表示「结论本身就是全部，没有额外的依据」（例如「今天和他平常
+    #: 差不多。」），这时前端**不画**那一行，而不是画一行空的。
+    #:
+    #: `headline` 一个字没改：推送和 /care 用的是它。这是加法。
+    headline_detail: str = ""
     baselines: list[ChannelBaselineView]
     deviations: list[ChannelDeviationView]
     #: 观测窗口内的天数。少于阈值时全部通道都是 unknown，这里说明还差多少。
@@ -190,6 +202,18 @@ class DailyReport(StrictModel):
     generated_at: datetime
     overall: Verdict
     headline: str
+    #: `headline` 里**只有依据**的那半句；结论那半句由页头自己说。
+    #:
+    #: 家人端的页头已经用一句短的说了结论（完整 headline 最长 38 字，在 390px 上
+    #: 排四行、吃掉四分之一首屏），然后紧接着又把整句原样放在下面一行，于是屏幕上
+    #: 是同一句话说两遍——`unknown` 那一条**逐字**相同。分成两半之后，页头取结论、
+    #: 下面一行取这个。
+    #:
+    #: 空字符串表示「结论本身就是全部，没有额外的依据」（例如「今天和他平常
+    #: 差不多。」），这时前端**不画**那一行，而不是画一行空的。
+    #:
+    #: `headline` 一个字没改：推送和 /care 用的是它。这是加法。
+    headline_detail: str = ""
     #: 与常态对比的分项。
     sections: list[ReportSection]
     errands: ErrandDigest

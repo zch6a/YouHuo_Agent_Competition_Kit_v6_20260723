@@ -211,11 +211,26 @@ async function renderReceipt() {
   // 这一页只读，永远不是「刚刚亲手办的」。
   let taskId = null;
 
-  const bills = (await api('/v2/tasks?limit=100', {}, 'family'))
-    .filter(t => t.task_type === 'bill_payment');
+  const tasks = await api('/v2/tasks?limit=100', {}, 'family');
+
+  // 想看**哪一件**：URL 说了算，没说就取最近的一件。
+  //
+  // 这一页原先没有任何按 id 进来的入口（无 URL 参数、无 body 属性），所以从家人端
+  // 的一条任务点不进它对应的那张凭证——「看这一次的经过」只能看最近那一次。
+  // 用 hash 而不是 query：`?task=` 会让 service worker 的 `start_url` 与缓存键
+  // 多出一个维度，而 hash 不参与请求。
+  const wanted = (location.hash.match(/(?:^|[#&])task=([\w:-]+)/) || [])[1];
+
+  // **不再按 `task_type === 'bill_payment'` 硬过滤。**
+  //
+  // 那条过滤让挂号和用药永远出不了凭证——而这一页要证明的「每一步都留下记录」
+  // 对它们同样成立，甚至更需要：一次挂号的经过比一次缴费更难自己回想。
+  // 过滤改成「链上真的有这件事」，那才是能不能出凭证的真实条件。
+  const byRecent = [...tasks].sort(
+    (a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
   // 最近的一件——不挑状态。一件"未成功，已安全停下"的任务同样是这一页要证明的
   // 事情之一（只有权威状态回报成功才算办好），把它藏起来才是不诚实。
-  const recent = bills.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+  const recent = (wanted && tasks.find(t => t.id === wanted)) || byRecent[0];
 
   if (!recent) {
     // 没有就说没有。
@@ -243,21 +258,44 @@ async function renderReceipt() {
   }
   taskId = recent.id;
 
-  const audit = await api(`/v2/audit?limit=200`, {}, 'family');
-  const mine = (audit.events || []).filter(e => e.entity_id === taskId);
+  // 只要这一件事的链，让**服务端**去筛。
+  //
+  // 原先是 `/v2/audit?limit=200` 再在客户端按 `entity_id` 过滤。那两件事不一样：
+  // 一个家庭用久了，第 201 条之前的事务就再也拼不出完整的链——而页面上看不出来，
+  // 它会渲染出一份**少了前几步**的凭证，而凭证的全部价值就是「每一步都在」。
+  // `entity_id` 这个参数是这一轮加的（`api.py::list_audit`），limit 因此作用在
+  // 这一件事的事件上，不是整个家庭的流水上。
+  const audit = await api(
+    `/v2/audit?limit=200&entity_id=${encodeURIComponent(taskId)}`, {}, 'family');
+  const mine = audit.events || [];
   if (!mine.length) throw new Error('审计链里找不到这件任务');
 
-  const tasks = await api('/v2/tasks?limit=100', {}, 'family');
-  const task = tasks.find(t => t.id === taskId) || recent || {};
+  const task = recent;
   const amount = (task.details && task.details.amount_yuan) || '';
 
   host.replaceChildren();
 
   // --- 抬头 ---
+  //
+  // 抬头两行原先写死成「缴费凭证」和「水费 ${amount}元」。那在只认 bill_payment
+  // 的时候还说得过去；现在挂号和提醒也能出凭证，写死就会给一次挂号盖上「缴费凭证」
+  // 的头、再印一个空的金额。
+  //
+  // 所以这两行按类型算：眉题是「<类型>凭证」，主值是**这一类事最要紧的那个数**
+  // ——缴费是金额，挂号是「医院 · 科室」，提醒是它的标题。取不到就不硬凑一个，
+  // 退回 `summary`（后端给的整句），再不行才是类型词。
   const head = el('header', 'receipt-head');
   const left = el('div');
-  left.appendChild(el('p', 'receipt-eyebrow', '缴费凭证'));
-  left.appendChild(el('h3', 'receipt-title', task.summary || `水费 ${amount}元`));
+  const typeWord = window.YouHuo.taskWord(task.task_type);
+  const details = task.details || {};
+  const primary = amount
+    ? `${details.bill_type || typeWord} ${amount}元`
+    : ([details.hospital, details.department].filter(Boolean).join(' · ')
+       || details.title
+       || task.summary
+       || typeWord);
+  left.appendChild(el('p', 'receipt-eyebrow', `${typeWord}凭证`));
+  left.appendChild(el('h3', 'receipt-title', primary));
   head.appendChild(left);
   const done = task.status === 'completed';
   head.appendChild(el('span', `pill ${done ? 'good' : 'bad'}`, done ? '已办好' : '未完成'));

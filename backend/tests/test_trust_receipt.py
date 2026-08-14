@@ -44,7 +44,16 @@ def test_the_receipt_reads_the_audit_chain_rather_than_a_canned_example():
     """
     js = _trust_js()
     assert "/v2/audit" in js, "凭证没有读审计链"
-    assert "entity_id === taskId" in js, "凭证没有按任务筛选审计事件，会把整条链都画出来"
+    # 「只画这一件事的链」这条性质**还在，保证它的地方换了**。
+    #
+    # 旧断言找的是客户端过滤 `entity_id === taskId`。那种做法是「取最近 200 条再
+    # 自己筛」——一个家庭用久了，第 201 条之前的事务就再也拼不出完整的链，而页面
+    # 看不出来：它会渲染一份少了前几步的凭证。所以筛选移到了服务端
+    # （`api.py::list_audit` 这一轮新增的 `entity_id` 参数），limit 因此作用在
+    # 这一件事的事件上，而不是整个家庭的流水上——比旧写法强，不是弱。
+    assert "entity_id=" in js, (
+        "凭证没有按任务向服务端要链，会把整条家庭流水都画出来"
+    )
     assert "chain_valid" in js, "凭证没有展示链自校验的结果——那正是它可信的理由"
 
 

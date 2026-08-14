@@ -158,11 +158,14 @@ class BaselineAnalyzer:
         overall = overall_verdict(raw_deviations)
         observed_days = len({o.day for o in observations if o.day < today})
         established = any(b.established for b in baselines)
+        headline, headline_detail = cls._headline_parts(
+            overall, raw_deviations, established, observed_days)
         return BaselineSnapshot(
             elder_id=elder_id,
             day=today,
             overall=overall,
-            headline=cls._headline(overall, raw_deviations, established, observed_days),
+            headline=headline,
+            headline_detail=headline_detail,
             baselines=baselines,
             deviations=deviations,
             observed_days=observed_days,
@@ -205,33 +208,65 @@ class BaselineAnalyzer:
         return f"{value:.0f} 次"
 
     @staticmethod
-    def _headline(
+    def _headline_parts(
         overall: Verdict,
         deviations: list[ChannelDeviation],
         established: bool,
         observed_days: int,
-    ) -> str:
+    ) -> tuple[str, str]:
+        """→ `(整句, 只有依据的那半句)`。
+
+        为什么要分成两半：家人端的页头**已经**用一句短的说了结论
+        （`family.js` 的 `VERDICT_SENTENCE`，因为完整 headline 最长 38 字，在 390px
+        上按 26px 排是四行、吃掉四分之一首屏，而「需要您确认」必须留在第一屏），
+        然后紧接着又把整句 headline 原样放在下面一行。于是屏幕上是：
+
+            H1     今天该有的记录还没出现
+            紧接着 今天该有的记录还没出现（外出：今天还没有有效记录），建议打个电话问一声。
+
+        每个状态都在复述，`unknown` 这一条**逐字**相同，所以看起来最像 bug；
+        而演示数据正好停在这个状态，也就是评委看到的第一屏。
+
+        修法不是在前端截字符串——那是对一个结构化句子做字符串手术，措辞一变就错。
+        由**产出这句话的地方**同时给出「结论」和「依据」，前端各取所需。
+
+        `headline` 一个字没改：推送和 `/care` 用的是它。这是加法。
+        """
         if not established:
             return (
                 f"还在熟悉他的生活规律（已记录 {observed_days} 天）。"
-                "在攒够之前，不会拿别人的标准来评价他。"
+                "在攒够之前，不会拿别人的标准来评价他。",
+                f"已记录 {observed_days} 天。在攒够之前，不会拿别人的标准来评价他。",
             )
         if overall is Verdict.PENDING:
-            return "今天还没过完，还不到下结论的时候。"
+            # 结论本身就是全部，没有额外的依据可说。空字符串让前端不画那一行，
+            # 而不是画一行空的。
+            return "今天还没过完，还不到下结论的时候。", ""
         if overall is Verdict.UNKNOWN:
             # 这句话现在有分量了：本该有记录却一条都没有。
             missing = [d.parenthetical for d in deviations if d.verdict is Verdict.UNKNOWN]
             lead = f"（{missing[0]}）" if missing else ""
-            return f"今天该有的记录还没出现{lead}，建议打个电话问一声。"
+            detail = f"{missing[0]}。建议打个电话问一声。" if missing else "建议打个电话问一声。"
+            return f"今天该有的记录还没出现{lead}，建议打个电话问一声。", detail
         if overall is Verdict.TYPICAL:
-            return "今天和他平常差不多。"
+            return "今天和他平常差不多。", ""
         worst = [d for d in deviations if d.verdict in (Verdict.MARKED, Verdict.NOTICE)]
         worst.sort(key=lambda d: -(d.sigma or 0.0))
         # `.inline` 而不是 `.explanation`：后者自带「起床：」那个冒号，接在
         # `{prefix}：` 后面就成了一句话两个冒号。
         lead = worst[0].inline if worst else ""
         prefix = "今天和他平常不太一样" if overall is Verdict.MARKED else "今天有一点和平常不同"
-        return f"{prefix}：{lead}"
+        return f"{prefix}：{lead}", lead
+
+    @classmethod
+    def _headline(
+        cls,
+        overall: Verdict,
+        deviations: list[ChannelDeviation],
+        established: bool,
+        observed_days: int,
+    ) -> str:
+        return cls._headline_parts(overall, deviations, established, observed_days)[0]
 
 
 # --- ① 环境感知 -------------------------------------------------------------
@@ -462,6 +497,7 @@ class DailyReportBuilder:
             generated_at=generated_at,
             overall=snapshot.overall,
             headline=snapshot.headline,
+            headline_detail=snapshot.headline_detail,
             sections=sections,
             errands=ErrandDigest(
                 due_today=errands.due_today,

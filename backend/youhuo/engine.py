@@ -1786,6 +1786,29 @@ class YouHuoEngine:
         if (data or {}).get("care_intent") != care_voice.CareIntent.REPEAT.value:
             with self._lock:
                 _remember(self._last_spoken, session.session_id, message)
+
+        # 有任务就带上它的类型——**在这里一次，不在每个分支各补一遍**。
+        #
+        # 原先只有缴费那一个分支往 `data` 里放 `task_type`（见 `_process_bill` 里
+        # 那段注释：「后端给的字段比屏幕上要说的话薄」）。实测（打接口，不是猜）：
+        #
+        #     「帮我交这个月的水费」 → data.task_type = 'bill_payment'
+        #     「我想去医院挂个号」   → data.task_type = None（走完四轮都没出现）
+        #     「提醒我明天吃药」     → data.task_type = None
+        #
+        # 后果是老人端状态行说「正在办**这件事**」而不是「正在办：挂号」，
+        # Task Space 的主体同样退成「这件事」。前端为此在四个文件里各写了一张
+        # 任务类型词表，其中三张还写了 `appointment` / `medication` 这种后端没有的
+        # 键——**写表的人没见过真实的值**。
+        #
+        # 补在 `_response()` 而不是补那两个分支：缺口本来就是「一个分支记得、
+        # 别的分支忘了」造成的，再补两处只是把同一个陷阱留给第四个分支。
+        # 这里不覆盖调用方已经给的值（缴费分支自己填的那个和这里算的一样，
+        # 但显式优先仍然是对的规矩）。
+        payload = dict(data or {})
+        if task is not None:
+            payload.setdefault("task_type", task.task_type.value)
+
         return ChatResponse(
             code=code,
             message=message,
@@ -1795,7 +1818,7 @@ class YouHuoEngine:
             risk_level=task.risk_level if task else None,
             approval_digest=task.approval_digest if task else None,
             ui=ui or {"theme": "orange" if session.mode == Mode.COMPANION else "blue", "speak": True},
-            data=data or {},
+            data=payload,
         )
 
 
