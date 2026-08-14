@@ -310,6 +310,104 @@ class V4FeatureStore:
                  "community", "phone", "***-***-8899", 3, 1),
             )
 
+    def seed_demo_content(self, suffix: str = "demo") -> None:
+        """给演示家庭补上「身体」与「心情」两段的内容。
+
+        ## 为什么单独一个函数，而不是并进 `seed_demo()`
+
+        `seed_demo()` 是**无条件**调用的（`api.py::visitor_sandbox`），它种的是安全
+        策略和一位社区网格员——那是**配置**，真实部署也需要。而下面这些是**演示
+        历史**，真实用户不该被塞。所以分开，由调用方挂在 `seed_history` 开关上，
+        和作息回填、提醒、缴费剧本同一个位置、同一个开关。
+
+        ## 实测的缺口（打接口，不是猜）
+
+        照护页六段里三段没有内容：
+
+            身体  /v4/health/events/{id}   → 0 条
+            心情  /v4/reports/emotion/{id} → event_count=0
+            安全  联系人档案                → 0 条（策略是有的）
+
+        原因不是数据落在窗口外——`list_health_events` 根本没有时间窗（最近 500 条）。
+        是这两张表**从来没被种过**。
+
+        ## 上一次尝试是怎么死的，以及为什么这一次不同
+
+        KNOWN_ISSUES 记着：上一个 agent 做这件事时，**它自己写的测试报「情绪趋势是
+        编造出来的上升」**——它死在自己的变异测试上，那批改动整段回退。
+
+        所以这里的情绪序列是**稳定**的，不是一个好转故事：七天里六天平静、一天孤单。
+        趋势应当报 `stable`，因为他这一周确实没什么变化。**演示数据可以有内容，
+        但不能替产品把结论编出来**——一个"情绪逐日改善"的曲线正是这个产品最不该
+        伪造的东西。
+
+        那条 KNOWN_ISSUES 还警告过一个陷阱：合成回填写 `activity_events_v4`，
+        而无交互预警取那张表的 `MAX(occurred_at)`，默认打开会让合成数据悄悄改掉
+        真实功能的输入。**这里一行都不碰那张表**——身体、心情是另外两张表，
+        那个陷阱不适用（查过：`health_events_v4`、`emotion_events` 没有别的功能在读
+        它们的 `MAX`）。
+
+        时间戳一律**锚在今天往前**，一条都不落在未来：那正是上面那条警告的另一半。
+        """
+        from .database import DemoIdentities
+
+        ids = DemoIdentities.for_suffix(suffix)
+        today = utcnow().replace(hour=9, minute=0, second=0, microsecond=0)
+
+        #: 身体：三条，都在过去。一次体检、一次门诊、一条记录。
+        health = [
+            (7, "checkup", "社区体检：血压 138/86",
+             {"systolic": 138, "diastolic": 86, "note": "比上次略高，医生说先观察"}),
+            (3, "visit", "心内科复诊",
+             {"department": "心内科", "advice": "继续吃降压药，两周后复查"}),
+            (1, "note", "早晨量了血压：132/84", {"systolic": 132, "diastolic": 84}),
+        ]
+        #: 心情：七天。**六天平静、一天孤单**——稳定，不是好转曲线。
+        #: 那一天的孤单也不编成事件：它就是一天，没有下文。
+        mood = [
+            (6, "calm"), (5, "calm"), (4, "lonely"), (3, "calm"),
+            (2, "calm"), (1, "calm"), (0, "calm"),
+        ]
+
+        with self.db.transaction() as conn:
+            for days_ago, kind, title, payload in health:
+                when = today - timedelta(days=days_ago)
+                conn.execute(
+                    """INSERT OR IGNORE INTO health_events_v4(
+                        id,family_id,elder_id,kind,title,event_at,payload_json,source,scope,created_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (f"health-seed-{suffix}-{days_ago}", ids.family_id, ids.elder_id,
+                     kind, title, iso(when), canonical_json(payload),
+                     "demo_seed", ShareScope.FAMILY_SUMMARY.value, iso(when)),
+                )
+            for days_ago, label in mood:
+                when = today - timedelta(days=days_ago, hours=2)
+                # `privacy_safe_note` 逐字抄自真实分析器的 `safe_note_map`
+                # （`v4_services.py:210-217`）。**不是随便写一句**：照护页把这个字段
+                # 汇总成「可以试试」那一栏。第一版我往里塞了「只记类别与强度，
+                # 不记原文。」——一句隐私声明，于是屏幕上「可以试试：」下面挂着
+                # 一句根本不是建议的话。看图才发现。
+                #
+                # 这和 `attempts` 那次是同一条：**演示数据的形状必须和真实引擎一样**，
+                # 而「形状」不只是字段在不在，还包括字段里装的是哪一类内容。
+                note = ("未检测到明显情绪风险信号。" if label == "calm"
+                        else "本周出现孤独感表达，建议增加温和联系。")
+                # `text_digest` 是**摘要**不是原文：这一页的隐私边界写着
+                # 「日报不包含无忧伴陪伴聊天的任何原文」，种子当然也不能破例。
+                conn.execute(
+                    """INSERT OR IGNORE INTO emotion_events(
+                        id,family_id,elder_id,label,valence,arousal,distress,confidence,
+                        source,text_digest,privacy_safe_note,created_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (f"emotion-seed-{suffix}-{days_ago}", ids.family_id, ids.elder_id,
+                     label,
+                     0.1 if label == "calm" else -0.3,
+                     0.2, 0.1 if label == "calm" else 0.35, 0.8,
+                     "companion",
+                     hashlib.sha256(f"seed-{suffix}-{days_ago}".encode()).hexdigest(),
+                     note, iso(when)),
+                )
+
     # ----- authorization helpers -----
     def ensure_elder(self, family_id: str, elder_id: str) -> None:
         if not self.db.actor_in_family(elder_id, family_id, ActorRole.ELDER.value):
@@ -523,7 +621,21 @@ class V4FeatureStore:
             trend = "distress_decreasing"
         else:
             trend = "stable_or_insufficient"
-        notes = sorted({event.privacy_safe_note for event in events})
+        # 「可以试试」那一栏只收**真的在建议做点什么**的那几句。
+        #
+        # `privacy_safe_note` 是按情绪标签给的一句话，而 `calm` 那一句是
+        # 「未检测到明显情绪风险信号。」——一句**陈述**。它混进来之后，照护页的
+        # 「可以试试：」下面就挂着一条根本不是建议的话。
+        #
+        # 这个缺陷一直在，只是那一段此前是空的、没人看得见（演示家庭没有情绪记录）。
+        # 补上种子之后它立刻显形——**空态掩盖的不只是布局**。
+        #
+        # 判据是「这句话里有没有『建议』」，而不是把 calm 那句写进黑名单：
+        # 黑名单会在下一次有人加一个新标签、又忘了同步的时候静默失效。
+        notes = sorted({
+            event.privacy_safe_note for event in events
+            if "建议" in event.privacy_safe_note
+        })
         summary = {
             "event_count": len(events), "label_counts": labels, "average_distress": round(avg_distress, 3),
             "trend": trend, "safe_suggestions": notes[:4],

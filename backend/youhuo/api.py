@@ -370,6 +370,11 @@ def create_app(
             baseline_store.seed_demo_for(suffix)
             db.seed_demo_reminders(ids)
             db.seed_demo_scenario(ids, "completed_bill_payment")
+            # 照护页的「身体」与「心情」两段实测是空的（0 条 / event_count=0）。
+            # 它们和上面三样一样是**演示历史**，所以挂在同一个开关上：真实部署
+            # 不受影响。`v4_store.seed_demo()` 那个是无条件调用的，因为它种的是
+            # 安全策略——那是配置，不是历史。
+            v4_store.seed_demo_content(suffix)
         elder_token, elder, expires_at = engine.demo_login(ids.elder_id)
         family_token, _, _ = engine.demo_login(ids.daughter_id)
         return VisitorSandboxResponse(
