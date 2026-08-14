@@ -44,6 +44,39 @@ ROOT = Path(__file__).resolve().parents[2]
 #: 因为演示机比这台机器慢，慢机器上位移只会更明显。
 BUDGET = 0.10
 
+#: 每一格量几次，取最坏的那一次。
+#:
+#: 单次采样这道闸门**同时会漏和会误报**，2026-08-14 实测到同一份代码在连续几次
+#: 运行里给出不同判决：
+#:
+#:     /family 390×844   一次 0.2613（源是 1370ms 的 nav.segmented），另外三次 0.0000
+#:     /care   1440×900  同一条位移的时间戳在两次运行里是 524ms 和 327ms
+#:
+#: 那一天 `/care` 那条 **0.3687 的真回归**（我删掉一条 CSS 规则造成的）差一点被当成
+#: 抖动放过；而干净的代码也报过一次红，逼人去查一个不存在的缺陷。
+#:
+#: **不靠调阈值解决**——调高会漏真回归，调低会更常误报，那只是选择要哪一种错。
+#: 位移由异步内容的到达时机决定，同一份代码的分布本来就有尾巴，所以判据取三次里
+#: 最坏的一次：任何一次超预算都算超。
+#:
+#: **它不保证抓到罕见的尖峰，这一点要说清楚。** 那条 0.2613 在后来的三次采样里
+#: 一次都没再现（`/family 390×844` 三次全 0.0000）。三次只是把抓到尾部事件的机会
+#: 提高，不是把它变成必然。真正让这件事可管理的是下面那行**把每次采样都印出来**：
+#: 一格里出现 0.0000 与 0.09 并存时，人看得见「这一格快要不稳」，
+#: 而只印一个最大值会把那件事藏起来。
+#:
+#: **怎么读那三个数**（变异证明时才发现这一点，写下来给下一个人）：
+#:
+#:     [0.3687 0.3687 0.3687]   三次一样 → 确定性回归，代码真的坏了
+#:     [0.0000 0.2613 0.0000]   只有一次高 → 抖动，先重跑，别急着改布局
+#:     [0.0505 0.0648 0.0505]   小幅摆动 → 这一格靠近边界了，值得留意
+#:
+#: 一个最大值分不出前两种，而它们该做的事完全相反。
+#:
+#: 代价是这道闸门的时间乘以三（实测 312s）。那是买「结论可信」的价钱，
+#: 而一道结论不可信的闸门在做大改动时比没有闸门更糟：它会让人相信一个错的答案。
+RUNS = 3
+
 #: 桌面必测：这两个缺陷只在桌面显形。手机一起测，防止修桌面把手机弄坏。
 VIEWPORTS = [(1440, 900), (390, 844)]
 ROUTES = ["/", "/elder", "/family", "/care", "/trust", "/judge", "/stage"]
@@ -174,23 +207,42 @@ def main() -> int:
             for width, height in VIEWPORTS:
                 call("Emulation.setDeviceMetricsOverride", session, width=width, height=height,
                      deviceScaleFactor=1, mobile=width < 761)
-                call("Page.navigate", session, url=f"{base}{route}")
-                time.sleep(7)
-                raw = call("Runtime.evaluate", session, returnByValue=True, expression=(
-                    "JSON.stringify({cls: +window.__cls.toFixed(4),"
-                    " shifts: window.__shifts, ready: document.readyState})"
-                ))["result"]["value"]
-                data = json.loads(raw)
-                measured += 1
-                score = data["cls"]
                 label = f"{route} {width}×{height}"
+
+                # 同一格量 RUNS 次，取**最坏**的那一次。见 `RUNS` 的说明。
+                samples: list[float] = []
+                worst_data: dict | None = None
+                for _ in range(RUNS):
+                    # 每一轮都重新导航：CLS 是**载入期**指标，
+                    # 不重新载入就只是把同一个数读第二遍。
+                    call("Page.navigate", session, url="about:blank")
+                    time.sleep(0.3)
+                    call("Page.navigate", session, url=f"{base}{route}")
+                    time.sleep(7)
+                    raw = call("Runtime.evaluate", session, returnByValue=True, expression=(
+                        "JSON.stringify({cls: +window.__cls.toFixed(4),"
+                        " shifts: window.__shifts, ready: document.readyState})"
+                    ))["result"]["value"]
+                    data = json.loads(raw)
+                    samples.append(data["cls"])
+                    if worst_data is None or data["cls"] > worst_data["cls"]:
+                        worst_data = data
+
+                measured += 1
+                score = max(samples)
+                spread = f"[{' '.join(f'{s:.4f}' for s in samples)}]"
                 if score > BUDGET:
-                    worst = sorted(data["shifts"], key=lambda s: -s["v"])[:2]
+                    worst = sorted(worst_data["shifts"], key=lambda s: -s["v"])[:2]
                     detail = "；".join(
                         f"{s['v']} @{s['t']}ms {'/'.join(s['who'])}" for s in worst)
-                    failures.append(f"{label} CLS {score:.4f} > {BUDGET}  —  {detail}")
+                    failures.append(
+                        f"{label} CLS {score:.4f} > {BUDGET}  {spread}  —  {detail}")
                 else:
-                    print(f"  ok {label}  CLS {score:.4f}")
+                    # 每一次的采样值都印出来，**让抖动本身可见**。
+                    # 一格里出现 0.0000 与 0.09 并存，是「这一格快要不稳」的预警，
+                    # 而只印一个最大值会把那件事藏起来。
+                    jitter = "" if max(samples) - min(samples) < 0.01 else "  ← 抖"
+                    print(f"  ok {label}  CLS {score:.4f} {spread}{jitter}")
     finally:
         browser.terminate()
         server.terminate()

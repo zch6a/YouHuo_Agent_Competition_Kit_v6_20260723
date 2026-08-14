@@ -24,7 +24,7 @@ START pytest_v6
 ........................................................................ [ 94%]
 ........................................................................ [ 99%]
 ...                                                                      [100%]
-1371 passed in 134.33s (0:02:14)
+1371 passed in 133.24s (0:02:13)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
@@ -386,20 +386,20 @@ START focus_geometry_v6
 OK focus_geometry: 5 个视口 × 3 个 Case（无卡/正常卡/最大卡）= 15 组，七条几何约束全过；对话区可见、输入行与发送键够得到、没有块被裁掉
 PASS focus_geometry_v6
 START layout_stability_v6
-  ok / 1440×900  CLS 0.0000
-  ok / 390×844  CLS 0.0000
-  ok /elder 1440×900  CLS 0.0033
-  ok /elder 390×844  CLS 0.0000
-  ok /family 1440×900  CLS 0.0505
-  ok /family 390×844  CLS 0.0000
-  ok /care 1440×900  CLS 0.0322
-  ok /care 390×844  CLS 0.0000
-  ok /trust 1440×900  CLS 0.0239
-  ok /trust 390×844  CLS 0.0000
-  ok /judge 1440×900  CLS 0.0000
-  ok /judge 390×844  CLS 0.0000
-  ok /stage 1440×900  CLS 0.0170
-  ok /stage 390×844  CLS 0.0000
+  ok / 1440×900  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok / 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /elder 1440×900  CLS 0.0033 [0.0033 0.0033 0.0033]
+  ok /elder 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /family 1440×900  CLS 0.0505 [0.0505 0.0505 0.0505]
+  ok /family 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /care 1440×900  CLS 0.0121 [0.0121 0.0121 0.0121]
+  ok /care 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /trust 1440×900  CLS 0.0239 [0.0239 0.0239 0.0239]
+  ok /trust 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /judge 1440×900  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /judge 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
+  ok /stage 1440×900  CLS 0.0170 [0.0170 0.0170 0.0170]
+  ok /stage 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
 PASS layout_stability: 14 组（7 路由 × 2 视口）载入期 CLS 全部 < 0.1
 PASS layout_stability_v6
 START exits_v6
