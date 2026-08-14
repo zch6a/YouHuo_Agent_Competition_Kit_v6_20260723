@@ -486,6 +486,59 @@ def check_accessibility(tab: "CDP", page: str, failures: list[str]) -> None:
             failures.append(f"{page}  无障碍/{kind}：{item}")
 
 
+#: 可见正文里不许出现的 JS 裸值。四个是同一类事故的不同形状。
+RAW_VALUE_PROBE = r"""JSON.stringify((() => {
+  const BAD = ['undefined', 'NaN', '[object Object]', 'null'];
+  const hits = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const text = (n.nodeValue || '').trim();
+    if (!text) continue;
+    // 只看**画出来**的：藏起来的分区里没人读得到，而且那里常有占位符。
+    const host = n.parentElement;
+    if (!host || !host.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) continue;
+    for (const bad of BAD) {
+      // 词边界：`nullify`、`undefinedness` 不算。中文前后本来没有空格，
+      // 所以判断的是"前后不是英文字母"。
+      const re = new RegExp('(^|[^A-Za-z])' + bad.replace(/[[\]]/g, '\\$&') + '([^A-Za-z]|$)');
+      if (re.test(text)) {
+        hits.push({bad, where: host.tagName.toLowerCase()
+          + (host.id ? '#' + host.id : '')
+          + (host.className ? '.' + String(host.className).split(/\s+/)[0] : ''),
+          text: text.slice(0, 110)});
+        break;
+      }
+    }
+  }
+  return hits;
+})())"""
+
+
+def check_no_raw_js_values(tab: "CDP", page: str, failures: list[str]) -> None:
+    """渲染出来的中文正文里不许出现 `undefined` / `NaN` / `[object Object]` / `null`。
+
+    这条判据是被一次真实的事故换来的：可信中心的凭证正文里印着
+    「系统等的是 68.40，听到的是 68.40，第 **undefined** 次通过」。
+    原因是 `TEACH_BACK_VERIFIED` 的模板读 `p.attempts`，而演示种子的载荷里没有这个
+    字段（真实引擎写，种子漏了）。
+
+    **它躲过了每一道现有闸门**：对比度只读颜色，点击遍历只看有没有抛异常，
+    截图闸门看的是尺寸与横向溢出。一个 `undefined` 混在中文里既不报错、
+    也不改变布局、在缩略图上也看不出来——而它出现在一整页都在讲
+    「这里每一条都可核验」的地方。
+
+    查的是**可见文字**而不是源码：`undefined` 在 JS 源码里是合法关键字。
+    """
+    raw = tab.send("Runtime.evaluate", expression=RAW_VALUE_PROBE,
+                   returnByValue=True)["result"].get("value")
+    if not raw:
+        return
+    for hit in json.loads(raw):
+        failures.append(
+            f"{page}  正文里印着 JS 裸值 [{hit['bad']}]，在 {hit['where']}：{hit['text']}"
+        )
+
+
 def check_sprite_icons(tab: "CDP", page: str, failures: list[str]) -> None:
     """标签栏图标引用的是外部 sprite，必须确认它真的画出来了。
 
@@ -1304,6 +1357,7 @@ def main() -> int:
                 tab.send("Page.navigate", url=BASE + page)
                 tab.drain(SETTLE_SECONDS)
                 failures.extend(collect(tab.events, page))
+                check_no_raw_js_values(tab, page, failures)
                 check_sprite_icons(tab, page, failures)
                 check_no_horizontal_overflow(tab, page, failures)
                 tab.events.clear()

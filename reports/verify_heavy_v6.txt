@@ -15,7 +15,7 @@
   },
   "failures": [],
   "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。",
-  "source_digest": "98182e44da6de05a44d8578a528f6b84f8c02aefe43325301912fc4eee5f8ddb"
+  "source_digest": "9f6def96d925572c2ef5082d60d2c143ed5e5b578dc35512204145742b11fc3a"
 }
 {
   "version": "5.0.0",
@@ -28,7 +28,7 @@
   "failed": 0,
   "failures": [],
   "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。",
-  "source_digest": "98182e44da6de05a44d8578a528f6b84f8c02aefe43325301912fc4eee5f8ddb"
+  "source_digest": "9f6def96d925572c2ef5082d60d2c143ed5e5b578dc35512204145742b11fc3a"
 }
 {
   "version": "6.0.0",
@@ -37,14 +37,14 @@
   "concurrency": 100,
   "successful": 5000,
   "failed": 0,
-  "elapsed_seconds": 218.2963,
-  "throughput_rps": 22.9,
+  "elapsed_seconds": 421.885,
+  "throughput_rps": 11.85,
   "latency_ms": {
-    "mean": 4287.875,
-    "p50": 2605.079,
-    "p95": 14134.517,
-    "p99": 24199.91,
-    "max": 44400.237
+    "mean": 8266.151,
+    "p50": 5559.661,
+    "p95": 25361.984,
+    "p99": 38900.252,
+    "max": 76129.721
   },
   "mix": {
     "liveness_reads": 3000,
@@ -54,7 +54,7 @@
   "keepalive_retries": 0,
   "transport_errors": {},
   "note": "真实Uvicorn回环网络负载；不等同于公网、多进程或真实HarmonyOS设备压测。keepalive_retries 表示连接被服务端回收后重试的次数，属于长连接竞态，不是请求失败。",
-  "source_digest": "98182e44da6de05a44d8578a528f6b84f8c02aefe43325301912fc4eee5f8ddb"
+  "source_digest": "9f6def96d925572c2ef5082d60d2c143ed5e5b578dc35512204145742b11fc3a"
 }
 {
   "version": "6.0.0",
@@ -70,7 +70,7 @@
     "consented_user_study_registry": true,
     "competition_evidence_board": true
   },
-  "source_digest": "98182e44da6de05a44d8578a528f6b84f8c02aefe43325301912fc4eee5f8ddb"
+  "source_digest": "9f6def96d925572c2ef5082d60d2c143ed5e5b578dc35512204145742b11fc3a"
 }
 {
   "version": "6.0.0",

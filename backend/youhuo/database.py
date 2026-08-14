@@ -370,7 +370,18 @@ class Database:
     _BILL_SCENARIO: tuple[tuple[int, str, str, dict[str, Any]], ...] = (
         (12364, "TASK_CREATED", "elder",
          {"task_type": "bill_payment", "risk": 3, "semantic_basis": "hybrid"}),
-        (12376, "TEACH_BACK_VERIFIED", "system", {"expected": "68.40", "heard": "68.40"}),
+        # `attempts` 不是可选的：真实引擎写它（`engine.py:1302`），种子漏了它。
+        #
+        # 后果不是「少一个字段」，是**可信中心的凭证正文里印着「第 undefined 次通过」**
+        # ——`trust.js` 的模板读 `p.attempts`，读到 undefined 就原样拼进中文里。
+        # 那一行出现在一整页都在讲「这里每一条都可核验」的地方，而它躲过了每一道闸门
+        # （对比度只读颜色，点击遍历只看有没有抛异常，截图看的是尺寸与溢出）。
+        #
+        # 渲染那一侧已经改成「不知道就不说这一句」，但种子仍然要补上：**演示数据的
+        # 载荷形状必须和真实引擎一样**，否则演示验证过的东西和生产跑的不是一回事，
+        # 这类偏差还会以别的形式再咬一次。
+        (12376, "TEACH_BACK_VERIFIED", "system",
+         {"expected": "68.40", "heard": "68.40", "attempts": 1}),
         (12391, "ELDER_CONFIRMED", "elder", {"amount_yuan": "68.40"}),
         (12422, "FAMILY_APPROVAL_RECORDED", "system", {"required": True}),
         (12458, "NOTIFICATION_CREATED", "system",

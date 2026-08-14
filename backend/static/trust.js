@@ -70,8 +70,23 @@ const RECEIPT_STEPS = {
   TEACH_BACK_VERIFIED: {
     who: '他',
     what: '把金额念了一遍',
-    proof: p => `系统等的是 ${p.expected}，听到的是 ${p.heard}，第 ${p.attempts} 次通过`
-      + '——念错就停下，不会按听到的数字去付',
+    // 念了几遍这一句，**只有在真的知道遍数时才说**。
+    //
+    // 原先是 `第 ${p.attempts} 次通过`，而演示种子的载荷里没有 `attempts`
+    // （`database.py:373` 只写了 expected 与 heard；真实引擎 `engine.py:1302`
+    // 是写的）。于是可信中心的凭证正文里印着「第 **undefined** 次通过」——
+    // 一个裸露的 JS 值，出现在一整页都在讲「这里的每一条都可核验」的地方。
+    //
+    // 兜底不许编数字（写死「第 1 次」就是把不知道的事说成知道），也不许把
+    // undefined 漏出去。不知道就不说这一句：少说一句是诚实的，说错一句不是。
+    proof: p => {
+      const times = Number(p.attempts);
+      const howMany = Number.isFinite(times) && times > 0
+        ? (times === 1 ? '，一次就念对了' : `，念到第 ${times} 遍才对上`)
+        : '';
+      return `系统等的是 ${p.expected}，听到的是 ${p.heard}${howMany}`
+        + '——念错就停下，不会按听到的数字去付';
+    },
   },
   TEACH_BACK_REJECTED: {
     who: '他',
