@@ -48,15 +48,38 @@ def test_the_receipt_reads_the_audit_chain_rather_than_a_canned_example():
     assert "chain_valid" in js, "凭证没有展示链自校验的结果——那正是它可信的理由"
 
 
-def test_the_receipt_actually_runs_the_payment():
-    """凭证渲染前必须真的走一遍缴费：立任务、复述金额、家人同意。
+def test_the_receipt_never_runs_the_payment():
+    """凭证渲染**不许**去办一笔缴费。
 
-    只查已有任务而不办，在一个刚起的库上会渲染空白；而写死一段样例就不是凭证了。
+    这一条是上一条的反面，而上一条（`test_the_receipt_actually_runs_the_payment`）
+    把一个 P0 写成了需求：它要求 `/v2/sessions`、`/v2/chat`、`/v2/family/approve`
+    出现在 `trust.js` 里，理由是「只查已有任务而不办，在一个刚起的库上会渲染空白」。
+
+    「会渲染空白」的正确答案是**说它是空的**，不是「那我现在帮你办一笔出来」。
+    打开一张只读的凭证会凭空发起一笔缴费，而那段代码自己的注释写着触发条件是
+    「评委第一次打开这一页时走的那一条」。
+
+    逐项对照（判据覆盖不许变弱）：
+
+      旧：三个写接口必须在 → 新：三个写接口都不许在
+      旧：`确认支付` 必须在前端    → 复述确认是**后端**的事，由下面
+          `test_backend_produces_everything_the_receipt_needs` 在真实引擎上验
+          （`TEACH_BACK_VERIFIED` 的 expected == heard == amount），比查一个
+          前端字符串强得多
+      新增：空数据时必须给出空态文案，而不是留一片白
     """
-    js = _trust_js()
+    # 剥注释再查：这个修复要求把被删掉的那三个路径写进注释解释清楚，
+    # 而不剥注释的判据会在注释里读到它们。
+    from .helpers import strip_js_comments
+
+    js = strip_js_comments(_trust_js())
     for path in ("/v2/sessions", "/v2/chat", "/v2/family/approve"):
-        assert path in js, f"凭证没有真的走 {path}，它拿不到自己声称展示的那次办事"
-    assert "确认支付" in js, "凭证没有走复述确认这条路——而复述正是这一页的主张之一"
+        assert path not in js, (
+            f"凭证页又出现了 {path}——渲染一张凭证不许改动任何一笔业务事务"
+        )
+    assert "还没有可以出示的凭证" in js, (
+        "没有数据时这一页要说「还没有可以出示的凭证」，不能留一片白"
+    )
 
 
 def test_a_failed_receipt_does_not_claim_success():

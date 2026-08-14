@@ -185,8 +185,8 @@ async function renderReceipt() {
   const host = byId('receipt');
   if (!host) return;
 
-  //: 这一次是我们刚刚亲手办的吗？只有亲手办的才知道他说了什么原话。
-  let asked = null;
+  // `asked`（「这一次是我们刚刚亲手办的吗」）连同它下面那条写路径一起删了：
+  // 这一页只读，永远不是「刚刚亲手办的」。
   let taskId = null;
 
   const bills = (await api('/v2/tasks?limit=100', {}, 'family'))
@@ -195,35 +195,31 @@ async function renderReceipt() {
   // 事情之一（只有权威状态回报成功才算办好），把它藏起来才是不诚实。
   const recent = bills.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
 
-  if (recent) {
-    taskId = recent.id;
-  } else {
-    // 链上还什么都没有：真的办一次。这是全新沙箱里的路径，也就是评委第一次打开
-    // 这一页时走的那一条。
-    const session = (await api('/v2/sessions', {method: 'POST', body: '{}'})).session_id;
-    asked = '帮我交这个月的水费';
-    const first = await api('/v2/chat', {
-      method: 'POST', body: JSON.stringify({session_id: session, text: asked}),
-    });
-    const amount = (first.data && first.data.amount_yuan)
-      || (first.message.match(/(\d+\.\d{2})\s*元/) || [])[1];
-    if (!amount) throw new Error(`账单金额没读到，不能凭空造一份凭证（${first.message}）`);
-
-    // 复述确认必须念出金额——这一步就是这个产品的主张，凭证里当然要走真的那条路。
-    const confirmed = await api('/v2/chat', {
-      method: 'POST',
-      body: JSON.stringify({session_id: session, text: `确认支付${amount}元`}),
-    });
-    if (!confirmed.approval_digest) throw new Error(`没有拿到确认摘要（${confirmed.message}）`);
-    taskId = confirmed.task_id;
-
-    await api('/v2/family/approve', {
-      method: 'POST',
-      body: JSON.stringify({
-        task_id: taskId, approve: true, approval_digest: confirmed.approval_digest,
-      }),
-    }, 'family');
+  if (!recent) {
+    // 没有就说没有。
+    //
+    // 这里原先是一整段「那我现在帮你办一笔出来」：建会话、说「帮我交这个月的水费」、
+    // 复述确认金额、再调 `/v2/family/approve`——**打开一张只读的凭证会凭空发起一笔
+    // 缴费**。那段代码自己的注释写着触发条件是「评委第一次打开这一页时走的那一条」。
+    //
+    // 它平时到不了，因为 `visitor_sandbox()` 会给每位访客种一笔已完成缴费；但那段
+    // 种子挂在 `seed_history` 开关上，关掉（真实部署的默认值）就又能到。
+    // 「平时到不了」不是「不会发生」。
+    //
+    // Read UI 必须是 Read。`test_receipt_is_read_only.py` 现在钉住这一点：
+    // 这个文件里不许出现任何写方法。
+    // 两个 class 都是这个项目已有的：`.receipt-pending`（pages.css:962）和
+    // `.section-note`（pages.css:236）。**不新造 class 名**——一个没有样式的
+    // class 不报错也不显形，只是让这段字继承默认样式，看起来像"忘了写样式"。
+    host.replaceChildren(
+      el('p', 'receipt-pending', '还没有可以出示的凭证。'),
+      el('p', 'section-note',
+        '优活替他办完一件事之后，这里会出现那一次的完整经过：他说了什么、'
+        + '金额是多少、家人什么时候点的头、对方什么时候给的回执。'),
+    );
+    return;
   }
+  taskId = recent.id;
 
   const audit = await api(`/v2/audit?limit=200`, {}, 'family');
   const mine = (audit.events || []).filter(e => e.entity_id === taskId);
@@ -247,19 +243,19 @@ async function renderReceipt() {
 
   // --- 没有进链的那一句 ---
   //
-  // 两种说法，取决于这一次是不是我们刚刚亲手办的。
+  // 这里原先有两种说法，靠 `asked` 分支：亲手办的那一次知道他说了什么，可以把原话
+  // 摆出来。而「亲手办」就是上面被删掉的那条写路径——它一走，`asked` 恒为 null，
+  // 那一半永远到不了。删一半留一半是回归的温床（下一个人会照着那半段以为这里
+  // 还有两种状态），所以连它一起收掉。
   //
-  // 亲手办的时候我们知道他说了什么，所以可以把原话摆出来，再说"链上没有它"。
-  // 读链的时候我们**不知道**——而那恰恰是更强的一次演示：连做这个系统的人都没法
-  // 从这条链上还原他当时说了什么。所以不能沿用第一种说法去编一句原话。
+  // 留下的这一种本来就是更强的一次演示：**连做这个系统的人都没法从这条链上还原
+  // 他当时说了什么。**
   const off = el('p', 'receipt-offchain');
   off.appendChild(el('strong', null, '他说的原话不在链上。'));
-  off.appendChild(document.createTextNode(asked
-    ? `这一次他说的是「${asked}」，而审计链里只有「有一件缴费任务被建立」。`
-      + '少记一样东西也是要证明的事，所以写在这里。'
-    : '这份凭证是从审计链上读出来的，而链上只有「有一件缴费任务被建立」'
-      + '——连我们自己都没法从这条链上还原他当时说了什么。'
-      + '少记一样东西也是要证明的事，所以写在这里。'));
+  off.appendChild(document.createTextNode(
+    '这份凭证是从审计链上读出来的，而链上只有「有一件缴费任务被建立」'
+    + '——连我们自己都没法从这条链上还原他当时说了什么。'
+    + '少记一样东西也是要证明的事，所以写在这里。'));
   host.appendChild(off);
 
   // --- 时间轴 ---
