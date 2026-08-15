@@ -823,6 +823,17 @@ async function bootstrap() {
 }
 
 // 页内分区，与家人端同一套实现（common.js）。
-window.YouHuo.initSections('today');
+//
+// 兜底是 `overview` 而不是 `today`，因为**两个事实源打架时看得见的那个是 JS**。
+// `care.html` 的 markup 把 `overview` 标成 `is-current` + `aria-current="true"`，
+// 而这里原先传的是 `'today'`；`initSections` 在无 hash 时执行 `show(fallback)`，
+// 于是 JS 赢。两个后果：
+//
+//   ① 首屏落在「今天」而不是「概览」——而「概览」正是这一页从**功能分区**
+//      变成**以人为中心**的那一步，它不在第一屏，这一步就等于没做
+//   ② 服务器发出的 HTML 高亮「概览」，JS 一跑改成「今天」——**载入时闪一下**。
+//      这正是 Phase C 判据 ① 说的那件事：导航必须在服务器发出的 HTML 里
+//      就带好正确的激活态，否则首屏会先闪一个错的
+window.YouHuo.initSections('overview');
 
 bootstrap();

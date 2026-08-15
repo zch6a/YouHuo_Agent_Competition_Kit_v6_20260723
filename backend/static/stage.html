@@ -45,6 +45,21 @@
     <!-- 进度。观众层的第四样东西：任何时候都能一眼看出这场演示走到哪儿了。 -->
     <p class="stage-note" id="stageProgress" role="status" aria-live="polite">还没开始 · 共七拍</p>
     <div class="stage-depth" role="group" aria-label="导演台">
+      <!-- 出口必须在观众层里，**不能只在导演台里**。
+           ......................................................................
+           改之前这一页的两个出口（`/` 与 `/judge`）都在收起的
+           `<details id="directorDeck">` 里，于是一个刚打开 `/stage`、又不知道
+           有「导演台」这回事的人无路可走。`check_exits.py` 五个宽度全报死路：
+
+               /stage @ 320×568 / 390×844 / 768×1024 / 900×1200 / 1440×900
+               出口 2 · 一步可用 0 · 首屏 0 · 两步 0
+
+           而 `manifest.webmanifest` 是 `display: standalone`——装成应用之后没有
+           浏览器后退键，iOS standalone 连边缘滑动返回都没有。
+
+           放在这里而不是页尾：它和「导演台」并排，是这一页仅有的两个「元操作」，
+           而观众层的主线（叙事·手机·意义·进度）不该被出口打断。 -->
+      <a class="stage-pick" href="/">返回首页</a>
       <button type="button" class="stage-pick" id="directorToggle"
               aria-expanded="false" aria-controls="directorDeck">导演台</button>
     </div>

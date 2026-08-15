@@ -1,5 +1,5 @@
 {
-  "count": 194,
+  "count": 195,
   "controls": [
     {
       "key": "href=/elder",
@@ -1304,6 +1304,24 @@
       "apis": []
     },
     {
+      "key": "href=/",
+      "id": "",
+      "tag": "a",
+      "text": "返回首页",
+      "source_file": "stage.html",
+      "route": "/stage",
+      "panel": "",
+      "hidden": false,
+      "surface": "presentation",
+      "shell": "stage",
+      "module": "shell",
+      "visibility": "presentation-only",
+      "handler_file": "",
+      "handler": "",
+      "interaction_type": "navigate",
+      "apis": []
+    },
+    {
       "key": "id=directorToggle",
       "id": "directorToggle",
       "tag": "button",
@@ -1316,15 +1334,10 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "(顶层)",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
-      "apis": [
-        "/v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200",
-        "/v2/family/approve",
-        "/v2/tasks?limit=100",
-        "/v6/tasks/${encodeURIComponent(task.id)}/glass-box"
-      ]
+      "apis": []
     },
     {
       "key": "id=playStory",
@@ -1340,7 +1353,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -1357,8 +1370,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1375,8 +1388,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1393,8 +1406,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1411,8 +1424,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1429,8 +1442,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1447,8 +1460,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1465,8 +1478,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "activate",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "",
       "apis": []
     },
@@ -1483,15 +1496,10 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "stage.js",
-      "handler": "(顶层)",
+      "handler_file": "",
+      "handler": "",
       "interaction_type": "details-toggle",
-      "apis": [
-        "/v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200",
-        "/v2/family/approve",
-        "/v2/tasks?limit=100",
-        "/v6/tasks/${encodeURIComponent(task.id)}/glass-box"
-      ]
+      "apis": []
     },
     {
       "key": "data-section=beats",
@@ -1957,7 +1965,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -1975,7 +1983,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -1993,7 +2001,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2011,7 +2019,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2029,7 +2037,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2047,7 +2055,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2065,7 +2073,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2083,7 +2091,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2101,7 +2109,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2119,7 +2127,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2137,7 +2145,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2155,7 +2163,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2173,7 +2181,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "applySize",
       "interaction_type": "click",
       "apis": []
     },
@@ -2244,8 +2252,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "",
-      "handler": "",
+      "handler_file": "stage.js",
+      "handler": "setClean",
       "interaction_type": "",
       "apis": []
     },
@@ -2262,13 +2270,13 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "",
-      "handler": "",
+      "handler_file": "stage.js",
+      "handler": "setClean",
       "interaction_type": "",
       "apis": []
     },
     {
-      "key": "href=/",
+      "key": "href=/#2",
       "id": "",
       "tag": "a",
       "text": "直接打开应用（不套框）→",
@@ -2299,7 +2307,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2317,7 +2325,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2335,7 +2343,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2353,7 +2361,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2371,7 +2379,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2389,7 +2397,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -2407,7 +2415,7 @@
       "module": "beats",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "runStory",
+      "handler": "playStory",
       "interaction_type": "",
       "apis": []
     },
@@ -3026,10 +3034,14 @@
       "handler": "(顶层)",
       "interaction_type": "",
       "apis": [
-        "/v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200",
-        "/v2/family/approve",
-        "/v2/tasks?limit=100",
-        "/v6/tasks/${encodeURIComponent(task.id)}/glass-box"
+        "/v2/audit?entity_id=${ids.elderId}",
+        "/v2/audit?entity_id=${ids.elderId}&limit=10",
+        "/v2/tasks",
+        "/v3/delegation/preview",
+        "/v5/actions/authorize",
+        "/v5/sagas",
+        "/v5/sagas/${current.id}/advance",
+        "/v5/voice/resolve"
       ]
     },
     {

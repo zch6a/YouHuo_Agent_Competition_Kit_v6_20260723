@@ -195,6 +195,22 @@ PROBE = r"""
   // 在一个 `hidden` 的面板里（两步可达）、或者根本就是别的东西压着它。
   const blame = el => {
     for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      // 关着的 `<details>` **不靠 display:none 藏内容**——它的祖先链上
+      // `getComputedStyle` 一路都是 block，所以下面那个循环找不到任何罪魁，
+      // 报出来是「不画，但说不出为什么」。实测撞到过：`/stage` 的两个出口都在
+      // 一个收起的 `<details id="directorDeck">` 里，闸门只能说死路，说不出
+      // 死在哪儿——一个指不出原因的失败，人只能靠猜。
+      if (n.tagName === 'DETAILS' && !n.open) {
+        return {
+          tag: 'details', id: n.id || '',
+          cls: (n.className || '').toString().slice(0, 34),
+          panel: '',
+          // `<details>` 是**用户可以自己打开**的，和 `[hidden]` 分区同一档：
+          // 一步到不了，但两步到得了——前提是它的 `<summary>` 或触发按钮可见。
+          byAttr: true,
+          display: 'details-closed', vis: 'visible', op: '1',
+        };
+      }
       const cs = getComputedStyle(n);
       if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) {
         return {
@@ -220,6 +236,22 @@ PROBE = r"""
   //
   // 配对靠 `data-section`（切换器）对 `data-panel`（面板）。这两个名字不一样，
   // 是这个项目的既有约定，猜成 `data-panel-target` 会一个都匹配不上。
+  // 可见的 `<summary>` / `aria-controls` 触发器，能打开哪些收起的 `<details>`。
+  //
+  // 和下面的分区切换器是同一件事的另一种形态：一个人点得到它，就够得着里面的东西。
+  const openableDetails = new Set();
+  document.querySelectorAll('details:not([open])').forEach(d => {
+    const summary = d.querySelector('summary');
+    const trigger = d.id
+      ? document.querySelector(`[aria-controls="${d.id}"]`) : null;
+    for (const t of [summary, trigger]) {
+      if (!t) continue;
+      if (!t.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) continue;
+      const r = t.getBoundingClientRect();
+      if (r.height >= 8 && r.width >= 8) { openableDetails.add(d); break; }
+    }
+  });
+
   const reachable = new Set();
   document.querySelectorAll('[data-section], [role="tab"], a[href^="#"]').forEach(el => {
     if (!el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) return;
@@ -252,10 +284,19 @@ PROBE = r"""
       bottom: Math.round(r.bottom + window.scrollY),
       block, paints, onscreen, sized, focusable, firstScreen, culprit,
       usable: !block && paints && onscreen && sized && focusable,
-      // 只差一次页内切换。两个条件都必要：`byAttr`（样式表藏起来的东西点不出来），
-      // 以及**确实有一个可见控件指着装它的那个分区**。
-      twoStep: !paints && !!culprit && culprit.byAttr
-               && !!culprit.panel && reachable.has(culprit.panel),
+      // 只差一次页内操作。两条路各有各的条件，缺一不可：
+      //
+      //   分区：`byAttr`（样式表藏起来的东西点不出来）**并且**确实有一个可见
+      //         控件指着装它的那个分区
+      //   details：这个收起的 `<details>` 有一个**可见的** summary 或
+      //            `aria-controls` 触发器
+      //
+      // 两边都要求「那个开关真的看得见」。「有一个开关」和「有一个能开这扇门的
+      // 开关」不是一回事——变异证明抓到过第一版把前者当成后者。
+      twoStep: !paints && (
+        (!!culprit && culprit.byAttr && !!culprit.panel && reachable.has(culprit.panel))
+        || [...openableDetails].some(d => d.contains(el))
+      ),
     };
   });
   // 文档高度取三者最大。第一版只用 `documentElement.scrollHeight`，于是

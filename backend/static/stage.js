@@ -322,7 +322,22 @@
           observe_authoritative_payment_state: {paid: true, receipt: 'demo-receipt'},
           verify_final_state: {verified: true},
         };
-        while (current && current.current_step_index < current.steps.length) {
+        // 终止条件看**状态**，不看下标。
+        //
+        // 后端在推完最后一步时把 status 置为 `completed`，但**把
+        // `current_step_index` 留在最后一个下标上**（实测：六步的 saga 走完之后
+        // status='completed' 而 index=5、len(steps)=6）。于是 `index < length`
+        // 仍然成立，循环会**多推一次**，后端回「Saga已经结束。」→ HTTP 400。
+        //
+        // 后果是七拍全部演完之后，控制台里留下一个红色 400 ——
+        // 而这一页是答辩时投在大屏上的那一页。`check_page_runtime` 抓到了它：
+        //   /stage 点击「01」 HTTP 400：/v5/sagas/{id}/advance
+        //
+        // 用**白名单**而不是列举终态（completed/failed/compensated/cancelled）：
+        // 将来后端多一个状态时，白名单会让循环停下，黑名单会让它继续捶接口。
+        const RUNNING = new Set(['active', 'awaiting_human']);
+        while (current && RUNNING.has(current.status)
+               && current.current_step_index < current.steps.length) {
           const step = current.steps[current.current_step_index];
           if (!step) break;
           let role = 'system';

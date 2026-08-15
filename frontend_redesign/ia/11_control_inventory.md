@@ -3,12 +3,12 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 194 |
+| 总数 | 195 |
 |---|---|
-| 有 id | 194 |
+| 有 id | 195 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
-| 追不到 handler（非 `<a>`） | 3 |
+| 追不到 handler（非 `<a>`） | 10 |
 
 ## 全部控件
 
@@ -86,16 +86,17 @@
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#directorToggle` | stage | — | button | — | stage.js:(顶层) | /v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200<br>/v2/family/approve<br>/v2/tasks?limit=100<br>/v6/tasks/${encodeURIComponent(task.id)}/glass-box | presentation | stage | shell | presentation-only |
-| `#playStory` | stage | — | button | — | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | — | stage.js:activate | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | summary | details-toggle | stage.js:(顶层) | /v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200<br>/v2/family/approve<br>/v2/tasks?limit=100<br>/v6/tasks/${encodeURIComponent(task.id)}/glass-box | presentation | stage | shell | presentation-only |
+| `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
+| `#directorToggle` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#playStory` | stage | — | button | — | stage.js:playStory | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | summary | details-toggle | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
@@ -121,32 +122,32 @@
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | button | click | stage.js:runStory | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | button | click | stage.js:applySize | — | presentation | stage | shell | presentation-only |
 | `#stageReset` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#stageClean` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#stageFull` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
-| `#depthProduct` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
-| `#depthTechnical` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#depthProduct` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#depthTechnical` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
-| `#` | stage | beats | button | — | stage.js:runStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
+| `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
 | `#baselineDemo` | stage | demo | button | — | proof-demos.js:showBaseline | — | presentation | stage | demo | presentation-only |
 | `#coldRoomDemo` | stage | demo | button | — | proof-demos.js:showBaseline | — | presentation | stage | demo | presentation-only |
 | `#lateWakeDemo` | stage | demo | button | — | proof-demos.js:pastDeviationMoment | — | presentation | stage | demo | presentation-only |
@@ -180,7 +181,7 @@
 | `#syncDemo` | stage | engineering | button | — | proof-demos.js:register | — | presentation | stage | engineering | presentation-only |
 | `#capabilitiesDemo` | stage | engineering | button | — | proof-demos.js:register | — | presentation | stage | engineering | presentation-only |
 | `#` | stage | engineering | a | navigate | —:— | — | presentation | stage | engineering | presentation-only |
-| `#stageEscape` | stage | — | button | — | stage.js:(顶层) | /v2/audit?entity_id=${encodeURIComponent(taskId)}&limit=200<br>/v2/family/approve<br>/v2/tasks?limit=100<br>/v6/tasks/${encodeURIComponent(task.id)}/glass-box | presentation | stage | shell | presentation-only |
+| `#stageEscape` | stage | — | button | — | stage.js:(顶层) | /v2/audit?entity_id=${ids.elderId}<br>/v2/audit?entity_id=${ids.elderId}&limit=10<br>/v2/tasks<br>/v3/delegation/preview<br>/v5/actions/authorize<br>/v5/sagas<br>/v5/sagas/${current.id}/advance<br>/v5/voice/resolve | presentation | stage | shell | presentation-only |
 | `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
 | `#txnForm` | judge | — | form | submit | judge.js:bindControls | — | professional | evidence | shell | professional-only |
 | `#txnPick` | judge | — | select | change | judge.js:bindControls | — | professional | evidence | shell | professional-only |

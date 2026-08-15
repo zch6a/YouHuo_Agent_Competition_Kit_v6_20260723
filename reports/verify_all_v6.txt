@@ -24,7 +24,7 @@ START pytest_v6
 ........................................................................ [ 94%]
 ........................................................................ [ 99%]
 ........                                                                 [100%]
-1376 passed in 142.29s (0:02:22)
+1376 passed in 318.51s (0:05:18)
 PASS pytest_v6
 START coverage_v6
 Name                                  Stmts   Miss  Cover
@@ -359,8 +359,8 @@ START browser_javascript_v6
 PASS browser_javascript_v6: 17 file(s)
 PASS speech_text_v6: 34 项朗读文本断言通过
 START page_runtime_v6
-  按到的控件（按页）：/ 0、/elder 49、/family 3、/care 6、/trust 1、/judge 28、/stage 50
-OK page_runtime: 7 个页面加载干净，137 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
+  按到的控件（按页）：/ 0、/elder 49、/family 3、/care 7、/trust 1、/judge 28、/stage 68
+OK page_runtime: 7 个页面加载干净，156 个控件逐个按过，Voice Orb 11 态在关掉动效后两两可辨，评委页 7 拍演完且全中文，手机视口无横向溢出、无障碍五项通过，无异常、无 console.error、无失败请求
 PASS page_runtime_v6
 START arkts_v6
 PASS check_arkts: 18 个 .ets 文件，20 个颜色令牌，已按 SDK 核对 1159 个 kit 符号
@@ -392,13 +392,13 @@ START layout_stability_v6
   ok /elder 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
   ok /family 1440×900  CLS 0.0505 [0.0505 0.0505 0.0505]
   ok /family 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
-  ok /care 1440×900  CLS 0.0121 [0.0121 0.0121 0.0121]
+  ok /care 1440×900  CLS 0.0316 [0.0316 0.0316 0.0316]
   ok /care 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
   ok /trust 1440×900  CLS 0.0239 [0.0239 0.0239 0.0239]
   ok /trust 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
   ok /judge 1440×900  CLS 0.0000 [0.0000 0.0000 0.0000]
   ok /judge 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
-  ok /stage 1440×900  CLS 0.0170 [0.0170 0.0170 0.0170]
+  ok /stage 1440×900  CLS 0.0085 [0.0083 0.0085 0.0085]
   ok /stage 390×844  CLS 0.0000 [0.0000 0.0000 0.0000]
 PASS layout_stability: 14 组（7 路由 × 2 视口）载入期 CLS 全部 < 0.1
 PASS layout_stability_v6
@@ -406,7 +406,11 @@ START exits_v6
 ============================================================================
 320×568
 ============================================================================
-  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  ✓ /         出口 4 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /stage      产品演示 →     不画   []
+             ↑ <div id=- class=landing-wide data-panel=-> none/visible/1 — 样式表藏的
+        － /judge      专业审计 →     不画   []
+             ↑ <div id=- class=landing-wide data-panel=-> none/visible/1 — 样式表藏的
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
@@ -425,15 +429,21 @@ START exits_v6
   ✓ /trust    出口 6 · 一步可用 5 · 首屏 4 · 两步 0   
         － /           ← 返回首页     不画   [back-link]
              ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
-  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2692 / 文档 2740）
-        － /judge      完整的评委导览（七拍 不画   []
+  ✓ /stage    出口 3 · 一步可用 1 · 首屏 1 · 两步 1   
+        － /           直接打开应用（不套框 不画   []
+             ↑ <details id=directorDeck class=stage-group data-panel=-> details-closed/visible/1 — 页内分区（[hidden]）
+        － /judge      评委导览与证据板 → 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
   ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
 
 ============================================================================
 390×844
 ============================================================================
-  ✓ /         出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
+  ✓ /         出口 4 · 一步可用 2 · 首屏 2 · 两步 0   
+        － /stage      产品演示 →     不画   []
+             ↑ <div id=- class=landing-wide data-panel=-> none/visible/1 — 样式表藏的
+        － /judge      专业审计 →     不画   []
+             ↑ <div id=- class=landing-wide data-panel=-> none/visible/1 — 样式表藏的
   · /elder    出口 1 · 一步可用 0 · 首屏 0 · 两步 1   出口要先切一次页内分区（藏在 me 里）
         － /           换一个人用      不画   [fam-link]
              ↑ <div id=- class=elder-panel data-panel=me> none/visible/1 — 页内分区（[hidden]）
@@ -452,8 +462,10 @@ START exits_v6
   ✓ /trust    出口 6 · 一步可用 5 · 首屏 4 · 两步 0   
         － /           ← 返回首页     不画   [back-link]
              ↑ <a id=- class=back-link data-panel=-> none/visible/1 — 样式表藏的
-  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2532 / 文档 2596）
-        － /judge      完整的评委导览（七拍 不画   []
+  ✓ /stage    出口 3 · 一步可用 1 · 首屏 1 · 两步 1   
+        － /           直接打开应用（不套框 不画   []
+             ↑ <details id=directorDeck class=stage-group data-panel=-> details-closed/visible/1 — 页内分区（[hidden]）
+        － /judge      评委导览与证据板 → 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
   ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
 
@@ -475,8 +487,10 @@ START exits_v6
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
   ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
   ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
-  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2335 / 文档 2399）
-        － /judge      完整的评委导览（七拍 不画   []
+  ✓ /stage    出口 3 · 一步可用 1 · 首屏 1 · 两步 1   
+        － /           直接打开应用（不套框 不画   []
+             ↑ <details id=directorDeck class=stage-group data-panel=-> details-closed/visible/1 — 页内分区（[hidden]）
+        － /judge      评委导览与证据板 → 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
   ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
 
@@ -498,8 +512,10 @@ START exits_v6
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
   ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
   ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
-  · /stage    出口 2 · 一步可用 1 · 首屏 0 · 两步 0   出口要滚下去才看得到（最高的在 y=2513 / 文档 2577）
-        － /judge      完整的评委导览（七拍 不画   []
+  ✓ /stage    出口 3 · 一步可用 1 · 首屏 1 · 两步 1   
+        － /           直接打开应用（不套框 不画   []
+             ↑ <details id=directorDeck class=stage-group data-panel=-> details-closed/visible/1 — 页内分区（[hidden]）
+        － /judge      评委导览与证据板 → 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
   ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
 
@@ -521,8 +537,10 @@ START exits_v6
              ↑ <section id=- class=page-section data-panel=mine> none/visible/1 — 页内分区（[hidden]）
   ✓ /care     出口 4 · 一步可用 4 · 首屏 4 · 两步 0   
   ✓ /trust    出口 6 · 一步可用 6 · 首屏 5 · 两步 0   
-  ✓ /stage    出口 2 · 一步可用 1 · 首屏 1 · 两步 0   
-        － /judge      完整的评委导览（七拍 不画   []
+  ✓ /stage    出口 3 · 一步可用 1 · 首屏 1 · 两步 1   
+        － /           直接打开应用（不套框 不画   []
+             ↑ <details id=directorDeck class=stage-group data-panel=-> details-closed/visible/1 — 页内分区（[hidden]）
+        － /judge      评委导览与证据板 → 不画   []
              ↑ <section id=engineering class=page-section data-panel=engineering> none/visible/1 — 页内分区（[hidden]）
   ✓ /judge    出口 4 · 一步可用 4 · 首屏 1 · 两步 0   
 
@@ -533,11 +551,6 @@ KNOWN exits_v6: 5 处出口要先切一次页内分区才露出来
         /elder @ 768×1024
         /elder @ 900×1200
         /elder @ 1440×900
-KNOWN exits_v6: 4 处出口在首屏之外（Phase C 要修的「静态导航排在 main 最后一个孩子」）
-        /stage @ 320×568
-        /stage @ 390×844
-        /stage @ 768×1024
-        /stage @ 900×1200
 PASS exits_v6: 7 条路由 × 5 个宽度，每一格都至少有一个真的可用的出口
 ============================================================================
 PASS exits_v6
