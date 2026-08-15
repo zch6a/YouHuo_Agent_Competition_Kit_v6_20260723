@@ -73,6 +73,76 @@ function failed(host, error) {
 }
 
 /* ==========================================================================
+   概览
+   ==========================================================================
+   这一页原先是六个**平级**的功能格子。打开它，人要先决定「我今天想看哪个功能」，
+   再自己把六段拼回一个人——核心对象是六个功能，不是他。计划书写的是
+   object-centered：核心对象始终是那位老人。
+
+   所以第一屏改成回答一个问题——**他最近怎么样**——一句总判定加五行摘要，
+   每一行点进去就是对应的那一段。六段一个都没删：它们是 Module 层，不是重复导航。
+
+   ## 这一段不发任何请求
+
+   五行的文字由那五段各自的 loader 在**它们自己的请求回来之后**回填。没有
+   「概览接口」，也没有把六段合成一次请求——后者会让一段慢下来拖住整屏，而这一页
+   最不该有的性质正是这个。慢的那一行自己停在「正在读……」，其余四行照常出现。
+
+   ## 一行只说一件事
+
+   摘要刻意短：它是索引，不是复述。要点在这里，展开在下一屏。
+   ========================================================================== */
+
+//: 概览五行的 id，顺序和 care.html 里一致。
+//:
+//: 单列一份是为了登录失败那一路：那时六个 loader 一个都不会跑，五行会永远停在
+//: 「正在读……」——一个看起来还在加载、其实永远不会有结果的界面。
+const OVERVIEW_ROWS = ['ovToday', 'ovMed', 'ovBody', 'ovMood', 'ovSafety'];
+
+/** 回填概览里的一行。
+ *
+ * 只换那一行的文字，不重建节点：`<a>` 是静态写在 HTML 里的，它从第一帧起就能点，
+ * 而重建会在数据回来的一瞬间把焦点从这一行上打掉。
+ *
+ * `bad` 走 `.meta.bad`（既有类）。失败的一行必须看得见，但它是一行字，不是红框——
+ * 五段里坏了一段，不该让整个概览看起来像出了大事。
+ */
+function overviewSay(id, text, bad) {
+  const row = byId(id);
+  if (!row) return;
+  const slot = row.querySelector('.meta');
+  if (!slot) return;
+  slot.className = bad ? 'meta bad' : 'meta';
+  slot.textContent = text;
+}
+
+/** 概览顶上那句总判定。
+ *
+ * 用的是「今天」那一段同一个组件（`.report-verdict` + `.report-badge`）和同一份
+ * 判定词（`verdictOf`）。同一个结论在两处必须长得一样——两套写法迟早会分叉，
+ * 而这个项目已经在情绪词表上栽过一次。
+ */
+function overviewVerdict(word, tone, headline) {
+  const host = byId('ovVerdict');
+  if (!host) return;
+  host.className = `report-verdict ${tone}`;
+  host.replaceChildren(el('span', 'report-badge', word), el('strong', null, headline));
+}
+
+/** 总判定取不到时说的话。
+ *
+ * **不出徽标。** `verdictOf` 的五个词说的都是「他今天怎么样」，而这里的事实是
+ * 「我们没读到」——拿其中任何一个来顶都是把一次读取失败说成一个关于他的结论，
+ * 连 `unknown`（「还没有记录」）也不行：那句话讲的是他没有记录，不是我们没连上。
+ */
+function overviewVerdictFailed(error) {
+  const host = byId('ovVerdict');
+  if (!host) return;
+  host.className = 'report-verdict';
+  host.replaceChildren(el('strong', null, errorWords(error, '今天的情况').text));
+}
+
+/* ==========================================================================
    今天
    ========================================================================== */
 
@@ -89,6 +159,9 @@ async function loadToday() {
     head.className = `report-verdict ${tone}`;
     head.append(el('span', 'report-badge', word), el('strong', null, report.headline));
     host.appendChild(head);
+
+    // 概览顶上那句是同一个判定、同一句话。
+    overviewVerdict(word, tone, report.headline);
 
     if (updated) updated.textContent = `今天 ${report.day} 的情况`;
 
@@ -163,8 +236,22 @@ async function loadToday() {
     privacy.appendChild(el('h3', 'care-block-head', '这份日报不包含什么'));
     privacy.appendChild(el('p', 'meta', report.privacy_note));
     host.appendChild(privacy);
+
+    // 概览那一行**不重复**上面那句总判定（它就在这一行的正上方）。它说的是这一段
+    // 里下一层的东西：三项分项有没有偏离，以及有没有事情压在头上。
+    const off = report.sections.filter((section) => section.verdict !== 'typical');
+    const lines = [off.length
+      ? `${off.map((section) => section.title).join('、')}和平常不一样`
+      : `${report.sections.length} 项都和平常一样`];
+    if (e.overdue) lines.push(`${e.overdue} 件事已经超时`);
+    else if (e.awaiting_family) lines.push(`${e.awaiting_family} 件等您点头`);
+    else if (e.due_today) lines.push(`今天要办 ${e.due_today} 件`);
+    else lines.push('今天没有要办的事');
+    overviewSay('ovToday', lines.join('｜'));
   } catch (error) {
     failed(host, error);
+    overviewVerdictFailed(error);
+    overviewSay('ovToday', errorWords(error, '今天的情况').text, true);
     if (updated) updated.textContent = '暂时没连上';
   }
 }
@@ -191,10 +278,46 @@ function medications() {
   return medicationPlans;
 }
 
+/** 「还能吃几天」。
+ *
+ * `stock_units` 和 `units_per_dose` 是两个数字，而一位子女要的是「还剩四天」这一个
+ * 结论。抽出来是因为「用药」那一段和概览那一行现在都要它——两处各算一遍，
+ * 迟早会有一处忘了乘 `times_local.length`，而算错的那个数看起来完全正常。
+ *
+ * 算不出来（每天吃 0 次）时返回 `null`，不返回 0：那是两回事。
+ */
+function daysLeft(plan) {
+  const perDay = plan.units_per_dose * plan.times_local.length;
+  return perDay > 0 ? Math.floor(plan.stock_units / perDay) : null;
+}
+
+/** 概览那一行：在吃什么、还够多久。
+ *
+ * 「已停」的计划不算进「在吃」——它们在细节那一段里带着「已停」的药丸列着，
+ * 但概览问的是**现在**在吃什么。全都停了也要说出来，那和从来没登记过不是一回事。
+ *
+ * 多种药时报**最少**的那一个天数，不报平均也不报总和：会先断的是最少的那一种。
+ */
+function medicationDigest(plans) {
+  if (!plans.length) return '还没有登记在吃的药';
+  const active = plans.filter((plan) => plan.active);
+  if (!active.length) return `登记过 ${plans.length} 个用药计划，现在都已经停了`;
+  const names = active.map((plan) => plan.display_name);
+  const head = active.length === 1
+    ? names[0]
+    : `在吃 ${active.length} 种：${names.join('、')}`;
+  const days = active.map(daysLeft).filter((n) => n !== null);
+  if (!days.length) return head;
+  const least = Math.min(...days);
+  if (least <= 0) return `${head}｜${active.length === 1 ? '药已经吃完了' : '有一种已经吃完了'}`;
+  return `${head}｜${active.length === 1 ? '还够' : '最少的还够'} ${least} 天`;
+}
+
 async function loadMedications() {
   const host = byId('medBody');
   try {
     const plans = await medications();
+    overviewSay('ovMed', medicationDigest(plans));
     if (!plans.length) {
       empty(host, '还没有登记在吃的药。等医生开了方子，您或他都可以添上——'
         + '添上之后到点会提醒他，也会盯着还剩多少。');
@@ -210,17 +333,18 @@ async function loadMedications() {
       );
       card.appendChild(title);
       card.appendChild(el('p', null, `${plan.dose_text}｜每天 ${plan.times_local.join('、')}`));
-      // 库存换算成"还能吃几天"。`stock_units` 和 `units_per_dose` 是两个数字，
-      // 而一位子女要的是"还剩四天"这一个结论。
-      const perDay = plan.units_per_dose * plan.times_local.length;
-      const days = perDay > 0 ? Math.floor(plan.stock_units / perDay) : null;
+      // 库存换算成"还能吃几天"。换算本身在 `daysLeft()` 里，概览那一行用的是同一个。
+      const days = daysLeft(plan);
       if (days !== null) {
         card.appendChild(el('p', days <= 3 ? 'notice warning' : 'meta',
           days <= 0 ? '药已经吃完了。' : `按现在的吃法还够 ${days} 天。`));
       }
       host.appendChild(card);
     });
-  } catch (error) { failed(host, error); }
+  } catch (error) {
+    failed(host, error);
+    overviewSay('ovMed', errorWords(error, '用药情况').text, true);
+  }
 }
 
 /* ==========================================================================
@@ -268,10 +392,42 @@ async function longTermMedication(host) {
   host.appendChild(el('p', 'meta', '这一条是从「用药」那一段推出来的，不是一份体检记录。'));
 }
 
+/** 一条健康记录属于哪一天。
+ *
+ * `event_at` 是事情发生的那一天，`created_at` 是它被录进来的那一天。上个月做的体检
+ * 今天才传，两者差一个月——先取前者，后者只在缺失时兜底。
+ *
+ * 「身体」那一段的渲染循环里**还留着同一行**没有改成调用这里，那不是漏掉：
+ * `test_health_section_actually_renders_the_load_bearing_fields` 要求
+ * `event.event_at` 出现在 `loadHealth()` 的函数体内。它防的是这个文件真发生过的一次
+ * 缺陷——字段名是猜的（`occurred_at`），于是日期永远退回入库时间而没有任何报错。
+ * 把那一行抽走，那道闸门就失去了锚点。
+ */
+function healthDay(event) {
+  return String(event.event_at || event.created_at).slice(0, 10);
+}
+
+/** 概览那一行：最近的一条身体记录。
+ *
+ * **按日期挑**，不取数组第一个——后端现在是按时间倒序给的，但那是它的实现细节，
+ * 不是接口承诺；换个排序之后「最近一次」会安静地指向最旧的那一条，而那一行看起来
+ * 完全正常。
+ *
+ * 印的是 `title`（记录本身写的字），认不出来才退回类型词。`source` 一律不印，
+ * 理由和「身体」那一段里的一样：它是给系统看的字。
+ */
+function healthDigest(events) {
+  if (!events.length) return '还没有体检或就诊记录';
+  const latest = events.reduce((a, b) => (healthDay(b) > healthDay(a) ? b : a));
+  const what = latest.title || HEALTH_WORD[latest.kind] || '一条记录';
+  return `共 ${events.length} 条｜最近一次 ${healthDay(latest)}｜${what}`;
+}
+
 async function loadHealth() {
   const host = byId('bodyBody');
   try {
     const events = await api(`/v4/health/events/${state.elderId}`, {}, 'family');
+    overviewSay('ovBody', healthDigest(events));
     if (!events.length) {
       // 空态要说清这一段将来长什么样、怎么才会有。原先只有一句话，勉强诚实但信息量
       // 低——它和「这个功能没做」在屏幕上没有区别。条目写的就是后端真有的四类记录，
@@ -310,7 +466,10 @@ async function loadHealth() {
       host.appendChild(card);
     });
     host.appendChild(el('p', 'meta', '这里只做整理，不做诊断。看病请以医生的判断为准。'));
-  } catch (error) { failed(host, error); }
+  } catch (error) {
+    failed(host, error);
+    overviewSay('ovBody', errorWords(error, '体检与就诊记录').text, true);
+  }
 }
 
 /* ==========================================================================
@@ -341,6 +500,24 @@ function ymd(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** 概览那一行：这两周的心情。
+ *
+ * 只说**记到几次**和**哪一类最多**，不说趋势。趋势那句话（`TREND_WORD`）最短的一条
+ * 也有九个字，最长的十七个——它是一个结论，值得在细节那一段里占一整行，塞进概览的
+ * 一行摘要里会把这一行挤成两行半。
+ *
+ * 「最多的是平静」是**数出来的**，不是概括出来的：取 `label_counts` 里计数最大的那个
+ * 键，并且把次数一起印出来，读的人自己判断六比一算不算「多数」。这一页的原则是不替
+ * 产品下没有数据支撑的结论。
+ */
+function moodDigest(summary) {
+  if (!summary.event_count) return '这两周没有需要记下来的情绪波动';
+  const labels = Object.entries(summary.label_counts);
+  if (!labels.length) return `最近两周记到 ${summary.event_count} 次`;
+  const [key, count] = labels.reduce((a, b) => (b[1] > a[1] ? b : a));
+  return `最近两周记到 ${summary.event_count} 次｜最多的是${EMOTION_WORD[key] || key}（${count} 次）`;
+}
+
 async function loadMood() {
   const host = byId('moodBody');
   try {
@@ -351,6 +528,7 @@ async function loadMood() {
       {}, 'family',
     );
     const s = report.summary;
+    overviewSay('ovMood', moodDigest(s));
     host.replaceChildren();
     host.appendChild(el('p', 'care-period', `最近两周（${report.period_start} 到 ${report.period_end}）`));
 
@@ -395,7 +573,10 @@ async function loadMood() {
       }
     }
     host.appendChild(el('p', 'meta', report.privacy_guarantee));
-  } catch (error) { failed(host, error); }
+  } catch (error) {
+    failed(host, error);
+    overviewSay('ovMood', errorWords(error, '最近两周的情况').text, true);
+  }
 }
 
 /* ==========================================================================
@@ -484,9 +665,47 @@ async function loadWeekly() {
    安全
    ========================================================================== */
 
-const CONTACT_WORD = {
-  family: '家人', neighbour: '邻居', community: '社区', doctor: '医生', other: '其他',
+//: 亲友档案的状态 → 给人看的话。键是后端 `contact_profiles_v4.consent_status`
+//: 的三个取值（`create_contact` 写 active / proposed，`decide_contact` 写
+//: active / rejected）。
+//:
+//: 这张表**取代**了原先那张 `CONTACT_WORD`（family / neighbour / community /
+//: doctor / other）。那五个键是 `safety_contacts_v4.contact_role` 的取值，而这一段
+//: 读的是 `/v4/contacts`——它回的是 `ContactRecord`（亲友档案），字段是
+//: `display_name` / `relation` / `phone_masked` / `status`，**没有** `contact_role`。
+//: 同一段代码里还读了 `c.name` 和 `c.address_masked`，那两个也不在这个模型上。
+//:
+//: 三个字段名全错，翻译表接的是另一张表——和这个文件里 `HEALTH_WORD` 那次
+//: （occurred_at / summary / source_name）是同一种缺陷，同样因为演示家庭里这个列表
+//: 恒为空而从未跑过。真出现一位亲友时，那一行会印成「undefined（undefined）
+//: undefined」：`c.name` 是 undefined，`CONTACT_WORD[undefined]` 也是 undefined，
+//: 而 `|| c.contact_role` 兜的还是 undefined。
+const CONTACT_STATUS_WORD = {
+  active: '他确认过',
+  proposed: '等他确认',
+  rejected: '他没同意',
 };
+
+/** 「多久没动静就找人」这个阈值的说法。
+ *
+ * 后端给的是分钟数（演示家庭里是 720）。720 分钟没有人读得出「半天」，
+ * 所以够一小时就换算成小时。概览那一行和「安全」那一段用同一份换算。
+ */
+function quietWindow(policy) {
+  const hours = Math.round((policy.inactivity_minutes || 0) / 60);
+  return hours >= 1 ? `${hours} 小时` : `${policy.inactivity_minutes} 分钟`;
+}
+
+/** 概览那一行：安全设置现在是什么状态。
+ *
+ * 两件事：阈值设成了多少，以及**他身边登记了几个人**。第二件放进概览是有理由的
+ * ——演示家庭里亲友档案是 0 条。一份只报好消息的概览，会把这个空档藏进第五个格子里，
+ * 而它恰恰是这一页唯一一处「设置在、人不在」的地方。
+ */
+function safetyDigest(policy, contacts) {
+  return `${quietWindow(policy)}没动静就找人｜`
+    + (contacts.length ? `登记了 ${contacts.length} 位亲友` : '还没有登记亲友');
+}
 
 async function loadSafety() {
   const host = byId('safetyBody');
@@ -495,12 +714,12 @@ async function loadSafety() {
       api(`/v4/safety/policy/${state.elderId}`, {}, 'family'),
       api(`/v4/contacts/${state.elderId}`, {}, 'family').catch(() => []),
     ]);
+    overviewSay('ovSafety', safetyDigest(policy, contacts));
     host.replaceChildren();
 
     const digest = el('div', 'digest');
-    const hours = Math.round((policy.inactivity_minutes || 0) / 60);
     [
-      ['多久没动静就找人', hours >= 1 ? `${hours} 小时` : `${policy.inactivity_minutes} 分钟`],
+      ['多久没动静就找人', quietWindow(policy)],
       ['出门多远开始留意', `${policy.geofence_radius_m} 米以外`],
       ['要不要告诉社区', policy.notify_community ? '要' : '不要'],
     ].forEach(([label, value]) => {
@@ -510,22 +729,66 @@ async function loadSafety() {
     });
     host.appendChild(digest);
 
+    // 标题原先是「出事先找谁」，而这个列表读的是 `/v4/contacts`——亲友档案，
+    // 不是应急接力名单（那一份在 `safety_contacts_v4`，现在只有 `/v4/safety/sos`
+    // 读得到，没有任何 GET 端点把它列出来）。标题承诺的东西这一段拿不到，所以标题
+    // 改成它真正显示的东西。列一份亲友档案本身是有用的：出事的时候，「他身边还有谁」
+    // 是子女第一个要回答的问题。
+    host.appendChild(el('h3', 'care-block-head', '他身边的人'));
     if (contacts.length) {
-      host.appendChild(el('h3', 'care-block-head', '出事先找谁'));
       const list = el('ul', 'care-lines');
-      contacts.slice(0, 6).forEach((c) => {
-        list.appendChild(el('li', null,
-          `${c.name}（${CONTACT_WORD[c.contact_role] || c.contact_role}）${c.address_masked}`));
+      contacts.slice(0, 6).forEach((person) => {
+        // 电话是打过码的（后端存的就是 `phone_masked`，原号只留一个摘要）。
+        // 没填电话时不写「无」，直接不提这一项。
+        const parts = [`${person.display_name}（${person.relation}）`];
+        if (person.phone_masked) parts.push(person.phone_masked);
+        // 状态只在**不是** active 的时候说。一位他已经确认过的亲友，后面再挂一个
+        // 「他确认过」的尾巴，是把默认状态当新闻讲——和这一页对 `typical` 判定的
+        // 处理是同一条原则。
+        if (person.status !== 'active') {
+          parts.push(CONTACT_STATUS_WORD[person.status] || '还没处理');
+        }
+        list.appendChild(el('li', null, parts.join('｜')));
       });
       host.appendChild(list);
     } else {
-      host.appendChild(el('p', 'care-empty', '还没有设紧急联系人。'));
+      // 亲友档案是 0 条——而这一段上面刚刚写着「12 小时没动静就找人」。
+      //
+      // 原先这里只有一句「还没有设紧急联系人。」。那句话读起来像一条提示，不像一个
+      // 空档：读的人既不知道这一栏将来长什么样，也不知道要做什么才会有。
+      //
+      // 所以照「身体」和「心情」那两段的写法来（`futureBlock`）：一句现状，
+      // 加两组「以后会有什么 / 怎么才会有」。
+      //
+      // **不用 `empty()`**：那个助手第一句是 `host.replaceChildren(...)`，会把上面
+      // 刚放好的策略表和标题一起清掉。那两段调用它的时候 host 还是空的，这里不是。
+      //
+      // 每一条都对得上后端：`ContactCreate` 收 display_name / relation / phone /
+      // notes / scope；电话存进去就打码（`_mask_phone`）；家人添的记录
+      // `status = "proposed"`，而 `decide_contact` 明写「只有老人本人可以批准亲友
+      // 档案」；`list_contacts` 对家属视角过滤掉 `scope == private` 的那些。
+      host.appendChild(el('p', 'care-empty',
+        '还没有登记他身边的人。上面那三条设置定的是「什么时候该找人」，'
+        + '而「找谁」这一栏现在是空的。'));
+      futureBlock(host, '这一栏以后会有什么', [
+        '一份名单：谁、和他什么关系',
+        '一个打过码的电话——原号不显示，也不落在这一页上',
+        '哪几位是他自己点过头的，哪几位还等着他确认',
+      ]);
+      futureBlock(host, '怎么才会有', [
+        '您可以添：写名字、什么关系、电话。电话存进去就是打码的',
+        '家人添的先记成「等他确认」，要**他本人**点头才生效——家属这一侧没有批准权限',
+        '他自己添的当场生效；他也可以把某一位设成只给自己看，那一位不会出现在这一页',
+      ]);
     }
 
     host.appendChild(el('p', 'meta',
       '位置只在需要的时候看一眼，按最小必要留存。定位精度不够时不会自动报警——'
       + '一次误报会让他以后不敢再带手机出门。'));
-  } catch (error) { failed(host, error); }
+  } catch (error) {
+    failed(host, error);
+    overviewSay('ovSafety', errorWords(error, '安全设置').text, true);
+  }
 }
 
 /* ========================================================================== */

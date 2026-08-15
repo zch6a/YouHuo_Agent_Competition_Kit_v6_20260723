@@ -775,7 +775,7 @@ def check_voice_orb_states(tab: "CDP", page: str, failures: list[str]) -> int:
 
 
 def check_judge_story(tab: "CDP", page: str, failures: list[str]) -> int:
-    """评委页的七拍：演一遍，然后检查 Product 层说的是不是人话。
+    """舞台页的七拍叙事：演一遍，然后检查 Product 层说的是不是人话。
 
     这一页最大的设计决定是"Product 层那七句话由**真实响应**填写，不是写死的文案"
     ——写死的文案在接口改坏之后照样好看，那不是演示，是插图。
@@ -786,14 +786,16 @@ def check_judge_story(tab: "CDP", page: str, failures: list[str]) -> int:
 
     所以这条闸门必须在**演过之后**量，静态扫源码看不见它：那些字是运行时从响应里
     拼出来的。它按下「从头演一遍」，等七拍走完，再逐句检查。
+
+    注意：七拍叙事已从 /judge 搬到 /stage，所以这条闸门现在跑在 /stage 上。
     """
-    if page != "/judge":
+    if page != "/stage":
         return 0
 
     ran = tab.send("Runtime.evaluate", returnByValue=True, expression="""
       (() => {
         const button = document.querySelector('#playStory');
-        if (!button) return {error: '评委页没有「从头演一遍」这个入口'};
+        if (!button) return {error: '舞台页没有「从头演一遍」这个入口'};
         button.click();
         return {ok: true};
       })()
@@ -812,7 +814,7 @@ def check_judge_story(tab: "CDP", page: str, failures: list[str]) -> int:
             total: document.querySelectorAll('.beat').length,
             played: document.querySelectorAll('.beat.is-played').length,
             busy: document.querySelector('#playStory').disabled,
-            status: document.querySelector('#judgeStatus').textContent,
+            status: document.querySelector('#stageProgress').textContent,
             says: [...document.querySelectorAll('.beat-say')].map(n => n.textContent),
           }))()
         """)["result"]["value"]

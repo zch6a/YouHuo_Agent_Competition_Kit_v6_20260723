@@ -65,14 +65,30 @@
 
     <p id="landingHint" class="landing-hint" role="status" aria-live="polite" hidden></p>
 
-    <p class="landing-demo">
-      <a href="/judge">演示与可信技术 →</a>
-    </p>
-    <!-- 桌面演示入口。和上面那行并列放在最末：它对老人和家属都没有意义，只有在电脑上
-         做答辩、录屏或截图的人才需要它。手机上打开它会直说"用应用本身"。 -->
-    <p class="landing-demo">
-      <a href="/stage">在电脑上演示 →</a>
-    </p>
+    <!-- 桌面才出现的那两个入口，放在最末。
+         `/stage` 是在电脑上做答辩、录屏、截图的人用的舞台，`/judge` 是专业审计表面。
+         这两件事在手机上都不成立：没有人在一台手机上做产品演示，也没有人在手机上逐条
+         核对审计链。
+         这一段此前写着「手机上打开它会直说『用应用本身』」——**那句话是假的**。
+         那行字只存在于 `pages.css:1673` 的一句注释里；`stage.html` 里搜不到它，
+         ≤900px 下那段样式做的只是把手机框摊平成单列（`pages.css:1674-1685`），
+         页面一个字都不会提醒你走错了地方。所以留一条通往它的链接，是把人送进一个在
+         这台设备上没有意义、而且不会自己说明的页面。
+         把它们留在窄屏，还会把一张「你是谁」的两选一重新变成一份四项的目录——
+         那正是这一页上一轮才刚去掉的形状。
+         隐藏由 `.landing-wide` 负责（≥761px 才显示），断点与全站同一档。
+         两条链接各套一层，而不是共用一层：`.landing` 是 flex 列、用 gap 分隔**直接**
+         子元素，合并成一层会让这两行贴在一起。 -->
+    <div class="landing-wide">
+      <p class="landing-demo">
+        <a href="/stage">产品演示 →</a>
+      </p>
+    </div>
+    <div class="landing-wide">
+      <p class="landing-demo">
+        <a href="/judge">专业审计 →</a>
+      </p>
+    </div>
   </main>
   <script src="/static/landing.js" defer></script>
 </body>

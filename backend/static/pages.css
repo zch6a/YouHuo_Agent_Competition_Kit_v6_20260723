@@ -100,6 +100,13 @@
 }
 .landing-demo a:hover { color: var(--ink-2); text-decoration: underline; }
 
+/* 桌面才显示答辩与审计入口；手机首页只保留两个真实使用入口。`landing-wide`
+   只是断点开关，不改变两条链接的视觉层级。 */
+@media (max-width: 760px) {
+  .landing-wide { display: none; }
+}
+.landing-demo a { min-height: var(--tap-key); }
+
 /* --------------------------------------------------------------------------
    老人端首屏的「今天」
    ..........................................................................
@@ -383,9 +390,12 @@ body[data-focus="on"] .elder-focus > #taskSpace {
   overscroll-behavior: contain;
 }
 
-/* 输入行和状态行不参与收缩：它们是这一屏的出口，任何时候都必须在。 */
+/* 输入行和状态行不参与收缩：它们是这一屏的出口，任何时候都必须在。
+   #status 在 elder-focus 外，保存设置与首页待办失败也要能看见。 */
 body[data-focus="on"] .elder-focus > .composer,
-body[data-focus="on"] .elder-focus > #status { flex: 0 0 auto; }
+body[data-focus="on"] .elder-layout > .status-line { flex: 0 0 auto; }
+.status-line:empty { min-height: 0; margin-top: 0; }
+.elder-layout > .status-line { margin: var(--space-1) var(--space-4) 0; }
 
 /* 矮屏上，输入行只留退路本身。
    ......................................................................
@@ -1348,6 +1358,7 @@ body[data-task-view] .elder-focus > #chat {
 .receipt-time,
 #stageSizes .stage-pick,
 .device-caption {
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
   font-feature-settings: var(--numeric-plain);
 }
 

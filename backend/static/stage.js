@@ -227,4 +227,188 @@
   }
 
   applySize();
+
+  // --- 七拍叙事 -------------------------------------------------------------
+  // 证明按钮。七拍的每一拍都对应一个调用，把真实响应填进右栏的对应区块。
+  // 这些函数同时被 "data-run" 按钮（单独跑这一拍）和 playStory()（从头演一遍）调用。
+  // 它们暴露到全局以便 stage.html 里的 data-run 属性能按 id 找到。
+  const byId = (id) => document.getElementById(id);
+  window.__stageStory = {
+    async runOpen() {
+      const el = byId('beatOpen');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        const resp = await api('/v2/tasks', {method: 'GET'}, 'elder');
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runVoice() {
+      const el = byId('demoVoiceOut');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        const resp = await api('/v5/voice/resolve', {method: 'POST', body: JSON.stringify({
+          elder_id: ids.elderId, side_effect_possible: true,
+          candidates: [
+            {text: '帮我交水费', confidence: 0.96, engine: 'HarmonyASR'},
+            {text: '帮我缴水费', confidence: 0.93, engine: 'BackupASR'},
+          ],
+        })});
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runLoad() {
+      const el = byId('demoLoadOut');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        // RiskLevel 是 IntEnum：INFORMATION=1, LOW=2, SENSITIVE=3, HIGH=4
+        const resp = await api('/v3/delegation/preview', {method: 'POST', body: JSON.stringify({
+          task_type: 'bill_payment', risk_level: 4, amount_cents: 6840,
+          ambiguity: 0.1, tool_is_reversible: true,
+        })});
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runPreview() {
+      const el = byId('demoPreviewOut');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        const resp = await api('/v5/actions/authorize', {method: 'POST', body: JSON.stringify({
+          elder_id: ids.elderId, goal: '帮我交本月水费', action: 'create_payment_request',
+          arguments: {bill_id: 'bill-water-2026-07', amount_cents: 6840, elder_id: ids.elderId},
+          facts: [{name: 'amount_cents', value: 6840, origin: 'trusted_tool',
+                   purpose: 'bill_payment', trusted_for_control: true}],
+          user_confirmed: true, family_approvals: 1, reversible: true,
+        })});
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runTeachBack() {
+      const el = byId('beatTeach');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        // audit requires family role
+        const resp = await api(`/v2/audit?entity_id=${ids.elderId}`, {method: 'GET'}, 'family');
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runRelay() {
+      const el = byId('beatRelay');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        // 创建 Saga
+        const saga = await api('/v5/sagas', {method: 'POST', body: JSON.stringify({
+          elder_id: ids.elderId, kind: 'bill_payment', goal: '交本月水费',
+          context: {bill_type: '水费'}, request_id: `stage-story-${Date.now()}`,
+        })});
+        // 推进 saga：每一步用正确的角色
+        let current = saga;
+        const outputs = {
+          locate_bill: {bill_id: 'bill-water-2026-07', amount_cents: 6840},
+          elder_confirm: {confirmed: true},
+          family_approval: {approved: true},
+          generate_payment_request: {request_id: 'demo-payment-request'},
+          observe_authoritative_payment_state: {paid: true, receipt: 'demo-receipt'},
+          verify_final_state: {verified: true},
+        };
+        while (current && current.current_step_index < current.steps.length) {
+          const step = current.steps[current.current_step_index];
+          if (!step) break;
+          let role = 'system';
+          // 只有这两步是人工步骤，其余自动步骤用 system
+          if (step.name === 'elder_confirm') role = 'elder';
+          if (step.name === 'family_approval') role = 'family';
+          current = await api(`/v5/sagas/${current.id}/advance`, {
+            method: 'POST', body: JSON.stringify({
+              outcome: 'success', output: outputs[step.name] || {},
+              expected_version: current.version,
+              idempotency_key: `${current.id}-${current.version}`,
+            }),
+          }, role);
+        }
+        el.textContent = JSON.stringify(current, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+    async runCard() {
+      const el = document.querySelector('.glass-card');
+      if (!el) return;
+      try {
+        const {api} = window.YouHuo;
+        const ids = await window.YouHuo.ready();
+        // audit requires family role
+        const resp = await api(`/v2/audit?entity_id=${ids.elderId}&limit=10`, {method: 'GET'}, 'family');
+        el.textContent = JSON.stringify(resp, null, 2);
+      } catch (error) { el.textContent = error.message; }
+    },
+  };
+
+  /** 从头演一遍：依次走完七拍。 */
+  async function playStory() {
+    const button = document.getElementById('playStory');
+    const progress = document.getElementById('stageProgress');
+    if (!button || !progress) return;
+    button.disabled = true;
+    // 先把所有拍重置
+    document.querySelectorAll('.beat').forEach((b) => b.classList.remove('is-played'));
+    const beats = document.querySelectorAll('.beat');
+    const proofs = document.querySelectorAll('[data-beat-proof]');
+    const intro = document.getElementById('beatIntro');
+    if (intro) intro.hidden = true;
+
+    const runFns = ['runOpen', 'runVoice', 'runLoad', 'runPreview', 'runTeachBack', 'runRelay', 'runCard'];
+    for (let i = 0; i < beats.length && i < 7; i++) {
+      const beat = beats[i];
+      beat.classList.add('is-played');
+      if (proofs[i]) proofs[i].hidden = false;
+      progress.textContent = `第 ${String(i + 1).padStart(2, '0')} 拍 · 进行中`;
+      const fn = window.__stageStory && window.__stageStory[runFns[i]];
+      if (fn) {
+        try { await fn(); } catch (_) { /* 单拍失败不影响后续 */ }
+      }
+      // 每拍之间停顿 420ms，让动画有时间渲染
+      await new Promise((resolve) => setTimeout(resolve, 420));
+    }
+    progress.textContent = '七拍全部完成';
+    if (button) button.disabled = false;
+  }
+
+  // 绑定「从头演一遍」按钮
+  const playBtn = document.getElementById('playStory');
+  if (playBtn) playBtn.addEventListener('click', () => playStory());
+
+  // 绑定节拍跳转按钮（点序号直接落到那一步，不重跑）
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('.beat-jump');
+    if (!btn) return;
+    const beatNum = btn.dataset.jump;
+    const beat = document.querySelector(`.beat[data-beat="${beatNum}"]`);
+    if (!beat) return;
+    // 滚动到该拍
+    beat.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    // 显示对应证明区块
+    const proof = document.querySelector(`[data-beat-proof="${beatNum}"]`);
+    if (proof) proof.hidden = false;
+    const intro = document.getElementById('beatIntro');
+    if (intro) intro.hidden = true;
+  });
+
+  // 绑定 data-run 按钮（单独跑这一拍）
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-run]');
+    if (!btn) return;
+    const fnName = btn.dataset.run;
+    const fn = window.__stageStory && window.__stageStory[fnName];
+    if (fn) fn();
+  });
 })();

@@ -16,6 +16,10 @@ r"""打交付包。
   2. 生成 MANIFEST.sha256（逐文件散列）
   3. 压缩成 .zip 并生成 .zip.sha256
 
+发布策略：第三方 `.claude/skills` 与 `.agents` 不随包发布；它们由 `.gitignore` 排除，
+可按仓库的技能登记重新安装。仓库自有的 `.claude/skills/youhuo-ui-constraints/SKILL.md`
+属于项目约束，会随 Git 跟踪文件进入包。脚本输出的包内 MANIFEST 是实际交付内容的唯一清单。
+
 最后自己检查一遍包里有没有敏感文件——打包脚本自己也可能有 bug。
 """
 

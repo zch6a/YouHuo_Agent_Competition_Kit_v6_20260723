@@ -51,7 +51,14 @@
     <p class="notice good care-status" aria-live="polite" id="status">正在连接……</p>
 
     <nav class="segmented" aria-label="照护分区">
-      <button type="button" class="seg is-current" data-section="today" aria-current="true">今天</button>
+      <!-- 「概览」是默认分区，而且它是这一页从**功能分区**变成**以人为中心**的那一步。
+           原先六个格子是平级的：打开这一页，人要先决定「我今天想看哪一个功能」，
+           然后自己在脑子里把六段拼回一个人。核心对象是六个功能，不是他。
+           现在第一屏回答的是一个问题——他最近怎么样——由五行摘要给出，每一行点进去
+           就是对应的那一段。六段一段都没有删（它们是 Module 层，不是重复导航），
+           只是从「六个入口」变成「一个人 + 五处细节」。 -->
+      <button type="button" class="seg is-current" data-section="overview" aria-current="true">概览</button>
+      <button type="button" class="seg" data-section="today">今天</button>
       <button type="button" class="seg" data-section="med">用药</button>
       <button type="button" class="seg" data-section="body">身体</button>
       <button type="button" class="seg" data-section="mood">心情</button>
@@ -62,12 +69,54 @@
       <button type="button" class="seg" data-section="trend">趋势</button>
     </nav>
 
-    <!-- 五段都是**进页面就加载**，不是点按钮才出数据。
+    <!-- 六段都是**进页面就加载**，不是点按钮才出数据。
          这一页原先有十三个按钮（「上报屋里 13.5℃」「加载能力矩阵」…），那是一个
          演示台，不是一份档案；它们全部搬到了 /stage 的「场景注入」，一个都没删。
-         每一段读一个既有的 GET，没有新增任何后端接口——见 care.js 顶部那张表。 -->
+         每一段读一个既有的 GET，没有新增任何后端接口——见 care.js 顶部那张表。
+         「概览」不多读一个接口：它的五行摘要由那六段各自加载完之后回填。 -->
 
-    <section class="page-section" data-panel="today" aria-label="他今天怎么样">
+    <!-- 概览。
+         ..................................................................
+         这一段**没有自己的数据源**，一个新的 GET 都没有。五行摘要分别由
+         loadToday / loadMedications / loadHealth / loadMood / loadSafety 在它们
+         各自的请求回来之后回填（care.js 的 `overviewSay`）——所以「一段慢了不
+         拖累其他段」这条性质原样保留：慢的那一行自己停在「正在读……」，其余四行
+         照常出现。
+
+         五行是**静态写在这里**的，不是 JS 建出来的。三个理由：
+           · 它们从第一帧起就能点——加载还没回来的时候，人已经可以进细节；
+           · `initSections` 只在加载时绑一次 `.seg`，而这五行走的是 `href="#…"`
+             加 hashchange，不需要绑定，也不会被 `check_page_runtime` 当按钮去按；
+           · 控件清单（11_control_inventory.json）静态扫描才看得见它们，
+             它们才有稳定身份，搬走或删掉会被闸门发现。 -->
+    <section class="page-section" data-panel="overview" aria-label="他最近怎么样">
+      <h2 class="section-head">他最近怎么样</h2>
+      <p class="section-note">先看这一屏。每一行点进去，就是那一段的细节。</p>
+      <div id="overviewBody" aria-live="polite">
+        <!-- 结论在最前，和「今天」那一段用的是同一个组件（`.report-verdict`）：
+             同一个判定在两处必须长得一样，否则人会以为它们是两件事。 -->
+        <div class="report-verdict" id="ovVerdict">
+          <span class="report-badge">还没读到</span><strong>正在读今天的情况……</strong>
+        </div>
+        <a class="trust-more-link" id="ovToday" href="#today">
+          <span><span>今天</span><br /><span class="meta">正在读今天的情况……</span></span>
+        </a>
+        <a class="trust-more-link" id="ovMed" href="#med">
+          <span><span>在吃什么药</span><br /><span class="meta">正在读用药情况……</span></span>
+        </a>
+        <a class="trust-more-link" id="ovBody" href="#body">
+          <span><span>身体</span><br /><span class="meta">正在读体检与就诊记录……</span></span>
+        </a>
+        <a class="trust-more-link" id="ovMood" href="#mood">
+          <span><span>心情</span><br /><span class="meta">正在读最近两周的情况……</span></span>
+        </a>
+        <a class="trust-more-link" id="ovSafety" href="#safety">
+          <span><span>安全</span><br /><span class="meta">正在读安全设置……</span></span>
+        </a>
+      </div>
+    </section>
+
+    <section class="page-section" data-panel="today" aria-label="他今天怎么样" hidden>
       <h2 class="section-head">他今天怎么样</h2>
       <p class="section-note">先建立他自己的常态，再谈今天是不是不一样。</p>
       <div id="todayBody" aria-live="polite">
@@ -122,14 +171,20 @@
       <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-today" /></svg><span>今天</span></a>
       <a href="/family#todo" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-todo" /></svg><span>待办</span></a>
       <!-- 这一格**故意不带** `seg` / `data-section`，尽管它指向本文档。
-           因为它代表的是 shell 里的**槽位**，不是某一个分区：这一页有六个分区
-           （今天/用药/身体/心情/安全/趋势），无论看的是哪一个，人都还在「照护」里。
+           因为它代表的是 shell 里的**槽位**，不是某一个分区：这一页有七个分区
+           （概览/今天/用药/身体/心情/安全/趋势），无论看的是哪一个，人都还在
+           「照护」里。
            给它 `data-section="today"` 试过一版，后果是用户点顶部「用药」时
            `show('med')` 会把这一格的高亮撤掉——底部四格一格都不亮，而他明明在照护里。
            `Route → Surface → Shell → Module → Panel` 里 Shell 和 Panel 是两层，
            一个控件不能同时当两层的指示灯。
-           href 仍写 `#today`：再点一次「照护」回到这一页的默认分区，那是 App 里
-           点当前 Tab 的常规行为，而且 `initSections` 的 hashchange 会接住它。 -->
+           href 仍写 `#today`，而**这一页的默认分区现在是「概览」**：两者不再是同一个。
+           这不是疏忽——这一格的 hash 由 `surfaces.py` 的 `FAMILY_NAV` 算出来
+           （`NavItem("care", "照护", "/care", "today")`），三份 markup 必须和它逐字
+           一致，`test_the_same_four_destinations_in_the_same_order` 会核对。
+           后果是良性的：再点一次「照护」落在「今天」而不是「概览」，仍然是这一页里
+           一个真实存在的分区，`initSections` 的 hashchange 照样接得住。
+           要让它落在「概览」，得改 `surfaces.py` 里那一行，而那不在这一轮的范围内。 -->
       <a href="#today" class="tab is-current" aria-current="page"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-care" /></svg><span>照护</span></a>
       <a href="/family#mine" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-me" /></svg><span>我的</span></a>
     </nav>

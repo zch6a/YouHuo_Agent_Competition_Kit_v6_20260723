@@ -26,9 +26,14 @@
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
 
-  <!-- 顶栏：四个分区 + 深度开关。
-       手机框内的那四个页面**没有**这一栏——它是这一页独有的东西，因为只有这一页
-       需要在"给谁看"之间切换。 -->
+  <!-- 顶栏：只剩三样东西。
+       ..........................................................................
+       原先这里有四个分区键加两个模式键，六个控件挤在一条 flex 里——实测它**换行**，
+       顶栏因此是 111px 而不是 CSS 里写的 `--stage-top-h: 76px`。那 35px 不是排版
+       瑕疵：`--chrome` 拿这个变量去算手机的可用高度，于是机身比它该有的高度少 35px，
+       框内那条底部标签栏被顶到机身边框上。手机是这一页的视觉中心，顶栏不该跟它抢。
+
+       现在顶栏是：招牌 · 进度 · 一个导演台入口。分区键和模式键都进了导演台。 -->
   <header class="stage-top">
     <div class="stage-brand">
       <span class="stage-mark" aria-hidden="true">优</span>
@@ -37,70 +42,231 @@
         <p class="stage-note">框里跑的是真实应用，不是截图。</p>
       </div>
     </div>
-    <nav class="segmented stage-segs" aria-label="看哪一层">
-      <button type="button" class="seg is-current" data-section="product" aria-current="true">产品</button>
-      <button type="button" class="seg" data-section="demo">演示</button>
-      <button type="button" class="seg" data-section="proof">证明</button>
-      <button type="button" class="seg" data-section="engineering">工程</button>
-    </nav>
-    <!-- 深度开关。产品模式把「工程」整层收起来：答辩的前八分钟不该有人看见
-         `/v5/metrics` 的原始响应，而最后两分钟必须能当场打开。 -->
-    <div class="stage-depth" role="group" aria-label="给谁看">
-      <button type="button" class="stage-pick is-current" id="depthProduct" aria-pressed="true">产品模式</button>
-      <button type="button" class="stage-pick" id="depthTechnical" aria-pressed="false">技术模式</button>
+    <!-- 进度。观众层的第四样东西：任何时候都能一眼看出这场演示走到哪儿了。 -->
+    <p class="stage-note" id="stageProgress" role="status" aria-live="polite">还没开始 · 共七拍</p>
+    <div class="stage-depth" role="group" aria-label="导演台">
+      <button type="button" class="stage-pick" id="directorToggle"
+              aria-expanded="false" aria-controls="directorDeck">导演台</button>
     </div>
   </header>
 
   <main class="demo-stage" id="main">
-    <!-- 左侧控制区。它只存在于这一页——六个 App 页面里不出现「场景：诈骗」这种按钮，
-         那是给答辩人用的，不是给一位老人用的。 -->
-    <aside class="stage-controls" id="stageControls" aria-label="演示控制">
-      <section class="stage-group" aria-label="看哪一端">
-        <h2>看哪一端</h2>
-        <div class="stage-choices" id="stageRoles">
-          <button type="button" class="stage-pick is-current" data-route="/elder" aria-current="true">老人端</button>
-          <button type="button" class="stage-pick" data-route="/family">家人端</button>
-          <button type="button" class="stage-pick" data-route="/care">照护</button>
-          <button type="button" class="stage-pick" data-route="/trust">可信中心</button>
-          <button type="button" class="stage-pick" data-route="/judge">评委导览</button>
+    <!-- ====================== 观众层 · 叙事 ==============================
+         这一栏是这一页的主线：一位老人交一次水费，中间发生了七件事。
+         每一拍只写「发生了什么」，不写「它凭什么」——后者在右栏，因为
+         「这东西是干什么的」必须先于「它怎么实现的」。
+
+         导演层收在这一栏最底下的那个 `<details>` 里。答辩的十分钟里它是一行字。
+         ==================================================================== -->
+    <aside class="stage-controls" id="stageControls" aria-label="七拍叙事与导演台">
+      <section class="stage-group" aria-label="这一场演示">
+        <h2>一位老人交一次水费，中间发生了七件事</h2>
+        <p class="stage-note">七拍跟着<b>同一件事</b>走。中间那台手机里跑的是真实的应用本身
+          ——不是录屏，也不是截图。她的两句话是真的填进输入框、真的按了发送。</p>
+        <button type="button" id="playStory">从头演一遍（约 20 秒）</button>
+        <p class="notice good" id="proofStatus" aria-live="polite">正在准备三个角色的演示身份……</p>
+        <p class="stage-note" id="storyStatus" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="stage-group" aria-label="七拍">
+        <h2>七拍</h2>
+        <!-- 序号既是这一拍的状态（演过上色、当前带光晕），也是跳转控件：
+             点它只把手机装到这一步、把右栏切到这一拍的证明，**不重跑**这一拍。
+             重跑的按钮在右栏那一拍自己的卡片里，两个控件各做一件事。 -->
+        <div class="story">
+          <article class="beat" data-beat="01">
+            <button type="button" class="beat-index beat-jump" data-jump="01"
+                    aria-label="第 1 拍，她开口：把手机装到这一步">01</button>
+            <div class="beat-body">
+              <h3 class="beat-title">她开口</h3>
+              <p class="beat-say" id="say-01">「帮我交这个月的水费。」</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="02">
+            <button type="button" class="beat-index beat-jump" data-jump="02"
+                    aria-label="第 2 拍，听不清就不猜：把手机装到这一步">02</button>
+            <div class="beat-body">
+              <h3 class="beat-title">听不清，就不猜</h3>
+              <p class="beat-say" id="say-02">两路识别打起来了：一路听成「确认办理」，一路听成「取消办理」。</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="03">
+            <button type="button" class="beat-index beat-jump" data-jump="03"
+                    aria-label="第 3 拍，一次只问一件事：把手机装到这一步">03</button>
+            <div class="beat-body">
+              <h3 class="beat-title">一次只问一件事</h3>
+              <p class="beat-say" id="say-03">这一轮只呈现一个动作，并且要她复述，而不是给她四个按钮。</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="04">
+            <button type="button" class="beat-index beat-jump" data-jump="04"
+                    aria-label="第 4 拍，账单图片说 9999.99：把手机装到这一步">04</button>
+            <div class="beat-body">
+              <h3 class="beat-title">账单图片说 9999.99，优活不听它的</h3>
+              <p class="beat-say" id="say-04">图片里的金额和「直接支付」指令都被剥掉了，只有账单接口返回的数字进得了工具参数。</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="05">
+            <button type="button" class="beat-index beat-jump" data-jump="05"
+                    aria-label="第 5 拍，她得把金额念一遍：把手机装到这一步">05</button>
+            <div class="beat-body">
+              <h3 class="beat-title">她得把金额念一遍</h3>
+              <p class="beat-say" id="say-05">念对了才继续；念错了就停下，不会按听到的数字去付。</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="06">
+            <button type="button" class="beat-index beat-jump" data-jump="06"
+                    aria-label="第 6 拍，第二个人点头：把手机装到这一步">06</button>
+            <div class="beat-body">
+              <h3 class="beat-title">第二个人点头</h3>
+              <p class="beat-say" id="say-06">女儿点了同意，而她同意的摘要和老人确认的是同一个。</p>
+            </div>
+          </article>
+
+          <article class="beat" data-beat="07">
+            <button type="button" class="beat-index beat-jump" data-jump="07"
+                    aria-label="第 7 拍，办好了而且说得清为什么：把手机装到这一步">07</button>
+            <div class="beat-body">
+              <h3 class="beat-title">办好了，而且说得清为什么</h3>
+              <p class="beat-say" id="say-07">听到了什么、哪些来源核验过、谁做最终决定、下一步是什么、能不能撤。</p>
+            </div>
+          </article>
         </div>
       </section>
 
-      <section class="stage-group" aria-label="演示台词">
-        <h2>演示台词</h2>
-        <p class="stage-note">点一下，把这句话送进老人端的输入框——真的发出去，不是演的。</p>
-        <div class="stage-choices" id="stageLines">
-          <button type="button" class="stage-pick" data-say="帮我交这个月的水费">缴费</button>
-          <button type="button" class="stage-pick" data-say="帮我挂个心内科">挂号</button>
-          <button type="button" class="stage-pick" data-say="我今天吃药了吗">用药</button>
-          <button type="button" class="stage-pick" data-say="有人说我中奖了要我先交钱">识别诈骗</button>
-          <button type="button" class="stage-pick" data-say="我一个人很孤单，没人陪">陪伴</button>
-        </div>
-      </section>
+      <!-- ====================== 导演层 ==================================
+           一个不起眼的入口，展开才有东西。答辩的十分钟里屏幕上不该有六十九个
+           按钮，而开发者仍然要能控制整场演示——所以是收起来，不是删掉。
 
-      <section class="stage-group" aria-label="视口">
-        <h2>视口</h2>
-        <div class="stage-choices" id="stageSizes">
-          <button type="button" class="stage-pick is-current" data-w="390" data-h="844" aria-current="true">390 × 844</button>
-          <button type="button" class="stage-pick" data-w="320" data-h="568">320 × 568</button>
-          <button type="button" class="stage-pick" data-w="412" data-h="915">412 × 915</button>
-        </div>
-      </section>
+           收进来的每一个控件都登记在 `D:\YouHuo\proposals\stage-controls.md`。
+           一个都没删：同一个 id、同一个 handler、同一个输出区，只换了位置。
+           =============================================================== -->
+      <details class="stage-group" id="directorDeck">
+        <summary>导演台（答辩时不用打开）</summary>
 
-      <section class="stage-group" aria-label="舞台">
-        <h2>舞台</h2>
-        <div class="stage-choices">
-          <button type="button" class="stage-pick" id="stageClean">只留手机（答辩模式）</button>
-          <button type="button" class="stage-pick" id="stageFull">全屏</button>
-          <button type="button" class="stage-pick" id="stageReset">重新开始</button>
-        </div>
-        <p class="stage-note" id="stageHint" role="status" aria-live="polite"></p>
-      </section>
+        <section class="stage-group" aria-label="场景选择">
+          <h2>场景选择</h2>
+          <p class="stage-note">右栏一次只显示一章。这里是目录，不是按钮墙——
+            点章名换整章，点条目直接落到那一段上。</p>
+          <div class="segmented" role="group" aria-label="换一章">
+            <button type="button" class="seg is-current" data-section="beats" aria-current="true">这一拍</button>
+            <button type="button" class="seg" data-section="product">产品</button>
+            <button type="button" class="seg" data-section="demo">演示</button>
+            <button type="button" class="seg" data-section="proof">证明</button>
+            <button type="button" class="seg" data-section="engineering">工程</button>
+          </div>
 
-      <p class="stage-note stage-exit"><a href="/">直接打开应用（不套框）→</a></p>
+          <nav aria-label="产品这一章的目录">
+            <h2>产品</h2>
+            <p class="stage-note"><a href="#cardWhat">它替谁解决什么 →</a></p>
+            <p class="stage-note"><a href="#cardThreeEnds">三个端，一套后台 →</a></p>
+          </nav>
+
+          <nav aria-label="演示这一章的目录">
+            <h2>演示 · 场景注入</h2>
+            <p class="stage-note"><a href="#cardBaseline">他自己的常态与今天 →</a></p>
+            <p class="stage-note"><a href="#cardRoutine">循环事务与月报 →</a></p>
+            <p class="stage-note"><a href="#cardMeds">用药与库存安全 →</a></p>
+            <p class="stage-note"><a href="#cardEmotion">情绪优先任务锁 →</a></p>
+            <p class="stage-note"><a href="#cardMedical">体检报告与健康时间线 →</a></p>
+            <p class="stage-note"><a href="#cardLocation">位置围栏与一键求助 →</a></p>
+            <p class="stage-note"><a href="#cardScheduler">到期待办推进 →</a></p>
+          </nav>
+
+          <nav aria-label="证明这一章的目录">
+            <h2>证明 · 四条底线</h2>
+            <p class="stage-note"><a href="#cardVoice">语音共识与保守澄清 →</a></p>
+            <p class="stage-note"><a href="#cardPolicy">目的绑定策略防火墙 →</a></p>
+            <p class="stage-note"><a href="#proofEnvelope">限时紧急破窗（自主权包络）→</a></p>
+            <p class="stage-note"><a href="#proofConsensus">缴费要走完的六步（家庭共识）→</a></p>
+            <p class="stage-note"><a href="#proofDone">能力真值与运行指标（证明式完成）→</a></p>
+            <p class="stage-note"><a href="#proofMemory">记住一件事要本人点头（同意记忆）→</a></p>
+          </nav>
+
+          <nav aria-label="工程这一章的目录">
+            <h2>工程</h2>
+            <p class="stage-note">这一章要先在下面切到技术模式才出现。</p>
+            <p class="stage-note"><a href="#cardSync">跨设备离线冲突 →</a></p>
+            <p class="stage-note"><a href="#cardCapabilities">能力真实性清单 →</a></p>
+          </nav>
+        </section>
+
+        <section class="stage-group" aria-label="数据状态">
+          <h2>数据状态</h2>
+          <p class="stage-note">这个家庭现在有多少数据，是服务器启动时就选定的：空的、常态、
+            或者需要关注。下面三条真的往后端写一条环境采样或一条活动心跳，
+            让「需要关注」当场发生——偏离由后端拿他自己的常态算出来，不是界面演的。</p>
+          <p class="stage-note"><a href="#baselineDemo">看他自己的常态与今天 →</a></p>
+          <p class="stage-note"><a href="#coldRoomDemo">上报「屋里 13.5℃」看关怀语变化 →</a></p>
+          <p class="stage-note"><a href="#lateWakeDemo">模拟「今天 11:20 才起」看偏离 →</a></p>
+        </section>
+
+        <section class="stage-group" aria-label="手机装哪一端">
+          <h2>手机装哪一端</h2>
+          <p class="stage-note">七拍会自己把手机装到该看的那一端。这里是手动接管。</p>
+          <div class="stage-choices" id="stageRoles">
+            <button type="button" class="stage-pick is-current" data-route="/elder" aria-current="true">老人端</button>
+            <button type="button" class="stage-pick" data-route="/family">家人端</button>
+            <button type="button" class="stage-pick" data-route="/care">照护</button>
+            <button type="button" class="stage-pick" data-route="/trust">可信中心</button>
+            <button type="button" class="stage-pick" data-route="/judge">评委导览</button>
+          </div>
+        </section>
+
+        <section class="stage-group" aria-label="临时台词">
+          <h2>临时台词</h2>
+          <p class="stage-note">点一下，把这句话送进老人端的输入框——真的发出去，不是演的。
+            七拍之外临时被问到什么，用这里。</p>
+          <div class="stage-choices" id="stageLines">
+            <button type="button" class="stage-pick" data-say="帮我交这个月的水费">缴费</button>
+            <button type="button" class="stage-pick" data-say="帮我挂个心内科">挂号</button>
+            <button type="button" class="stage-pick" data-say="我今天吃药了吗">用药</button>
+            <button type="button" class="stage-pick" data-say="有人说我中奖了要我先交钱">识别诈骗</button>
+            <button type="button" class="stage-pick" data-say="我一个人很孤单，没人陪">陪伴</button>
+          </div>
+        </section>
+
+        <section class="stage-group" aria-label="视口">
+          <h2>视口</h2>
+          <p class="stage-note">选的是**想要**的尺寸。窗口装不下时机身会按可用高度收，
+            下面那行说明写的永远是它**真实**的大小。</p>
+          <div class="stage-choices" id="stageSizes">
+            <button type="button" class="stage-pick is-current" data-w="390" data-h="844" aria-current="true">390 × 844</button>
+            <button type="button" class="stage-pick" data-w="320" data-h="568">320 × 568</button>
+            <button type="button" class="stage-pick" data-w="412" data-h="915">412 × 915</button>
+          </div>
+        </section>
+
+        <section class="stage-group" aria-label="重置与舞台">
+          <h2>重置</h2>
+          <div class="stage-choices">
+            <button type="button" class="stage-pick" id="stageReset">重新开始</button>
+            <button type="button" class="stage-pick" id="stageClean">只留手机（答辩模式）</button>
+            <button type="button" class="stage-pick" id="stageFull">全屏</button>
+          </div>
+          <p class="stage-note" id="stageHint" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="stage-group" aria-label="技术模式">
+          <h2>技术模式</h2>
+          <p class="stage-note">产品模式把「工程」整章收起来：答辩的前八分钟不该有人看见
+            原始响应，最后两分钟必须能当场打开。</p>
+          <div class="stage-choices">
+            <button type="button" class="stage-pick is-current" id="depthProduct" aria-pressed="true">产品模式</button>
+            <button type="button" class="stage-pick" id="depthTechnical" aria-pressed="false">技术模式</button>
+          </div>
+        </section>
+
+        <p class="stage-note stage-exit"><a href="/">直接打开应用（不套框）→</a></p>
+      </details>
     </aside>
 
-    <!-- 手机。它是这一页的主角；左右两侧都不能抢走它的视觉中心位置。 -->
+    <!-- 手机。它是这一页的主角；两侧都不能抢走它的视觉中心位置。 -->
     <div class="stage-viewport">
       <div class="device" id="device">
         <div class="device-screen">
@@ -111,26 +277,99 @@
         </div>
       </div>
       <p class="device-caption" id="deviceCaption">老人端 · 390 × 844</p>
+      <p class="stage-note" id="phoneHint" role="status" aria-live="polite">框里是真实的应用本身。按「从头演一遍」，或者点任意一拍的序号。</p>
     </div>
 
-    <!-- 右侧：产品说明与证明。
-         ......................................................................
-         这一整栏是从手机框里搬出来的。设计稿第 26 节的判据是"把手机框单独截图，
-         任何普通人都该觉得这就是一个能下载使用的 App"——而
-         「演示恶意文档金额」「加载聚合指标」出现在一位 78 岁用户的手机里，
-         是把整个比赛项目塞进了产品。
+    <!-- ================== 观众层 · 这一步证明了什么 ======================
+         左栏说「发生了什么」，这一栏说「它凭什么」：这一拍走的是哪个接口、
+         真实响应回了什么、以及单独重跑这一拍的按钮。
 
-         **一个都没删**：同一个 handler、同一个接口、同一个输出区（见
-         proof-demos.js 与 test_no_control_was_silently_deleted.py），只换位置。 -->
-    <aside class="stage-proof" id="stageProof" aria-label="产品与证明">
-      <p class="notice good" aria-live="polite" id="proofStatus">正在准备三个角色的演示身份……</p>
+         下面四章（产品 / 演示 / 证明 / 工程）是原来那面按钮墙。它们一个都没删，
+         只是默认不显示——目录在导演台里。
+         ==================================================================== -->
+    <aside class="stage-proof" id="stageProof" aria-label="这一步证明了什么">
+
+      <!-- ======================= 这一拍 ============================== -->
+      <section class="page-section" id="beats" data-panel="beats" aria-label="这一步证明了什么">
+        <h2 class="section-head">这一步证明了什么</h2>
+        <p class="section-note">跟着左边那七拍走。每一拍的这一段由**真实响应**填写，
+          不是写死的文案——写死的文案在接口改坏之后照样好看，那就不是演示，是插图。</p>
+
+        <article class="panel feature-panel" id="beatIntro">
+          <h3><span>还没有开始</span></h3>
+          <p>按左边那颗「从头演一遍」，或者点任意一拍的序号。每一拍会做三件事：
+            把手机装到该看的那一端、真的调一次后端、把结论写在这里。</p>
+          <p class="meta">这七拍不是七个互不相干的机制演示，是同一件事的七个先后步骤。</p>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="01" hidden>
+          <h3><span>第 1 拍 · 她开口</span></h3>
+          <p class="beat-why">这就是全部输入。没有表单，没有菜单，没有「请选择业务类型」。</p>
+          <p class="meta">手机里的老人端真的发了对话接口；这一栏读的是任务记录，不是界面。</p>
+          <button type="button" class="secondary" data-run="runOpen">单独跑这一拍</button>
+          <div class="result" id="beatOpen" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="02" hidden>
+          <h3><span>第 2 拍 · 听不清，就不猜</span></h3>
+          <p class="beat-why">语音在老人身上本来就不准。系统这时候有两个选择——按置信度高的那个
+            执行，或者停下来问。凡是有副作用的动作，优活一律停下来问。</p>
+          <p class="meta">多路语音共识 · 副作用任务用更高的阈值</p>
+          <button type="button" class="secondary" data-run="runVoice">单独跑这一拍</button>
+          <div class="result" id="demoVoiceOut" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="03" hidden>
+          <h3><span>第 3 拍 · 一次只问一件事</span></h3>
+          <p class="beat-why">适老化不是把字号调大。四个选项对一位记忆力下降的老人不是
+            「更自由」，是四倍的负担。风险越高，信息密度越要往下压。</p>
+          <p class="meta">认知负荷治理 · 本轮可见选项与复述要求都由后端定</p>
+          <button type="button" class="secondary" data-run="runLoad">单独跑这一拍</button>
+          <div class="result" id="demoLoadOut" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="04" hidden>
+          <h3><span>第 4 拍 · 不听图片里的金额</span></h3>
+          <p class="beat-why">这是这个项目的安全主线：<strong>别人写的字，不算你的指令</strong>。
+            识图、网页、短信、模型自己的输出，全部只是数据。</p>
+          <p class="meta">目的绑定安全预演 · 剥掉的字段逐个列出</p>
+          <button type="button" class="secondary" data-run="runPreview">单独跑这一拍</button>
+          <div class="result" id="demoPreviewOut" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="05" hidden>
+          <h3><span>第 5 拍 · 她得把金额念一遍</span></h3>
+          <p class="beat-why">一句「好的」证明不了她听懂了金额。复述确认是这一步唯一算数的证据。</p>
+          <p class="meta">复述确认 · 事实取自审计链，不是取自这一次的回包</p>
+          <button type="button" class="secondary" data-run="runTeachBack">单独跑这一拍</button>
+          <div class="result" id="beatTeach" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="06" hidden>
+          <h3><span>第 6 拍 · 第二个人点头</span></h3>
+          <p class="beat-why">高风险的事不由一个人拍板，也不由模型拍板。两个摘要对不上就不执行
+            ——这是「家庭共识」那条底线的实现，不是它的说法。</p>
+          <p class="meta">家人接力 · 两个摘要一致才执行</p>
+          <button type="button" class="secondary" data-run="runRelay">单独跑这一拍</button>
+          <div class="result" id="beatRelay" aria-live="polite"></div>
+        </article>
+
+        <article class="panel feature-panel" data-beat-proof="07" hidden>
+          <h3><span>第 7 拍 · 办好了，而且说得清为什么</span></h3>
+          <p class="beat-why">玻璃盒不是给工程师看的日志，是给老人看的一段话。她要能从盲目信任
+            变成知情依赖——知道什么时候该信，什么时候该问女儿。</p>
+          <p class="meta">玻璃盒依赖校准卡</p>
+          <button type="button" class="secondary" data-run="runCard">单独跑这一拍</button>
+          <div class="glass-card" id="glassCard" aria-live="polite"></div>
+        </article>
+      </section>
 
       <!-- ============================ 产品 ============================ -->
-      <section class="page-section" id="product" data-panel="product" aria-label="这是什么产品">
+      <section class="page-section" id="product" data-panel="product" aria-label="这是什么产品" hidden>
         <h2 class="section-head">这是什么产品</h2>
         <p class="section-note">一句话：让一位不会用智能手机的老人，靠说话把事办完，而家人始终知情、始终能兜底。</p>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardWhat">
           <h3><span>它替谁解决什么</span></h3>
           <p><strong>老人</strong>不需要学会任何界面：按住说话，系统把要办的事说回来给他听，
             他点头才继续。<strong>家人</strong>不需要盯着手机：花钱和看病这类事会主动找上来，
@@ -143,9 +382,9 @@
           </div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardThreeEnds">
           <h3><span>三个端，一套后台</span></h3>
-          <p>左边可以切换。老人端只有一个麦克风和四个标签；家人端把「需要你确认」放在第一屏；
+          <p>导演台里可以切换。老人端只有一个麦克风和四个标签；家人端把「需要你确认」放在第一屏；
             照护档案进页面就自动读真实数据。三端共用同一个后端，没有任何一端是截图。</p>
           <p class="meta">核心创新：系统先学这位老人<strong>自己</strong>的生活规律，再判断今天是不是不一样。
             老人 A 每天上午散步，老人 B 每天上午在家读书——同一个「今天没出门」对两个人是两个结论。</p>
@@ -158,7 +397,7 @@
         <p class="section-note">这些按钮真的往后端写数据，然后整条链路自己得出结论。
           演示和真实运行是同一条代码路径——否则它证明不了任何事。</p>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardBaseline">
           <h3><span>他自己的常态与今天</span></h3>
           <p>基线由已有事件流推导，老人不需要多做任何事，也不需要摄像头。
             后两个按钮真的写一条环境采样和一条活动心跳，偏离由后端算出来。</p>
@@ -168,7 +407,7 @@
           <div id="baselineOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardRoutine">
           <h3><span>循环事务与月报</span></h3>
           <p>创建每月固定事项，幂等生成提醒；月报不包含无忧伴聊天原文。</p>
           <button id="routineDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4" /> <path d="M3 11v-1a4 4 0 0 1 4-4h14" /> <path d="m7 22-4-4 4-4" /> <path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg><span>创建并物化「每月交水费」</span></button>
@@ -176,17 +415,17 @@
           <div class="result" id="routineOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardMeds">
           <h3><span>用药与库存安全</span></h3>
           <p>这份对照表是有限的：没查出问题不等于安全。调整用药之前，请让医生或药师看过。</p>
           <button id="interactionDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /> <path d="m8.5 8.5 7 7" /></svg><span>检查「华法林 + 阿司匹林」</span></button>
           <div class="result" id="interactionOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardEmotion">
           <h3><span>情绪优先任务锁</span></h3>
           <p>只保存情绪类别与趋势，不把聊天原文推给家属；高风险表达转人工。</p>
-          <!-- 读屏软件念一个没有名字的 textarea 只会说"编辑框"。这一段是要输进去被
+          <!-- 读屏软件念一个没有名字的 textarea 只会说「编辑框」。这一段是要输进去被
                分析的原话，名字必须说清楚它是什么。 -->
           <label for="emotionText">老人说的话（用于情绪分析）</label>
           <textarea id="emotionText" rows="3">我一个人很孤单，没人陪</textarea>
@@ -194,7 +433,7 @@
           <div class="result" id="emotionOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardMedical">
           <h3><span>体检报告与健康时间线</span></h3>
           <p>整理日期、指标和医学术语，不诊断；复查日期经确认后进入待办。</p>
           <label for="medicalText">体检报告原文（只做术语整理，不做诊断）</label>
@@ -203,7 +442,7 @@
           <div class="result" id="medicalOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardLocation">
           <h3><span>位置围栏与一键求助</span></h3>
           <p>精度不足时不自动报警；位置按最小必要原则留存。</p>
           <button id="locationInside"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></svg><span>测试家庭范围内</span></button>
@@ -212,7 +451,7 @@
           <div class="result" id="locationOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardScheduler">
           <h3><span>到期待办推进</span></h3>
           <p>提前提醒和超时升级要靠这一步推进。现在还没有后台定时器，所以需要手动催一下——
             正式环境会由服务端定时触发。这是运维动作，不是一位子女会按的按钮，所以它在这里。</p>
@@ -252,17 +491,17 @@
           </a></li>
         </ul>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardVoice">
           <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10v3" /> <path d="M6 6v11" /> <path d="M10 3v18" /> <path d="M14 8v7" /> <path d="M18 5v13" /> <path d="M22 10v3" /></svg></span><span>语音共识与保守澄清</span></h3>
-          <p>多路 ASR 候选不一致时不猜测；支付、删除、认证等副作用任务使用更高阈值。</p>
+          <p>多路识别候选不一致时不猜测；支付、删除、认证等副作用任务使用更高阈值。</p>
           <button id="voiceSafe">演示一致候选</button>
           <button class="secondary" id="voiceConflict"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>演示确认/取消冲突</span></button>
           <div class="result" id="voiceOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardPolicy">
           <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M12 9v6" /> <path d="M16 15v6" /> <path d="M16 3v6" /> <path d="M3 15h18" /> <path d="M3 9h18" /> <path d="M8 15v6" /> <path d="M8 3v6" /></svg></span><span>目的绑定策略防火墙</span></h3>
-          <p>OCR 账单中的金额可以作为待核验数据，不能直接成为支付授权或控制字段。</p>
+          <p>识图得到的账单金额可以作为待核验数据，不能直接成为支付授权或控制字段。</p>
           <button id="policySafe">演示可信账单</button>
           <button class="danger" id="policyAttack">演示恶意文档金额</button>
           <div class="result" id="policyOutput" aria-live="polite"></div>
@@ -313,10 +552,10 @@
       <!-- ============================ 工程 ============================ -->
       <section class="page-section" id="engineering" data-panel="engineering" aria-label="它是怎么被做出来和验证的" hidden>
         <h2 class="section-head">它是怎么被做出来和验证的</h2>
-        <p class="section-note">这一层默认收起。答辩的前八分钟不该有人看见原始响应，
+        <p class="section-note">这一章默认收起。答辩的前八分钟不该有人看见原始响应，
           最后两分钟必须能当场打开。</p>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardSync">
           <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057" /> <path d="M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78" /> <path d="m2 2 20 20" /></svg></span><span>跨设备离线冲突</span></h3>
           <p>两台设备在离线时改了同一个字段。普通字段可按版本合并；健康、身份这类高敏感字段
             发生并发修改时<strong>必须由人选择</strong>——系统不替谁做这个决定。</p>
@@ -324,14 +563,14 @@
           <div class="result" id="syncOutput" aria-live="polite"></div>
         </article>
 
-        <article class="panel feature-panel">
+        <article class="panel feature-panel" id="cardCapabilities">
           <h3><span class="head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="m9 14 2 2 4-4" /></svg></span><span>能力真实性清单</span></h3>
           <p>逐条列出每项能力现在到哪一步了，以及它的安全边界。</p>
           <button id="capabilitiesDemo">加载能力矩阵</button>
           <div id="capabilityList" class="task-list" aria-live="polite"></div>
         </article>
 
-        <p class="stage-note"><a href="/judge">完整的评委导览（七拍 + 证据板）→</a></p>
+        <p class="stage-note"><a href="/judge">评委导览与证据板 →</a></p>
       </section>
     </aside>
 

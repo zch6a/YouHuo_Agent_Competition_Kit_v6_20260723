@@ -173,10 +173,13 @@
             </button>
           </div>
 
-          <!-- aria-live 不是可选的：elder.js 把 12 处状态写入收敛到一个入口，理由就是
-               "读屏用户听到的顺序才是确定的"——而这个元素此前没有 aria-live，那句话是假的。 -->
-          <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
         </div>
+
+        <!-- 状态通道属于老人端外壳，不属于 Focus Mode。
+             保存字号、刷新记录、首页待办失败都发生在 Focus Mode 之外；如果把它放进
+             `.elder-focus`，这些操作的反馈会写进一个默认隐藏的节点，用户一个字也看不到。
+             它保留 aria-live，所有状态仍从 elder.js 的 setStatus() 统一发出。 -->
+        <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
 
         <!-- ═══════════════════════════════════════════════════════════════════
              ③ 记录
