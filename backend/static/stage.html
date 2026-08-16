@@ -284,11 +284,53 @@
     <!-- 手机。它是这一页的主角；两侧都不能抢走它的视觉中心位置。 -->
     <div class="stage-viewport">
       <div class="device" id="device">
+        <!-- 侧键。纯装饰，但少了它们机身就是一块圆角板子。 -->
+        <span class="device-btn device-btn-silent" aria-hidden="true"></span>
+        <span class="device-btn device-btn-volup" aria-hidden="true"></span>
+        <span class="device-btn device-btn-voldn" aria-hidden="true"></span>
+        <span class="device-btn device-btn-power" aria-hidden="true"></span>
+
         <div class="device-screen">
+          <!-- 状态栏 / 灵动岛 / home 横条：**模拟的系统界面**，不是应用的一部分。
+               整块 aria-hidden——它是一台被画出来的手机的外观，读屏软件把一个假电量
+               念出来只会误导。时间是真的（stage.js 每分钟对一次系统时钟）：既然要
+               显示，就没有理由显示一个凑出来的 9:41。 -->
+          <div class="device-status" aria-hidden="true">
+            <span class="device-clock" id="deviceClock">--:--</span>
+            <span class="device-island"></span>
+            <span class="device-signals">
+              <svg class="device-ico" viewBox="0 0 18 12" role="presentation">
+                <rect x="0"  y="8"   width="3" height="4"  rx="1"/>
+                <rect x="5"  y="5.5" width="3" height="6.5" rx="1"/>
+                <rect x="10" y="3"   width="3" height="9"  rx="1"/>
+                <rect x="15" y="0"   width="3" height="12" rx="1"/>
+              </svg>
+              <svg class="device-ico" viewBox="0 0 16 12" role="presentation">
+                <path d="M8 10.6 6.2 8.6a2.7 2.7 0 0 1 3.6 0Z"/>
+                <path d="M3.4 5.9a6.9 6.9 0 0 1 9.2 0" fill="none" stroke-width="1.6"
+                      stroke-linecap="round"/>
+                <path d="M1 3.1a10.4 10.4 0 0 1 14 0" fill="none" stroke-width="1.6"
+                      stroke-linecap="round"/>
+              </svg>
+              <svg class="device-ico device-ico-batt" viewBox="0 0 27 12" role="presentation">
+                <rect x="0.6" y="0.6" width="22" height="10.8" rx="3.2"
+                      fill="none" stroke-width="1.1" opacity=".4"/>
+                <rect x="2.2" y="2.2" width="15" height="7.6" rx="1.9"/>
+                <path d="M24.4 4.2a2.3 2.3 0 0 1 0 3.6Z" opacity=".4"/>
+              </svg>
+            </span>
+          </div>
+
           <!-- 真 iframe，不是 transform: scale()。App 必须在 390px 视口里真的跑起来：
                媒体查询、env(safe-area-inset-*)、100dvh、抽屉的 position: fixed
-               全都依赖真实视口宽度。缩放只是把桌面布局拍小。 -->
+               全都依赖真实视口宽度。缩放只是把桌面布局拍小。
+
+               状态栏和 home 横条**占位**，不是浮在应用上面：真机上这两条也是系统
+               占掉的，应用拿到的可视高度本来就比机身短。盖在上面会挡住应用自己的
+               页头，而 iframe 里 `env(safe-area-inset-top)` 恒为 0，应用躲不开。 -->
           <iframe id="deviceFrame" src="/elder" title="优活应用" allow="microphone"></iframe>
+
+          <div class="device-home" aria-hidden="true"><span></span></div>
         </div>
       </div>
       <p class="device-caption" id="deviceCaption">老人端 · 390 × 844</p>

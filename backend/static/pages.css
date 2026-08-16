@@ -1644,10 +1644,21 @@ body.is-clean .stage-proof { display: none; }
      真实手机的边框不会因为你开了深色模式就变白。这里改成固定的近黑，两个主题一致。 */
   background: linear-gradient(160deg, #3f3c38, #17151300);
   background-color: #211f1c;
-  /* 一道环境阴影，不是四道。高程靠位置和大小，不靠堆叠阴影。 */
+  /* 侧键是绝对定位的，要贴着这台机身的边缘长出去。 */
+  position: relative;
+  /* 一道环境阴影，不是四道。高程靠位置和大小，不靠堆叠阴影。
+     两道 inset 是**边框本身**，不是额外的高程：外圈一道浅色高光（金属边的受光面）、
+     内圈一道深色（屏幕玻璃陷进机身的那道坎）。少了这两道，边框就是一片平涂的黑，
+     看起来像画上去的框，而不是一圈有厚度的金属。 */
   box-shadow:
     0 var(--space-8) var(--space-16) color-mix(in srgb, var(--ink) 22%, transparent),
-    inset 0 0 0 1px rgba(255, 255, 255, .14);
+    inset 0 0 0 1px rgba(255, 255, 255, .18),
+    inset 0 0 0 var(--bezel) var(--device-rim);
+  /* 系统栏的底色由 stage.js 从框里那一页读出来覆写（同源）。在这里先声明，
+     而不是在使用处写 `var(--x, 兜底)`——带兜底的引用会把拼错的名字藏起来，
+     `test_fallbacks_are_only_used_where_the_token_is_genuinely_optional` 守的就是这条。 */
+  --device-status-bg: var(--surface);
+  --device-home-bg: var(--surface);
 }
 .device-screen {
   width: var(--screen-w);
@@ -1657,13 +1668,101 @@ body.is-clean .stage-proof { display: none; }
   background: var(--bg);
   /* 屏幕自己不投影：影子属于机身。 */
   box-shadow: none;
+  /* 状态栏 / 应用 / home 横条，三段竖排。 */
+  display: flex;
+  flex-direction: column;
 }
 .device-screen iframe {
   display: block;
   width: 100%;
-  height: 100%;
+  /* 高度由 flex 分配，不是 100%。写 100% 的话它会顶掉上下两条系统栏。 */
+  flex: 1 1 auto;
+  min-height: 0;
   border: 0;
 }
+
+/* --- 模拟的系统界面 -------------------------------------------------------
+   一个只有黑色圆角边框的矩形不会被看成手机。让它成为手机的是**屏幕里的东西**：
+   状态栏、灵动岛、底部那根横条。没有这三样，它就是一张画框。
+
+   尺寸按 iPhone 14 Pro 的实际点数取：状态区 54、home 区 34。两条都**占位**，
+   所以应用真正拿到的是 390 × (机身高 − 88)——真机上也正是这个数，它不是缩水，
+   是真实设备上应用本来就只有这么高。
+   ------------------------------------------------------------------------ */
+.device-status {
+  position: relative;
+  flex: 0 0 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 不加上内边距：让时间和图标在 54px 里居中，正好和灵动岛的中心对齐
+     （岛 top 12 + 高 30 → 中心 27；54 的一半也是 27）。先前写 padding-top 14
+     把文字压低了 6px，比岛低半行。 */
+  padding: 0 var(--space-5);
+  background: var(--device-status-bg);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.device-clock { min-width: 54px; }
+/* 灵动岛。它压在状态栏上层、水平居中，两侧才是时间和图标——这正是 iOS 16 起
+   状态栏被它切成两半的样子。 */
+.device-island {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 104px;
+  height: 30px;
+  border-radius: 999px;
+  background: #05070a;
+}
+.device-signals {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 54px;
+  justify-content: flex-end;
+}
+.device-ico {
+  height: 11px;
+  width: auto;
+  fill: currentColor;
+  stroke: currentColor;
+}
+.device-ico-batt { height: 12px; }
+
+.device-home {
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--device-home-bg);
+}
+.device-home > span {
+  display: block;
+  width: 140px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  opacity: 0.85;
+}
+
+/* --- 侧键 ----------------------------------------------------------------
+   四颗，位置按真机：左侧静音拨片 + 音量上下，右侧电源。它们要**从机身边缘长出去**
+   一点点（负 inset），贴着边缘画会看不出是按键。 */
+.device-btn {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #4a4642, #2a2724);
+}
+.device-btn-silent { left: -3px; top: 96px;  height: 26px; }
+.device-btn-volup  { left: -3px; top: 140px; height: 52px; }
+.device-btn-voldn  { left: -3px; top: 204px; height: 52px; }
+.device-btn-power  { right: -3px; top: 168px; height: 84px; }
 .device-caption {
   margin: 0;
   font-size: var(--text-xs);

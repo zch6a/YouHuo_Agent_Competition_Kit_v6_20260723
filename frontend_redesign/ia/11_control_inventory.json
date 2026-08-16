@@ -1965,7 +1965,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -1983,7 +1983,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2001,7 +2001,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2019,7 +2019,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2037,7 +2037,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2055,7 +2055,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2073,7 +2073,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2091,7 +2091,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2109,7 +2109,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2127,7 +2127,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2145,7 +2145,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2163,7 +2163,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },
@@ -2181,7 +2181,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "applySize",
+      "handler": "tickClock",
       "interaction_type": "click",
       "apis": []
     },

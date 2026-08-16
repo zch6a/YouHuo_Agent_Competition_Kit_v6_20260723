@@ -54,7 +54,80 @@
     // 现在 CSS 拿 `--want-*` 去算 `--screen-*`，两边职责不重叠。
     device.style.setProperty('--want-w', `${size.w}px`);
     device.style.setProperty('--want-h', `${size.h}px`);
-    caption.textContent = `${ROLE_WORD[route] || route} · ${size.w} × ${size.h}`;
+    // 报**应用真正拿到的那块视口**，不是机身尺寸。
+    //
+    // 状态栏和 home 横条各占掉 54 和 34（真机上也是系统占的），而机身高度还会被
+    // `min(--want-h, 可用高度)` 钳。写死 `size.h` 就是在说一个应用从来没见过的数字，
+    // 而这一页整页都在讲「框里跑的是真实应用」——那更不能在它自己的说明上写虚数。
+    // 量 iframe，不是算它：钳制发生在 CSS 里，JS 不知道钳到了多少。
+    requestAnimationFrame(() => {
+      const box = frame.getBoundingClientRect();
+      const w = Math.round(box.width) || size.w;
+      const h = Math.round(box.height) || size.h;
+      caption.textContent = `${ROLE_WORD[route] || route} · ${w} × ${h}`;
+    });
+  }
+
+  // --- 让系统栏跟框里那一页同色 ------------------------------------------------
+  //
+  // 状态栏和 home 横条是画在 iframe **外面**的，所以它们不会自动跟应用同色。
+  // 写死 `var(--surface)` 的结果：底部那条白带和应用自己的标签栏差半个色阶，
+  // 4 倍放大下是一条清清楚楚的接缝——真机上那块区域就是应用背景本身的延伸，
+  // 有接缝就立刻露馅。
+  //
+  // 同源 iframe（`frame-src 'self'`），所以直接问那一页自己是什么颜色，而不是
+  // 猜一个令牌：不同路由的标签栏未必用同一个面色，猜就会在某一端上错。
+  function matchChrome() {
+    const doc = frame.contentDocument;
+    if (!doc || !doc.body) return;
+    const view = doc.defaultView;
+    const solid = (c) => c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c);
+
+    // 取**那一个像素上真正是什么**，而不是猜哪个选择器拥有它。
+    //
+    // 上一版按 `header` / `.tabbar` 取色，结果状态栏拿到的是页头卡片的白，而应用
+    // 视口最顶上那一行其实是页面底色——差半个色阶，接缝就在放大图里。选择器写法还
+    // 有个毛病：换一条路由（家人端、照护页）页头未必叫同一个名字，猜错就静默错色。
+    // `elementFromPoint` 问的是渲染结果，对任何一页都成立。
+    const w = doc.documentElement.clientWidth;
+    const h = doc.documentElement.clientHeight;
+    const at = (x, y) => {
+      let el = doc.elementFromPoint(x, y);
+      while (el) {
+        const bg = view.getComputedStyle(el).backgroundColor;
+        if (solid(bg)) return bg;
+        el = el.parentElement;
+      }
+      return view.getComputedStyle(doc.body).backgroundColor;
+    };
+    const topBg = at(Math.round(w / 2), 1);
+    const botBg = at(Math.round(w / 2), h - 2);
+    if (solid(topBg)) device.style.setProperty('--device-status-bg', topBg);
+    if (solid(botBg)) device.style.setProperty('--device-home-bg', botBg);
+  }
+  frame.addEventListener('load', () => {
+    matchChrome();
+    // 应用的脚本是 defer 的，页头/标签栏可能在 load 之后才拿到最终配色。
+    setTimeout(matchChrome, 400);
+  });
+
+  // --- 状态栏的时间 ----------------------------------------------------------
+  //
+  // 用真实系统时钟，不用 9:41。这台手机是画出来的，但没有任何理由让它上面的
+  // 时间也是编的——而且一个不动的时间恰恰是「这是张贴图」最明显的破绽。
+  const clock = document.getElementById('deviceClock');
+  function tickClock() {
+    if (!clock) return;
+    const now = new Date();
+    clock.textContent = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+  if (clock) {
+    tickClock();
+    // 对齐到整分再按分钟走，免得显示的分钟数比系统慢将近一分钟。
+    setTimeout(() => {
+      tickClock();
+      setInterval(tickClock, 60_000);
+    }, (60 - new Date().getSeconds()) * 1000);
   }
 
   // --- 换页 -----------------------------------------------------------------
