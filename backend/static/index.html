@@ -1,84 +1,174 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="light dark" />
-  <!-- Matches the app bar so the phone status bar blends into the header. -->
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3" />
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
-  <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png" />
-  <!-- iOS ignores the manifest; these are what make "add to home screen" open
-       fullscreen without Safari's chrome. -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="优活" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <title>优活</title>
-  <link rel="stylesheet" href="/static/tokens.css" />
-  <link rel="stylesheet" href="/static/base.css" />
-  <link rel="stylesheet" href="/static/components.css" />
-  <link rel="stylesheet" href="/static/pages.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <!-- 明暗两套。只写一个 theme-color 时，深色系统下手机状态栏和页面底色对不上，
+       那条缝在装成应用之后一直在。 -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f3">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f0e0c">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" href="/static/icons/icon-192.png" sizes="192x192" type="image/png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="优活">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>优活 · 让家更近一点</title>
+  <!-- **加载顺序就是层叠顺序。** 这一页此前写成
+       `base → tokens → pages → components → landing`，`pages` 排到了 `components`
+       前面——层叠反了：凡是 pages.css 在同等特异性下刻意覆盖组件的地方，
+       在这一页上变成组件赢。这个项目在「规则的位置决定它生不生效」上咬过四次，
+       `test_stylesheet_layers_load_in_cascade_order` 就是为此建的，它抓到了。
+       `landing.css` 是这一页专属的第五层，只能排在最后。 -->
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/base.css">
+  <link rel="stylesheet" href="/static/components.css">
+  <link rel="stylesheet" href="/static/pages.css">
+  <link rel="stylesheet" href="/static/landing.css">
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo" data-surface="consumer">
+<body class="landing" data-mode="youhuo" data-surface="consumer">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
-       这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
-       `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
-       就露出来——一片黑屏至少变成一句话。
-       它不用 JS：JS 在 file:// 下同样取不到。也不用内联脚本：严格 CSP 禁止。
-       CSS 藏、CSS 失效即现，是这个约束下唯一还能工作的机制。 -->
+       平时被 base.css 的 `.needs-server { display: none }` 藏着；而 `file://` 下
+       五个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段就露出来——
+       一片黑屏至少变成一句话。不用 JS（file:// 下同样取不到），也不用内联脚本
+       （严格 CSP 禁止）。CSS 藏、CSS 失效即现，是这个约束下唯一还能工作的机制。 -->
   <p class="needs-server">
     这个页面要用服务器打开，不能直接双击 HTML 文件。<br />
     在项目根目录运行 <b>run_demo.ps1</b>（Windows）或 <b>run_demo.sh</b>，
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
-  <!-- 这一页做一件事：问你是谁，然后送你去对应的那一端。
-       此前它是一份项目目录——390px 下 8574px、六张导航卡、九个工程术语、一整块
-       「工程证据」，而视觉权重最高的卡片是「五分钟决赛导览」。一个真实用户（老人
-       或他的子女）在那一页上没有任何可以完成的事。 -->
-  <main id="main" class="landing">
-    <div class="landing-brand">
-      <span class="landing-mark" aria-hidden="true">优</span>
-      <h1>优活</h1>
-      <p class="landing-tagline">让日常生活简单一点。</p>
-    </div>
+  <main class="landing-main yh-paper">
 
-    <nav class="role-choice" aria-label="选择身份">
-      <a href="/elder" class="role-pick" data-role="elder">
-        <span class="role-pick-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3" /><path d="M8 22h8" /><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /></svg>
-        </span>
-        <strong>我是老人</strong>
-        <span class="role-pick-note">说一句话，剩下的交给优活</span>
-      </a>
-      <a href="/family" class="role-pick" data-role="family">
-        <span class="role-pick-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0" /><circle cx="10" cy="8" r="5" /><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" /></svg>
-        </span>
-        <strong>我是家人</strong>
-        <span class="role-pick-note">看看今天怎么样，有没有需要我的</span>
-      </a>
-    </nav>
+    <!-- 装饰：左上角一枚纸纹印章（纯 SVG，不靠图床） -->
+    <svg class="yh-stamp" viewBox="0 0 120 120" aria-hidden="true">
+      <defs>
+        <filter id="yh-stamp-rough">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/>
+          <feDisplacementMap in="SourceGraphic" scale="1.6"/>
+        </filter>
+      </defs>
+      <circle class="art-seal" cx="60" cy="60" r="48" fill="none" stroke-width="1.6"
+              stroke-dasharray="2 3" filter="url(#yh-stamp-rough)"/>
+      <!-- 这里原先是 `YOUHUO` 加 `SINCE 2025`。两处都要改：
+           ① 全大写英文——`test_no_page_labels_itself_with_all_caps_english` 抓的就是它，
+              而这一页的读者是老人和他们的子女；
+           ② 「SINCE 2025」是**编出来的成立年份**。这个项目整页都在讲「只有真的
+              办成了才说办成了」，一枚印章上写一个不存在的年份，代价比它好看值得的多。 -->
+      <text class="art-warm-fill" x="60" y="64" text-anchor="middle" font-size="20"
+            font-weight="700">优活</text>
+    </svg>
 
-    <p id="landingHint" class="landing-hint" role="status" aria-live="polite" hidden></p>
+    <!-- HERO：品牌字 + 主张 + 抽象纸面插画（家 = 屋顶 + 烟 = 弧线 + 心 = 一笔） -->
+    <section class="yh-hero" aria-labelledby="yh-hero-title">
+      <div class="yh-hero-text">
+        <p class="yh-eyebrow"><span class="yh-eyebrow-dot"></span>优活 · 一本给家人的本子</p>
+        <!-- 纯文本，不再逐字拆成 8 个 span。
+             逐字入场是「巨大 Hero」的一部分（任务 D 要删的三样之一），而且拆开之后
+             `test_the_scan_actually_reads_the_copy` 的 `<h1[^>]*>([^<]+)</h1>` 匹配不上
+             ——它对这一页**一直是跳过的**，看起来和通过一模一样。压平之后这条判据
+             第一次真的作用在首页上。 -->
+        <h1 id="yh-hero-title" class="yh-hero-title">让家，更近一点。</h1>
+        <p class="yh-sub">不是多一个 App，是少一点担心。</p>
+      </div>
 
-    <!-- 桌面才出现的那两个入口，放在最末。
-         `/stage` 是在电脑上做答辩、录屏、截图的人用的舞台，`/judge` 是专业审计表面。
-         这两件事在手机上都不成立：没有人在一台手机上做产品演示，也没有人在手机上逐条
-         核对审计链。
-         这一段此前写着「手机上打开它会直说『用应用本身』」——**那句话是假的**。
-         那行字只存在于 `pages.css:1673` 的一句注释里；`stage.html` 里搜不到它，
-         ≤900px 下那段样式做的只是把手机框摊平成单列（`pages.css:1674-1685`），
-         页面一个字都不会提醒你走错了地方。所以留一条通往它的链接，是把人送进一个在
-         这台设备上没有意义、而且不会自己说明的页面。
-         把它们留在窄屏，还会把一张「你是谁」的两选一重新变成一份四项的目录——
-         那正是这一页上一轮才刚去掉的形状。
-         隐藏由 `.landing-wide` 负责（≥761px 才显示），断点与全站同一档。
-         两条链接各套一层，而不是共用一层：`.landing` 是 flex 列、用 gap 分隔**直接**
-         子元素，合并成一层会让这两行贴在一起。 -->
+      <div class="yh-hero-art" aria-hidden="true">
+        <!-- 颜色不写在这里：九处色值原先是硬编码的属性，令牌层看不到它们。
+             现在每个形状只声明自己是什么（墙/门/窗/远山…），配色由 landing.css
+             从 --art-* 令牌取。描边默认走 currentColor，由 .yh-house 的 color 定。 -->
+        <svg viewBox="0 0 320 220" class="yh-house">
+          <!-- 地面 -->
+          <line class="art-ground" x1="20" y1="180" x2="300" y2="180" stroke-width="1.4" stroke-linecap="round"/>
+          <!-- 房子 -->
+          <path class="art-wall" d="M90 180 L90 110 L160 70 L230 110 L230 180 Z"
+                stroke-width="2.2" stroke-linejoin="round"/>
+          <!-- 门 -->
+          <rect class="art-door" x="145" y="135" width="30" height="45"/>
+          <circle class="art-knob" cx="170" cy="158" r="1.6"/>
+          <!-- 窗 -->
+          <rect class="art-glass" x="105" y="120" width="22" height="22" stroke-width="1.6"/>
+          <line class="art-mullion" x1="116" y1="120" x2="116" y2="142" stroke-width="1.2"/>
+          <line class="art-mullion" x1="105" y1="131" x2="127" y2="131" stroke-width="1.2"/>
+          <!-- 烟：一笔飞出去 -->
+          <path d="M165 70 C 175 50, 195 50, 200 30 S 240 18, 250 0"
+                fill="none" stroke-width="2" stroke-linecap="round"
+                stroke-dasharray="0.1 6" class="yh-smoke"/>
+          <!-- 远处小山 -->
+          <path class="art-far" d="M0 180 L60 150 L110 175 L170 145 L230 178 L320 165 L320 180 Z"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 二选一：核心契约，class=role-pick + data-role= 是 landing.js 的钩子，不能改 -->
+    <section class="yh-choose" aria-labelledby="yh-choose-title">
+      <p class="yh-choose-eyebrow"><span></span>先告诉我们，今天您是谁</p>
+      <h2 id="yh-choose-title" class="yh-choose-title">请选一个身份，开始</h2>
+
+      <div class="yh-choose-grid">
+        <a class="role-pick yh-card yh-card-elder" href="/elder" data-role="elder" aria-label="我是老人，进入老人端">
+          <div class="role-pick-icon yh-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48">
+              <circle cx="24" cy="18" r="9" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4"/>
+              <path d="M8 42 C 8 30, 40 30, 40 42" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M15 14 Q 24 6 33 14" fill="none" stroke="currentColor" stroke-width="2"/>
+              <circle cx="20" cy="18" r="1.4" fill="currentColor"/>
+              <circle cx="28" cy="18" r="1.4" fill="currentColor"/>
+              <path d="M21 23 Q 24 25 27 23" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="yh-card-body">
+            <strong>我是老人</strong>
+            <span class="yh-card-tag">给我自己用</span>
+            <p class="role-pick-note">
+              大字、大按钮。说一句话就能记一笔账，
+              找不到路就让孙辈看见我的位置。
+            </p>
+            <span class="yh-card-go">进入老人端 →</span>
+          </div>
+        </a>
+
+        <a class="role-pick yh-card yh-card-family" href="/family" data-role="family" aria-label="我是家人，进入家人端">
+          <div class="role-pick-icon yh-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48">
+              <circle cx="16" cy="20" r="7" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4"/>
+              <circle cx="32" cy="20" r="7" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4"/>
+              <path d="M2 42 C 2 32, 30 32, 30 42" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M18 42 C 18 32, 46 32, 46 42" class="yh-ic-paper" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+              <path d="M11 17 Q 16 10 21 17" fill="none" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M27 17 Q 32 10 37 17" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+          </div>
+          <div class="yh-card-body">
+            <strong>我是家人</strong>
+            <span class="yh-card-tag">陪爸妈用</span>
+            <p class="role-pick-note">
+              一处看见爸妈的位置、用药、记账；
+              紧急时一键拨过去，不用再翻通话记录。
+            </p>
+            <span class="yh-card-go">进入家人端 →</span>
+          </div>
+        </a>
+      </div>
+
+      <p id="landingHint" class="landing-hint yh-hint" hidden></p>
+    </section>
+
+    <!-- 通往另外两个表面的门。**只在桌面显示**（≥761px，断点与全站同一档）。
+         ......................................................................
+         这一版首页把这两个入口整个去掉了，于是从入口页再也到不了 `/stage` 与
+         `/judge`——`test_the_entry_page_only_names_other_surfaces_in_the_doorway`
+         报的就是这件事，而它的措辞正好说中了：「要么门的写法变了，要么它真的没有
+         通往另外两个表面的入口。前者要改这条断言，后者是产品问题。」是后者。
+
+         为什么窄屏不显示（这段理由是上一轮量出来的，照搬）：`/stage` 在 ≤900px
+         只是把手机框摊平成单列，页面一个字都不会提醒你走错了地方；留一条链接
+         等于把人送进一个在这台设备上没有意义、而且不会自己说明的页面。
+         而且它会把「你是谁」的两选一重新变成一份四项的目录。
+
+         两条链接各套一层 `.landing-wide`，不共用：`.landing` 是 flex 列、用 gap
+         分隔**直接**子元素，合并成一层会让这两行贴在一起。 -->
     <div class="landing-wide">
       <p class="landing-demo">
         <a href="/stage">产品演示 →</a>
@@ -89,7 +179,16 @@
         <a href="/judge">专业审计 →</a>
       </p>
     </div>
+
+    <!-- 底部签字：纸质本子味儿 -->
+    <footer class="yh-foot">
+      <span class="yh-foot-line"></span>
+      <span class="yh-foot-sign">优活 · 一本给家人的本子</span>
+      <span class="yh-foot-line"></span>
+    </footer>
   </main>
+
   <script src="/static/landing.js" defer></script>
+  <script src="/static/landing-new.js" defer></script>
 </body>
 </html>

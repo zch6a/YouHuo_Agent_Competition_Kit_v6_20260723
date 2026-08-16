@@ -1885,9 +1885,9 @@ body.is-clean .stage-proof { display: none; }
   color: var(--ink-3);
 }
 .beat pre {
-  background: #0d1526;
-  color: #d6e4ff;
-  border-color: #1d2b46;
+  background: var(--code-surface);
+  color: var(--code-ink);
+  border-color: var(--code-line);
   max-height: 340px;
   overflow: auto;
 }

@@ -741,7 +741,10 @@ class CompetitionEvidenceService:
                     dimension="作品完整度",
                     score_weight=20,
                     readiness="high_backend_medium_native",
-                    evidence=["老人端、家属端、照护中心、可信实验室、评委导览", "挂号/缴费/提醒完整沙箱闭环", "自动化测试与专项Benchmark"],
+                    # 「评委导览」是这一页改名前的旧称，现在它叫「事务证据工作台」。
+                    # 同一轮改名只跟到了前端，后端这句字符串留在了原地——于是页面自己
+                    # 报出的名字和它列举自己时用的名字对不上。
+                    evidence=["老人端、家属端、照护中心、可信实验室、事务证据工作台", "挂号/缴费/提醒完整沙箱闭环", "自动化测试与专项Benchmark"],
                     remaining_gap=["DevEco Studio编译签名", "官方Core Speech、Push、Location正式联调"],
                 ),
                 CompetitionEvidenceItem(

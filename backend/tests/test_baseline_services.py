@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -22,8 +22,19 @@ from youhuo.baseline_services import (
     FallbackAlerting,
 )
 
-TODAY = date(2026, 8, 9)
-NOW = datetime(2026, 8, 9, 10, 0)
+# 这两个基准点原先写死成 2026-08-09，而 `EnvironmentSample.occurred_at` 的校验器
+# 比对的是**真实**时钟：只接受「最近 7 天到 5 分钟后」。于是整份测试有一个硬到期日
+# ——2026-08-16 之后 `test_a_stale_sample_is_not_treated_as_now` 永远红，而且它构造
+# 的样本还要再往前减 5 小时，比基准点更早到期。这不是偶发，是必然，只是要等一周。
+#
+# 锚到「昨天 UTC 的 10:00」：距此刻恒定在 10~38 小时之前，两条边界都不会碰到。
+# 时刻固定在 10:00 是必须的——下面所有 at("HH:MM") 的比较都以它为参照；
+# 浮动的只有日历日期，而这份文件里没有任何断言检查字面日期，也没有按星期几分支的逻辑
+# （weekday 相关代码都在 v4/v5/utils，这里一个都没 import）。
+_ANCHOR = (datetime.now(UTC) - timedelta(days=1)).replace(
+    hour=10, minute=0, second=0, microsecond=0, tzinfo=None)
+TODAY = _ANCHOR.date()
+NOW = _ANCHOR
 
 
 def at(hhmm: str) -> float:

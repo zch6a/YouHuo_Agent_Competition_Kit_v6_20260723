@@ -18,7 +18,7 @@
 //: `task-detail.js`。不升这个字符串，已安装的设备会继续用 v8 那份**缺两个模块**
 //: 的清单——而 `elder.js` 是 `type="module"`，一个 import 取不到就是整个模块图
 //: 一起失败，离线的老人端不是降级而是白屏。
-const VERSION = 'youhuo-shell-v9';
+const VERSION = 'youhuo-shell-v10';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -38,6 +38,12 @@ const SHELL = [
   '/static/components.css',
   '/static/pages.css',
   '/static/landing.js',
+  // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：
+  //   landing.css    离线时缺它 = 首页裸奔（它是这一页专属的第五层样式）
+  //   landing-new.js `test_shell_covers_every_module` 抓到的就是它
+  // 这条清单漏一个文件，在联网时一切正常，只有断网那一次才显形。
+  '/static/landing.css',
+  '/static/landing-new.js',
   '/static/identity.js',
   '/static/common.js',
   '/static/elder.js',

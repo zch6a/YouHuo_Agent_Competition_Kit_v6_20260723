@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 from pathlib import Path
@@ -107,17 +108,50 @@ AUDIT_JS = r"""
     if (box.width < 10 || box.height < 10) continue;      // 装饰性细线不算
     const cs = getComputedStyle(svg);
     if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-    // 看得见的"墨"是描边；没有描边时才是填充。
-    const inkStr = (cs.stroke && cs.stroke !== 'none') ? cs.stroke : cs.fill;
-    if (!inkStr || /rgba\(0, 0, 0, 0\)|transparent|none/.test(inkStr)) continue;
+
+    //: 墨色要从**真正画出东西的那些形状**上取，不能取根 `<svg>` 自己的。
+    //:
+    //: 上一版读的是根节点的 `cs.stroke || cs.fill`。可插画的颜色全在子元素上，
+    //: 根节点两个属性都是 SVG 初始值——`stroke: none`、`fill: rgb(0,0,0)`——
+    //: 于是每一张插画都被当成"纯黑"来量。报出来的 `ink=rgb(0, 0, 0)` 是一个
+    //: **从来没有被画到屏幕上的颜色**。着陆页那次它恰好也判红了（真实墨色
+    //: #3b2f22 同样是近黑），结论对，路径错；换一张浅色插画就会反过来漏报。
+    const shapes = svg.querySelectorAll('path,circle,rect,line,polygon,polyline,ellipse');
+    const inks = new Set();
+    for (const sh of (shapes.length ? shapes : [svg])) {
+      const scs = getComputedStyle(sh);
+      const v = (scs.stroke && scs.stroke !== 'none') ? scs.stroke : scs.fill;
+      if (v && !/rgba\(0, 0, 0, 0\)|transparent|none/.test(v)) inks.add(v);
+    }
+    if (!inks.size) continue;
+    //: 半透明的装饰水印不在这条判据的范围内，明确跳过而不是碰巧算及格。
+    //: `.yh-stamp` 是 opacity 0.16 的印章，本来就该若隐若现；而下面按不透明
+    //: 色值算出来的比值（4.97）与它实际的观感（约 1.1）根本不是一回事——
+    //: 让它"通过"等于让这条判据在这里说了一句它并不知道的话。
+    if (parseFloat(cs.opacity) < 0.3) continue;
     const bg = bgOf(svg.parentElement || svg);
     if (bg === null) continue;
-    const r = ratio(toRGB(inkStr), bg);
-    if (r < 3.0) {
+    //: 取**最好**的那一笔，不是最差的。
+    //:
+    //: 判据问的是"这个图形认不认得出来"，而一个「奶油填充 + 墨色描边」的形状
+    //: 在白底上靠描边、在深底上靠填充，总有一笔立得住。要求每一笔都单独对抗
+    //: 页面底色，会把所有双色插画一律判红——那不是无障碍问题，是度量选错了。
+    //: 对单色图标（这段最初要防的那种）最好与最差相同，原有的防护一点没减。
+    let best = null;
+    for (const v of inks) {
+      const r = ratio(toRGB(v), bg);
+      if (best === null || r > best.r) best = {r, v};
+    }
+    if (best.r < 3.0) {
+      //: SVG 元素的 `className` 是 SVGAnimatedString，`.toString()` 出来是
+      //: "[object SVGAnimatedString]"——那条告警**没法据以定位元素**。
       const host = svg.closest('[class]');
+      const name = host
+        ? (host.getAttribute('class') || host.tagName.toLowerCase())
+        : svg.tagName.toLowerCase();
       icons.push({
-        cls: host ? host.className.toString().slice(0, 34) : '?',
-        ink: inkStr, ratio: Math.round(r * 100) / 100,
+        cls: name.slice(0, 34),
+        ink: best.v, ratio: Math.round(best.r * 100) / 100,
       });
     }
   }
@@ -220,7 +254,19 @@ def main() -> int:
         print("SKIP contrast_v6: no Chromium browser found")
         return 0
 
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "YOUHUO_DEMO_MODE": "true"}
+    #: 数据库不许落在被检查的仓库里。
+    #:
+    #: 这里原先只设了 PYTHONPATH 和 YOUHUO_DEMO_MODE。uvicorn 以 `cwd=ROOT` 启动，
+    #: 数据库路径是相对的，于是每跑一次对比度闸门就在 `ROOT/data/` 里生成一个
+    #: 运行时数据库**和一把新的 HMAC 审计链密钥**——`check_artifacts_v6` 的
+    #: `leaked_artifacts` 当场就能抓到它们。一个检查发布干不干净的工具链，自己
+    #: 把发布弄脏了；而这个仓库的远端是公开的，有过审计密钥进公开仓库的前科。
+    #:
+    #: `check_layout_stability.py` 和 `check_focus_geometry.py` 早就为同一件事
+    #: 付过代价并改成了临时目录（见前者第 132 行的注释），这一个当时没跟上。
+    workdir = Path(tempfile.mkdtemp(prefix="youhuo-contrast-"))
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "backend"), "YOUHUO_DEMO_MODE": "true",
+           "YOUHUO_DB_PATH": str(workdir / "contrast.db")}
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "youhuo.api:app", "--host", "127.0.0.1",
          "--port", str(PORT), "--app-dir", "backend", "--log-level", "warning"],
@@ -333,6 +379,9 @@ def main() -> int:
                     proc.wait(timeout=10)
                 except Exception:
                     proc.kill()
+        #: 进程先停、再删目录：SQLite 的 WAL/SHM 只有在服务器退出后才放开句柄，
+        #: 顺序反过来在 Windows 上会留下删不掉的残留文件。
+        shutil.rmtree(workdir, ignore_errors=True)
 
     if failures:
         print(f"\nFAIL contrast_v6: {len(failures)} 项无障碍问题")
