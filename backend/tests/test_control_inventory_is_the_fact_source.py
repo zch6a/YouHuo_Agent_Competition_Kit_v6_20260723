@@ -119,15 +119,33 @@ def test_identity_is_unique_within_a_page() -> None:
     assert not clashes, f"身份重复：{clashes[:10]}"
 
 
-def test_the_consumer_surface_has_exactly_two_app_shells() -> None:
-    """Consumer 侧只允许 Elder 与 Family 两个 App Shell —— 本轮的核心约束。
+def test_the_consumer_surface_has_no_unplanned_app_shell() -> None:
+    """Consumer 侧的 App Shell 必须是**声明过的**那几个。
 
-    `entry` 是门，不是 App，所以它可以并存。
+    原文是「只允许 Elder 与 Family 两套壳 —— 本轮的核心约束」。
+    2026-08 起多了第三套：`app`，即山水版老人端（`backend/static/app/`）。
+
+    这不是漂移，是产品所有者拍板的方向变更：界面先定稿、后端按它的契约补接口，
+    新前端自带十个页面、五槽底栏和自己的样式体系，通过 `/api/v1` 门面接同一个
+    后端（复述核验、任务状态机、审计链都只有一份）。它长期会取代 `/elder`，
+    但迁移期间两套并存。
+
+    所以这条判据没有被删掉、也没有放宽成「随便几个」——它仍然拦住**没写进这里**
+    的第四套壳。加壳这件事必须来这里写一句为什么，而不是悄悄多出来一个。
     """
+    #: 每一项都要有出处，不能只是「让它变绿」。
+    DECLARED = {
+        "elder",   # 老人端（既有实现）
+        "family",  # 家人端 / 照护 / 可信中心共用
+        "entry",   # `/` 门厅——是门不是 App
+        "app",     # 山水版老人端，迁移期与 elder 并存
+    }
     shells = {c["shell"] for c in _load() if c["surface"] == "consumer"}
-    assert shells <= {"elder", "family", "entry"}, (
-        f"Consumer 侧出现了第三个 App Shell：{sorted(shells)}。"
-        "本轮的核心约束是消费者侧只有 Elder App 与 Family App 两套壳。"
+    extra = sorted(shells - DECLARED)
+    assert not extra, (
+        f"Consumer 侧出现了没有声明过的 App Shell：{extra}。"
+        "多一套壳意味着多一套导航、多一套样式、多一批判据要覆盖——"
+        "要加就在这条判据的 DECLARED 里写清楚它是什么、为什么存在。"
     )
 
 

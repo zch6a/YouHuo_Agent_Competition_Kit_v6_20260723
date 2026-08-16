@@ -3,12 +3,12 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 195 |
+| 总数 | 200 |
 |---|---|
-| 有 id | 195 |
+| 有 id | 200 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
-| 追不到 handler（非 `<a>`） | 10 |
+| 追不到 handler（非 `<a>`） | 15 |
 
 ## 全部控件
 
@@ -86,6 +86,11 @@
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#homeFollowupDetail` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#homeVoiceStart` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
+| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
+| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
+| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | secondary |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
 | `#directorToggle` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
 | `#playStory` | stage | — | button | — | stage.js:playStory | — | presentation | stage | shell | presentation-only |

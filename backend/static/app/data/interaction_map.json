@@ -1,0 +1,41 @@
+{
+  "home.voice": {
+    "action": "voice-start",
+    "api": "POST /voice/sessions",
+    "next": "recognition.html"
+  },
+  "listen.water": {
+    "action": "suggest-water",
+    "api": "POST /voice/sessions",
+    "next": "recognition.html"
+  },
+  "recognition.continue": {
+    "action": "recognition-continue",
+    "next": "bill-detail.html"
+  },
+  "bill.next": {
+    "action": "bill-next",
+    "api": "POST /payments/prepare",
+    "next": "voice-confirm.html"
+  },
+  "confirm.teachBack": {
+    "action": "teach-back",
+    "api": [
+      "POST /payments/:id/teach-back",
+      "POST /payments/:id/execute"
+    ],
+    "next": "payment-success.html"
+  },
+  "success.certificate": {
+    "action": "open-cert",
+    "next": "certificate.html"
+  },
+  "records.filter": {
+    "action": "records-filter",
+    "api": "GET /records?type="
+  },
+  "profile.emergency": {
+    "action": "emergency-confirm",
+    "api": "POST /emergency/call"
+  }
+}

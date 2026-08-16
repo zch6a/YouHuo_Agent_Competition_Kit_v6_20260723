@@ -90,16 +90,40 @@ def test_the_three_surfaces_are_all_populated() -> None:
         assert by_surface.get(surface), f"{surface} 这个表面下一条路由都没有"
 
 
-def test_consumer_has_exactly_two_shells() -> None:
-    """Consumer 侧只允许两个 App Shell，这是本轮的核心约束。
+#: Consumer 侧**被批准存在**的 shell。加一个必须先写进这里。
+#:
+#: 原来这条判据写死 `{"elder","family","entry"}`，注释叫它「本轮的核心约束」。
+#: 那条约束现在不成立了——`/app` 是山水版老人端，是一次明确的方向变更带进来的
+#: 第三个 consumer shell。判据照抄旧约束会一直红，而红的原因不是缺陷。
+#:
+#: 但**不能因此改成「有几个算几个」**：那样这条判据就只是在复述 SURFACES 自己，
+#: 悄悄多出来一套壳时它照样全绿。所以改成白名单——新增 shell 仍然会报红，
+#: 只是报红的意思从「你违规了」变成「你得在这里明确批准它」。
+#:
+#: **未决**：`/app` 和 `/elder` 是同一批用户的两套老人端。如果山水版是来替换
+#: 旧老人端的，`/elder` 应该退役、这里回到三个。这个决定不在测试里做。
+#: 见 KNOWN_ISSUES.md。
+DECLARED_CONSUMER_SHELLS = {"entry", "elder", "family", "app"}
+
+
+def test_consumer_shells_are_all_declared() -> None:
+    """Consumer 侧不许出现没被批准过的 App Shell。
 
     `entry` 这一层不算 shell：`/family` `/care` `/trust` 是同一个 family shell 的
     三个 deep link，不是三套壳。`/` 是入口页，单独一个 shell。
     """
     shells = {info.shell for info in SURFACES.values() if info.surface == "consumer"}
-    assert shells == {"elder", "family", "entry"}, (
-        f"Consumer 侧的 shell 是 {sorted(shells)}，"
-        "而本轮只允许 elder + family 两个 App Shell（外加入口页 entry）"
+    undeclared = shells - DECLARED_CONSUMER_SHELLS
+    assert not undeclared, (
+        f"consumer 侧多了没批准过的 shell：{sorted(undeclared)}。"
+        "一个页面属于哪个 shell 决定哪一批判据作用在它身上——"
+        "新壳要先在 DECLARED_CONSUMER_SHELLS 里写明，否则它会掉出所有名单"
+    )
+    # 反向：批准了却没有任何路由在用，说明白名单在腐烂。
+    unused = DECLARED_CONSUMER_SHELLS - shells
+    assert not unused, (
+        f"这些 shell 批准过但已经没有路由在用：{sorted(unused)}——"
+        "退役了就从白名单里删掉，别让它留在这里替将来的新壳背书"
     )
 
 

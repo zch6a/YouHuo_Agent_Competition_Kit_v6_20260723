@@ -803,19 +803,45 @@ def test_csp_is_still_strict(client):
     比内联脚本更宽，一个被投毒的 CDN 就能在这个应用里执行任意代码。这条测试是
     "无构建步骤、无 CDN、无网络字体"那条硬约束的守卫，判据必须覆盖来源本身。
     """
+    #: 2026-08：`style-src` 被**有意**放开到 `'unsafe-inline'`。
+    #:
+    #: 山水版新前端（`/app` 那十个页面）把图层定位全写在 `style="left:0;top:112px"`
+    #: 里，几十处每屏；严格 `style-src 'self'` 会把它们整批丢弃，山水堆到左上角。
+    #: 这是产品所有者拍板的取舍，`youhuo/api.py` 里也写明了代价。
+    #:
+    #: 原来的断言是 `"unsafe-inline" not in csp`——查的是**整条**字符串，于是
+    #: style-src 的放宽把这条测试也带红了。但这条测试自己的文档写的是
+    #: 「script-src 里不许有别的来源」：把断言收到 script-src 那一段，是让它测
+    #: 它声称在测的东西，不是放水。
+    #:
+    #: 同时给 style-src 补一条**同样严格**的来源检查——放开内联不等于放开 CDN。
+    #: 少了这一条，下一次有人往 style-src 里塞一个外部主机就没人管了。
+    def _directive(csp: str, name: str) -> list[str]:
+        part = next(
+            (p.strip() for p in csp.split(";") if p.strip().startswith(name + " ")), ""
+        )
+        return part.split()[1:]
+
     for route in ("/", "/elder", "/family", "/care", "/trust", "/judge"):
         csp = client.get(route).headers["content-security-policy"]
         assert "script-src 'self'" in csp, f"{route} 的 CSP 不是 script-src 'self'"
-        assert "unsafe-inline" not in csp, f"{route} 放开了内联脚本"
-        assert "unsafe-eval" not in csp, f"{route} 放开了 eval"
-        # script-src 那一段的来源列表：只允许 'self' 与关键字，不许主机、不许通配符。
-        directive = next(
-            (part.strip() for part in csp.split(";") if part.strip().startswith("script-src")),
-            "",
-        )
-        sources = directive.split()[1:]
-        bad = [s for s in sources if s != "'self'" and not s.startswith("'")]
+
+        script = _directive(csp, "script-src")
+        assert "'unsafe-inline'" not in script, f"{route} 放开了内联**脚本**"
+        assert "'unsafe-eval'" not in script, f"{route} 放开了 eval"
+        bad = [s for s in script if s != "'self'" and not s.startswith("'")]
         assert not bad, f"{route} 的 script-src 允许了外部来源：{bad}"
+
+        # style-src：允许 'unsafe-inline'（见上），但**只允许它**，不许主机、
+        # 不许通配符、不许 eval。
+        style = _directive(csp, "style-src")
+        assert style, f"{route} 没有 style-src 指令"
+        allowed = {"'self'", "'unsafe-inline'"}
+        extra = [s for s in style if s not in allowed]
+        assert not extra, (
+            f"{route} 的 style-src 除了 'self' 与 'unsafe-inline' 之外还允许了：{extra}。"
+            "放开内联样式是有意的取舍，放开外部来源不是。"
+        )
 
 
 # --- safe areas and the mobile shell -------------------------------------

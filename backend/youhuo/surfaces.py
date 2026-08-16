@@ -35,7 +35,15 @@ from __future__ import annotations
 from typing import Literal, NamedTuple
 
 Surface = Literal["consumer", "presentation", "professional"]
-Shell = Literal["elder", "family", "stage", "evidence", "entry"]
+#: `app` 是山水版老人端那一套（`backend/static/app/`）。
+#:
+#: 它必须是**自己的 shell**，不能塞进现有任何一个：
+#:   · 记成 `entry` → 门厅专属的断言会套上来（要求有 `.landing-demo` 那两道门），
+#:     而它是 App 主页不是门，那条断言对它没有意义。我第一版就是这么错的。
+#:   · 记成 `elder` → 老人端 shell 的断言要求四格标签栏，而它是五槽（中间是语音）。
+#: 一个页面属于哪个 shell，决定了哪一批判据会作用在它身上——这个字段不是标签，
+#: 是选择器。
+Shell = Literal["elder", "family", "stage", "evidence", "entry", "app"]
 
 
 class RouteSurface(NamedTuple):
@@ -60,6 +68,15 @@ SURFACES: dict[str, RouteSurface] = {
     # 凭证属于**待办**：`09_consumer_app_architecture.md` 把待办定义成
     # 「待我确认 / 进行中 / 已完成」，一笔办完的事就在那里面。
     "/trust":  RouteSurface("consumer",     "family",   "todo",  "trust.html"),
+    # 山水版老人端。它是**另一套前端**（`backend/static/app/`），有自己的十个页面、
+    # 自己的样式与脚本，通过 `/api/v1` 门面接同一个后端。
+    #
+    # 为什么也登记在这里：这张表是「app 真正在服务哪些路由」的唯一事实源，
+    # `test_surface_registry` 拿它和实际路由逐条对，漏登记就报红——而那正是它抓到
+    # 这一条的原因。它归 consumer 表面（读它的是老人本人），shell 是它自己的 `app`
+    # ——见上面 `Shell` 那段：shell 决定哪一批判据作用在它身上，塞进 `entry` 或
+    # `elder` 都会把不适用的断言套上来。
+    "/app":    RouteSurface("consumer",     "app",      None,   "app/pages/home.html"),
     "/stage":  RouteSurface("presentation", "stage",    None,   "stage.html"),
     "/judge":  RouteSurface("professional", "evidence", None,   "judge.html"),
 }

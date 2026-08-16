@@ -1,0 +1,1 @@
+window.YOUHUO_CONFIG={mode:"rest",apiBase:"https://your-domain.example/api/v1",timeoutMs:8000};

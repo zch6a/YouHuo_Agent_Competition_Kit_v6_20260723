@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from starlette.datastructures import MutableHeaders
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +21,7 @@ from .memory_vault import ConsentMemoryVault, MemoryDecision, MemoryItem, Memory
 from .orchestration import DelegationDecision, DelegationPolicy, TaskGraph, TaskPlanner
 from .tool_registry import ToolDryRunResult, ToolManifest, build_default_registry
 from .v3_models import DelegationPreviewRequest, ToolDryRunRequest
+from .app_api import build_app_router
 from .v4_api import build_v4_router
 from .v4_services import MedicationKnowledgeBase
 from .v4_store import V4FeatureStore
@@ -194,7 +195,19 @@ def create_app(
     _SECURITY_HEADERS = (
         (
             b"content-security-policy",
-            b"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            # `style-src` 放开了 `'unsafe-inline'`。
+            #
+            # 这是一处**真的放宽，不掩饰**。新前端（`/app`）的十个页面把山水图层的
+            # 定位全写在 `style="left:0;top:112px;..."` 里，几十处每屏；严格
+            # `style-src 'self'` 会把它们全部丢弃，结果是山水堆到左上角、卡片塌掉。
+            #
+            # 放开的代价说清楚：内联样式可被用来做数据渗出（例如
+            # `background:url(...)` 带走内容）和界面伪装。保住的是更要紧的那条——
+            # `script-src 'self'` 一步没动，没有 `unsafe-inline`、没有 `unsafe-eval`、
+            # 没有 CDN，脚本仍然只能来自本站。样式注入需要先有注入点，而注入点
+            # 在 `script-src` 收紧的前提下本来就是通局条件。
+            b"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            b"img-src 'self' data:; "
             # blob: is required to play locally synthesized WAV audio; it is
             # created in-page from a same-origin response, never fetched.
             b"media-src 'self' blob:; "
@@ -270,6 +283,20 @@ def create_app(
     @app.get("/", include_in_schema=False)
     def home() -> FileResponse:
         return FileResponse(static_dir / "index.html")
+
+    # --- 新前端（山水版）-----------------------------------------------------
+    #
+    # 这一版走「前端优先」：界面先定稿，后端按它的契约补接口。十个页面是一组
+    # 互相跳转的静态 HTML，自带 `assets/js` 那套 mock/rest 双模客户端。
+    #
+    # `/app` 单独挂一条路由而不是并进现有的六页：那六页有自己的四层令牌体系和
+    # 一整套判据，两套东西混在一个目录里，谁都说不清哪条规则该管谁。
+    # 页面之间用相对路径互相引用（`../assets/css/app.css`、`../art/png/…`、
+    # `records.html`），所以直接按磁盘结构从 `/static/app/` 提供，一处都不用改写。
+    # `/app` 只做一个跳转，给人一个短地址。
+    @app.get("/app", include_in_schema=False)
+    def elder_app_entry() -> RedirectResponse:
+        return RedirectResponse(url="/static/app/pages/home.html")
 
     @app.get("/sw.js", include_in_schema=False)
     def service_worker() -> FileResponse:
@@ -658,6 +685,9 @@ def create_app(
             raise HTTPException(status_code=403, detail="老人账户不属于当前家庭。")
         return memory_vault.list_visible(actor.family_id, elder_id, viewer_role=actor.role.value)
 
+    # 山水版老人端（`/app`）的门面。它把那一版前端写死的 `/api/v1/...` 路径翻译到
+    # 真实业务上——复述核验、任务状态机、审计链都是同一份，不是第二套。
+    app.include_router(build_app_router(db, engine, v4_store))
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
     app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))

@@ -41,6 +41,7 @@
 """
 from __future__ import annotations
 
+import posixpath
 import re
 from pathlib import Path
 
@@ -53,8 +54,65 @@ from youhuo.surfaces import SURFACES as _SURFACES
 
 PAGES = [info.page for info in _SURFACES.values()]
 
-_SRC_RE = re.compile(r'<script\b[^>]*\bsrc="/static/([\w.-]+\.js)"')
-_IMPORT_RE = re.compile(r"""\bfrom\s+['"]/static/([\w.-]+\.js)['"]""")
+#: `<script src>` 与 ES `import` 的路径，**原样**捕获，解析交给 `_resolve_script`。
+#:
+#: 第一版把 `/static/` 焊死在正则里、并且只允许 `[\w.-]+`（不含斜杠）。那对根目录
+#: 上的老六页成立，对山水版那十个页面一条都不成立：它们躺在
+#: `backend/static/app/pages/` 子目录里，写的是 `../assets/js/app.js`。
+#: 于是 `app/pages/home.html` 推出来的是**空列表**——而空列表正是
+#: `test_the_scan_loads_every_script_the_page_actually_loads` 的 docstring 描述的
+#: 那种失败：闸门"跑了"，只扫 HTML，一个 JS 文案都不看，然后全绿。
+#: 这一次它没有安静地全绿，只因为那条守卫先炸了——它就是为这一刻写的。
+#:
+#: 所以路径的**形状**不再由正则决定。正则只负责"这里引了一个 .js"，
+#: 引的是哪个文件是 `_resolve_script` 的事——下一种写法（`./`、带 query 串、CDN）
+#: 再出现时，改的是一个有名字的函数，不是一条谁也不敢碰的正则。
+_SRC_RE = re.compile(r'<script\b[^>]*\bsrc="([^"\s>]+\.js)"')
+_IMPORT_RE = re.compile(r"""\bfrom\s+['"]([^'"\n]+\.js)['"]""")
+
+
+def _resolve_script(src: str, base: str) -> str | None:
+    """把一处引用解析成 STATIC 下的相对路径（POSIX），供 `STATIC / name` 直接用。
+
+    `base` 是**写下这处引用的那份文件**在 STATIC 下的路径。相对路径必须相对它算，
+    不能相对 STATIC 根：同一串 `../assets/js/app.js`，写在
+    `app/pages/home.html` 里是 `app/assets/js/app.js`，写在根目录的页面里则指向
+    static 之外。基准弄错了不会报错，只会静默地少扫一个文件。
+
+    返回 `None` = "这不是 static 里的一个文件"，直接丢掉：外链 CDN、
+    `/static/` 以外的绝对路径、以及 `..` 爬出 STATIC 的路径。丢掉而不是当成一个
+    不存在的文件名塞进队列，是为了让"解析失败"和"文件不存在"保持可分——后者
+    是产品问题（页面引了一个不存在的脚本），前者是仪器问题。
+    """
+    src = src.split("?", 1)[0].split("#", 1)[0].strip()
+    if not src or "://" in src or src.startswith("//"):
+        return None
+    if src.startswith("/static/"):
+        rel = src[len("/static/"):]
+    elif src.startswith("/"):
+        return None
+    else:
+        rel = posixpath.join(posixpath.dirname(base.replace("\\", "/")), src)
+    rel = posixpath.normpath(rel)
+    if rel.startswith("../") or rel in ("..", ".") or posixpath.isabs(rel):
+        return None
+    return rel
+
+
+def _declared_scripts(page: str) -> list[str]:
+    """这一页 `<script src>` 里**直接写出来**的那些，已解析成 STATIC 下的路径。
+
+    单独拆出来是给守卫断言用的：它要拿"页面声明加载了什么"去核对"清单里有什么"，
+    而这两边必须是同一套写法。守卫那边自己再跑一遍裸正则的话，两种路径写法就会
+    对不上，而那条断言会因为**仪器内部不一致**报红，跟产品无关。
+    """
+    html = (STATIC / page).read_text(encoding="utf-8")
+    out: list[str] = []
+    for src in _SRC_RE.findall(html):
+        name = _resolve_script(src, page)
+        if name and name not in out:
+            out.append(name)
+    return out
 
 
 def _scripts_for(page: str) -> list[str]:
@@ -68,16 +126,22 @@ def _scripts_for(page: str) -> list[str]:
     而漏掉的那个文件从此**永远**在这条闸门的视野之外——安静地少测，结果看起来和
     通过一模一样。从 HTML 自己的 `<script src>` 读就不会漂，再跟着 ES `import`
     走（`elder.js` 的 `speech.js` / `glassbox.js` 是这么进来的）。
+
+    `import` 的基准是**那个脚本自己**，不是页面：`a/b.js` 里的 `./c.js` 是
+    `a/c.js`。跟着 import 走一层就换一次基准，所以队列里存的是已经解析好的路径。
     """
-    html = (STATIC / page).read_text(encoding="utf-8")
     seen: list[str] = []
-    queue = _SRC_RE.findall(html)
+    queue = _declared_scripts(page)
     while queue:
         name = queue.pop(0)
         if name in seen or not (STATIC / name).is_file():
             continue
         seen.append(name)
-        queue += _IMPORT_RE.findall((STATIC / name).read_text(encoding="utf-8"))
+        source = (STATIC / name).read_text(encoding="utf-8")
+        for target in _IMPORT_RE.findall(source):
+            resolved = _resolve_script(target, name)
+            if resolved:
+                queue.append(resolved)
     return seen
 
 
@@ -224,7 +288,18 @@ _SHELL_OF = {info.page: info.shell for info in _SURFACES.values()}
 #: `entry`——它是门，不是 App。门可以写出它通向哪里（「演示与可信技术 →」），
 #: 那不是工程词泄漏进产品，那就是边界本身。门另有一条更窄的规则，见
 #: `test_the_entry_page_only_names_other_surfaces_in_the_doorway`。
-APP_SHELLS = {"elder", "family"}
+#:
+#: **`app` 为什么在这里面。** 山水版（`backend/static/app/`）就是老人本人打开的那个
+#: App——它比 `elder` 更是"手机框里"。把它留在外面，这条闸门会在**新前端上线之后**
+#: 继续报绿，而绿的原因不是它干净，是没人看过它：`app/pages/home.html` 的
+#: surface 是 `consumer`（所以不在 PLATFORM_PAGES 里），shell 是 `app`（所以不在
+#: APP_PAGES 里）——它会同时掉出两张名单，一个字都不被扫。
+#:
+#: 这正是这份文件从第一行起反复说的那件事："安静地少测和通过在结果里长得一模一样"。
+#: 上一次它是 `common.js`，这一次是一整套前端。加进来立刻红了两处（见
+#: `test_the_app_surface_speaks_no_engineering` 的失败信息）——那两处在屏幕上活着，
+#: 而闸门此前从未看见过它们。
+APP_SHELLS = {"elder", "family", "app"}
 APP_PAGES = [p for p in PAGES if _SHELL_OF[p] in APP_SHELLS]
 #: 手机框外：**必须**有那些词，否则这条闸门是空的。
 PLATFORM_PAGES = [p for p in PAGES if _SURFACE_OF[p] != "consumer"]
@@ -287,9 +362,12 @@ def test_the_entry_page_only_names_other_surfaces_in_the_doorway(page: str) -> N
 
 @pytest.mark.parametrize("page", APP_PAGES)
 def test_the_app_surface_speaks_no_engineering(page: str):
-    """手机框里的四个页面，用户看得见的地方一个禁用词都不许有。
+    """手机框里的页面，用户看得见的地方一个禁用词都不许有。
 
     改之前的实测基线：elder 2、family 6、care 13、trust 21，合计 42。
+
+    山水版（`app/pages/home.html`）是第五个进来的，它此前从未被扫过——见
+    `APP_SHELLS` 上面那段。它进来的第一次运行就红了，红在 `app.js` 的两个 `toast`。
     """
     hits = _leaks(page)
     total = sum(hits.values())
@@ -314,15 +392,32 @@ def test_the_scan_loads_every_script_the_page_actually_loads():
     for page in PAGES:
         scripts = PAGE_SCRIPTS[page]
         assert scripts, f"{page} 一个脚本都没推出来——<script src> 的正则跟 HTML 对不上了"
-        html = (STATIC / page).read_text(encoding="utf-8")
-        for name in _SRC_RE.findall(html):
+        for name in _declared_scripts(page):
             assert name in scripts, f"{page} 加载了 {name}，但清单里没有"
 
+    # 两种 `src` 写法都必须真的被解析过一遍，否则上面那圈"非空"可以靠另一种写法
+    # 蒙混过去：老六页全绿，而子目录里的十页各推出空列表——那正是这一条要挡的。
+    assert _resolve_script("/static/common.js", "elder.html") == "common.js"
+    assert _resolve_script("../assets/js/app.js", "app/pages/home.html") == (
+        "app/assets/js/app.js"
+    ), "子目录页面的相对路径没有解析到 static 下的真实文件"
+
     for page in APP_PAGES:
-        assert "common.js" in PAGE_SCRIPTS[page], (
-            f"{page} 的清单里没有 common.js。它被四个 app 页面全部加载，"
-            "里面装着用户看得见的中文——漏掉它，这条闸门就有一整块盲区。"
-        )
+        # `common.js` 是**老六页那一套**的共享文件。山水版（shell `app`）是另一套
+        # 前端，有它自己的 `app/assets/js/`，不加载也不该加载 common.js。
+        # 判据因此按"这一页真的声明了它"来核对，而不是无条件要求每个 app 页都有——
+        # 后者会在山水版身上报一条与产品无关的红。要守的东西没变：**页面加载了的
+        # 共享文件，一个都不许漏出清单**，而这正是 `common.js` 当初被漏掉的那件事。
+        shared = [s for s in _declared_scripts(page) if s.endswith("common.js")]
+        for name in shared:
+            assert name in PAGE_SCRIPTS[page], (
+                f"{page} 的清单里没有 {name}。它被这一页加载，"
+                "里面装着用户看得见的中文——漏掉它，这条闸门就有一整块盲区。"
+            )
+    assert any("common.js" in PAGE_SCRIPTS[p] for p in APP_PAGES), (
+        "一个 app 页面都没扫到 common.js——它被老六页全部加载，"
+        "整批消失说明清单又断了一次"
+    )
     assert "speech.js" in PAGE_SCRIPTS["elder.html"], (
         "elder.js 用 ES import 引入 speech.js，跟着 import 走的那一步断了"
     )
@@ -373,13 +468,23 @@ def test_the_scan_actually_reads_text():
     第一版设的是"≥80 个中文字"，而首页只有 64 个——它刻意稀疏（两个入口加一句话），
     于是一个正确的页面被判成"正则把正文剥掉了"。h1 是每一页一定有、一定可见、一定
     在 `<body>` 里的东西，用它当探针不需要猜数字。
+
+    **两边必须用同一套空白规范。** 这里原先把标题里的标签替换成空串，而
+    `_visible_text` 把标签替换成空格——`<h1>上午好，<span data-bind="profile.name">
+    </span> 👋</h1>` 于是变成两个只差空格数的字符串，包含判定失败。老六页的 h1 里
+    没有嵌套元素，所以这个不一致一直没显形；山水版首页进到这批里的第一次运行就撞上
+    了。它是**仪器自己的假命中**，不是产品缺陷：那句标题在提取结果里好好地待着。
+    判据一点没松——整句标题（含那个 emoji）仍然必须原样出现在正文里。
     """
+    def collapse(s: str) -> str:
+        return " ".join(s.split())
+
     for page in APP_PAGES + PLATFORM_PAGES:
         html = (STATIC / page).read_text(encoding="utf-8")
         h1 = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S)
         assert h1, f"{page} 没有 h1"
-        heading = re.sub(r"<[^>]+>", "", h1.group(1)).strip()
-        text = _visible_text(html)
+        heading = collapse(re.sub(r"<[^>]+>", " ", h1.group(1)))
+        text = collapse(_visible_text(html))
         assert heading and heading in text, (
             f"{page} 的标题「{heading}」没出现在提取结果里——剥标签的正则把正文一起剥掉了"
         )

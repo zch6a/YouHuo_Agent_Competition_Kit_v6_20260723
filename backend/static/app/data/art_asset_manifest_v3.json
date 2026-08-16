@@ -1,0 +1,1398 @@
+{
+  "version": "3.1",
+  "runtime_asset_count": 87,
+  "assets": [
+    {
+      "id": "avatar",
+      "role": "老人头像",
+      "png": "art/png/avatar.png",
+      "webp": "art/webp/avatar.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        680,
+        127,
+        783,
+        230
+      ],
+      "method": "circle",
+      "sha256": "08a99b08a389cd8c0a991957cc023eb48d0908c02a6ba82bd1912fe3f5a86ffb",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_gold_cloud",
+      "role": "安全模块金云",
+      "png": "art/png/bill_gold_cloud.png",
+      "webp": "art/webp/bill_gold_cloud.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        585,
+        1322,
+        792,
+        1452
+      ],
+      "method": "gold",
+      "sha256": "d3a355067d62ec70d90843775f72104012d01ac45080ccf601583ecbfc9ea2aa",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_safe_mountain_l",
+      "role": "安全模块左山河",
+      "png": "art/png/bill_safe_mountain_l.png",
+      "webp": "art/webp/bill_safe_mountain_l.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        58,
+        1365,
+        328,
+        1500
+      ],
+      "method": "wash",
+      "sha256": "652669ef171070945d91269925de643d7634edbeec0fbbcd951651446f3dc8be",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_safe_mountain_r",
+      "role": "安全模块右山河",
+      "png": "art/png/bill_safe_mountain_r.png",
+      "webp": "art/webp/bill_safe_mountain_r.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        510,
+        1380,
+        795,
+        1500
+      ],
+      "method": "wash",
+      "sha256": "825063395d72caee83a7742bd06201dfb299e3e0a0c100043d6dce8b5ca6de75",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_safety_shield",
+      "role": "完整安全金盾",
+      "png": "art/png/bill_safety_shield.png",
+      "webp": "art/webp/bill_safety_shield.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        360,
+        1320,
+        505,
+        1442
+      ],
+      "method": "flood",
+      "sha256": "6fa5465279039551e20b3dbe08e5d26e4c2ebf14b55c9a374c91cccb1bd16326",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_scene_left",
+      "role": "账单页左侧山水",
+      "png": "art/png/bill_scene_left.png",
+      "webp": "art/webp/bill_scene_left.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        30,
+        285,
+        335,
+        410
+      ],
+      "method": "wash",
+      "sha256": "2b78ac69e4c710fc4a6c9e37e3fbd16f6d9a9a3ebe91c12676628daa861d3495",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_scene_right",
+      "role": "账单页右侧山水",
+      "png": "art/png/bill_scene_right.png",
+      "webp": "art/webp/bill_scene_right.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        535,
+        245,
+        833,
+        410
+      ],
+      "method": "wash",
+      "sha256": "1651a3cb1b2a3eb20d10c49df18cca0759e3cf12dffb1e2bd71229444db70cf2",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "bill_water_badge",
+      "role": "账单水滴",
+      "png": "art/png/bill_water_badge.png",
+      "webp": "art/webp/bill_water_badge.webp",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        91,
+        432,
+        218,
+        559
+      ],
+      "method": "flood",
+      "sha256": "8647dd45a65a39e25e008d16f7f4ba61dbc8a0cbccd6d3240670b709f0059f20",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "brand_mark",
+      "role": "优活品牌标记",
+      "png": "art/png/brand_mark.png",
+      "webp": "art/webp/brand_mark.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        64,
+        126,
+        151,
+        211
+      ],
+      "method": "flood",
+      "sha256": "c9059de6671a270b74d45ef267f359b1b9c0379a45a122e6a973efaea8e94b2a",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "cert_footer_scene",
+      "role": "凭证页底山河",
+      "png": "art/png/cert_footer_scene.png",
+      "webp": "art/webp/cert_footer_scene.webp",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        30,
+        1690,
+        833,
+        1755
+      ],
+      "method": "wash",
+      "sha256": "728dd3f39a97f0937b01f0e44e8522ae219c9fe2d6274e95b48e047e5574a7c7",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "cert_gold_seal",
+      "role": "纯金色交易印记，不含绿色文字",
+      "png": "art/png/cert_gold_seal.png",
+      "webp": "art/webp/cert_gold_seal.webp",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        545,
+        670,
+        780,
+        880
+      ],
+      "method": "gold",
+      "sha256": "9b5634d9179f8af24a8cf8949ed6eb713e95d8c4d32db95dcdb178477d04ac96",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "cert_scene_left",
+      "role": "凭证页左山水",
+      "png": "art/png/cert_scene_left.png",
+      "webp": "art/webp/cert_scene_left.webp",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        30,
+        445,
+        285,
+        610
+      ],
+      "method": "wash",
+      "sha256": "9f840f917c97b794a48d01a051fc5c0c2f7f74c960cfc23c37c8ee770543b80d",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "cert_scene_right",
+      "role": "凭证页右亭阁",
+      "png": "art/png/cert_scene_right.png",
+      "webp": "art/webp/cert_scene_right.webp",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        615,
+        445,
+        833,
+        610
+      ],
+      "method": "wash",
+      "sha256": "54093bb0af93a2174e2e59c2810bfbfbc911310ab51cfff9f5593f6f790c7c2d",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "cert_shield",
+      "role": "可信蓝盾",
+      "png": "art/png/cert_shield.png",
+      "webp": "art/webp/cert_shield.webp",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        278,
+        248,
+        585,
+        526
+      ],
+      "method": "flood",
+      "sha256": "6a0bac832ff8d039581809b190c218d88fb985481bc7145b6bb5b76087a9f3ac",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_bottom_l",
+      "role": "确认页左底山河",
+      "png": "art/png/confirm_bottom_l.png",
+      "webp": "art/webp/confirm_bottom_l.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        30,
+        1710,
+        330,
+        1797
+      ],
+      "method": "wash",
+      "sha256": "0db3718f4310f1db63f3c74f3065ff606e46328cfe1545b6b4fe0b597315f3b3",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_bottom_r",
+      "role": "确认页右底山河",
+      "png": "art/png/confirm_bottom_r.png",
+      "webp": "art/webp/confirm_bottom_r.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        525,
+        1710,
+        833,
+        1797
+      ],
+      "method": "wash",
+      "sha256": "aee0352d5559a5f129f82ff53af2f591a8ecc4533d10d7fa1d02312a93a774c8",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_gold_cloud",
+      "role": "确认模块金云",
+      "png": "art/png/confirm_gold_cloud.png",
+      "webp": "art/webp/confirm_gold_cloud.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        650,
+        952,
+        795,
+        1035
+      ],
+      "method": "gold",
+      "sha256": "c3ee4d8e84cde0dad75baa2fede9727ed39c277aff52ee68a61f36c4886d05ee",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_mic_orb",
+      "role": "确认麦克风",
+      "png": "art/png/confirm_mic_orb.png",
+      "webp": "art/webp/confirm_mic_orb.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        280,
+        1210,
+        585,
+        1492
+      ],
+      "method": "circle",
+      "sha256": "019c04ac1318b4bd8024514cca613ce2acc086298a77cb447ce04675a90455b0",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_scene_right",
+      "role": "确认页右侧山水",
+      "png": "art/png/confirm_scene_right.png",
+      "webp": "art/webp/confirm_scene_right.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        550,
+        220,
+        833,
+        385
+      ],
+      "method": "wash",
+      "sha256": "6d63c9f6802202c9ff3f2e885c8dc3c4fe9d411ec3dd75cec028bb6eda039b07",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_security_badge",
+      "role": "平台安全徽章",
+      "png": "art/png/confirm_security_badge.png",
+      "webp": "art/webp/confirm_security_badge.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        82,
+        820,
+        155,
+        878
+      ],
+      "method": "flood",
+      "sha256": "457dd974dd812d20468da3a19901ac93f27defde240585b365afea5d2e5bfbaf",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "confirm_water_badge",
+      "role": "确认页水滴",
+      "png": "art/png/confirm_water_badge.png",
+      "webp": "art/webp/confirm_water_badge.webp",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        87,
+        405,
+        213,
+        512
+      ],
+      "method": "flood",
+      "sha256": "2542c455c3a9a7bf1a5d68fb565350b8bc8199632914d3751c78f03a0f122f6a",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_appt_medallion",
+      "role": "复诊心电金环",
+      "png": "art/png/home_appt_medallion.png",
+      "webp": "art/webp/home_appt_medallion.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        536,
+        456,
+        772,
+        689
+      ],
+      "method": "flood",
+      "sha256": "861e79c29bee620b1ecb23530cfcafec42526950b82a35e0e643b9344c9688f6",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_schedule_people",
+      "role": "社区活动图标",
+      "png": "art/png/home_schedule_people.png",
+      "webp": "art/webp/home_schedule_people.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        994,
+        164,
+        1063
+      ],
+      "method": "flood",
+      "sha256": "83206b39aa246c2bdacfe35a6b6a8a9d2eabd79997105403909200f09cd2557e",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_schedule_pill",
+      "role": "用药计划图标",
+      "png": "art/png/home_schedule_pill.png",
+      "webp": "art/webp/home_schedule_pill.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        903,
+        164,
+        973
+      ],
+      "method": "flood",
+      "sha256": "c79191998f597b53e2285b75d7b98b088ddfdf1eb3040c07ce6d7363760d9e2e",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_schedule_pressure",
+      "role": "血压计划图标",
+      "png": "art/png/home_schedule_pressure.png",
+      "webp": "art/webp/home_schedule_pressure.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        1082,
+        164,
+        1152
+      ],
+      "method": "flood",
+      "sha256": "fe4231b08ff0b54de3732f8ea1214b2a92c32e730c0fbf6afb19d7c2f8d5dc7b",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_voice_mountain_l",
+      "role": "首页语音区左山河",
+      "png": "art/png/home_voice_mountain_l.png",
+      "webp": "art/webp/home_voice_mountain_l.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        64,
+        1370,
+        260,
+        1517
+      ],
+      "method": "wash",
+      "sha256": "df0e68297e183ee7a2d5c2209664b94a717dbf6395dca7482d965b672d38082f",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_voice_mountain_r",
+      "role": "首页语音区右山河",
+      "png": "art/png/home_voice_mountain_r.png",
+      "webp": "art/webp/home_voice_mountain_r.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        600,
+        1370,
+        783,
+        1517
+      ],
+      "method": "wash",
+      "sha256": "809e08f740d591d5031eb1a901bffc46137b9ddfd6ca615f717efe1d53ac640e",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_voice_orb",
+      "role": "首页语音球",
+      "png": "art/png/home_voice_orb.png",
+      "webp": "art/webp/home_voice_orb.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        298,
+        1184,
+        572,
+        1463
+      ],
+      "method": "circle",
+      "sha256": "3e1b9d9856f6e4e53b51f65896f81eef74f27aed5bac87a49868767947befd6f",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_voice_wave_l",
+      "role": "首页左声波",
+      "png": "art/png/home_voice_wave_l.png",
+      "webp": "art/webp/home_voice_wave_l.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        118,
+        1260,
+        267,
+        1328
+      ],
+      "method": "flood",
+      "sha256": "d507e36ab44c13b0c6d6078ae870a6b4316ba9b4c65240738512c060a3019c85",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "home_voice_wave_r",
+      "role": "首页右声波",
+      "png": "art/png/home_voice_wave_r.png",
+      "webp": "art/webp/home_voice_wave_r.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        598,
+        1260,
+        747,
+        1328
+      ],
+      "method": "flood",
+      "sha256": "8f34c38b622307dc1226e1bf0f5ea3173c90512c0ca992dda765781634995136",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "listen_orb",
+      "role": "倾听心形球",
+      "png": "art/png/listen_orb.png",
+      "webp": "art/webp/listen_orb.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        286,
+        620,
+        579,
+        910
+      ],
+      "method": "circle",
+      "sha256": "90465b27d7b10250f576bb12712546c8737f696fabbd9fe1011b820bdfa29f30",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "listen_wave_l",
+      "role": "倾听左声波",
+      "png": "art/png/listen_wave_l.png",
+      "webp": "art/webp/listen_wave_l.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        95,
+        735,
+        275,
+        815
+      ],
+      "method": "flood",
+      "sha256": "2a538115f5773d07633c5c5ef0fe2d3ca88f4b713c20d66c1ee7129d16d0c062",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "listen_wave_r",
+      "role": "倾听右声波",
+      "png": "art/png/listen_wave_r.png",
+      "webp": "art/webp/listen_wave_r.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        588,
+        735,
+        770,
+        815
+      ],
+      "method": "flood",
+      "sha256": "b6ef79e212f66cb3998d3a94bcdd63e914fe3690c700e2850ab551669bcf477e",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "nav_voice_control",
+      "role": "全局底栏中央语音原稿 patch",
+      "png": "art/png/nav_voice_control.png",
+      "webp": "art/webp/nav_voice_control.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        300,
+        1560,
+        565,
+        1745
+      ],
+      "method": "raw",
+      "sha256": "238b15b5d61d68187e36f32261406e0bc772bef6a658ae9f368e37f117556163",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "profile_avatar_large",
+      "role": "个人头像",
+      "png": "art/png/profile_avatar_large.png",
+      "webp": "art/webp/profile_avatar_large.webp",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        83,
+        382,
+        276,
+        570
+      ],
+      "method": "circle",
+      "sha256": "bb60fa0cdac9e9abcaa991dcad00787abe82c8bcdbfb7dfa3fc4a1d3ca976005",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "profile_health_mountain",
+      "role": "健康摘要山水",
+      "png": "art/png/profile_health_mountain.png",
+      "webp": "art/webp/profile_health_mountain.webp",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        610,
+        720,
+        758,
+        756
+      ],
+      "method": "wash",
+      "sha256": "ff73181a0eb65c163205329dfff640bf495c905006e8b62e53010d60eab40a78",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "profile_scene_right",
+      "role": "我的页主背景山水",
+      "png": "art/png/profile_scene_right.png",
+      "webp": "art/webp/profile_scene_right.webp",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        330,
+        180,
+        660,
+        340
+      ],
+      "method": "wash",
+      "sha256": "2ed5a66776db2339b6f6fe3b91fb9b8462cd827960509a36f70809a52e33255c",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "profile_sos",
+      "role": "SOS 圆章",
+      "png": "art/png/profile_sos.png",
+      "webp": "art/webp/profile_sos.webp",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        75,
+        1525,
+        192,
+        1643
+      ],
+      "method": "flood",
+      "sha256": "9e078e16c8a1e90cf027fb771bccc03311c724da7f512ac843e2b3abd5c7c551",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "recognize_scene_right",
+      "role": "识别页右侧山水",
+      "png": "art/png/recognize_scene_right.png",
+      "webp": "art/webp/recognize_scene_right.webp",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        520,
+        250,
+        833,
+        500
+      ],
+      "method": "wash",
+      "sha256": "73836e3632168ac096eedad89fe8693b85e9bc8e449ad73cf180f3baef263326",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "recognize_step_bill",
+      "role": "查看账单步骤",
+      "png": "art/png/recognize_step_bill.png",
+      "webp": "art/webp/recognize_step_bill.webp",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        128,
+        1258,
+        210,
+        1348
+      ],
+      "method": "flood",
+      "sha256": "a9f1ae763ff22b53005fb7d7d5c9ed852b646e426606877b97adf3d69bfe0907",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "recognize_step_pay",
+      "role": "完成支付步骤",
+      "png": "art/png/recognize_step_pay.png",
+      "webp": "art/webp/recognize_step_pay.webp",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        620,
+        1258,
+        730,
+        1348
+      ],
+      "method": "flood",
+      "sha256": "1ddb4f79b227fe1b8637f1c0aaa138acfba6fc4476736f94f9e2f7115adeeb9c",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "recognize_step_repeat",
+      "role": "复述步骤",
+      "png": "art/png/recognize_step_repeat.png",
+      "webp": "art/webp/recognize_step_repeat.webp",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        384,
+        1258,
+        474,
+        1348
+      ],
+      "method": "flood",
+      "sha256": "065dc41ca50c32cd5161f6bd2a5fec1a0ec5790ad8422daaa75438d27b070d02",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "recognize_water_badge",
+      "role": "识别结果水滴",
+      "png": "art/png/recognize_water_badge.png",
+      "webp": "art/webp/recognize_water_badge.webp",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        92,
+        523,
+        190,
+        621
+      ],
+      "method": "flood",
+      "sha256": "1fb6ed47560857f026b5a5223317a7b439d735ff765913d929364bd013d13834",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_confirm",
+      "role": "确认金额时间线图标",
+      "png": "art/png/record_confirm.png",
+      "webp": "art/webp/record_confirm.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        1087,
+        263,
+        1220
+      ],
+      "method": "flood",
+      "sha256": "34e60e30fc5af2d57c2c31bb0f269687671b296d89b208bb39fcea69ce0aba07",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_family",
+      "role": "家人处理时间线图标",
+      "png": "art/png/record_family.png",
+      "webp": "art/webp/record_family.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        837,
+        263,
+        971
+      ],
+      "method": "flood",
+      "sha256": "0a7118326a9a57e1adda3520469b70dd9c44a27ccc48aea90187f411adc05a7d",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_request",
+      "role": "申请时间线图标",
+      "png": "art/png/record_request.png",
+      "webp": "art/webp/record_request.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        1325,
+        263,
+        1456
+      ],
+      "method": "flood",
+      "sha256": "8f2ff9bfc6fc77ddfbeca5379d2d98a6e8a4adfd4fd879469bdb34c3bd51b8cb",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_scene_left",
+      "role": "记录页左侧远山",
+      "png": "art/png/record_scene_left.png",
+      "webp": "art/webp/record_scene_left.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        30,
+        365,
+        310,
+        550
+      ],
+      "method": "wash",
+      "sha256": "ddacb43ceb5de5439c863a32aee0e8a72adb422ea498abbbff3b9a9eb274c02d",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_scene_right",
+      "role": "记录页右侧亭阁",
+      "png": "art/png/record_scene_right.png",
+      "webp": "art/webp/record_scene_right.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        585,
+        365,
+        833,
+        550
+      ],
+      "method": "wash",
+      "sha256": "815c4d16475b48d78a9cd570d205e3d96688f4bfb70e92faec747be74e4a0e68",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "record_water",
+      "role": "水费时间线图标",
+      "png": "art/png/record_water.png",
+      "webp": "art/webp/record_water.webp",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        597,
+        263,
+        731
+      ],
+      "method": "flood",
+      "sha256": "288c9cc65ee9d96d2a182402826f89bf6ede5d3e9d4ab7739696a0c95b951716",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "scene_mountain_left_home",
+      "role": "首页左上淡山",
+      "png": "art/png/scene_mountain_left_home.png",
+      "webp": "art/webp/scene_mountain_left_home.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        30,
+        205,
+        350,
+        285
+      ],
+      "method": "wash",
+      "sha256": "71c887ce56c258ee5dec8b6d831a8a1eae17c076a2ff2342d78337eb54573624",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "scene_mountain_mid",
+      "role": "中景远山",
+      "png": "art/png/scene_mountain_mid.png",
+      "webp": "art/webp/scene_mountain_mid.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        275,
+        180,
+        615,
+        420
+      ],
+      "method": "wash",
+      "sha256": "02f65873c6537927ec0177447eed4a1929a0fa18d17e0aaad660d2ffd8f5ecbc",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "scene_mountain_right_home",
+      "role": "首页右上亭阁山水",
+      "png": "art/png/scene_mountain_right_home.png",
+      "webp": "art/webp/scene_mountain_right_home.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        430,
+        245,
+        833,
+        445
+      ],
+      "method": "wash",
+      "sha256": "80af879d9ce9dcc9f797cf840504a17ae0a83ea634041750cc1355ccee119e92",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "scene_pavilion_right",
+      "role": "右侧亭台瀑布",
+      "png": "art/png/scene_pavilion_right.png",
+      "webp": "art/webp/scene_pavilion_right.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        625,
+        340,
+        833,
+        760
+      ],
+      "method": "wash",
+      "sha256": "fc1730694802659fc0f3da4dce66743ae30250d83a71e59841b3604b25dd56a1",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "scene_tree_left",
+      "role": "左侧秋树与山",
+      "png": "art/png/scene_tree_left.png",
+      "webp": "art/webp/scene_tree_left.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        30,
+        340,
+        240,
+        750
+      ],
+      "method": "wash",
+      "sha256": "c67edf8bf438a41322c4953926fae821f12e1cd8e6f5d4e5d582bb148ffaf2e7",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_ask",
+      "role": "ask 图标",
+      "png": "art/png/service_ask.png",
+      "webp": "art/webp/service_ask.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        448,
+        792,
+        572,
+        910
+      ],
+      "method": "flood",
+      "sha256": "9f0a7a20e11c01822797030b0c5944b9973d5200ed1241128e1bf704e7ed95c4",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_bamboo_clean",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_bamboo_clean.png",
+      "webp": "art/webp/service_bamboo_clean.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        655,
+        675,
+        730,
+        760
+      ],
+      "method": "wash",
+      "sha256": "fb0d930d2c81d33da73a68189612e68766bc5ec89fb02716bdd0787b0926ceff",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_common",
+      "role": "common 图标",
+      "png": "art/png/service_common.png",
+      "webp": "art/webp/service_common.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        448,
+        540,
+        570,
+        670
+      ],
+      "method": "flood",
+      "sha256": "f13469af7d0a6e29add40b5cc5e58d5fa6b268615143440cccf4378e06f13a5f",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_credential",
+      "role": "credential 图标",
+      "png": "art/png/service_credential.png",
+      "webp": "art/webp/service_credential.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        70,
+        1498,
+        180,
+        1594
+      ],
+      "method": "flood",
+      "sha256": "1688e6840cd03386bc1e8421b8bff4fb651df51bee778acb33222aa18e3bc3b6",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_emergency",
+      "role": "emergency 图标",
+      "png": "art/png/service_emergency.png",
+      "webp": "art/webp/service_emergency.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        75,
+        1260,
+        170,
+        1375
+      ],
+      "method": "flood",
+      "sha256": "c5bfb663abf48b68c7eacc2dffea30a681c637be9b0e0932c7ad1e4d84b56b32",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_health",
+      "role": "health 图标",
+      "png": "art/png/service_health.png",
+      "webp": "art/webp/service_health.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        72,
+        1028,
+        190,
+        1148
+      ],
+      "method": "flood",
+      "sha256": "ec277de3877da362e27db73c1ab20d2b347804ad7aa10cd1f889f6254ac453ee",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_medication",
+      "role": "medication 图标",
+      "png": "art/png/service_medication.png",
+      "webp": "art/webp/service_medication.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        445,
+        1495,
+        570,
+        1610
+      ],
+      "method": "flood",
+      "sha256": "8c609924299b900bd9d87cb8a50179ff5e5aabb4970d203b87114000a4074b9b",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_records",
+      "role": "records 图标",
+      "png": "art/png/service_records.png",
+      "webp": "art/webp/service_records.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        72,
+        785,
+        190,
+        910
+      ],
+      "method": "flood",
+      "sha256": "7df659af8dd634fdf218a04ecb9b1e9d3e78ace6c853a9bc45fc1b580f8a8525",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_settings",
+      "role": "settings 图标",
+      "png": "art/png/service_settings.png",
+      "webp": "art/webp/service_settings.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        445,
+        1025,
+        575,
+        1150
+      ],
+      "method": "flood",
+      "sha256": "6ba2c216823e6f97989bda6f0e78e4ce6ce3c212e352ce90c4be96cde9ac6ba5",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_todo",
+      "role": "todo 图标",
+      "png": "art/png/service_todo.png",
+      "webp": "art/webp/service_todo.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        74,
+        535,
+        188,
+        665
+      ],
+      "method": "flood",
+      "sha256": "703e6999ee7a46fa7935c7f6f9fe93ff943a021fdb596119cc036c642afd8d03",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_utility",
+      "role": "utility 图标",
+      "png": "art/png/service_utility.png",
+      "webp": "art/webp/service_utility.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        447,
+        1260,
+        562,
+        1382
+      ],
+      "method": "flood",
+      "sha256": "62c750c3c44edf1152a61f0973c78daa7205242ad2a04907a36f249eeadd1f84",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_blue",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_blue.png",
+      "webp": "art/webp/service_wash_blue.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        60,
+        950,
+        345,
+        1003
+      ],
+      "method": "wash",
+      "sha256": "f1c4303d94c473eb7cd3e05c2ddc7b1e61e4f36dfa2fd18f7c0e0aa63a3d7714",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_gold",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_gold.png",
+      "webp": "art/webp/service_wash_gold.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        60,
+        1405,
+        345,
+        1438
+      ],
+      "method": "wash",
+      "sha256": "dcc5d8d5da9daac607f1e8ee493707e2cacb055c749f4b07ce60cafa979b6d76",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_gray",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_gray.png",
+      "webp": "art/webp/service_wash_gray.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        430,
+        1185,
+        715,
+        1228
+      ],
+      "method": "wash",
+      "sha256": "c6012f8297c37d9a6040c05891a9bb0dc04d70f2d16bf761862a347352c5bde0",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_orange",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_orange.png",
+      "webp": "art/webp/service_wash_orange.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        60,
+        1185,
+        345,
+        1228
+      ],
+      "method": "wash",
+      "sha256": "33544397b5ad8911aaf57ee007e6fb134943d8bd291fe299acb3ff133e1b0972",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_purple",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_purple.png",
+      "webp": "art/webp/service_wash_purple.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        430,
+        950,
+        715,
+        1003
+      ],
+      "method": "wash",
+      "sha256": "ec5c872143a1b9167673c5b6c98f0675d69bdc7691d612c94a28e73f15f040c8",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_warm",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_warm.png",
+      "webp": "art/webp/service_wash_warm.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        60,
+        700,
+        345,
+        760
+      ],
+      "method": "wash",
+      "sha256": "115c756c2f7e493984628ba9a5ed62425bc84e26f15336b347a475cf33dc6327",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "service_wash_water",
+      "role": "服务卡水墨背景",
+      "png": "art/png/service_wash_water.png",
+      "webp": "art/webp/service_wash_water.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        430,
+        1405,
+        715,
+        1438
+      ],
+      "method": "wash",
+      "sha256": "5e1dc822305e4631c0496eb9e3025ec1cd3a9dad69eff52cb4b928387427d250",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "services_scene_center",
+      "role": "服务页中远山",
+      "png": "art/png/services_scene_center.png",
+      "webp": "art/webp/services_scene_center.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        300,
+        160,
+        585,
+        286
+      ],
+      "method": "wash",
+      "sha256": "330b2612dcf92f78f9a9f93a4d4d7367740cf4aafd481164449238f167d927d0",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "services_scene_left",
+      "role": "服务页左群山",
+      "png": "art/png/services_scene_left.png",
+      "webp": "art/webp/services_scene_left.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        30,
+        220,
+        275,
+        515
+      ],
+      "method": "wash",
+      "sha256": "2c5f47525c7663a51784be1182415f6ac19db3eab26594431404a1e7b57c87d5",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "services_scene_right",
+      "role": "服务页右亭阁",
+      "png": "art/png/services_scene_right.png",
+      "webp": "art/webp/services_scene_right.webp",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        220,
+        833,
+        515
+      ],
+      "method": "wash",
+      "sha256": "17c7ba1b56b924ee3e9b8669ed17c15ed964017961693a6ad3be278d4ebe7331",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_bamboo",
+      "role": "竹影",
+      "png": "art/png/success_bamboo.png",
+      "webp": "art/webp/success_bamboo.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        598,
+        1040,
+        780,
+        1185
+      ],
+      "method": "flood",
+      "sha256": "d95ad1ac2f23a25b3ac6103aa00eddd9356d9bd00f00da1ba1e458ae9ade163c",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_check",
+      "role": "绿色成功章",
+      "png": "art/png/success_check.png",
+      "webp": "art/webp/success_check.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        285,
+        180,
+        590,
+        480
+      ],
+      "method": "main",
+      "sha256": "7d2487dcbdf4066b850929e5334b5fba1b284d14be7a49f0e8c8cb4562c001b2",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_crane",
+      "role": "仙鹤",
+      "png": "art/png/success_crane.png",
+      "webp": "art/webp/success_crane.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        575,
+        1428,
+        744,
+        1532
+      ],
+      "method": "crane",
+      "sha256": "a7d1bde48c18e673ed50ce3831ce2bf9db9593ca566341ad51de7cf0bb62fc76",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_hut",
+      "role": "亭舍",
+      "png": "art/png/success_hut.png",
+      "webp": "art/webp/success_hut.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        72,
+        1210,
+        245,
+        1365
+      ],
+      "method": "flood",
+      "sha256": "1ffb9ed0aec6646443822f6315b7a0e6d181cadbf27765682c77a3971cdaa8a3",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_scene_left",
+      "role": "成功页左侧群山",
+      "png": "art/png/success_scene_left.png",
+      "webp": "art/webp/success_scene_left.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        30,
+        170,
+        295,
+        610
+      ],
+      "method": "wash",
+      "sha256": "3f2eaea6efab238006d2863c5d187539f1db1e68a007ab89e88a4079bd8febe5",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_scene_right",
+      "role": "成功页右侧亭阁",
+      "png": "art/png/success_scene_right.png",
+      "webp": "art/webp/success_scene_right.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        600,
+        190,
+        833,
+        610
+      ],
+      "method": "wash",
+      "sha256": "4d0abfce73da9549fd8e577aaf4ed9258cb02c175ebbfc269dd5aa576f890161",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "success_water_splash",
+      "role": "水花",
+      "png": "art/png/success_water_splash.png",
+      "webp": "art/webp/success_water_splash.webp",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        500,
+        660,
+        760,
+        858
+      ],
+      "method": "flood",
+      "sha256": "26ee5ae874e58586da4e9105895c39e2951136dd2936a0e5cf228317dbdb66d4",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "suggest_bill_art",
+      "role": "账单水墨章",
+      "png": "art/png/suggest_bill_art.png",
+      "webp": "art/webp/suggest_bill_art.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        145,
+        1285,
+        330,
+        1425
+      ],
+      "method": "flood",
+      "sha256": "97a975460613c22d4897f3d43638348b22b7753ad5cc30746a67030488e27c4c",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "suggest_calendar_art",
+      "role": "日历水墨章",
+      "png": "art/png/suggest_calendar_art.png",
+      "webp": "art/webp/suggest_calendar_art.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        520,
+        965,
+        705,
+        1110
+      ],
+      "method": "flood",
+      "sha256": "b4379a668ce0788c1caafdd73eeb4ac1628780f39f8db9d5556b21bfcbc7b40e",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "suggest_pill_art",
+      "role": "药丸水墨章",
+      "png": "art/png/suggest_pill_art.png",
+      "webp": "art/webp/suggest_pill_art.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        520,
+        1285,
+        705,
+        1425
+      ],
+      "method": "flood",
+      "sha256": "f7c1c3f954aaba1ae73a3410dcff470bc7e4d87af1c9b365f3aa1728e4b354f5",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "suggest_water_art",
+      "role": "水费水墨章",
+      "png": "art/png/suggest_water_art.png",
+      "webp": "art/webp/suggest_water_art.webp",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        145,
+        965,
+        330,
+        1110
+      ],
+      "method": "flood",
+      "sha256": "b2f2739583fe70636ba4712f2689cef20eab34507d178d3a93878c0418cf51ac",
+      "qc": "PASS_V3"
+    },
+    {
+      "id": "sun_disc",
+      "role": "暖橙旭日",
+      "png": "art/png/sun_disc.png",
+      "webp": "art/webp/sun_disc.webp",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        526,
+        143,
+        641,
+        254
+      ],
+      "method": "circle",
+      "sha256": "9634572657e5f9196f5752e16d1e4ddf2c7d804ed590caa818e4fe38ae4bee86",
+      "qc": "PASS_V3"
+    }
+  ]
+}
