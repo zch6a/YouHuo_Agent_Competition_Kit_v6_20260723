@@ -106,7 +106,10 @@ html::before {
    `--role-ink` 就是为「同一族颜色，但用来当字」准备的那一档，浅深两套都够。 */
 .yh-card-go { font-size: var(--text-sm); font-weight: 700; color: var(--role-ink); margin-top: var(--space-1); display: inline-flex; align-items: center; gap: var(--space-1); transition: gap var(--dur-fast) var(--ease-out); }
 .yh-card:hover .yh-card-go { gap: var(--space-2); }
-.yh-card::after { content: ""; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(139, 115, 85, 0.18); transform: translate(-50%, -50%); pointer-events: none; opacity: 0; }
+/* 涟漪色走令牌。原先写死 `rgba(139, 115, 85, .18)`——一团暖褐色，浅色卡片上
+   刚好，深色卡片上几乎看不见（底色本来就深）。`--ink` 会跟主题翻转，
+   于是浅底上是深涟漪、深底上是浅涟漪，两边都读得出「按下去了」。 */
+.yh-card::after { content: ""; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: color-mix(in srgb, var(--ink) 18%, transparent); transform: translate(-50%, -50%); pointer-events: none; opacity: 0; }
 .yh-card:active::after { animation: yh-ripple 0.45s var(--ease-out) forwards; }
 @keyframes yh-ripple { 0% { width: 0; height: 0; opacity: 0.5; } 100% { width: 280px; height: 280px; opacity: 0; } }
 .yh-hint { margin: 0; padding: var(--space-3) var(--space-4); background: var(--surface-2); border-left: 3px solid var(--wuyou-orange); border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: var(--text-sm); color: var(--ink-2); line-height: var(--lh-snug); }
