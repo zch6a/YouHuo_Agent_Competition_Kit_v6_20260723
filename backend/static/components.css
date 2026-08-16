@@ -1161,6 +1161,53 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
      · `text-align` 默认 center——两栏内容会各自居中
      · `appearance` 在部分平台会画出原生按钮的边框
    宽度不用管：`.log-list` 是 grid，子项默认 stretch。 */
+/* --- 换分区的转场 ---------------------------------------------------------
+   `initSections` 换分区时走 View Transitions（见 common.js 里那段说明）。
+   这里只定义"怎么动"：旧的那屏往上收一点点淡出，新的那屏从下方托上来。
+   位移只有 6/8px——这是"翻了一页"的最小可读信号，再大就成了炫技，而这一页的
+   读者是老人和他们的子女。
+
+   时长走令牌，不写字面值：`--dur-1` 那类编出来的名字这个项目已经栽过一次
+   （见下面 `button.log-item` 的注释），真名只有 fast / base / sheet / slow。
+
+   整段包在 `no-preference` 里：开了「减少动态效果」的人一帧都不该看到，
+   而 `check_page_runtime` 正是用这个媒体查询在量最终状态。
+   ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: yh-panel-out var(--dur-fast) var(--ease-out) both;
+  }
+  ::view-transition-new(root) {
+    animation: yh-panel-in var(--dur-base) var(--ease-out) both;
+  }
+}
+@keyframes yh-panel-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes yh-panel-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* 领了名字**还不够**——这是探针推翻我自己的一个说法换来的。
+ *
+ * 我原以为给手机和标签栏各起一个 `view-transition-name` 就等于让它们不参与淡入
+ * 淡出。抓了转场期间 `document.getAnimations()` 才看到实情：
+ *     ::view-transition-old(yh-device) -ua-view-transition-fade-out
+ *     ::view-transition-new(yh-device) -ua-view-transition-fade-in
+ * 起名字只是让它独立成一组（位置会被平滑地对位），**旧新两张快照照样交叉淡入**。
+ * 手机那一格里是个 iframe，交叉淡入就是框里那一页闪一下——正是我说要避免的东西。
+ *
+ * 所以显式把这两组的动画掐掉：位置对位保留，淡入淡出不要。
+ * `mix-blend-mode` 也要还原成 normal——UA 默认给它加 plus-lighter，两张快照叠在
+ * 一起时会整体发亮。 */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(yh-device),
+  ::view-transition-new(yh-device),
+  ::view-transition-old(yh-tabbar),
+  ::view-transition-new(yh-tabbar) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(yh-device),
+  ::view-transition-old(yh-tabbar) { opacity: 0; }
+}
+
 button.log-item {
   appearance: none; -webkit-appearance: none;
   font: inherit; text-align: left; cursor: pointer;

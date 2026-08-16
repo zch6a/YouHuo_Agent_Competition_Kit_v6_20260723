@@ -644,12 +644,51 @@
 
     function show(name, writeHash) {
       const target = resolve(name);
-      panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
-      segs.forEach(s => {
-        const on = s.dataset.section === target;
-        s.classList.toggle('is-current', on);
-        if (on) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
-      });
+      const apply = () => {
+        panels.forEach(p => { p.hidden = p.dataset.panel !== target; });
+        segs.forEach(s => {
+          const on = s.dataset.section === target;
+          s.classList.toggle('is-current', on);
+          if (on) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
+        });
+      };
+
+      //: 换分区要**看起来像翻了一页**，而不是原地闪一下。
+      //:
+      //: 这里原先只是 `p.hidden = …`：DOM 换了，屏幕上瞬间替换，没有任何位移或
+      //: 淡入。人眼不把"瞬间替换"读成导航，只读成"这一堆东西本来就在那儿"——
+      //: 于是一个真的在切页的应用，看起来像一张什么都堆着的长页面。
+      //:
+      //: 用 View Transitions：动画跑在合成器上、零依赖、不需要打包步骤，也不违反
+      //: 严格 CSP（它是 CSS + 一个 DOM API，没有内联样式和脚本）。
+      //: 标签栏和页头在 CSS 里各自领了 `view-transition-name`，所以它们**不参与**
+      //: 这次淡入淡出——真机上切标签时，底下那条栏是不动的，动的只有内容。
+      //:
+      //: 两道退让：浏览器不支持时照常直接换；用户开了「减少动态效果」时也直接换
+      //: （`check_page_runtime` 正是用 `prefers-reduced-motion: reduce` 在量这一页，
+      //: 它必须量到最终状态，而不是过渡中间的某一帧）。
+      const instant = !document.startViewTransition
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (instant) {
+        apply();
+      } else {
+        //: 转场的 `ready` / `finished` 是 Promise，**被打断时会拒绝**。
+        //:
+        //: 连着点两个分区，后一次会中止前一次；页面被隐藏也会中止
+        //: （`InvalidStateError: Transition was aborted because of invalid state`）。
+        //: 没人接这个拒绝，它就是一条未捕获异常——`check_page_runtime` 的「无异常」
+        //: 当场判红，而这一条在答辩现场就是控制台里一串红字。
+        //:
+        //: 中止对我们不是错误：`apply()` 照常执行，DOM 该换的还是换了，
+        //: 只是没播完那 200ms。所以这里明确把拒绝吃掉，而不是让它冒泡。
+        const t = document.startViewTransition(apply);
+        if (t) {
+          for (const p of [t.ready, t.finished, t.updateCallbackDone]) {
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          }
+        }
+      }
+
       if (writeHash) history.replaceState(null, '', `#${target}`);
     }
 

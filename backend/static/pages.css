@@ -801,6 +801,10 @@ body[data-task-view] .elder-focus > #chat {
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     background: var(--surface-2);
+    /* 切分区时这条栏**不参与**淡入淡出。领了自己的名字，它就被单独捕捉，
+       前后位置一样 = 视觉上纹丝不动——真机上切标签就是这样：动的只有内容。
+       不领名字的话它会跟着整页一起淡出再淡入，那一闪正是"网页感"的来源。 */
+    view-transition-name: yh-tabbar;
   }
   .tabbar .tab {
     flex: 1 1 0;
@@ -1272,6 +1276,25 @@ body[data-task-view] .elder-focus > #chat {
 .demo-stage > .stage-proof { order: 2; }
 .demo-stage > .stage-controls { order: 3; }
 
+/* --- 两侧安静下来 ---------------------------------------------------------
+   `.panel` 是全站组件：面色 + 1px 边框 + shadow-2 + 高光线。那套外观是给「一块
+   可操作的卡片」用的，而在这一页上，两侧是**说明文字**，不是控件。三块带框带影的
+   卡片摆在手机两边，视觉重量和手机持平——于是眯眼看过去，第一落点落在框上，
+   而不是落在那块屏幕里。`stage.html` 自己写着「两侧都不能抢走它的视觉中心位置」。
+
+   所以在这一页把框去掉，改用一条发丝线加留白分段：层级靠字阶和间距，不靠盒子。
+   收窄在 `.stage-body` 里——`.panel` 在别的页面上仍然是那张卡片，一个像素没动。 */
+.stage-body .demo-stage .panel {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--space-6) 0 0;
+}
+/* 去掉框之后段与段之间要自己撑开，否则两张说明会黏成一坨。 */
+.stage-body .demo-stage .page-section > * + * { margin-top: var(--space-6); }
+
 @media (min-width: 1180px) {
   .demo-stage {
     /* 中间那一列是内容宽度（机身 390 + 边框），两侧各自可压缩。
@@ -1618,22 +1641,38 @@ body.is-clean .stage-proof { display: none; }
 .device {
   /* `--want-*` 是 JS 提的需求（视口按钮选的尺寸）；`--screen-*` 是钳过之后真正用的。
      职责分开：JS 不知道窗口有多高，CSS 不知道用户选了哪一档。 */
+  /* 屏幕**永远是真实尺寸**，不再按可用高度压扁。
+     ......................................................................
+     原先是 `--screen-h: min(844px, 100svh - --chrome)`：高度被钳，宽度不动。
+     实测长宽比——1200px 窗口 2.164（对），950 变 1.903，900 变 1.774，
+     820 变 1.569，760 已经是 1.415 的方板；真机 iPhone 14 Pro 是 2.168。
+     也就是说在任何一台常见笔记本上，这台"手机"都是墩的。
+
+     改成整台等比缩放（下面的 `--fit`）。这不是原注释警告的那种缩放：那句
+     「真 iframe，不是 transform: scale()」说的是**别把桌面宽度的布局拍小**。
+     这里 iframe 仍然实实在在按 390×844 排版——媒体查询、`100dvh`、固定定位的
+     抽屉看到的都是一台真手机的视口——只是把渲染结果整体显示得小一点。
+     它比现在这样更忠实：现在应用拿到的其实是 654px 高，而不是 844。 */
   --want-w: 390px;
   --want-h: 844px;
   --bezel: 12px;
-  --screen-radius: 38px;
-  /* 44px 留给下面那行「老人端 · 390 × 844」加它的间距。
-     `--stage-top-h` 是这一轮新加的顶栏（产品/演示/证明/工程 + 模式开关）。它必须
-     算进来：机身是拿 `100svh` 减 `--chrome` 定高的，而顶栏把整块内容往下推了 76px
-     ——机身于是比可用高度高出一个顶栏，底边连同下边框一起被裁掉。
-     视觉审查在 desktop-stage 上量到的就是这个：「机身在 y=900 处消失、没有下边框，
-     四个标签只剩上半截字形」。
-     兜底 0px：`/judge` 复用同一个机身，而那一页没有顶栏。 */
-  --chrome: calc(var(--space-8) * 2 + var(--bezel) * 2 + 44px + var(--stage-top-h, 0px));
+  /* 真机屏幕圆角是屏宽的 14.2%（55.7pt / 393pt）。原先 38/390 = 9.7%，偏方。 */
+  --screen-radius: 56px;
+  /* 由 stage.js 按可用高度算；1 = 原尺寸。CSS 没法把两个长度相除得到无单位数，
+     所以这一个必须来自 JS——但**只有它**来自 JS，尺寸本身仍然写在这里。 */
+  --fit: 1;
   --screen-w: var(--want-w);
-  --screen-h: min(var(--want-h), calc(100svh - var(--chrome)));
+  --screen-h: var(--want-h);
   padding: var(--bezel);
   border-radius: calc(var(--screen-radius) + var(--bezel));
+  transform: scale(var(--fit));
+  transform-origin: top center;
+  /* 换分区时这台手机也不参与淡入淡出——它是这一页的主角，不该跟着闪。
+     而且它里面是个 iframe：跟着整页一起被截图再淡入，框里那一页会白一下。 */
+  view-transition-name: yh-device;
+  /* 缩放不改变元素占的布局空间。不把多出来的那块收回去，下面那行说明会被推到
+     屏幕外——正是原先「机身在 y=900 处消失」那个缺陷的另一种形态。 */
+  margin-bottom: calc((var(--fit) - 1) * (var(--want-h) + var(--bezel) * 2));
   /* 机身是**实物**，不跟主题翻转。
      ......................................................................
      原先是 `color-mix(… var(--ink) 82% …)`——而 `--ink` 是**文字色**，深色模式下它
@@ -1798,14 +1837,15 @@ body.is-clean .stage-proof { display: none; }
 @media (max-width: 900px) {
   .demo-stage { grid-template-columns: 1fr; padding: var(--space-4); }
   .stage-controls { position: static; }
-  /* 减的是**整台机器**的宽度，不只是屏幕。
-     此前写的是 `100vw - var(--space-8)`（= 视口减两侧 16px 内边距），得到 358px 的
-     屏幕，再加上两侧各 12px 的机身边框就是 382px——比容器宽 8px，溢出探针量出来
-     398 > 390。边框是机身的一部分，必须一起算进去。 */
-  .device {
-    --screen-w: min(390px, calc(100vw - var(--space-8) - var(--bezel) * 2));
-  }
-  .device-screen { height: min(844px, 78svh); }
+  /* 这里原先有两条「压扁以塞进去」的规则：把 `--screen-w` 按 100vw 减一减，再把
+     `.device-screen` 的高钳到 `min(844px, 78svh)`。它们和上面那条按高度钳的规则
+     是同一个毛病的两处分身——宽高各自被裁，长宽比就没人管了。实测 1000px 高的
+     窄屏上应用视口是 390×692，而不是 390×756。
+
+     两条都删掉：`--fit` 现在同时按可用**宽度和高度**整台等比缩放（stage.js 里
+     取两者的较小值），一个机制覆盖所有尺寸，比例在任何窗口下都是 2.164。
+     `--bezel` 要算进宽度——边框是机身的一部分——这一点在 fitDevice 里靠量
+     `offsetWidth` 天然成立，不用再手写一遍那个减法。 */
 }
 
 /* --------------------------------------------------------------------------
@@ -1956,6 +1996,27 @@ body.is-clean .stage-proof { display: none; }
   line-height: var(--lh-snug);
   color: var(--ink);
 }
+
+/* --- 七拍：一次只摊开一句 -------------------------------------------------
+   量出来的：首屏一共 543 个字，左右两条栏各 225 上下，而中间那台手机——这一页
+   自己声明的主角，`stage.html` 原话「两侧都不能抢走它的视觉中心位置」——只有 51 个。
+   左栏那 228 字几乎全是这七行 `.beat-say`（七句 × 二十几字）。
+
+   七句同时摊开，等于要人在演示开始之前先读完整个剧本。改成：标题始终在（七步的
+   骨架一眼看得见，这是目录），只有**当前这一拍**的那句话是展开的。
+   一个字都没删——它们随播放推进逐句出现，或者点序号直接跳过去。
+
+   收窄到 `.story` 里：`.beat` 这套类名只有演示台在用，但显式限定省得下一个人
+   在别处复用 `.beat` 时被这条规则打到。
+
+   用 `display` 而不是 `max-height: 0 + overflow: hidden`：后者正是
+   `test_no_page_clips_its_own_content` 盯的那种形态——一个装不下自己内容的
+   overflow:hidden 盒子，而且读屏软件仍会念出屏幕上看不见的字。 */
+.story .beat-say { display: none; }
+.story .beat.is-current .beat-say { display: block; }
+/* 没摊开的那几拍收紧一档，摊开的那一拍保持原来的呼吸感——疏密差本身就是"现在在这一拍"。 */
+.story .beat:not(.is-current) { padding: var(--space-3) 0; }
+.story .beat.is-current .beat-title { color: var(--role-ink); }
 .beat-why {
   margin: 0;
   max-width: 62ch;

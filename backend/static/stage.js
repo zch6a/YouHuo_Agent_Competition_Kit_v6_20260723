@@ -26,7 +26,9 @@
 
   const ROLE_WORD = {
     '/elder': '老人端', '/family': '家人端', '/care': '照护',
-    '/trust': '可信中心', '/judge': '评委导览',
+    // 「评委导览」是这一页改名前的旧称，现在它叫「事务证据工作台」。
+    // 上一轮改名跟到了后端 v6_services.py，漏了演示台这两处（按钮和这张表）。
+    '/trust': '可信中心', '/judge': '事务证据',
   };
 
   let route = '/elder';
@@ -61,12 +63,55 @@
     // 而这一页整页都在讲「框里跑的是真实应用」——那更不能在它自己的说明上写虚数。
     // 量 iframe，不是算它：钳制发生在 CSS 里，JS 不知道钳到了多少。
     requestAnimationFrame(() => {
-      const box = frame.getBoundingClientRect();
-      const w = Math.round(box.width) || size.w;
-      const h = Math.round(box.height) || size.h;
+      fitDevice();
+      // 量**未经缩放**的布局尺寸：`getBoundingClientRect()` 会把 `--fit` 的缩放
+      // 一起量进去，于是窗口越矮报出来的视口越小——而应用拿到的视口其实没变。
+      // offsetWidth / offsetHeight 是布局值，不受 transform 影响。
+      const w = frame.offsetWidth || size.w;
+      const h = frame.offsetHeight || size.h;
       caption.textContent = `${ROLE_WORD[route] || route} · ${w} × ${h}`;
     });
   }
+
+  // --- 整台等比缩放 ------------------------------------------------------------
+  //
+  // 原先窗口不够高时只压高度、不动宽度，于是长宽比从 2.164 掉到 1.90（950px 窗口）、
+  // 1.77（900）、1.41（760）——真机 iPhone 14 Pro 是 2.168。也就是说在任何一台常见
+  // 笔记本上，那台"手机"都是墩的。现在尺寸固定，装不下就整台缩。
+  //
+  // 为什么必须是 JS：CSS 没法把「可用高度 ÷ 机身高度」算成一个无单位的 scale。
+  // 但**只有这个比例**来自 JS，390×844 和边框厚度仍然写在 CSS 里。
+  function fitDevice() {
+    const slot = device.parentElement;
+    if (!slot) return;
+    const style = getComputedStyle(slot);
+    const gap = parseFloat(style.rowGap) || 0;
+    // 同一格里除机身以外的东西（那行尺寸说明 + 那句提示）也要占位置。
+    const others = [...slot.children]
+      .filter((el) => el !== device)
+      .reduce((sum, el) => sum + el.getBoundingClientRect().height + gap, 0);
+    // 用 slot 在视口里的位置来算，而不是用 slot.clientHeight：后者会被缩放后的
+    // 内容高度反过来影响，第一次算完就变，得来回收敛。slot 的顶边不受 --fit 影响。
+    const top = slot.getBoundingClientRect().top;
+    const availH = window.innerHeight - top - others - 16;
+    // 宽度也要算。窄屏上原先是另写一条 CSS 去裁 `--screen-w`，宽高各裁各的，
+    // 长宽比就没人管了。两边取较小的那个比例，一个机制管所有尺寸。
+    const availW = slot.clientWidth;
+    // offsetWidth / offsetHeight 是**未经 transform** 的布局尺寸（844 + 边框×2），
+    // 本身不受 `--fit` 影响——再除一次 `--fit` 会把它算大，缩放系数跟着偏。
+    const natW = device.offsetWidth;
+    const natH = device.offsetHeight;
+    if (!natW || !natH) return;
+    const fit = Math.max(0.35, Math.min(1, availH / natH, availW / natW));
+    device.style.setProperty('--fit', fit.toFixed(4));
+  }
+  fitDevice();
+  window.addEventListener('resize', fitDevice);
+
+  // 开局先摊开第一拍。七拍收起来之后左栏是一份干净的目录，但一条都不展开会让人
+  // 以为这七行只是标题、点不开——摊开第一句就把"这里还有内容"说清楚了。
+  const firstBeat = document.querySelector('.story .beat');
+  if (firstBeat) firstBeat.classList.add('is-current');
 
   // --- 让系统栏跟框里那一页同色 ------------------------------------------------
   //
@@ -448,7 +493,10 @@
     if (!button || !progress) return;
     button.disabled = true;
     // 先把所有拍重置
-    document.querySelectorAll('.beat').forEach((b) => b.classList.remove('is-played'));
+    document.querySelectorAll('.beat').forEach((b) => {
+      b.classList.remove('is-played');
+      b.classList.remove('is-current');
+    });
     const beats = document.querySelectorAll('.beat');
     const proofs = document.querySelectorAll('[data-beat-proof]');
     const intro = document.getElementById('beatIntro');
@@ -457,6 +505,11 @@
     const runFns = ['runOpen', 'runVoice', 'runLoad', 'runPreview', 'runTeachBack', 'runRelay', 'runCard'];
     for (let i = 0; i < beats.length && i < 7; i++) {
       const beat = beats[i];
+      // 一次只展开一拍的那句话。七句同时摊开的时候，左栏是 87 个文本块、1114 字，
+      // 而中间那台手机（这一页的主角）只有 51 字——量出来是 26 倍。
+      // 标题始终在，读者随时看得见七步的骨架；只有当前这一拍的那句话是展开的。
+      beats.forEach((b) => b.classList.remove('is-current'));
+      beat.classList.add('is-current');
       beat.classList.add('is-played');
       if (proofs[i]) proofs[i].hidden = false;
       progress.textContent = `第 ${String(i + 1).padStart(2, '0')} 拍 · 进行中`;
@@ -482,6 +535,9 @@
     const beatNum = btn.dataset.jump;
     const beat = document.querySelector(`.beat[data-beat="${beatNum}"]`);
     if (!beat) return;
+    // 点序号跳过来的这一拍也要展开，否则点了之后只有滚动、没有内容变化。
+    document.querySelectorAll('.beat').forEach((b) => b.classList.remove('is-current'));
+    beat.classList.add('is-current');
     // 滚动到该拍
     beat.scrollIntoView({behavior: 'smooth', block: 'nearest'});
     // 显示对应证明区块

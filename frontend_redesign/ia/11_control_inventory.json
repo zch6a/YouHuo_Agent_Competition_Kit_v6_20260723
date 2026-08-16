@@ -2027,7 +2027,7 @@
       "key": "id=stageRoles/button#5",
       "id": "",
       "tag": "button",
-      "text": "评委导览",
+      "text": "事务证据",
       "source_file": "stage.html",
       "route": "/stage",
       "panel": "",
