@@ -25,7 +25,11 @@ html::before {
   padding-right: max(var(--space-4), env(safe-area-inset-right));
   display: flex; flex-direction: column; gap: var(--space-12);
   padding-top: var(--space-14); padding-bottom: var(--space-14);
-  animation: yh-main-in 0.8s var(--ease-out) both;
+  /* 整页淡入 0.8 秒——它套着所有东西，所以**每个子元素的可见时刻都不早于它**。
+     把 `.yh-choose` 的延迟从 0.95 压到 0.12 之后，实测仍要 1281ms 才看得见那两张卡，
+     差额就出在这一条：子元素自己淡完了，外层还没淡完，乘起来还是透明。
+     压到 0.35 秒。 */
+  animation: yh-main-in 0.35s var(--ease-out) both;
 }
 @keyframes yh-main-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .yh-hero { display: grid; grid-template-columns: 1fr auto; gap: var(--space-8); align-items: center; opacity: 0; animation: yh-fade-up 0.7s var(--ease-out) 0.1s both; }
@@ -63,7 +67,20 @@ html::before {
 .yh-stamp .art-warm-fill { fill: var(--art-warm); }
 .yh-smoke { stroke-dasharray: 120; stroke-dashoffset: 120; animation: yh-smoke-draw 1.4s var(--ease-out) 0.9s forwards; }
 @keyframes yh-smoke-draw { to { stroke-dashoffset: 0; } }
-.yh-choose { display: flex; flex-direction: column; gap: var(--space-4); opacity: 0; animation: yh-fade-up 0.65s var(--ease-out) 0.95s both; }
+/* 入场动效不许挡住这一页唯一的两个控件。
+ *
+ * 这一条原先是 `0.65s ... 0.95s both` 且基态 `opacity: 0`——延迟 0.95 秒才开始，
+ * 再放 0.65 秒。实测「我是老人」从加载到看得见：正常机器 **1621ms**，
+ * 用 CDP 把 CPU 降到 1/6（就是一台便宜安卓机的量级）要 **3636ms**。
+ * 也就是说老人打开这一页，先对着一个只有标题的空屏幕等三秒半。
+ *
+ * 这不只是慢：`exits` 闸门在负载下报「/ @ 320×568 和 390×844 走不出去」，
+ * 报得对——那一刻这一页确实没有任何可用出口。桌面档之所以不报，是因为
+ * `/stage` `/judge` 那两道门没挂动画，一直看得见。
+ *
+ * 现在：延迟压到 0.12 秒（一帧多一点，够读作"淡入"而不是"卡住"），时长 0.4 秒。
+ * 装饰性的东西（页脚、印章、插画）可以慢慢来，要按的东西不行。 */
+.yh-choose { display: flex; flex-direction: column; gap: var(--space-4); opacity: 0; animation: yh-fade-up 0.4s var(--ease-out) 0.12s both; }
 .yh-choose-eyebrow { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; display: flex; align-items: center; gap: var(--space-2); }
 .yh-choose-eyebrow span { display: inline-block; width: 20px; height: 2px; background: var(--line-strong); }
 .yh-choose-title { margin: 0; font-size: clamp(22px, 4vw, 30px); font-weight: 800; line-height: var(--lh-tight); color: var(--ink); }

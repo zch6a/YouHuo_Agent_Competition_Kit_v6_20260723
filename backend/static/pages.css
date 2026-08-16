@@ -174,7 +174,7 @@
   .fam-head .fam-refresh { align-self: flex-start; }
 }
 
-.fam-updated { margin: var(--space-1) 0 0; font-size: 14px; color: var(--ink-3); }
+.fam-updated { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--ink-3); }
 .fam-refresh { flex: none; }
 /* `justify-content: space-between` 会把右边这个挤到只剩几个字宽——「← 返回首页」
    于是折成三行，变成右上角一个比标题还大的白块。实测在可信页上就是这样。 */
@@ -236,7 +236,7 @@
 @media (max-width: 760px) {
   .seg { flex: 1 1 calc(25% - var(--space-2)); }
 }
-@media (max-width: 360px) { .seg { font-size: 14px; padding-inline: 0; } }
+@media (max-width: 360px) { .seg { font-size: var(--text-sm); padding-inline: 0; } }
 /* 当前分区不只靠颜色：底色、边框和字重同时变，色觉障碍下仍然分得出。 */
 .seg.is-current {
   background: var(--surface);
@@ -254,7 +254,7 @@
   color: var(--ink);
 }
 .page-section > .section-head:first-child { margin-top: 0; }
-.section-note { margin: 0 0 var(--space-3); font-size: 14px; color: var(--ink-3); line-height: var(--lh-snug); }
+.section-note { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--ink-3); line-height: var(--lh-snug); }
 
 .metric-row-one { grid-template-columns: 1fr; }
 
@@ -1178,7 +1178,7 @@ body[data-task-view] .elder-focus > #chat {
 .care-status {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 500;
   line-height: var(--lh-snug);
 }
@@ -1885,7 +1885,7 @@ body.is-clean .stage-proof { display: none; }
      的注释——这一轮已经在三处踩过同一个坑。） */
   color: var(--youhuo-blue-ink);
 }
-.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: 14px; }
+.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: var(--text-xs); }
 
 /* --------------------------------------------------------------------------
    评委页的七拍
@@ -2093,7 +2093,7 @@ body.is-clean .stage-proof { display: none; }
 .evidence-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
 .evidence-mini { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--space-4); background: var(--surface-2); }
 .evidence-mini h3 { margin: 0 0 var(--space-2); }
-.evidence-mini ul { padding-left: var(--space-5); line-height: 1.6; color: var(--ink-2); font-size: 14px; }
+.evidence-mini ul { padding-left: var(--space-5); line-height: 1.6; color: var(--ink-2); font-size: var(--text-sm); }
 
 .final-claim {
   margin-top: var(--space-6);
@@ -2145,7 +2145,7 @@ body.is-clean .stage-proof { display: none; }
     box-shadow: none;
   }
   .score-ribbon strong { font-size: 22px; }
-  .score-ribbon span { font-size: 12px; }
+  .score-ribbon span { font-size: var(--text-xs); }
 }
 /* 单列收拢。
  *
@@ -2164,7 +2164,13 @@ body.is-clean .stage-proof { display: none; }
    * `.metric-row-one`（我的分区里那一个）自己覆写成单列，不受影响。 */
   .metric-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
   .metric { padding: var(--space-3) var(--space-2); }
-  .metric-label { font-size: 12px; }
+  /* 12px 比整个字阶的下限还小一档——`--text-xs` 就是 13px，而它的注释写着
+     「metadata only」，下面 `--text-sm` 15px 才是正文。tokens.css 顶上那段话说得
+     很直接：这个产品的读者有老花，所以字阶「deliberately starting high」。
+     一个比最小令牌还小的写死值，等于在这一处把那个决定推翻了，而且没人会发现。
+     标签只有三四个汉字（待您确认 / 进行中 / 今天到期），390px 下每格约 118px，
+     13px 时四个汉字才 52px——挤不下不是真的，量过。 */
+  .metric-label { font-size: var(--text-xs); }
   .metric strong, .metric.good strong, .metric.bad strong { font-size: 22px; }
   .preview-columns { grid-template-columns: 1fr; }
   .reliance-row, .glass-card > div, .log-item, .digest-row { grid-template-columns: 1fr; gap: var(--space-1); }
@@ -2173,7 +2179,7 @@ body.is-clean .stage-proof { display: none; }
   .bubble { max-width: 94%; }
   .entry-btn { font-size: 16px; gap: var(--space-2); }
   .topbar { gap: var(--space-3); }
-  .badge { padding: var(--space-2) var(--space-3); font-size: 14px; }
+  .badge { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); }
   .profile-tools { gap: var(--space-3); }
 }
 
@@ -2408,11 +2414,31 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
   #chat > *:first-child { margin-top: auto; }
 
   /* Edge to edge. The gutter now lives on the things inside, so the bubbles and
-     the composer line up with the app bar instead of with a card edge. */
+     the composer line up with the app bar instead of with a card edge.
+     ........................................................................
+     这份「里面的东西」清单原先只有三项，而它们全都住在 `home` 那一屏。老人端另外
+     三个分区（记录 / 家人 / 我的）用的是 `.tab-head` 和 `.panel.rail-card`，一项都
+     没在册——于是外壳的左右内边距被清零之后，那三屏**整幅贴死在屏幕两侧**：
+     实测标题、说明、卡片一律 0..390，「办事记录」四个字的第一笔就压在屏幕边缘上。
+
+     首屏正常，所以截图看首屏永远看不出来；而横向溢出检查也不会响——贴边不是溢出。
+     它是「边到边」这个决定只执行了三分之一。
+
+     `.tab-head` 与 `.rail-card` 只出现在这三个分区里（`home` 里一个都没有），
+     所以补进来不会让已经有内缩的元素再叠一层。 */
   main.shell.app-frame { padding-left: 0; padding-right: 0; }
   .app-bar,
   .role-header,
   .composer { padding-left: var(--space-4); padding-right: var(--space-4); }
+  /* 记录 / 家人 / 我的这三个分区整体退开，而不是去点名里面的每一个元素。
+     点名的写法正是这条缺陷的来源——清单漏了 `.tab-note`、`.home-entries`、
+     那三个 `.secondary` 按钮……每加一个新控件就要记得回来登记一次，漏了不报错。
+     `home` 不在其中：那一屏是刻意的通栏（对话气泡要贴边），它的留白由自己里面的
+     `.role-header` 和 `.composer` 各自负责，见上面那条。 */
+  .elder-panel:not([data-panel="home"]) {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
 
   /* The conversation takes whatever the fixed furniture leaves, and scrolls. */
   #chat {
@@ -2608,7 +2634,7 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      keeps every word at a tighter measure. Roughly 150px comes back, which on
      this page is the difference between seeing one card and seeing two.
      ---------------------------------------------------------------------- */
-  .eyebrow { font-size: 11px; letter-spacing: .12em; margin-bottom: var(--space-1); }
+  .eyebrow { font-size: var(--text-xs); letter-spacing: .12em; margin-bottom: var(--space-1); }
   .care-title, .topbar h1 { font-size: 26px; line-height: 1.2; margin-bottom: var(--space-1); }
   .lead { font-size: 16px; line-height: 1.62; }
   .topbar { margin-bottom: var(--space-4); }
@@ -2674,9 +2700,18 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
     align-content: center;
     gap: var(--space-1);
     min-height: var(--tabbar-h);
-    /* 13px, and only just enough — a tab label is the one place where a shorter
-       word beats a smaller size, which is why these are all two characters. */
-    font-size: var(--text-xs);
+    /* 原注释：「13px, and only just enough — a tab label is the one place where a
+       shorter word beats a smaller size, which is why these are all two characters.」
+       ......................................................................
+       前半句（标签要短）是对的，后半句（所以只能 13px）量下来不成立：
+       320px 这个最窄档上每格宽 **80px**，两个汉字在 15px 时只占 **30px**——用掉
+       37%。390px 上是 98px 对 30px。三个端、两个宽度、八个标签，提到 15px 之后
+       无一换行、整页也不横向溢出。「刚好够」这个前提有 2.7 倍的余量。
+
+       而 `--text-xs` 自己的注释写着 `13px, metadata only`，tokens.css 顶上那段
+       还写着这套字阶「deliberately starting high，因为读它的人有老花」。
+       底部这四个是老人端唯一的换屏控件，不是元数据。 */
+    font-size: var(--text-sm);
     font-weight: 650;
     line-height: 1;
     letter-spacing: .01em;

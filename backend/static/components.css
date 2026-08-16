@@ -318,7 +318,7 @@ pre:empty { display: none; }
   min-width: 0;
 }
 .result-row:first-child { border-top: 0; }
-.result-row > strong { color: var(--ink-3); font-weight: 600; font-size: 14px; }
+.result-row > strong { color: var(--ink-3); font-weight: 600; font-size: var(--text-sm); }
 .result-row > div { min-width: 0; overflow-wrap: anywhere; }
 /* 嵌套一层就缩进并淡化边框，不再往下继续缩，否则深层结构会被挤成一条线。 */
 .result-row .result-group {
@@ -717,7 +717,9 @@ body[data-mode="companion"] .role-icon .icon-companion { display: block; }
   margin-bottom: var(--space-3);
 }
 .rail-head h2 { margin: 0; font-size: 19px; }
-.rail-note { font-size: var(--text-xs); color: var(--ink-3); }
+/* `--text-xs` 的注释是「metadata only」，而 `.rail-note` 装的是「直接念出来就行」
+   这类**说给用户听的做法说明**——是正文，不是角标。 */
+.rail-note { font-size: var(--text-sm); color: var(--ink-3); }
 button.block { width: 100%; margin-top: var(--space-3); }
 .log-panel { margin-top: var(--space-4); }
 
@@ -993,7 +995,10 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
    三个孩子，flex 会把说明行排到 select 旁边；而下面 `.rail` 那条
    `grid-template-columns: 76px 1fr` 会把第三个孩子甩到下一行的 76px 那一格里，
    挤成一条竖着的字。所以文字先包一层 `.tool-text`，行数变化不再影响外层布局。 */
-.profile-tools label { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: 14px; }
+/* 14px 不在字阶里（只有 --text-xs 13 与 --text-sm 15）。这一条是「我的」里
+   「语速 / 文字大小」两项设置的标签——老人要照着它去调自己的字号，本身却是全 App
+   最后一处绕开字阶的字。 */
+.profile-tools label { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-sm); }
 .profile-tools .tool-text { display: grid; gap: 0; flex: 1 1 auto; min-width: 0; }
 .profile-tools .tool-name { font-weight: 700; }
 /* `.meta` 自带 `margin-top: var(--space-1)`，在这里两行之间已经够开了，收掉。 */
@@ -1036,7 +1041,10 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   color: color-mix(in srgb, var(--ok) 38%, var(--ink));
   border: 1px solid color-mix(in srgb, var(--ok) 26%, transparent);
   padding: var(--space-2) var(--space-3);
-  font-size: 14px;
+  /* 14px 在这套字阶里不存在（只有 13 和 15）。而这几枚小标签写的是
+     「不上网也听得懂」「不会自动扣钱」——是产品对老人做的承诺，正是最该看清的字。
+     `.trust-line` 本来就是 `flex-wrap: wrap`，放大一档只会换行，不会挤坏。 */
+  font-size: var(--text-sm);
   font-weight: 750;
 }
 /* Whether a language model is advising the semantic layer is a fact about the
@@ -1054,7 +1062,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 .status-chip {
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-1) var(--space-3); border-radius: 999px;
-  font-size: 14px; font-weight: 750;
+  font-size: var(--text-sm); font-weight: 750;   /* 同上：14px 不在字阶里 */
   border: 1px solid transparent;
   white-space: nowrap;
 }
@@ -1117,7 +1125,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   min-height: 44px;
 }
 .preview-details > summary::-webkit-details-marker { display: none; }
-.preview-details > summary::after { content: "▾"; font-size: 12px; color: var(--ink-3); }
+.preview-details > summary::after { content: "▾"; font-size: var(--text-xs); color: var(--ink-3); }
 .preview-details[open] > summary::after { content: "▴"; }
 .preview-details > summary:hover { border-color: var(--role-accent); }
 .preview-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-3); }

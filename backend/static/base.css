@@ -172,7 +172,10 @@ a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underlin
   margin: 0 0 var(--space-2);
 }
 .lead { max-width: 62ch; font-size: clamp(17px, 1.6vw, 20px); color: var(--ink-2); }
-.meta { font-size: 14px; color: var(--ink-3); margin-top: var(--space-1); line-height: 1.6; }
+/* 14px 在这套字阶里**不存在**：只有 --text-xs 13 和 --text-sm 15，中间没有一档。
+   写死 14 等于绕开字阶自己造了一号字，而 `.meta` 承载的是「未打扰您：今天一切照常」
+   这类真的要读的句子，不是角标。归到 --text-sm。 */
+.meta { font-size: var(--text-sm); color: var(--ink-3); margin-top: var(--space-1);line-height: 1.6; }
 /* 生活日报里"这条会推送给您"的那一行（family.js renderDailyReport）。它写的是
    `meta bad`，而 .bad 此前只在 .pill / .report-verdict / .metric 下有规则，于是这
    一行和普通说明文字长得一模一样——最需要家属注意的那条反而最不显眼。 */

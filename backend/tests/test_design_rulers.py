@@ -111,6 +111,49 @@ def test_the_two_fixed_type_sizes_go_through_tokens(layer):
     )
 
 
+#: 字阶里根本没有的字号，比"该走令牌却写了字面值"更糟。
+#:
+#: 上面那条只认 13px 和 15px 两个确切值——因为它是为"这两级最常用、散着写"那个具体
+#: 问题建的。于是 **12px 和 14px 从它中间穿过去了**：字阶只有 --text-xs 13 和
+#: --text-sm 15，中间没有一档，而实际渲染里这两个尺寸到处都是（`.metric-label` 12、
+#: `.meta` / `.trust-pill` / `.status-chip` / `.profile-tools label` 14）。
+#: 12px 比整个字阶的下限还小，而 tokens.css 顶上写着这套字阶
+#: 「deliberately starting high: this product is read by people with presbyopia」。
+#:
+#: 一条只认两个值的规则，等于给"随手写一个 14px"发了通行证。这里改成反过来问：
+#: 你写的这个 px 字号，在字阶里存在吗？不存在就得说明理由。
+_SCALE_PX = {13, 15}          # --text-xs / --text-sm 的确切值
+_ALLOWED_BIG_PX = {16, 17, 18, 19, 22, 26, 28, 30, 32, 34, 36, 58}
+#: ↑ 16 以上是排版尺度（标题、数字、麦克风图标），它们本来就不在 --text-* 阶梯上，
+#:   由各自的版式决定。这条判据管的是**下限**：不许出现小于 --text-sm 又不是
+#:   --text-xs 的字号，因为那正是"绕开字阶把字调小"的形状。
+
+
+@pytest.mark.parametrize("layer", LAYERS)
+def test_no_font_size_falls_below_the_scale(layer):
+    """不许出现字阶里没有的小字号。
+
+    通过条件：写死的 px 字号要么 ≥ 16（版式尺度，另有其理），要么正好是 13/15
+    （那两个由上面那条判据逼着走令牌）。落在中间或更小的——12、14——一律拦下。
+    """
+    offenders = []
+    for prop, value in _declarations(layer):
+        if prop != "font-size":
+            continue
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)px", value.strip())
+        if not m:
+            continue
+        px = float(m.group(1))
+        if px >= 16 or px in _SCALE_PX:
+            continue
+        offenders.append(f"{prop}: {value}")
+    assert not offenders, (
+        f"{layer} 有小于 --text-sm(15px) 又不在字阶上的字号：{offenders}。"
+        "字阶只有 --text-xs(13，仅限元数据) 和 --text-sm(15)，中间没有一档；"
+        "tokens.css 说明这套字阶是为老花眼刻意起高的。要更小就得先在字阶里加一档。"
+    )
+
+
 @pytest.mark.parametrize("layer", LAYERS)
 def test_no_shadow_hardcodes_a_colour(layer):
     """阴影的颜色必须从令牌派生，不能写死。

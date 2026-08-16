@@ -159,7 +159,31 @@ def find_chrome() -> str | None:
 #: 所以先证明「这是优活的页面」，再谈量到了什么。
 PROBE = r"""
 (async () => {
-  await new Promise(r => setTimeout(r, 1200));
+  // 等**页面真的准备好**，不是等一个固定的 1200ms。
+  //
+  // 原写法是 `setTimeout(r, 1200)`。机器空闲时够用，一旦被别的活儿压着就不够：
+  // 本轮在一次 pytest 跑了 208 秒（平时 120 秒）的负载下，这道闸门报了
+  // 「1 个 路由×宽度 走不出去」，而同一份代码单独连跑三次全绿。
+  // 出口有一部分是页面脚本渲染出来的（`defer`，还要等接口回来），1200ms 没到
+  // 就去数，数到的是「还没画出来」，报出来的却是「这一页走不出去」——
+  // 一个偶发的红，比一直红更糟：它教人把红当噪音，重跑一次就过去了。
+  //
+  // 改成轮询到出口出现为止，最多等 8 秒。快的时候比原来还快（不用干等 1200ms），
+  // 慢的时候才多等，而且**等不到照样报红**——这不是把判据放宽，是把「没准备好」
+  // 和「真的没有出口」分开。
+  const deadline = Date.now() + 8000;
+  const settled = () => document.readyState === 'complete';
+  const anyExit = () => [...document.querySelectorAll('a[href]')].some(a => {
+    try { return new URL(a.href, location.href).pathname.replace(/\/$/, '')
+                 !== (location.pathname.replace(/\/$/, '') || '/'); }
+    catch (_) { return false; }
+  });
+  while (Date.now() < deadline && !(settled() && anyExit())) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  // 脚本跑完之后再给一拍，让它把渲染出来的节点插进去。
+  await new Promise(r => setTimeout(r, 250));
+
   const here = location.pathname.replace(/\/$/, '') || '/';
   const liveness = !!document.querySelector('link[href*="/static/tokens.css"]');
 
