@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -40,6 +41,7 @@ from .app_schemas import (
     AppBill,
     AppBillList,
     AppCertificate,
+    AppContact,
     AppContactList,
     AppEmergencyResult,
     AppHealthSummary,
@@ -110,6 +112,7 @@ _EV_REMINDER_CANCELLED = "app.reminder.cancelled"
 _EV_SETTINGS_CHANGED = "app.settings.changed"
 _EV_APPOINTMENT_CREATED = "app.appointment.created"
 _EV_SOS_NOTIFY_FAILED = "app.emergency.notify_failed"
+_EV_CONTACT_PHONE_SET = "app.contact.phone_set"
 
 
 def _yuan(cents: int) -> str:
@@ -881,6 +884,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         "app.settings.changed": ("改了设置", "服务", "record_request"),
         "app.appointment.created": ("记下一次就医安排", "健康", "record_confirm"),
         "app.emergency.notify_failed": ("紧急呼叫没能通知到家人", "服务", "record_family"),
+        "app.contact.phone_set": ("登记了紧急联系电话", "服务", "record_family"),
     }
 
     _OUTCOME_WORDS = {
@@ -1233,22 +1237,74 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
     def contacts(ctx: AuthContext = Depends(_actor)) -> AppContactList:
         """紧急联系人。真的读家庭成员表，不是三行写死的卡片。
 
-        **没有电话号码这个字段。** `actors` 表只有 id / family_id / role /
-        display_name。所以这里回 `phone: null`，由界面决定怎么显示——
-        编一个号码出来，老人真按下去会拨错人。
+        `phone` 此前恒为 `null`，因为 `actors` 表根本没有那一列。现在有了
+        （见 `Database._migrate`），但**演示数据里一个号码都不种**——
+        编一个出来，老人真按下去会拨错人。真实部署用 `PUT` 那个端点填。
         """
+        elder = _elder_of(ctx)
         people = []
         for row in db.list_actors(ctx.family_id):
-            if row["id"] == _elder_of(ctx):
+            if row["id"] == elder:
                 continue
             people.append({
                 "id": row["id"],
                 "name": row["display_name"],
                 "role": _ROLE_WORDS.get(row["role"], "家人"),
-                "phone": None,
+                "phone": row["phone"] if "phone" in row.keys() else None,
                 "primary": row["id"] == _DEMO_FAMILY,
             })
         return {"items": people, "count": len(people)}
+
+    @router.put("/contacts/{contact_id}/phone")
+    def set_contact_phone(
+        contact_id: str,
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppContact:
+        """给一位家人登记电话。传空串或 null 表示清掉。
+
+        **只允许家人身份来改。** 紧急联系人的号码是紧急时真会被拨出去的东西；
+        让老人端自己改它，等于把这个产品最后一道人工兜底交给最容易被诱导的一方
+        （这个产品的整条设计线就是「高风险动作要第二个人点头」）。
+
+        校验刻意宽松：这一版只做长度和字符集，不做归属地/运营商判断——
+        座机、分机、境外号码都要能填，而一个填不进去的紧急联系人比没有更糟。
+        """
+        if ctx.role is not ActorRole.FAMILY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="紧急联系人的电话只能由家人登记。",
+            )
+        row = db.actor(contact_id)
+        if row is None or row["family_id"] != ctx.family_id:
+            raise HTTPException(status_code=404, detail="这个家庭里没有这个人。")
+
+        raw = (body or {}).get("phone")
+        phone = None
+        if raw is not None and str(raw).strip():
+            phone = re.sub(r"[\s\-()]", "", str(raw))
+            if not re.fullmatch(r"\+?\d{5,20}", phone):
+                raise HTTPException(status_code=400, detail="这个号码看起来不对，请再检查一下。")
+
+        if not db.set_actor_phone(contact_id, ctx.family_id, phone):
+            raise HTTPException(status_code=404, detail="这个家庭里没有这个人。")
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_CONTACT_PHONE_SET,
+            entity_id=contact_id,
+            # **号码本身不进审计。** 审计链是给人看的、会被导出的，
+            # 而这是 PII。记「谁给谁登记了/清空了」就够回答「这个号码哪来的」。
+            payload={"contact": row["display_name"], "cleared": phone is None},
+        )
+        fresh = db.actor(contact_id)
+        return {
+            "id": contact_id,
+            "name": fresh["display_name"],
+            "role": _ROLE_WORDS.get(fresh["role"], "家人"),
+            "phone": fresh["phone"] if "phone" in fresh.keys() else None,
+            "primary": contact_id == _DEMO_FAMILY,
+        }
 
     # ---- 设置：字号与语音 ----------------------------------------------------
     #

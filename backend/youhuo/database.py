@@ -316,6 +316,34 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_approval_votes_task ON approval_votes(task_id,decision);
             """
         )
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """给已经存在的库补列。
+
+        **这是这个仓库第一次做迁移**，所以写清楚为什么不能只改上面的建表语句：
+        `CREATE TABLE IF NOT EXISTS` 对**已经存在**的表什么都不做。改了上面那段，
+        新建的库有新列，而任何一个已经跑过的库（开发机、演示部署、竞赛机上那份）
+        永远停在旧结构上——然后代码按新列去查，当场 `no such column`。
+        这种缺陷只在"升级"路径上出现，全新环境里测不出来。
+
+        用 `PRAGMA table_info` 判断，而不是 `try: ALTER except: pass`：
+        后者会把真正的错误（磁盘满、库损坏）一起吞掉，变成一次静默的半迁移。
+        """
+        wanted = [
+            # 紧急联系人的电话。此前 `actors` 只有 id/family_id/role/display_name，
+            # 于是 `/api/v1/contacts` 只能回 `phone: null`，界面上写「还没有留电话」。
+            # 号码是 PII：这一列**允许为空且默认为空**，不种任何演示号码——
+            # 编一个出来，老人真按下去会拨错人。
+            ("actors", "phone", "TEXT"),
+        ]
+        with self._lock:
+            for table, column, decl in wanted:
+                cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+                if column in cols:
+                    continue
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+            self._conn.commit()
 
     def seed_demo(self, suffix: str = "demo") -> DemoIdentities:
         """Seed one self-contained demo family.
@@ -563,6 +591,19 @@ class Database:
                 "ORDER BY CASE role WHEN 'family' THEN 0 WHEN 'system' THEN 1 ELSE 2 END, display_name",
                 (family_id,),
             ).fetchall()
+
+    def set_actor_phone(self, actor_id: str, family_id: str, phone: str | None) -> bool:
+        """给家庭成员登记电话。`None` / 空串表示清掉。
+
+        带上 `family_id` 一起匹配，不是只按 actor_id 改——跨家庭写入是这类
+        「按主键改一行」的方法最容易出的洞，而这里改的是**紧急时会被拨出去的号码**。
+        """
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE actors SET phone=? WHERE id=? AND family_id=?",
+                (phone or None, actor_id, family_id),
+            )
+            return cur.rowcount > 0
 
     def actor_in_family(self, actor_id: str, family_id: str, required_role: str | None = None) -> bool:
         row = self.actor(actor_id)

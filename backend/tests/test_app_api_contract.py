@@ -483,6 +483,107 @@ def test_contacts_never_invent_a_phone_number(client: TestClient) -> None:
     assert all(c["id"] != "elder-demo" for c in items), "老人自己不该在联系人里"
 
 
+def test_an_existing_database_gets_the_new_column(tmp_path) -> None:
+    """迁移的价值全在**升级路径**上，而全新的库测不出它。
+
+    `CREATE TABLE IF NOT EXISTS` 对已经存在的表什么都不做。只改建表语句的话，
+    新建的库有新列，而任何一个已经跑过的库（开发机、演示部署、竞赛机上那份）
+    永远停在旧结构 —— 然后代码按新列去查，当场 `no such column`。
+
+    这里手工造一个**旧结构**的库（`actors` 没有 `phone`），再用当前的
+    `Database` 打开它，确认列被补上、而且原有的数据还在。
+    """
+    import sqlite3
+
+    from youhuo.database import Database
+
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE families(id TEXT PRIMARY KEY, display_name TEXT NOT NULL);
+        CREATE TABLE actors(
+            id TEXT PRIMARY KEY,
+            family_id TEXT NOT NULL REFERENCES families(id),
+            role TEXT NOT NULL CHECK(role IN ('elder','family','system')),
+            display_name TEXT NOT NULL
+        );
+        INSERT INTO families VALUES ('fam-old','老库家庭');
+        INSERT INTO actors VALUES ('elder-old','fam-old','elder','旧库老人');
+        """
+    )
+    conn.commit()
+    before = {r[1] for r in conn.execute("PRAGMA table_info(actors)")}
+    conn.close()
+    assert "phone" not in before, "夹具没造出旧结构，这条测试没有意义"
+
+    db = Database(path)
+    try:
+        after = {r[1] for r in db._conn.execute("PRAGMA table_info(actors)")}
+        assert "phone" in after, f"旧库没有被补上 phone 列：{sorted(after)}"
+        # 原有数据不许在迁移里丢掉。
+        row = db.actor("elder-old")
+        assert row is not None and row["display_name"] == "旧库老人"
+        assert row["phone"] is None
+        # 补上之后要真的能写。
+        assert db.set_actor_phone("elder-old", "fam-old", "13800001111")
+        assert db.actor("elder-old")["phone"] == "13800001111"
+    finally:
+        db.close()
+
+
+def test_a_family_member_can_register_an_emergency_phone(client: TestClient) -> None:
+    """`actors` 原先根本没有电话这一列——这是这个仓库的第一次 `ALTER TABLE`。"""
+    fam = _login(client, "daughter-demo")
+    r = client.put(f"{V1}/contacts/son-demo/phone", headers=fam, json={"phone": "138 0000 1111"})
+    assert r.status_code == 200, r.text
+    assert r.json()["phone"] == "13800001111", "空格和横杠要清掉"
+    listed = next(c for c in client.get(f"{V1}/contacts", headers=fam).json()["items"]
+                  if c["id"] == "son-demo")
+    assert listed["phone"] == "13800001111", "列表里没跟着变"
+    # 清掉
+    assert client.put(f"{V1}/contacts/son-demo/phone", headers=fam,
+                      json={"phone": ""}).json()["phone"] is None
+
+
+def test_the_elder_cannot_change_an_emergency_phone(client: TestClient) -> None:
+    """紧急联系人的号码是紧急时真会被拨出去的东西。
+
+    让老人端自己改它，等于把最后一道人工兜底交给最容易被诱导的一方——
+    而这个产品的整条设计线就是「高风险动作要第二个人点头」。
+    """
+    elder = _login(client, "elder-demo")
+    r = client.put(f"{V1}/contacts/son-demo/phone", headers=elder, json={"phone": "13800001111"})
+    assert r.status_code == 403, f"老人改动了紧急联系电话：{r.status_code}"
+
+
+def test_a_nonsense_phone_is_refused(client: TestClient) -> None:
+    fam = _login(client, "daughter-demo")
+    assert client.put(f"{V1}/contacts/son-demo/phone", headers=fam,
+                      json={"phone": "打给我女儿"}).status_code == 400
+
+
+def test_a_phone_cannot_be_set_across_families(client: TestClient) -> None:
+    visitor = client.post("/v2/auth/visitor", json={})
+    if visitor.status_code != 200:
+        pytest.skip("这个部署没有访客沙箱")
+    theirs = {"Authorization": "Bearer " + visitor.json()["family_token"]}
+    r = client.put(f"{V1}/contacts/son-demo/phone", headers=theirs, json={"phone": "13800001111"})
+    assert r.status_code == 404, f"跨家庭写入了紧急联系电话：{r.status_code}"
+
+
+def test_the_audit_never_stores_the_phone_number_itself(client: TestClient) -> None:
+    """审计链会被导出、会被人看，而号码是 PII。
+
+    记「谁给谁登记了」足够回答「这个号码哪来的」，不需要把号码本身留在链上。
+    """
+    fam = _login(client, "daughter-demo")
+    client.put(f"{V1}/contacts/son-demo/phone", headers=fam, json={"phone": "13800001111"})
+    dump = client.get(f"{V1}/records", headers=fam).text
+    assert "13800001111" not in dump, "号码被写进审计流水了"
+    assert "登记了紧急联系电话" in dump, "这件事没有留下任何痕迹"
+
+
 def test_the_profile_reports_days_but_never_invents_weather(client: TestClient) -> None:
     """有依据的给值，没依据的给 null——两者都要，而且不能反过来。"""
     p = client.get(f"{V1}/profile").json()
