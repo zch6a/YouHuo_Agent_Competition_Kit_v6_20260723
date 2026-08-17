@@ -130,7 +130,9 @@
       记得走到哪、紧急时多给的权限会自己收回。那些要在电脑上看。
     </p>
     <!-- 三栏行组件（图标 / 文字 / 箭头）。卷轴是「完整证明」的意象。 -->
-    <a class="trust-more-link art-row" href="/judge" data-art-scene="scroll-desk">在电脑上看完整证明</a>
+    <!-- 文字要**包在元素里**。裸文本节点在网格里是匿名项，`grid-column` 管不到它，
+         落到哪一栏由自动排布决定——量出来文字栏宽度是 0。 -->
+    <a class="trust-more-link art-row" href="/judge" data-art-scene="chrysanth"><span>在电脑上看完整证明</span></a>
 
     <!-- 这一页此前**没有**底部导航，出口只有一个 back-link。而它属于 family shell
          的「待办」（`surfaces.py` 里 `/trust` 的 entry 是 `todo`：一笔办完的事就在

@@ -255,12 +255,11 @@
 /* 行尾那个箭头是绝对定位的，让它待在第三栏的位置上。 */
 .art-row.trust-more-link::after { right: 16px; }
 
-/* `.art-row` 自己排版，形状分类那三条让位规则一律不生效——
-   两套 padding 叠加会把文字挤成窄条（结论卡上实测过一次）。 */
-.art-row[data-shape-hint] > :not(.art-scene) {
-  padding-right: 0;
-  padding-bottom: 0;
-}
+/* 让位规则的清零挪到文件**后面**去了（见「场景意象」那一节的末尾）。
+   写在这里不行：它和 `.art-scene-host[data-shape-hint="mark"] > …`
+   特异性相同 (0,3,0)，而那条在后面，按层叠顺序它赢。
+   实测后果：每一行都吃到 96px 的「给角落画让位」，行高涨到 112–167px，
+   文字被压成 90px 一栏。 */
 
 /* 三档配色，对应三种语气。不是随机换颜色：绿=常态、玉=在办、珊瑚=要留意。 */
 .art-row[data-art-tone="jade"] {
@@ -357,6 +356,46 @@
 .trust-more-link.art-scene-host > .art-scene { right: 34px; }
 .trust-more-link.art-scene-host[data-shape-hint="mark"] > :not(.art-scene) { padding-right: 96px; }
 .trust-more-link.art-scene-host[data-shape-hint="wide"] > :not(.art-scene) { padding-right: 124px; }
+
+/* ------------------------------------------------- 行组件不吃上面这些让位
+ *
+ * 上面所有 `padding-right` 都是给「画压在文字上」用的——画绝对定位在角落，
+ * 文字要缩进去避开它。三栏行组件里画和字**各占各的格**，不重叠，不用让。
+ *
+ * ## 必须写在这里，不能写在 `.art-row` 那一节
+ *
+ * 第一版写在前面，特异性同为 (0,3,0)，按层叠顺序输给
+ * `.art-scene-host[data-shape-hint="mark"] > :not(.art-scene)`。
+ * 实测：每一行都吃到 96px 让位，行高涨到 112–167px，文字压成 90px 一栏。
+ * `care.html` 五行全中——而我看了截图没发现，是并行的审计量出来的。
+ *
+ * 这里同时提高特异性（多一个 `.art-scene-host`），双保险：
+ * 以后有人在这行后面再加规则也不会又把它顶掉。
+ */
+.art-row.art-scene-host[data-shape-hint] > :not(.art-scene),
+.trust-more-link.art-row.art-scene-host[data-shape-hint] > :not(.art-scene) {
+  padding-right: 0;
+  padding-bottom: 0;
+}
+
+/* 图标位只认 `mark`（近方形）。`tall`/`wide` 的角落几何会赢过
+   `.art-row > .art-scene`——实测 `scroll-desk`（tall）在 44px 的圆里
+   渲染成 15×63 的一条。这里把三种形状都拉回图标位，
+   免得下一个人挑了张竖图然后看到一条缝。 */
+.art-row > .art-scene[data-shape="tall"],
+.art-row > .art-scene[data-shape="wide"],
+.art-row > .art-scene[data-shape="mark"] {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: none;
+  width: 56px;
+  height: 56px;
+  max-width: none;
+  max-height: none;
+}
 
 /* --------------------------------------------------------------- 票据语言 */
 
