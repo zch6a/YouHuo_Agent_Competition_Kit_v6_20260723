@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>健康助手 · 优活</title><link rel="stylesheet" href="../assets/css/app.css"></head><body data-surface="consumer"><main class="phone"><div class="status"><span>9:41</span><i class="island"></i><span class="sys">▮▮▮ ◉ ▰</span></div><div class="header-grid" style="grid-template-columns:48px 1fr 48px"><button class="back" data-action="back" aria-label="返回" style="width:48px;height:48px;display:grid;place-items:center;margin-left:-6px">‹</button><h1>健康助手</h1><span></span></div>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>健康助手 · 优活</title><link rel="stylesheet" href="../assets/css/app.css"><link rel="stylesheet" href="/static/art-cards.css"></head><body data-surface="consumer"><main class="phone"><div class="status"><span>9:41</span><i class="island"></i><span class="sys">▮▮▮ ◉ ▰</span></div><div class="header-grid" style="grid-template-columns:48px 1fr 48px"><button class="back" data-action="back" aria-label="返回" style="width:48px;height:48px;display:grid;place-items:center;margin-left:-6px">‹</button><h1>健康助手</h1><span></span></div>
 <img class="scene" src="../art/png/profile_scene_right.png" alt="" style="right:-14px;top:104px;width:210px;opacity:.60">
 <img class="art" src="../art/png/sun_disc.png" alt="" style="right:74px;top:96px;width:52px;opacity:.72">
 
@@ -10,7 +10,7 @@
   <p class="sub" style="margin-top:6px;max-width:58%">没有记到就说没有。</p>
 </section>
 
-<section class="card content" style="margin-top:14px;padding:18px;min-height:132px;overflow:hidden">
+<section class="card content art-framed" data-art-frame="primary" style="margin-top:14px;padding:18px;min-height:132px;overflow:hidden">
   <img class="scene" src="../art/png/profile_health_mountain.png" alt="" style="right:0;bottom:0;width:96px;opacity:.52">
   <div class="row" style="gap:12px">
     <img class="icon" src="../art/png/service_health.png" alt="">
@@ -24,10 +24,10 @@
 </section>
 
 <h2 class="section-title content" style="margin:20px 0 9px">今天的健康待办</h2>
-<section class="card content" style="padding:4px 16px 12px;min-height:96px">
+<section class="card content art-scene-host" data-art-scene="mountain" style="padding:4px 16px 12px;min-height:96px">
   <div id="hsTodo"></div>
 </section>
 
 <p class="muted content" id="hsFoot" style="margin:14px 0 0;font-size:calc(15px * var(--fs, 1));line-height:1.55">身体数据来自家人和老人自己记下的健康事件。优活不会替您「估」一个心率或血压——没有记到的数字，这一页不会写出来。</p>
 <img class="scene" src="../art/png/services_scene_left.png" alt="" style="left:-10px;bottom:92px;width:180px;opacity:.50">
-</main><script src="../assets/js/config.js"></script><script src="../assets/js/mock-api.js"></script><script src="../assets/js/api-client.js"></script><script src="../assets/js/app.js"></script><script src="../assets/js/page-health.js"></script></body></html>
+</main><script src="../assets/js/config.js"></script><script src="../assets/js/mock-api.js"></script><script src="../assets/js/api-client.js"></script><script src="../assets/js/app.js"></script><script src="../assets/js/page-health.js"></script><script src="/static/art-cards.js" defer></script></body></html>
