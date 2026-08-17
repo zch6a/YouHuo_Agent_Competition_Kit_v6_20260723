@@ -605,6 +605,83 @@ def test_a_notification_can_be_read_only_once(client: TestClient) -> None:
     assert client.post(f"{V1}/notifications/{nid}/read").status_code == 404
 
 
+# ---- 手抖点两下 ------------------------------------------------------------
+#
+# 老人手抖、以为没反应、网络慢了再按一次——重复点击是这一端最常见的操作，
+# 不是边角情况。实测过每个写接口连点两次留下了什么：加提醒和建安排被唯一键
+# 意外挡住了（409），另外四处全都留下了重复。
+
+def test_double_tapping_execute_does_not_duplicate_the_chain(client: TestClient) -> None:
+    """**这一条是这组里最要紧的。**
+
+    审计链是这个产品的全部价值。连点两下 execute 会让链上出现**两条**
+    `app.payment.awaiting_family`——看链的人会以为老人确认了两遍。
+    """
+    pid = _pay_to(client, "verified")
+    first = client.post(f"{V1}/payments/{pid}/execute", json={})
+    second = client.post(f"{V1}/payments/{pid}/execute", json={})
+    assert first.status_code == second.status_code == 200
+    chain = client.get(f"{V1}/payments/{pid}/certificate").json()["chain"]
+    awaiting = [s for s in chain if s["action"] == "app.payment.awaiting_family"]
+    assert len(awaiting) == 1, f"同一步在链上出现了 {len(awaiting)} 次：{chain}"
+
+
+def test_double_tapping_prepare_reuses_the_same_payment(client: TestClient) -> None:
+    """同一张账单不许同时有两笔在飞。
+
+    实测连点两下拿到两个不同的事务号。老人接着在其中一笔上复述、
+    另一笔永远悬着，而「我的账单」上那张仍然未缴。
+    """
+    a = client.post(f"{V1}/payments/prepare", json={}).json()
+    b = client.post(f"{V1}/payments/prepare", json={}).json()
+    assert a["id"] == b["id"], f"建了两笔：{a['id']} / {b['id']}"
+    assert a["amount"] == b["amount"]
+
+
+def test_double_tapping_a_reading_records_it_once(client: TestClient) -> None:
+    """一分钟内同一项同一个值，当成手抖。
+
+    血压量两次是正常的，所以不能一律拒绝——但一分钟内同一项同一个**读数**，
+    只可能是重复提交：真的量了两次，第二次的数字几乎不会一模一样。
+    """
+    client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
+    client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
+    assert client.get(f"{V1}/health-summary").json()["recorded"] == 1
+    # 值不同 = 真的又量了一次，必须记下来。
+    client.post(f"{V1}/health/events", json={"type": "血压", "value": "131/85"})
+    assert client.get(f"{V1}/health-summary").json()["recorded"] == 2
+
+
+def test_the_first_emergency_call_always_notifies(client: TestClient) -> None:
+    """**阳性对照，而且是被一个真 bug 逼出来的。**
+
+    加「一分钟内不重复推送」时，我把检查写在了本次审计**之后**——
+    于是它查到自己刚写的那一条，`recent_sos` 恒为真，紧急呼叫从此
+    **一条通知都不发**。接口照样 200，审计照样有记录，只是没人被叫。
+    一个防重复的改动，把这个 App 里最要紧的功能整个关掉了。
+
+    所以「第二次不重复」那条断言必须配这一条：只证明「没重复」，
+    等于给「一次都不发」发了通行证。
+    """
+    r = client.post(f"{V1}/emergency/call", json={}).json()
+    assert r["notified"], "第一次呼叫就没有通知任何人"
+    assert client.get(f"{V1}/notifications", params={"role": "家人"}).json()["count"] == 1
+
+
+def test_double_tapping_sos_does_not_spam_the_family(client: TestClient) -> None:
+    """真出事时家人手机上应该是一条清楚的呼叫，不是一串重复消息。
+
+    重复本身会让人以为是系统故障，从而降低这条通知的可信度。
+    但**呼叫本身照记**——审计链上每一次按下都在。
+    """
+    client.post(f"{V1}/emergency/call", json={})
+    second = client.post(f"{V1}/emergency/call", json={}).json()
+    assert client.get(f"{V1}/notifications", params={"role": "家人"}).json()["count"] == 1
+    assert "120" in second["message"], "第二次要告诉他更急的话该打 120"
+    calls = [i for i in client.get(f"{V1}/records").json()["items"] if i["title"] == "紧急呼叫"]
+    assert len(calls) == 2, f"按了两次，链上只记了 {len(calls)} 次"
+
+
 # ---- 联系人 / 档案 / 设置 --------------------------------------------------
 
 def test_contacts_never_invent_a_phone_number(client: TestClient) -> None:

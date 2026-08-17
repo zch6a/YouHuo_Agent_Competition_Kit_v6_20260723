@@ -123,6 +123,25 @@ def _yuan(cents: int) -> str:
     return f"{cents / 100:.2f}"
 
 
+class _AlreadyCalled(Exception):
+    """一分钟内已经呼叫过了。
+
+    用异常而不是 `if` 嵌套，是为了让「不重复推送」和「推送失败」共用同一个出口——
+    两者都要走到「呼叫本身照记、只是不发第二条」那个分支，而它们的**原因不同**，
+    所以只有后者写 `notify_failed` 审计。
+    """
+
+
+#: 已经走完的事务状态。用它判断「这张账单还有没有一笔在飞」。
+#: 单列出来是因为「哪些算结束了」这件事以后还会有人问，
+#: 而写成散在各处的 `not in {...}` 迟早会有一处漏掉 CANCELLED。
+_TASK_DONE = frozenset({
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+    TaskStatus.FAILED,
+})
+
+
 def _parse_when(raw: str) -> datetime:
     """把老人说得出的时间变成一个时刻。
 
@@ -676,6 +695,26 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         if row["paid"]:
             raise HTTPException(status_code=409, detail="这一张已经交过了。")
 
+        # 这张账单已经有一笔在办了，就把那一笔给他，别再建一笔。
+        #
+        # 实测：连点两下「继续办理」，拿到两个不同的事务号——同一张账单两笔在飞。
+        # 老人接着在其中一笔上复述、另一笔永远悬着，而「我的账单」上那张仍然未缴。
+        # 这一层原先完全没有幂等保护，而重复点击是老人端最常见的操作。
+        for existing in db.list_tasks(ctx.family_id, limit=60):
+            if (
+                existing.task_type is TaskType.BILL_PAYMENT
+                and existing.status not in _TASK_DONE
+                and existing.slots.get("bill_id") == row["id"]
+            ):
+                return {
+                    "id": existing.id,
+                    "status": "awaiting_teach_back",
+                    "amount": _yuan(int(existing.slots.get("amount_cents") or 0)),
+                    "prompt": TeachBackVerifier.build_prompt(
+                        TaskType.BILL_PAYMENT, existing.slots
+                    ),
+                }
+
         period = str(row["period"] or "")
         b = {
             "id": row["id"],
@@ -799,6 +838,20 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         task = _task_or_404(ctx, payment_id)
         if task.status is TaskStatus.COMPLETED:
             return {"ok": True, "status": "paid", "certificateId": task.id}
+        # 已经在等家人了，再点一次不做任何事。
+        #
+        # 不加这一条的后果实测过：连点两下，链上出现**两条**
+        # `app.payment.awaiting_family`。审计链是这个产品的全部价值，
+        # 而它把发生过一次的事记成了两次——看链的人会以为老人确认了两遍。
+        # 老人手抖、以为没反应、网络慢了再按一次，是这一端最常见的操作，
+        # 不是边角情况。
+        if task.status is TaskStatus.AWAITING_FAMILY_APPROVAL:
+            return {
+                "ok": True,
+                "status": "awaiting_family",
+                "certificateId": task.id,
+                "message": "已经提交过了，正在等家里第二个人点头。",
+            }
 
         # 复述必须先过：查这一件事的审计链里有没有一条 verified。
         events = db.list_audit(ctx.family_id, limit=200, entity_id=task.id)
@@ -1173,6 +1226,37 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
             except ValueError:
                 raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。")
 
+        # 一分钟内同一项同一个值，当成手抖。
+        #
+        # 实测连点两下「记血压」留下**两条一模一样的记录**。血压量两次是正常的，
+        # 所以不能一律拒绝——但一分钟内同一项同一个读数，只可能是重复提交。
+        # 这条线画在「值也相同」上：真的量了两次，第二次的数字几乎不会一模一样。
+        try:
+            recent = v4_store.list_health_events(
+                ctx.family_id, _elder_of(ctx), ActorRole.ELDER
+            )
+        except Exception:      # noqa: BLE001
+            recent = []
+        window = datetime.now(UTC) - timedelta(minutes=1)
+        for e in recent:
+            when = getattr(e, "event_at", None)
+            if when and when.tzinfo is None:
+                when = when.replace(tzinfo=UTC)
+            if (
+                when and when > window
+                and str(getattr(e, "title", "")) == label
+                and str((getattr(e, "payload", None) or {}).get("value") or "") == value
+            ):
+                return {
+                    "ok": True,
+                    "id": e.id,
+                    "label": label,
+                    "value": value,
+                    "unit": unit,
+                    "at": when.isoformat(),
+                    "message": f"刚才已经记过一次{label} {value}{unit or ''}了。",
+                }
+
         try:
             record = v4_store.create_health_event(
                 ctx.family_id,
@@ -1213,6 +1297,26 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
     @router.post("/emergency/call")
     def emergency_call(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppEmergencyResult:
         """记一次真实的紧急呼叫。不会真的拨号——那要电话能力，这里只留证据。"""
+        # 一分钟内按第二次，不再重复叫人。
+        #
+        # 实测连点两下，家人收到**两条**一模一样的通知。紧急呼叫尤其不能刷屏：
+        # 真出事时家人手机上应该是一条清楚的呼叫，不是一串重复消息——
+        # 重复本身会让人以为是系统故障，从而降低这条通知的可信度。
+        #
+        # **但不能直接拒绝。** 老人可能真的需要再喊一次（第一次没人接）。
+        # 所以呼叫本身照记（审计链上每一次按下都在），只是不重复推送。
+        #
+        # **这一段必须在写本次审计之前。** 第一版放在后面，于是它查到的是
+        # **自己刚写的那一条**，`recent_sos` 恒为真——实测的后果是
+        # 紧急呼叫从此一条通知都不发。一个「防重复」的改动，
+        # 把这个 App 里最要紧的功能整个关掉了，而接口照样 200。
+        recent_sos = False
+        cutoff = datetime.now(UTC) - timedelta(minutes=1)
+        for e in db.list_audit(ctx.family_id, limit=20):
+            if e.event_type == _EV_SOS and e.created_at and e.created_at > cutoff:
+                recent_sos = True
+                break
+
         db.append_audit(
             family_id=ctx.family_id,
             actor_id=ctx.actor_id,
@@ -1220,6 +1324,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
             entity_id=f"sos-{uuid.uuid4().hex[:10]}",
             payload={"source": (body or {}).get("source", "elder-app")},
         )
+
         # **真的把家人叫起来。**
         #
         # 原先这里只写一条审计就返回「已记录这次呼叫，并按顺序联系紧急联系人」——
@@ -1230,6 +1335,8 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         # 发不出去不能让这次呼叫本身失败——那会让老人以为没按上。
         notified: list[str] = []
         try:
+            if recent_sos:
+                raise _AlreadyCalled
             # 主要联系人排最前。
             #
             # `list_actors` 按 role 再按名字排，于是「儿子」排在「女儿」前面——
@@ -1253,6 +1360,8 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
                 )
                 notified.append(row["display_name"])
                 break   # 通知是按家庭发的，不是按人发的——发一条就够，别刷屏
+        except _AlreadyCalled:
+            pass          # 一分钟内已经叫过了，不重复推送。呼叫本身照记。
         except Exception as exc:      # noqa: BLE001
             db.append_audit(
                 family_id=ctx.family_id,
@@ -1262,14 +1371,18 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
                 payload={"error": type(exc).__name__},
             )
 
+        if recent_sos:
+            message = "刚才那次呼叫已经发出去了，家人正在赶来。要是很急，请直接拨打 120。"
+        elif notified:
+            message = "已经记下这次呼叫，正在联系" + "、".join(notified) + "。"
+        else:
+            message = "已经记下这次呼叫。这个家庭还没有登记可以联系的家人，请直接拨打 120。"
         return {
             "ok": True,
             "status": "contacting",
             "notified": notified,
             # 说的话要跟着实际发生的事走：真发出去了才说"正在联系"。
-            "message": ("已经记下这次呼叫，正在联系" + "、".join(notified) + "。")
-                       if notified else
-                       "已经记下这次呼叫。这个家庭还没有登记可以联系的家人，请直接拨打 120。",
+            "message": message,
         }
 
     # ---- 提醒：用药 / 就医 / 其他 -------------------------------------------
