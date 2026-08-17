@@ -170,7 +170,8 @@ def _parse_when(raw: str) -> datetime:
         raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。") from None
 
 
-def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice=None) -> APIRouter:
+def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice=None,
+                     v6_store=None) -> APIRouter:
 
     class _IdempotentRoute(APIRoute):
         """带 `Idempotency-Key` 的写请求，重放同一个响应。
@@ -1874,15 +1875,44 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
 
     # ---- 设置：字号与语音 ----------------------------------------------------
     #
-    # 存在 `memory_items` 里，`sensitivity='preference'`。这不是借地方放东西：
-    # 那张表的枚举里本来就有 `preference`，而「记住老人的偏好、并且可撤回」
-    # 正是这个产品的同意记忆机制。设置项走它，等于自动获得撤回与审计。
+    # ## 字号和语速**不在这一层存**
+    #
+    # 它们是 v6 交互档案（`interaction_profiles_v6`）的两列，那张表才是事实源。
+    # 我一开始在 `memory_items` 里另存了一份，那是个真缺陷，实测长这样：
+    #
+    #     老人说「说慢一点」 → 它回答「好，我说慢一点。」
+    #                        → 档案 0.88 降到 0.80
+    #                        → 而 App 仍然用 1.0 念
+    #
+    # 也就是**它答应了，然后用原速念**。反过来拖滑块，档案不动，
+    # 下一次「说慢一点」从档案的旧值继续往下减。字号同理：App 说 1.6，
+    # `/v6/interaction/plan` 仍按 1.25 排版。
+    #
+    # 两边各自都对，合起来才错——所以两边的测试都不会红。
+    #
+    # ## 夹取范围跟着档案走
+    #
+    # 档案的约束是 speech_rate 0.6–1.2、font_scale 1.0–1.8（`v6_models.py`），
+    # 越界会被 Pydantic 打回。这一层原来允许 voiceSpeed 到 1.6、fontScale 到 0.9，
+    # 现在收进档案的范围里。fontScale 下限 1.0 是有意的：适老界面不该比常规更小。
+    #
+    # ## 发音人和高对比仍在 `memory_items`
+    #
+    # 档案里没有这两列，而它们只跟这一端有关（哪个 TTS 音色、要不要高对比配色），
+    # 不参与 v6 那套自适应。留在 `sensitivity='preference'` 的同意记忆里，
+    # 顺带获得撤回与审计。
 
     _PREF_KEY = "elder_app_settings"
-    _PREF_DEFAULTS = {"fontScale": 1.0, "voiceSpeed": 1.0, "highContrast": False,
+    #: 只剩这一端独有的两项。字号语速从档案读，不在这里兜默认——
+    #: 在这里再写一份默认值，就是把刚拆掉的第二事实源又建回来。
+    _PREF_DEFAULTS = {"highContrast": False,
                        # 换了声音要存下来——不存的话下次打开又变回第一个，
                        # 而「我明明换过」是最让人怀疑功能有没有做的一种表现。
                        "voiceSpeaker": 0}
+    #: 和 `InteractionProfileUpdate` 的 Field 约束一致。写死一份是因为这一层
+    #: 要在调 upsert **之前**夹好——否则越界会变成 422，而老人只是拖了个滑块。
+    _RATE_LO, _RATE_HI = 0.6, 1.2
+    _FONT_LO, _FONT_HI = 1.0, 1.6
 
     def _pref_item(ctx: AuthContext):
         for item in db.list_memories(ctx.family_id, _elder_of(ctx)):
@@ -1890,18 +1920,37 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                 return item
         return None
 
-    def _read_prefs(ctx: AuthContext) -> dict[str, Any]:
-        """这位老人存下来的偏好，没存过就是默认值。
+    def _profile(ctx: AuthContext):
+        """这位老人的 v6 交互档案。没有 v6 store 时返回 None。
 
-        抽出来是因为**朗读那一端也要读它**：语速存在这里，而
-        `POST /speech` 必须按它来念，否则那个设置又变成一个没人读的值。
-        两处各写一遍解析，迟早有一处忘了兜默认。
+        `build_app_router` 允许不传 v6_store（测试里有单独构造这个路由的用法），
+        那种情况下退回本层的偏好项——功能不掉，只是不与档案同步。
+        """
+        if v6_store is None:
+            return None
+        return v6_store.get_profile(ctx.family_id, _elder_of(ctx))
+
+    def _read_prefs(ctx: AuthContext) -> dict[str, Any]:
+        """这位老人当前生效的字号语速与本端偏好。
+
+        抽出来是因为**朗读那一端也要读它**：`POST /speech` 必须按这里的语速念，
+        否则那个设置又变成一个没人读的值。两处各写一遍解析，迟早有一处忘了兜默认。
         """
         item = _pref_item(ctx)
         values = dict(_PREF_DEFAULTS)
         if item is not None and isinstance(item.value, dict):
-            values.update(item.value)
-        values["saved"] = item is not None
+            # 老库里可能还留着旧版写进去的 fontScale / voiceSpeed。
+            # 只取本端仍然管的那几个键，别让旧值盖掉档案。
+            values.update({k: v for k, v in item.value.items() if k in _PREF_DEFAULTS})
+        prof = _profile(ctx)
+        if prof is not None:
+            values["fontScale"] = round(min(max(float(prof.font_scale), _FONT_LO), _FONT_HI), 3)
+            values["voiceSpeed"] = round(float(prof.speech_rate), 3)
+        else:
+            legacy = item.value if (item is not None and isinstance(item.value, dict)) else {}
+            values["fontScale"] = float(legacy.get("fontScale", 1.25))
+            values["voiceSpeed"] = float(legacy.get("voiceSpeed", 0.88))
+        values["saved"] = item is not None or (prof is not None and prof.updated_by != "system")
         return values
 
     @router.get("/settings")
@@ -1913,10 +1962,9 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         """改字号 / 语速。**真的存下来**，换一页、重开都还在。"""
         body = body or {}
         now = datetime.now(UTC)
-        values = dict(_PREF_DEFAULTS)
+        values = _read_prefs(ctx)
+        values.pop("saved", None)
         item = _pref_item(ctx)
-        if item is not None and isinstance(item.value, dict):
-            values.update(item.value)
         for key, cast in (("fontScale", float), ("voiceSpeed", float),
                           ("highContrast", bool), ("voiceSpeaker", int)):
             if key in body:
@@ -1925,23 +1973,37 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                 except (TypeError, ValueError):
                     raise HTTPException(status_code=400, detail=f"{key} 这个值看不懂。")
         # 字号夹在能用的范围里。前端滑到 3 倍会让整屏只剩两个字。
-        values["fontScale"] = min(max(float(values["fontScale"]), 0.9), 1.6)
-        values["voiceSpeed"] = min(max(float(values["voiceSpeed"]), 0.6), 1.6)
+        values["fontScale"] = round(min(max(float(values["fontScale"]), _FONT_LO), _FONT_HI), 3)
+        values["voiceSpeed"] = round(min(max(float(values["voiceSpeed"]), _RATE_LO), _RATE_HI), 3)
         # 发音人不在这里夹上界：能挑几个取决于**当前装的哪个模型**，
         # 而这一层不该知道那件事。超范围由合成那一侧夹回来（它拿得到 num_speakers）。
         # 负数在任何模型上都非法，挡在这里。
         values["voiceSpeaker"] = max(0, int(values.get("voiceSpeaker", 0)))
 
+        # 字号语速写回交互档案。合并的写法照 `engine.py:1606` 那一处——
+        # `upsert_profile` 要的是**完整**的 update 模型，只传两个字段会把
+        # verbosity / max_options / hearing_support 这些一并重置成默认值。
+        prof = _profile(ctx)
+        if prof is not None:
+            from .v6_models import InteractionProfileUpdate
+
+            merged = prof.model_dump(exclude={"family_id", "updated_by", "updated_at", "version"})
+            merged["font_scale"] = values["fontScale"]
+            merged["speech_rate"] = values["voiceSpeed"]
+            v6_store.upsert_profile(ctx.family_id, ctx, InteractionProfileUpdate(**merged))
+
+        # 本端独有的两项才落 `memory_items`。
+        stored = {k: values[k] for k in _PREF_DEFAULTS}
         if item is None:
             item = MemoryItem(
                 id=f"mem-{uuid.uuid4().hex[:12]}",
                 family_id=ctx.family_id,
                 elder_id=_elder_of(ctx),
                 key=_PREF_KEY,
-                value=values,
+                value=stored,
                 sensitivity=MemorySensitivity.PREFERENCE,
                 scope=MemoryScope.PRIVATE,
-                purpose="记住这位老人的字号与语音偏好，用于渲染界面与朗读。",
+                purpose="记住这位老人在手机端的发音人与配色偏好。字号语速在交互档案里。",
                 status=MemoryStatus.ACTIVE,
                 created_at=now,
                 updated_at=now,
@@ -1950,7 +2012,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             )
             db.create_memory(item)
         else:
-            db.update_memory(item.model_copy(update={"value": values, "updated_at": now}))
+            db.update_memory(item.model_copy(update={"value": stored, "updated_at": now}))
         db.append_audit(
             family_id=ctx.family_id,
             actor_id=ctx.actor_id,

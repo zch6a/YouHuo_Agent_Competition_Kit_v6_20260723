@@ -712,7 +712,8 @@ def create_app(
     # 真实业务上——复述核验、任务状态机、审计链都是同一份，不是第二套。
     # demo_mode 决定「没带令牌」是退回演示老人还是 401。
     # 不传的话这一层在真实部署里也会把演示家庭的数据发给任何人。
-    app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode, voice=neural_voice))
+    app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode,
+                                        voice=neural_voice, v6_store=v6_store))
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
     app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))
