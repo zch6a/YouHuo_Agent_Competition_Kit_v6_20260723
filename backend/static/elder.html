@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <link rel="stylesheet" href="/static/art-cards.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-activity="idle" data-surface="consumer" data-focus="off" data-tab="home">
@@ -89,7 +90,12 @@
 
           <!-- 下一件最重要的事。只显示一件。
                原先这里是「今日全部事项」，而一位老人不需要在首屏做排序。 -->
-          <article id="nextItem" class="next-item" hidden>
+          <!-- 「下一件」用**可拉伸描边框**，不是有构图的卡壳。
+               老人端字号能调到 1.6 倍，这张卡的高度跟着变；有构图的画（hero/wide）
+               一拉就变形，而描边框只拉边、四角原样。
+               月窗是「下一件事」的意象：一扇窗，看出去是接下来要办的事。 -->
+          <article id="nextItem" class="next-item art-framed" data-art-frame="primary"
+                   data-art-scene="moon-window" hidden>
             <p class="next-label">下一件</p>
             <p class="next-time" id="nextTime"></p>
             <h2 class="next-title" id="nextTitle"></h2>
@@ -187,7 +193,10 @@
         <div class="elder-panel" data-panel="log" aria-label="记录" hidden>
           <h2 class="tab-head">办事记录</h2>
           <p class="tab-note">和无忧伴聊天的内容不会记在这里。</p>
-          <section id="logPanel" class="panel rail-card log-panel">
+          <!-- 办事记录：卷轴。和家人端「做过的事」用同一个意象——
+               同一件事在两个壳里必须是同一个语义，否则那两处会被当成两件事。 -->
+          <section id="logPanel" class="panel rail-card log-panel art-framed"
+                   data-art-scene="scroll">
             <div id="activityLog" class="log-list"></div>
           </section>
           <div class="home-entries" aria-label="重来一次">
@@ -222,7 +231,9 @@
 
                现在由 `renderKin()` 填：有真实联系人档案就显示它的名字，
                没有就只显示这个家庭真实存在的角色。**不编名字。** -->
-          <section class="panel rail-card kin-card">
+          <!-- 家人卡：团扇。R7 那张选择器表里 `.kin-card → round-fan` 就是这个映射，
+               这一条它选对了（团扇 = 团圆），所以沿用。 -->
+          <section class="panel rail-card kin-card art-framed" data-art-scene="fan">
             <div id="kinList" class="kin-list" aria-live="polite"></div>
             <p class="kin-help-label">家人可以帮您</p>
             <ul class="kin-help">
@@ -402,5 +413,8 @@
   <script src="/static/common.js"></script>
   <script src="/static/sheet.js"></script>
   <script type="module" src="/static/elder.js"></script>
+  <!-- 不是 module：`elder.js` 是 module，一个 import 取不到就整张模块图不执行。
+       美术层做成经典脚本，它坏掉也不会把老人端拖成白屏。 -->
+  <script src="/static/art-cards.js" defer></script>
 </body>
 </html>

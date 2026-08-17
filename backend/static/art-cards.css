@@ -87,12 +87,16 @@
    而是给文字块本身一层**从纸色渐隐**的衬底：它读起来是这张纸的一部分，
    不是压在画上的另一张卡。 */
 .art-card[data-art-shell="hero"] > * {
-  --art-scrim: rgba(250, 247, 240, .82);
+  /* 两个色停都用同一个变量（末端 alpha 归零）。
+     第一版末端写死成 `rgba(250,247,240,0)`——深色下把 `--art-scrim` 换成暗色
+     之后，渐变从暗色渐到**透明的纸色**，中间那段是脏的。
+     一个变量控两端，翻深色只要改一处。 */
+  --art-scrim: 250, 247, 240;
   background:
     linear-gradient(90deg,
-      var(--art-scrim) 0%,
-      var(--art-scrim) 58%,
-      rgba(250, 247, 240, 0) 100%);
+      rgba(var(--art-scrim), .84) 0%,
+      rgba(var(--art-scrim), .84) 58%,
+      rgba(var(--art-scrim), 0) 100%);
   border-radius: 10px;
   padding: 6px 10px;
   margin: -6px -10px;
@@ -288,17 +292,43 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* 只降不透明度、反色描边。**不做 display:none**——
+    /* 只降不透明度、压暗。**不做 display:none**——
        R6 那次深色下整层艺术消失，用户看到的是两套完全不同的产品。 */
-    --art-scene-opacity: .55;
+    --art-scene-opacity: .5;
     --art-frame-opacity: .8;
   }
+
+  /* **不反色。** 第一版这里是 `invert(.9) hue-rotate(180deg)`，
+     实测把那幅青绿山水变成了一张底片：山成惨白、纸成暗褐、红日成灰粉。
+     反色对线条描边有效，对**一幅画**永远是错的。
+     压暗 + 略降饱和，让它退到文字后面去，颜色关系保持不变。 */
   .art-card > .art-shell,
-  .art-scene { filter: invert(.9) hue-rotate(180deg) saturate(.7); }
+  .art-scene { filter: brightness(.55) saturate(.8) contrast(1.05); }
+
+  /* 文字衬底必须跟着翻。
+     衬底写死成纸色（`rgba(250,247,240,.82)`）而文字在深色下变成浅色，
+     结果是**浅字压在浅底上**——实测截图里「他今天和平常差不多」几乎读不出来。
+     这是一整类错误：给亮色模式挑的颜色写死在变量里，深色只改了别的东西。 */
+  .art-card[data-art-shell] > * { --art-scrim: 16, 15, 14; }
+
+  /* 描边框是线条，反色是对的；内容再反回来。
+     这一招在 trust 上实测成立（票据框变成暗底金线，正文可读）。 */
   .art-framed,
   .art-receipt { filter: invert(.88) hue-rotate(180deg); }
   .art-framed > *,
   .art-receipt > * { filter: invert(1) hue-rotate(180deg); }
+
+  /* 印章不跟着反：它是朱红的，反色变成青蓝，就不是印章了。 */
+  .art-seal { filter: invert(1) hue-rotate(180deg) brightness(1.1); }
+
+  /* 描边框**里面**的意象要抵消宿主那层反色，再压暗。
+     `filter` 一个元素上只生效一条，上面 `.art-scene` 和 `.art-framed > *`
+     同特异性，胜负全靠源码顺序——实测结果恰好是对的，但那是巧合。
+     写明白：反回来 + 压暗，一条规则说完。 */
+  .art-framed > .art-scene,
+  .art-receipt > .art-scene {
+    filter: invert(1) hue-rotate(180deg) brightness(.62) saturate(.85);
+  }
 }
 
 /* ---------------------------------------------------------------- 无障碍 */
