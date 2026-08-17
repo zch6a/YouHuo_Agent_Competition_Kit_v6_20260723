@@ -61,6 +61,48 @@ def _pay_to(client: TestClient, step: str, bill_id: str | None = None) -> str:
     return pid
 
 
+# ---- OpenAPI：契约要能被工具消费 -------------------------------------------
+
+def test_every_endpoint_documents_what_it_returns(client: TestClient) -> None:
+    """`/api/v1` 不许有端点返回一个没有字段的 `object`。
+
+    这一层的 25 个端点原先全部注解成 `dict[str, Any]`，FastAPI 生成出来的是：
+
+        {"additionalProperties": true, "type": "object", "title": "Response Profile …"}
+
+    **有名字，零字段。** 对照老接口那批：171 个模型，字段清清楚楚，
+    而其中属于 `/api/v1` 的一个都没有。任何人想按 OpenAPI 生成客户端
+    （新前端、鸿蒙端、第三方），拿到的是 25 个 `object`。
+
+    这条判据在「前端可能整套作废」之后尤其要紧：新前端唯一能依据的东西
+    就是这份 schema。
+    """
+    spec = client.get("/openapi.json").json()
+    bare = []
+    for path, ops in spec["paths"].items():
+        if not path.startswith(V1):
+            continue
+        for method, op in ops.items():
+            schema = (op.get("responses", {}).get("200", {})
+                        .get("content", {}).get("application/json", {}).get("schema", {}))
+            # 有 `$ref` 就是指向一个具名模型；否则必须自带 properties。
+            if "$ref" not in schema and not schema.get("properties"):
+                bare.append(f"{method.upper()} {path}")
+    assert not bare, (
+        f"{len(bare)} 个端点没有描述自己的返回值：\n  " + "\n  ".join(bare) +
+        "\n把返回注解从 `dict[str, Any]` 换成 `app_schemas` 里的模型。"
+    )
+
+
+def test_the_instrument_can_actually_see_the_endpoints(client: TestClient) -> None:
+    """上面那条如果一个端点都没读到，会**恒为真**。先证明它读到了。"""
+    spec = client.get("/openapi.json").json()
+    v1 = [p for p in spec["paths"] if p.startswith(V1)]
+    assert len(v1) >= 20, f"只在 OpenAPI 里看到 {len(v1)} 条 /api/v1 路径"
+    models = [k for k in spec.get("components", {}).get("schemas", {}) if k.startswith("App")]
+    assert len(models) >= 25, f"只注册了 {len(models)} 个 App* 模型"
+
+
 # ---- 仪器自检 --------------------------------------------------------------
 
 def test_the_demo_data_is_actually_seeded(client: TestClient) -> None:

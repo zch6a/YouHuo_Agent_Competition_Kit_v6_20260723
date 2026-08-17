@@ -32,6 +32,30 @@ from .memory_vault import (
     MemorySensitivity,
     MemoryStatus,
 )
+from .app_schemas import (
+    AppAgenda,
+    AppAppointmentCreated,
+    AppAppointmentList,
+    AppBill,
+    AppBillList,
+    AppCertificate,
+    AppContactList,
+    AppEmergencyResult,
+    AppHealthSummary,
+    AppNotificationList,
+    AppNotificationRead,
+    AppPaymentMoved,
+    AppPaymentPrepared,
+    AppProfile,
+    AppRecordList,
+    AppReminderChanged,
+    AppReminderCreated,
+    AppReminderList,
+    AppSettings,
+    AppTeachBackResult,
+    AppVoiceSession,
+    AppWaterBill,
+)
 from .security import SafetyPolicy
 from .utils import semantic_hash
 from .models import (
@@ -113,7 +137,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 档案 ---------------------------------------------------------------
 
     @router.get("/profile")
-    def profile() -> dict[str, Any]:
+    def profile() -> AppProfile:
         ctx = _ctx()
         # 「优活已陪伴您 N 天」。
         #
@@ -139,7 +163,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 今日日程 -----------------------------------------------------------
 
     @router.get("/agenda")
-    def agenda() -> dict[str, Any]:
+    def agenda() -> AppAgenda:
         """首页那两张卡（「接下来」和「今日安排」）的真实数据源。
 
         原稿这两张卡是写死的——「14:00 心内科复诊 · 和睦家医院 2号楼3层」「08:00
@@ -202,7 +226,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 健康概览（「我的」那一屏）------------------------------------------
 
     @router.get("/health-summary")
-    def health_summary() -> dict[str, Any]:
+    def health_summary() -> AppHealthSummary:
         """「我的」页那一排健康数字的真实来源。
 
         原稿这里写死了「今日健康 良好 / 心率 72 次每分 / 血压 120/78 / 睡眠 7.5 小时」。
@@ -254,7 +278,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 账单 ---------------------------------------------------------------
 
     @router.get("/bills/water/current")
-    def current_water_bill() -> dict[str, Any]:
+    def current_water_bill() -> AppWaterBill:
         """当前这一笔水费。
 
         `paidAt` 原先是写死的 `None`——于是凭证页和成功页的「完成时间 / 支付时间」
@@ -312,7 +336,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.get("/bills")
-    def list_bills() -> dict[str, Any]:
+    def list_bills() -> AppBillList:
         """这个家庭的**全部**账单。
 
         原先 `/api/v1` 只暴露一张写死的水费，而库里躺着三张（水费 68.40、
@@ -340,7 +364,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     #: 真正会被吃掉的是**同为两段**的路径。所以如果将来加
     #: `/bills/unpaid` 这种，它才必须排在这一条前面。
     @router.get("/bills/{bill_id}")
-    def one_bill(bill_id: str) -> dict[str, Any]:
+    def one_bill(bill_id: str) -> AppBill:
         ctx = _ctx()
         row = db.get_bill(bill_id)
         if row is None or row["family_id"] != ctx.family_id:
@@ -350,7 +374,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 就医安排 -----------------------------------------------------------
 
     @router.get("/appointments")
-    def list_appointments() -> dict[str, Any]:
+    def list_appointments() -> AppAppointmentList:
         """挂号/复诊。`appointments` 表和 `insert_appointment` 一直都在，
         **没有任何地方读它**——所以「就医安排」那一页此前只能拿提醒凑。
         """
@@ -373,7 +397,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         return {"items": items, "count": len(items)}
 
     @router.post("/appointments")
-    def create_appointment(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def create_appointment(body: dict[str, Any] | None = None) -> AppAppointmentCreated:
         """记一次就医安排，并**同时建一条到点提醒**。
 
         只写 `appointments` 表是不够的：那张表没有任何东西会到点提醒老人，
@@ -447,7 +471,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 通知 ---------------------------------------------------------------
 
     @router.post("/notifications/{notification_id}/read")
-    def read_notification(notification_id: str) -> dict[str, Any]:
+    def read_notification(notification_id: str) -> AppNotificationRead:
         """标成已读。没有这一步，通知只会越堆越多，红点永远下不去。"""
         ctx = _ctx()
         if not db.mark_notification_read(notification_id, ctx.family_id, datetime.now(UTC)):
@@ -457,7 +481,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 语音会话 -----------------------------------------------------------
 
     @router.post("/voice/sessions")
-    def open_voice_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def open_voice_session(body: dict[str, Any] | None = None) -> AppVoiceSession:
         """开一个真实会话；带了 `utterance` 就真的过一遍语义引擎。"""
         ctx = _ctx()
         now = datetime.now(UTC)
@@ -491,7 +515,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 支付：准备 / 复述 / 执行 --------------------------------------------
 
     @router.post("/payments/prepare")
-    def prepare_payment(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def prepare_payment(body: dict[str, Any] | None = None) -> AppPaymentPrepared:
         """建一件**真的**缴费事务，并把复述提示词一并给前端。
 
         风险取 HIGH：`TeachBackVerifier.requires_teach_back` 只在 `BILL_PAYMENT`
@@ -578,7 +602,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/teach-back")
-    def teach_back(payment_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def teach_back(payment_id: str, body: dict[str, Any] | None = None) -> AppTeachBackResult:
         """真的核对老人念出来的金额。念错就停——这一条是整个产品的支点。"""
         ctx = _ctx()
         task = _task_or_404(ctx, payment_id)
@@ -627,7 +651,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/execute")
-    def execute_payment(payment_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def execute_payment(payment_id: str, body: dict[str, Any] | None = None) -> AppPaymentMoved:
         """推进这件事。
 
         **不会因为前端调了就直接扣钱。** 高风险缴费要家人点头，所以这里把状态推到
@@ -691,7 +715,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/family-approve")
-    def family_approve(payment_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def family_approve(payment_id: str, body: dict[str, Any] | None = None) -> AppPaymentMoved:
         """家人点头，这一笔才真的走完。
 
         没有这一步，链条就停在 `awaiting_family` 永远不动——凭证页会一直显示
@@ -814,7 +838,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     }
 
     @router.get("/records")
-    def records(type: str | None = Query(default=None)) -> dict[str, Any]:
+    def records(type: str | None = Query(default=None)) -> AppRecordList:
         """真实审计流水，翻成人话之后再给前端。"""
         ctx = _ctx()
         events = db.list_audit(ctx.family_id, limit=80)
@@ -851,7 +875,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 凭证 ---------------------------------------------------------------
 
     @router.get("/payments/{payment_id}/certificate")
-    def certificate(payment_id: str) -> dict[str, Any]:
+    def certificate(payment_id: str) -> AppCertificate:
         """一件事的**完整**审计链。
 
         `list_audit` 带 `entity_id` 走 SQL 过滤，拿到的是这一件事从头到尾的每一步，
@@ -926,7 +950,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 紧急呼叫 -----------------------------------------------------------
 
     @router.post("/emergency/call")
-    def emergency_call(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def emergency_call(body: dict[str, Any] | None = None) -> AppEmergencyResult:
         """记一次真实的紧急呼叫。不会真的拨号——那要电话能力，这里只留证据。"""
         ctx = _ctx()
         db.append_audit(
@@ -1040,7 +1064,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         ]
 
     @router.get("/reminders")
-    def reminders(kind: str | None = Query(default=None)) -> dict[str, Any]:
+    def reminders(kind: str | None = Query(default=None)) -> AppReminderList:
         """用药提醒 / 就医安排 / 今日事项 三个界面共用的真实数据源。
 
         `kind` 取「用药」「就医」「其他」，不传就是全部。传一个不认识的值回空表，
@@ -1058,7 +1082,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/reminders")
-    def create_reminder(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def create_reminder(body: dict[str, Any] | None = None) -> AppReminderCreated:
         """老人自己加一条提醒。**真的写进提醒表**，不是回一个 ok 就算了。
 
         时间用 `HH:MM`（今天）或完整 ISO 串。给的时间已经过点就顺延到明天——
@@ -1115,7 +1139,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 "message": f"记好了，{due.strftime('%H:%M')} 提醒您{title}。"}
 
     @router.post("/reminders/{reminder_id}/done")
-    def complete_reminder(reminder_id: str) -> dict[str, Any]:
+    def complete_reminder(reminder_id: str) -> AppReminderChanged:
         """办完了。写的是真状态，记录页当场就能看到这一条。"""
         ctx = _ctx()
         now = datetime.now(UTC)
@@ -1136,7 +1160,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 "message": f"好的，{existing.title}已经记成办好了。"}
 
     @router.post("/reminders/{reminder_id}/cancel")
-    def cancel_reminder(reminder_id: str) -> dict[str, Any]:
+    def cancel_reminder(reminder_id: str) -> AppReminderChanged:
         ctx = _ctx()
         existing = db.get_reminder(reminder_id)
         if existing is None or existing.family_id != ctx.family_id:
@@ -1161,7 +1185,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     _ROLE_WORDS = {"family": "家人", "system": "系统", "elder": "本人"}
 
     @router.get("/contacts")
-    def contacts() -> dict[str, Any]:
+    def contacts() -> AppContactList:
         """紧急联系人。真的读家庭成员表，不是三行写死的卡片。
 
         **没有电话号码这个字段。** `actors` 表只有 id / family_id / role /
@@ -1198,7 +1222,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         return None
 
     @router.get("/settings")
-    def get_settings() -> dict[str, Any]:
+    def get_settings() -> AppSettings:
         ctx = _ctx()
         item = _pref_item(ctx)
         values = dict(_PREF_DEFAULTS)
@@ -1207,7 +1231,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         return {**values, "saved": item is not None}
 
     @router.put("/settings")
-    def put_settings(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def put_settings(body: dict[str, Any] | None = None) -> AppSettings:
         """改字号 / 语速。**真的存下来**，换一页、重开都还在。"""
         body = body or {}
         ctx = _ctx()
@@ -1258,7 +1282,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 通知 ---------------------------------------------------------------
 
     @router.get("/notifications")
-    def notifications(role: str | None = Query(default=None)) -> dict[str, Any]:
+    def notifications(role: str | None = Query(default=None)) -> AppNotificationList:
         """通知。默认是**发给老人自己**的那些。
 
         `role=家人` 取发给家人的那一批——按了紧急呼叫之后，老人那一屏要能回答
@@ -1277,10 +1301,19 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             rows = []
         for n in rows:
             created = getattr(n, "created_at", None)
+            # 字段名是 `message`。
+            #
+            # 原先写的是 `getattr(n,"title",None) or getattr(n,"body","")`——
+            # 那两个属性**都不存在**（`notifications` 表的列是
+            # id/family_id/recipient_role/event_type/entity_id/message/created_at/read_at），
+            # 于是每一条通知的标题都是**空字符串**。`getattr` 带默认值把
+            # 「取错了字段」变成了「这条通知没有内容」，接口照样 200，
+            # 列表照样有 1 条——只是每一条都是空的。
             items.append({
                 "id": getattr(n, "id", None),
-                "title": getattr(n, "title", None) or getattr(n, "body", ""),
-                "body": getattr(n, "body", None),
+                "title": getattr(n, "message", "") or "",
+                "eventType": getattr(n, "event_type", None),
+                "read": getattr(n, "read_at", None) is not None,
                 "at": created.isoformat() if created else None,
                 "time": created.strftime("%m月%d日 %H:%M") if created else None,
             })
