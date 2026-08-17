@@ -510,6 +510,18 @@ def test_a_cancelled_reminder_leaves_todays_agenda(client: TestClient) -> None:
     可能只是因为它从来没在过。
     """
     from datetime import UTC, datetime, timedelta
+
+    # 先把当天已有的未办事项清空。
+    #
+    # 第一版直接建一条「45 分钟后」的就断言它是「接下来」——那**取决于现在几点**。
+    # 种子里有一条 11:00 的，10:44 跑就红（11:00 更早），11:30 跑就绿。
+    # 一条按钟点随机红的测试，比没有更糟：它会在比赛当天红一次，
+    # 然后所有人花时间去查一个不存在的缺陷。
+    for item in client.get(f"{V1}/agenda").json()["today"]:
+        if not item["done"]:
+            client.post(f"{V1}/reminders/{item['id']}/done")
+    assert client.get(f"{V1}/agenda").json()["next"] is None, "清空没生效，下面的对照不成立"
+
     soon = (datetime.now(UTC) + timedelta(minutes=45)).isoformat()
     rid = client.post(f"{V1}/reminders", json={"title": "吃钙片", "at": soon}
                       ).json()["item"]["id"]
@@ -898,9 +910,11 @@ def test_synthesis_really_uses_the_saved_speed(tmp_path, monkeypatch) -> None:
         available = True
 
         def status(self):
-            return {"available": True, "engine": "fake", "fallback": "browser_speech_synthesis"}
+            return {"available": True, "engine": "fake", "kind": "fake",
+                    "speakers": 4, "speaker": 0, "model": "fake",
+                    "fallback": "browser_speech_synthesis"}
 
-        def synthesize(self, text, speed=1.0):
+        def synthesize(self, text, speed=1.0, sid=None):
             calls.append((text, speed))
             return b"RIFF0000WAVEfake", 16000
 
@@ -926,6 +940,57 @@ def test_synthesis_really_uses_the_saved_speed(tmp_path, monkeypatch) -> None:
         calls.clear()
         c.post(f"{V1}/speech", json={"text": "试听", "speed": 9.9})
         assert calls == [("试听", 1.6)]
+
+
+def test_the_chosen_voice_is_remembered_and_used(tmp_path, monkeypatch) -> None:
+    """换了声音要**存下来**，而且合成时真的用它。
+
+    `sid` 原先在 `tts.py` 里**写死成 0**——单音色模型上看不出问题，
+    换成多音色模型（Kokoro 中文有男女多个发音人）就等于永远只能听第一个，
+    而「换个好听点的声音」恰恰是要换这个。
+    """
+    import youhuo.api as api_mod
+
+    used: list[int] = []
+
+    class _MultiVoice:
+        available = True
+
+        def status(self):
+            return {"available": True, "engine": "fake", "kind": "kokoro",
+                    "speakers": 4, "speaker": 0, "model": "fake",
+                    "fallback": "browser_speech_synthesis"}
+
+        def synthesize(self, text, speed=1.0, sid=None):
+            used.append(sid)
+            return b"RIFF0000WAVEfake", 22050
+
+        def warm_up_async(self):
+            return None
+
+    monkeypatch.setattr(api_mod, "NeuralVoice", lambda *_a, **_k: _MultiVoice())
+    app = create_app(tmp_path / "voice.db", demo_mode=True, seed_baseline_history=True)
+    with TestClient(app) as c:
+        # 界面靠这个决定要不要摆「换个声音」那一栏。
+        assert c.get(f"{V1}/speech/status").json()["speakers"] == 4
+
+        saved = c.put(f"{V1}/settings", json={"voiceSpeaker": 2}).json()
+        assert saved["voiceSpeaker"] == 2
+        assert c.get(f"{V1}/settings").json()["voiceSpeaker"] == 2, "换了声音没存住"
+
+        r = c.post(f"{V1}/speech", json={"text": "您好"})
+        assert r.status_code == 200
+        assert used == [2], f"存的是 2 号声音，合成时用的是 {used}"
+        assert r.headers["X-Speech-Speaker"] == "2"
+
+        # 试听：显式指定时以传入的为准，不改他存的偏好。
+        used.clear()
+        c.post(f"{V1}/speech", json={"text": "试听", "speaker": 3})
+        assert used == [3]
+        assert c.get(f"{V1}/settings").json()["voiceSpeaker"] == 2, "试听不该改掉他存的选择"
+
+        # 负数在任何模型上都非法。
+        assert c.put(f"{V1}/settings", json={"voiceSpeaker": -1}).json()["voiceSpeaker"] == 0
 
 
 def test_speech_refuses_an_empty_or_huge_utterance(client: TestClient) -> None:

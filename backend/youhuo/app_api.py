@@ -1270,6 +1270,13 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             "available": bool(st.get("available")),
             "engine": st.get("engine"),
             "speed": float(prefs["voiceSpeed"]),
+            # 有几个声音可挑、现在用的是哪个。单音色模型上就是 1 和 0，
+            # 界面据此决定要不要显示「换个声音」那一栏——
+            # 只有一个声音时摆一个选择器出来，是在承诺一件做不到的事。
+            "speakers": int(st.get("speakers") or 1),
+            "speaker": int(prefs.get("voiceSpeaker", st.get("speaker") or 0)),
+            "model": st.get("model"),
+            "kind": st.get("kind"),
             "fallback": st.get("fallback") or "browser_speech_synthesis",
             "note": st.get("note"),
         }
@@ -1300,6 +1307,8 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         raw_speed = body.get("speed")
         speed = float(raw_speed) if raw_speed is not None else float(prefs["voiceSpeed"])
         speed = min(max(speed, 0.6), 1.6)
+        raw_sid = body.get("speaker")
+        speaker = int(raw_sid) if raw_sid is not None else int(prefs.get("voiceSpeaker", 0))
 
         if voice is None or not voice.available:
             raise HTTPException(
@@ -1307,7 +1316,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                 detail="这台服务上没有离线语音，请用设备自带的朗读。",
             )
         try:
-            wav, sample_rate = voice.synthesize(text, speed)
+            wav, sample_rate = voice.synthesize(text, speed, sid=speaker)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return Response(
@@ -1316,8 +1325,9 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             headers={
                 "Cache-Control": "no-store",
                 "X-Sample-Rate": str(sample_rate),
-                # 让调用方能核对「用的确实是我存的那个语速」。
+                # 让调用方能核对「用的确实是我存的那个语速和那个声音」。
                 "X-Speech-Speed": f"{speed:.2f}",
+                "X-Speech-Speaker": str(speaker),
             },
         )
 
@@ -1869,7 +1879,10 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
     # 正是这个产品的同意记忆机制。设置项走它，等于自动获得撤回与审计。
 
     _PREF_KEY = "elder_app_settings"
-    _PREF_DEFAULTS = {"fontScale": 1.0, "voiceSpeed": 1.0, "highContrast": False}
+    _PREF_DEFAULTS = {"fontScale": 1.0, "voiceSpeed": 1.0, "highContrast": False,
+                       # 换了声音要存下来——不存的话下次打开又变回第一个，
+                       # 而「我明明换过」是最让人怀疑功能有没有做的一种表现。
+                       "voiceSpeaker": 0}
 
     def _pref_item(ctx: AuthContext):
         for item in db.list_memories(ctx.family_id, _elder_of(ctx)):
@@ -1905,7 +1918,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         if item is not None and isinstance(item.value, dict):
             values.update(item.value)
         for key, cast in (("fontScale", float), ("voiceSpeed", float),
-                          ("highContrast", bool)):
+                          ("highContrast", bool), ("voiceSpeaker", int)):
             if key in body:
                 try:
                     values[key] = cast(body[key])
@@ -1914,6 +1927,10 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         # 字号夹在能用的范围里。前端滑到 3 倍会让整屏只剩两个字。
         values["fontScale"] = min(max(float(values["fontScale"]), 0.9), 1.6)
         values["voiceSpeed"] = min(max(float(values["voiceSpeed"]), 0.6), 1.6)
+        # 发音人不在这里夹上界：能挑几个取决于**当前装的哪个模型**，
+        # 而这一层不该知道那件事。超范围由合成那一侧夹回来（它拿得到 num_speakers）。
+        # 负数在任何模型上都非法，挡在这里。
+        values["voiceSpeaker"] = max(0, int(values.get("voiceSpeaker", 0)))
 
         if item is None:
             item = MemoryItem(

@@ -54,6 +54,9 @@ class AppSettings(StrictModel):
     #: 服务端夹在 0.9–1.6。前端**必须**以返回值为准，不能假设传什么就是什么。
     fontScale: float
     voiceSpeed: float
+    #: 用哪个发音人。多音色模型（Kokoro 中文有男女多个）上才有意义；
+    #: 单音色模型永远是 0。
+    voiceSpeaker: int = 0
     highContrast: bool
     #: 这位老人有没有存过自己的偏好。false = 现在显示的是默认值。
     saved: bool
@@ -351,6 +354,13 @@ class AppSpeechStatus(StrictModel):
     #: **这位老人自己存的语速。** 放在这里而不是让调用方去 `/settings` 拼，
     #: 是因为本地合成和浏览器合成两条路的语速必须一致——分成两处取，迟早会不一致。
     speed: float
+    #: 有几个声音可挑。只有 1 时界面不该摆「换个声音」那一栏——
+    #: 摆了就是在承诺一件做不到的事。
+    speakers: int = 1
+    speaker: int = 0
+    model: str | None = None
+    #: vits / matcha / kokoro。三种音质差得很远，出问题第一件事就是问装的是哪个。
+    kind: str | None = None
     fallback: str
     note: str | None = None
 
