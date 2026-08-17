@@ -20,14 +20,18 @@
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse, Response
+from fastapi.routing import APIRoute
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .database import IdempotencyConflict
 from .memory_vault import (
     MemoryItem,
     MemoryScope,
@@ -61,7 +65,7 @@ from .app_schemas import (
     AppWaterBill,
 )
 from .security import SafetyPolicy
-from .utils import semantic_hash
+from .utils import request_fingerprint, semantic_hash
 from .models import (
     ActorRole,
     AuthContext,
@@ -166,7 +170,82 @@ def _parse_when(raw: str) -> datetime:
 
 
 def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> APIRouter:
-    router = APIRouter(prefix="/api/v1", tags=["elder-app"])
+
+    class _IdempotentRoute(APIRoute):
+        """带 `Idempotency-Key` 的写请求，重放同一个响应。
+
+        ## 为什么做在路由层，不是逐个端点加参数
+
+        这一层有十来个写端点，以后还会加。逐个加 `idempotency_key` 参数的失败方式是
+        **漏掉一个不会有任何东西提醒**——那个端点从此没有幂等，而它看起来和别的
+        一模一样。做在路由层，新加的端点自动就有。
+
+        ## 和「连点两下」那一批是两件事
+
+        那一批（execute 早返回、prepare 复用在飞的一笔、SOS 节流）守的是
+        **业务语义**：同一件事不许发生两次，不管请求长什么样。
+        这里守的是**传输层**：同一个请求被重发（客户端超时重试、代理重投），
+        应当拿回第一次的那个答案，而不是再执行一次。
+
+        两者都要。业务判断挡不住「同一个请求发两遍但状态还没落库」的竞态；
+        幂等键挡不住「用户真的按了两次不同的请求」。
+
+        ## 只缓存 2xx——而这一条目前其实碰不到
+
+        意图是：把一个 400 缓存下来，等于让客户端修好参数重试时仍然拿到那个 400，
+        而它的 `Idempotency-Key` 多半没变。失败不该被钉死。
+
+        **但实测下来这个判断是死代码**：这一层的失败都走 `HTTPException`，
+        它让路由处理器**抛出**而不是返回，`await original(request)` 之后的代码
+        根本执行不到（拿探针包了 `save_idempotent_response` 验过，一次都没被调）。
+        「失败不钉住 key」这条性质是成立的，只是不靠这个判断成立。
+
+        判断留着：以后要是有端点**返回**（而不是抛出）一个 4xx/5xx，它就生效了。
+        写清楚它现在碰不到，是为了下一个人不要以为这条已经被覆盖了。
+        """
+
+        def get_route_handler(self):
+            original = super().get_route_handler()
+
+            async def handler(request: Request) -> Response:
+                if request.method not in {"POST", "PUT", "PATCH"}:
+                    return await original(request)
+                key = request.headers.get("Idempotency-Key")
+                if not key:
+                    return await original(request)
+
+                body = await request.body()
+                # 指纹带上路径：同一个 key 用在两个不同端点上是调用方的错，
+                # 应当报冲突，而不是把 A 的响应回给 B。
+                scope = "app_api"
+                fingerprint = request_fingerprint(
+                    {"path": request.url.path, "body": body.decode("utf-8", "replace")}
+                )
+                try:
+                    cached = db.get_idempotent_response(scope, key, fingerprint)
+                except IdempotencyConflict as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="这个请求编号已经用过了，而且内容不一样。换一个编号。",
+                    ) from exc
+                if cached is not None:
+                    return JSONResponse(cached, headers={"Idempotency-Replayed": "true"})
+
+                response = await original(request)
+                if 200 <= response.status_code < 300:
+                    raw = getattr(response, "body", None)
+                    if raw:
+                        try:
+                            db.save_idempotent_response(
+                                scope, key, fingerprint, json.loads(raw)
+                            )
+                        except (ValueError, TypeError):
+                            pass      # 不是 JSON 就不缓存，别把响应弄坏
+                return response
+
+            return handler
+
+    router = APIRouter(prefix="/api/v1", tags=["elder-app"], route_class=_IdempotentRoute)
     bearer = HTTPBearer(auto_error=False)
 
     def _actor(

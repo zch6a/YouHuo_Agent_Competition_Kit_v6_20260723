@@ -682,6 +682,105 @@ def test_double_tapping_sos_does_not_spam_the_family(client: TestClient) -> None
     assert len(calls) == 2, f"按了两次，链上只记了 {len(calls)} 次"
 
 
+# ---- 幂等键：和「连点两下」是两件事 -----------------------------------------
+#
+# 「连点两下」那一批守的是**业务语义**：同一件事不许发生两次，不管请求长什么样。
+# 这里守的是**传输层**：同一个请求被重发（客户端超时重试、代理重投），
+# 应当拿回第一次那个答案，而不是再执行一次。
+#
+# 两者都要。业务判断挡不住「同一个请求发两遍但状态还没落库」的竞态；
+# 幂等键挡不住「用户真的按了两次不同的请求」。
+
+def test_replaying_a_request_returns_the_first_answer(client: TestClient) -> None:
+    key = {"Idempotency-Key": "req-0001"}
+    a = client.post(f"{V1}/reminders", headers=key, json={"title": "吃钙片", "time": "07:30"})
+    b = client.post(f"{V1}/reminders", headers=key, json={"title": "吃钙片", "time": "07:30"})
+    assert a.status_code == b.status_code == 200
+    assert a.json() == b.json(), "重放拿到的不是第一次那个答案"
+    assert b.headers.get("Idempotency-Replayed") == "true"
+
+
+def test_the_replay_really_skips_the_handler(client: TestClient) -> None:
+    """**阳性对照，而且换过一次端点。**
+
+    第一版用 `/health/events` 数「记了几条」，变异测试时把重放整个关掉——
+    它**纹丝不动**。原因是那个端点自己有一分钟业务去重，
+    幂等关不关它都只记一条。也就是说那条断言测的是业务层，不是幂等层。
+
+    `/reminders` 分辨得开：`UNIQUE(elder_id,title,due_at)` 让第二次撞唯一键。
+
+        幂等开着 → 200（重放第一次那个答案，压根没进处理器）
+        幂等关掉 → 409（真的执行了，撞在唯一键上）
+
+    状态码不同，这一条才真的在看「有没有第二次执行」。
+    """
+    key = {"Idempotency-Key": "req-0002"}
+    body = {"title": "吃钙片", "time": "07:30"}
+    first = client.post(f"{V1}/reminders", headers=key, json=body)
+    second = client.post(f"{V1}/reminders", headers=key, json=body)
+    assert first.status_code == 200
+    assert second.status_code == 200, (
+        f"第二次真的进了处理器（撞唯一键 {second.status_code}），说明没有重放"
+    )
+    assert second.json()["item"]["id"] == first.json()["item"]["id"]
+
+    # 反面：不带 key 发同样的内容，就该撞唯一键——这证明上面那个 200 不是白来的。
+    assert client.post(f"{V1}/reminders", json=body).status_code == 409
+
+
+def test_the_same_key_with_a_different_payload_is_a_conflict(client: TestClient) -> None:
+    """**这一条才是幂等键的价值所在。**
+
+    同一个编号配不同的内容，说明调用方把编号复用了——那时候悄悄执行第二次，
+    或者悄悄回第一次的答案，都是错的：前者重复扣钱，后者让调用方以为
+    第二件事办了而其实没办。必须报冲突。
+    """
+    key = {"Idempotency-Key": "req-0003"}
+    assert client.post(f"{V1}/reminders", headers=key,
+                       json={"title": "吃钙片", "time": "07:30"}).status_code == 200
+    r = client.post(f"{V1}/reminders", headers=key,
+                    json={"title": "量血压", "time": "09:00"})
+    assert r.status_code == 409, f"复用编号配不同内容被放行了：{r.status_code}"
+    assert "编号" in r.json()["detail"]
+
+
+def test_the_same_key_on_a_different_endpoint_is_a_conflict(client: TestClient) -> None:
+    """指纹带上路径：同一个 key 用在两个端点上，不许把 A 的响应回给 B。"""
+    key = {"Idempotency-Key": "req-0004"}
+    client.post(f"{V1}/reminders", headers=key, json={"title": "吃钙片", "time": "07:30"})
+    r = client.post(f"{V1}/health/events", headers=key,
+                    json={"title": "吃钙片", "time": "07:30"})
+    assert r.status_code == 409
+
+
+def test_a_failed_request_is_not_pinned_by_its_key(client: TestClient) -> None:
+    """失败不许把 key 钉死：修好参数重试要能成功。
+
+    **这条性质成立，但不是靠代码里那个 `2xx` 判断成立的。**
+    这一层的失败都走 `HTTPException`，它让路由处理器抛出而不是返回，
+    缓存那一行根本执行不到——拿探针包了 `save_idempotent_response` 验过，
+    失败请求期间它一次都没被调用。
+
+    所以对应的变异（「失败也缓存」）**咬不到这一条**，那不是判据的问题：
+    那段代码目前是死的。写在这里，是免得下一个人以为这条路径已经被覆盖了。
+    """
+    key = {"Idempotency-Key": "req-0005"}
+    bad = client.post(f"{V1}/reminders", headers=key, json={"title": ""})
+    assert bad.status_code == 400
+    good = client.post(f"{V1}/reminders", headers=key, json={"title": "吃钙片", "time": "07:30"})
+    assert good.status_code == 200, "修好参数重试，却被上一次的失败钉住了"
+
+
+def test_without_a_key_nothing_changes(client: TestClient) -> None:
+    """不带这个头的请求走原来的路——幂等是**可选**的，不是强制的。
+
+    强制的话，任何一个没实现这个头的调用方（包括现有前端）会当场全挂。
+    """
+    a = client.post(f"{V1}/health/events", json={"type": "体重", "value": "62.5"})
+    assert a.status_code == 200
+    assert "Idempotency-Replayed" not in a.headers
+
+
 # ---- 联系人 / 档案 / 设置 --------------------------------------------------
 
 def test_contacts_never_invent_a_phone_number(client: TestClient) -> None:
