@@ -115,10 +115,35 @@ _EV_APPOINTMENT_CREATED = "app.appointment.created"
 _EV_SOS_NOTIFY_FAILED = "app.emergency.notify_failed"
 _EV_CONTACT_PHONE_SET = "app.contact.phone_set"
 _EV_HEALTH_RECORDED = "app.health.recorded"
+_EV_REMINDER_MOVED = "app.reminder.moved"
+_EV_APPOINTMENT_CANCELLED = "app.appointment.cancelled"
 
 
 def _yuan(cents: int) -> str:
     return f"{cents / 100:.2f}"
+
+
+def _parse_when(raw: str) -> datetime:
+    """把老人说得出的时间变成一个时刻。
+
+    两种写法：`HH:MM`（今天，已经过点就顺延到明天）和完整 ISO 串。
+
+    「过点顺延」不是小聪明，是这一层唯一合理的解释：9 点的时候说「设 8 点吃药」，
+    意思显然是明天 8 点，而不是造一条建出来就已经过期的提醒。
+
+    抽成函数是因为**建提醒和改提醒必须用同一套解析**——两处各写一遍，
+    迟早会有一处忘了顺延，而那一处建出来的提醒永远不会响。
+    """
+    now = datetime.now(UTC)
+    try:
+        if len(raw) <= 5 and ":" in raw:
+            hh, mm = (int(x) for x in raw.split(":", 1))
+            due = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            return due + timedelta(days=1) if due < now else due
+        due = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        return due if due.tzinfo else due.replace(tzinfo=UTC)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。") from None
 
 
 def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> APIRouter:
@@ -937,6 +962,8 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         "app.emergency.notify_failed": ("紧急呼叫没能通知到家人", "服务", "record_family"),
         "app.contact.phone_set": ("登记了紧急联系电话", "服务", "record_family"),
         "app.health.recorded": ("记了一次身体数据", "健康", "record_confirm"),
+        "app.reminder.moved": ("改了提醒的时间", "健康", "record_confirm"),
+        "app.appointment.cancelled": ("取消了一次就医安排", "健康", "record_confirm"),
     }
 
     _OUTCOME_WORDS = {
@@ -947,9 +974,24 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
     }
 
     @router.get("/records")
-    def records(type: str | None = Query(default=None), ctx: AuthContext = Depends(_actor)) -> AppRecordList:
-        """真实审计流水，翻成人话之后再给前端。"""
-        events = db.list_audit(ctx.family_id, limit=80)
+    def records(
+        type: str | None = Query(default=None),
+        limit: int = Query(default=80, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppRecordList:
+        """真实审计流水，翻成人话之后再给前端。
+
+        **分页在筛选之后做。** 反过来（先切 80 条再按类别筛）会得到一个
+        随类别变化的、看起来像 bug 的结果：选「支付」只剩两条，而库里有二十条，
+        因为前 80 条审计里恰好只有两条是支付。老人不会理解这件事，
+        而它在界面上和「真的只有两条」长得一模一样。
+
+        所以先取一批足够大的（`limit+offset` 之上再留一截给筛选损耗），
+        翻译、筛完之后再切页。`total` 是**筛完的总数**，不是这一页的条数——
+        没有它，调用方无法判断还有没有下一页。
+        """
+        events = db.list_audit(ctx.family_id, limit=max(500, (limit + offset) * 4))
         items = []
         for e in reversed(events):
             title, kind, icon = _WORDS.get(
@@ -978,7 +1020,21 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
             )
         if type and type not in {"全部", "all"}:
             items = [i for i in items if i["kind"] == type]
-        return {"items": items, "total": len(items)}
+        total = len(items)
+        page = items[offset : offset + limit]
+        return {
+            "items": page,
+            # `total` = 筛完的**总数**（用来判断还有没有下一页）。
+            # `count` = 这一页有几条。
+            #
+            # 两个都给，是因为这个端点原先只有 `total`，而它的语义是「全部」，
+            # 和别的列表端点那个「这一页有几条」的 `count` 撞了名。
+            # 直接改名会掀翻调用方，所以补上 `count` 并把语义写清楚——
+            # 一个叫 total 一个叫 count，各自是什么，看字段名猜不出来。
+            "total": total,
+            "count": len(page),
+            "hasMore": offset + len(page) < total,
+        }
 
     # ---- 凭证 ---------------------------------------------------------------
 
@@ -1298,22 +1354,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
 
         now = datetime.now(UTC)
         raw = str(body.get("at") or body.get("time") or "").strip()
-        due = None
-        if raw:
-            try:
-                if len(raw) <= 5 and ":" in raw:
-                    hh, mm = (int(x) for x in raw.split(":", 1))
-                    due = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
-                    if due < now:
-                        due = due + timedelta(days=1)
-                else:
-                    due = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-                    if due.tzinfo is None:
-                        due = due.replace(tzinfo=UTC)
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。")
-        if due is None:
-            due = now + timedelta(hours=1)
+        due = _parse_when(raw) if raw else now + timedelta(hours=1)
 
         record = ReminderRecord(
             id=f"rem-{uuid.uuid4().hex[:12]}",
@@ -1375,6 +1416,100 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         )
         return {"ok": True, "id": reminder_id, "status": "已取消",
                 "message": f"已经把「{existing.title}」取消了。"}
+
+    @router.patch("/reminders/{reminder_id}")
+    def reschedule_reminder(
+        reminder_id: str,
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppReminderChanged:
+        """改时间或改名字。
+
+        此前这一层只能**建、办好、取消**——想把「八点吃药」挪到九点，唯一的办法是
+        取消再建一条。那会在记录里留下「取消了一条提醒 + 加了一条提醒」两行，
+        而实际发生的是一件事。审计链要能说清真正发生了什么。
+
+        已经办好或取消的不许改：那是已经结束的事，改它等于篡改记录。
+        """
+        body = body or {}
+        existing = db.get_reminder(reminder_id)
+        if existing is None or existing.family_id != ctx.family_id:
+            raise HTTPException(status_code=404, detail="没有找到这一条提醒。")
+        if existing.status in {ReminderStatus.COMPLETED, ReminderStatus.CANCELLED}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="这一条已经结束了，改不了。可以另外加一条。",
+            )
+
+        title = str(body.get("title") or "").strip() or existing.title
+        due = existing.due_at
+        raw = str(body.get("at") or body.get("time") or "").strip()
+        if raw:
+            due = _parse_when(raw)
+
+        changed = existing.model_copy(update={"title": title, "due_at": due})
+        # `insert_reminder` 是 INSERT，改不了已有行；表上有 `UNIQUE(elder_id,title,due_at)`，
+        # 所以取消旧的再建新的会在同名同时间时撞唯一键。走 SQL 直改这一行。
+        if not db.update_reminder_fields(reminder_id, ctx.family_id, title, due):
+            raise HTTPException(status_code=409, detail="这一条现在改不了。")
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_REMINDER_MOVED,
+            entity_id=reminder_id,
+            payload={"title": title, "from": existing.due_at.isoformat(),
+                     "to": due.isoformat()},
+        )
+        return {
+            "ok": True,
+            "id": reminder_id,
+            "status": "待进行",
+            "message": f"改好了，{due.strftime('%H:%M')} 提醒您{title}。",
+        }
+
+    @router.post("/appointments/{appointment_id}/cancel")
+    def cancel_appointment(
+        appointment_id: str,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppReminderChanged:
+        """取消一次就医安排，并把它带出来的那条提醒一起取消。
+
+        只取消 `appointments` 那一行是不够的：建安排时**同时**建了一条到点提醒
+        （不建的话没有任何东西会叫老人）。只取消一半，老人到点还是会被提醒
+        去一个已经取消了的门诊——那比不提醒更糟。
+        """
+        row = db.get_appointment(appointment_id)
+        if row is None or row["family_id"] != ctx.family_id:
+            raise HTTPException(status_code=404, detail="没有找到这次就医安排。")
+        if str(row["status"]) == "cancelled":
+            raise HTTPException(status_code=409, detail="这一次已经取消过了。")
+        if not db.cancel_appointment(appointment_id, ctx.family_id):
+            raise HTTPException(status_code=409, detail="这一次现在取消不了。")
+
+        # 连带那条提醒。按标题找——建的时候用的就是这个规则（见 create_appointment）。
+        hospital = row["hospital"]
+        department = row["department"] or ""
+        title = f"去{hospital}{department}就诊" if department else f"去{hospital}就诊"
+        killed = 0
+        for r in db.list_reminders(ctx.family_id, limit=200):
+            if r.title == title and r.status is ReminderStatus.SCHEDULED:
+                if db.cancel_reminder(r.id, ctx.family_id, r.elder_id):
+                    killed += 1
+
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_APPOINTMENT_CANCELLED,
+            entity_id=appointment_id,
+            payload={"hospital": hospital, "reminders_cancelled": killed},
+        )
+        return {
+            "ok": True,
+            "id": appointment_id,
+            "status": "已取消",
+            "message": f"已经取消{hospital}那一次。"
+                       + ("到点的提醒也一起撤了。" if killed else ""),
+        }
 
     # ---- 紧急联系人 ----------------------------------------------------------
 

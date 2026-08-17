@@ -592,6 +592,38 @@ class Database:
                 (family_id,),
             ).fetchall()
 
+    def update_reminder_fields(
+        self, reminder_id: str, family_id: str, title: str, due_at: datetime
+    ) -> bool:
+        """改一条提醒的名字和时间。
+
+        为什么不能「取消旧的再建一条」：`reminders` 上有
+        `UNIQUE(elder_id,title,due_at)`，同名同时间会撞唯一键；而且那样会在审计里
+        留下「取消 + 新建」两行，而实际发生的是**一件事**——把八点挪到九点。
+        """
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE reminders SET title=?,due_at=? WHERE id=? AND family_id=? "
+                "AND status='scheduled'",
+                (title, iso(due_at), reminder_id, family_id),
+            )
+            return cur.rowcount > 0
+
+    def get_appointment(self, appointment_id: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM appointments WHERE id=?", (appointment_id,)
+            ).fetchone()
+
+    def cancel_appointment(self, appointment_id: str, family_id: str) -> bool:
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE appointments SET status='cancelled' "
+                "WHERE id=? AND family_id=? AND status!='cancelled'",
+                (appointment_id, family_id),
+            )
+            return cur.rowcount > 0
+
     def set_actor_phone(self, actor_id: str, family_id: str, phone: str | None) -> bool:
         """给家庭成员登记电话。`None` / 空串表示清掉。
 

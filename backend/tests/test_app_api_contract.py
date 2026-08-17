@@ -463,6 +463,58 @@ def test_an_unknown_kind_returns_an_empty_list_not_an_error(client: TestClient) 
     assert r.json()["count"] == 0
 
 
+def test_a_reminder_can_be_moved_without_faking_two_events(client: TestClient) -> None:
+    """改时间必须是**一件事**。
+
+    此前只能建/办好/取消，想把八点挪到九点唯一的办法是取消再建——
+    记录里于是留下「取消了一条提醒 + 加了一条提醒」两行，而实际发生的是一件事。
+    审计链要能说清真正发生了什么。
+    """
+    rid = client.post(f"{V1}/reminders", json={"title": "吃钙片", "time": "08:00"}
+                      ).json()["item"]["id"]
+    r = client.patch(f"{V1}/reminders/{rid}", json={"time": "09:00"})
+    assert r.status_code == 200, r.text
+
+    moved = next(i for i in client.get(f"{V1}/reminders").json()["items"] if i["id"] == rid)
+    assert moved["time"] == "09:00", f"时间没改动：{moved['time']}"
+    assert moved["status"] == "待进行", "改个时间不该把状态也动了"
+
+    titles = [i["title"] for i in client.get(f"{V1}/records").json()["items"]]
+    assert "改了提醒的时间" in titles
+    assert "取消了一条提醒" not in titles, "改时间被记成了「取消 + 新建」"
+
+
+def test_a_finished_reminder_cannot_be_rescheduled(client: TestClient) -> None:
+    """已经结束的事改不了——改它等于篡改记录。
+
+    **同时钉住那句话，不只是状态码。** 这一条防了两层：Python 里的状态判断，
+    以及 `update_reminder_fields` 的 SQL 里那句 `AND status='scheduled'`。
+    变异测试时把 Python 那层拆掉，状态码照样 409（SQL 兜住了），断言纹丝不动——
+    也就是说它只证明了「拦住了」，没证明「拦得对」。
+
+    两层给的话不一样：上面那层说「已经结束了，**可以另外加一条**」，
+    SQL 兜底只说「现在改不了」。对一位老人来说，差别在于他知不知道下一步做什么。
+    """
+    rid = client.post(f"{V1}/reminders", json={"title": "量血压", "time": "08:00"}
+                      ).json()["item"]["id"]
+    client.post(f"{V1}/reminders/{rid}/done")
+    r = client.patch(f"{V1}/reminders/{rid}", json={"time": "09:00"})
+    assert r.status_code == 409
+    assert "另外加一条" in r.json()["detail"], (
+        f"拦住了，但没告诉他下一步能做什么：{r.json()['detail']}"
+    )
+
+
+def test_rescheduling_reuses_the_same_time_parser(client: TestClient) -> None:
+    """建和改必须用同一套解析。
+
+    两处各写一遍，迟早有一处忘了「过点顺延」——而那一处建出来的提醒永远不会响。
+    """
+    rid = client.post(f"{V1}/reminders", json={"title": "吃钙片", "time": "08:00"}
+                      ).json()["item"]["id"]
+    assert client.patch(f"{V1}/reminders/{rid}", json={"time": "晚一点"}).status_code == 400
+
+
 # ---- 就医安排 --------------------------------------------------------------
 
 def test_an_appointment_also_creates_a_reminder(client: TestClient) -> None:
@@ -480,6 +532,36 @@ def test_an_appointment_also_creates_a_reminder(client: TestClient) -> None:
 def test_an_appointment_needs_a_hospital_and_a_date(client: TestClient) -> None:
     assert client.post(f"{V1}/appointments", json={"department": "心内科"}).status_code == 400
     assert client.post(f"{V1}/appointments", json={"hospital": "某医院"}).status_code == 400
+
+
+def test_cancelling_an_appointment_also_kills_its_reminder(client: TestClient) -> None:
+    """**这一条是这组里最要紧的。**
+
+    建安排时同时建了一条到点提醒（不建的话没有任何东西会叫老人）。
+    只取消一半，老人到点还是会被提醒去一个已经取消了的门诊——那比不提醒更糟。
+    """
+    made = client.post(f"{V1}/appointments", json={
+        "hospital": "市中心医院", "department": "心内科",
+        "date": "2026-08-20", "time": "10:30"}).json()
+    # 阳性对照：先证明那条提醒确实建出来了。
+    titles = [i["title"] for i in client.get(f"{V1}/reminders").json()["items"]]
+    assert any("市中心医院" in t for t in titles), "提醒压根没建，下面的断言没有意义"
+
+    r = client.post(f"{V1}/appointments/{made['id']}/cancel")
+    assert r.status_code == 200, r.text
+
+    appt = next(a for a in client.get(f"{V1}/appointments").json()["items"]
+                if a["id"] == made["id"])
+    assert appt["status"] == "已取消"
+    left = [i for i in client.get(f"{V1}/reminders").json()["items"]
+            if "市中心医院" in i["title"] and i["status"] == "待进行"]
+    assert not left, f"门诊取消了，到点还是会提醒：{left}"
+
+
+def test_an_appointment_cannot_be_cancelled_twice(client: TestClient) -> None:
+    made = client.post(f"{V1}/appointments", json={"hospital": "某医院", "date": "2026-09-01"}).json()
+    assert client.post(f"{V1}/appointments/{made['id']}/cancel").status_code == 200
+    assert client.post(f"{V1}/appointments/{made['id']}/cancel").status_code == 409
 
 
 def test_appointment_status_is_chinese(client: TestClient) -> None:
@@ -773,6 +855,37 @@ def test_settings_survive_a_round_trip_and_are_clamped(client: TestClient) -> No
 
 
 # ---- 记录 ------------------------------------------------------------------
+
+def test_records_paginate_after_filtering_not_before(client: TestClient) -> None:
+    """分页必须在**筛选之后**做。
+
+    反过来（先切一页再按类别筛）会给出一个随类别变化、看起来像 bug 的结果：
+    选「支付」只剩两条，而库里有二十条——因为这一页里恰好只有两条是支付。
+    老人不会理解这件事，而它和「真的只有两条」在屏幕上长得一模一样。
+    """
+    _pay_to(client, "done")
+    for i in range(6):
+        client.post(f"{V1}/reminders", json={"title": f"吃药{i}", "time": "08:00"})
+
+    everything = client.get(f"{V1}/records", params={"limit": 500}).json()
+    assert everything["total"] > 6, "记录太少，分页测不出东西"
+
+    first = client.get(f"{V1}/records", params={"limit": 3}).json()
+    assert len(first["items"]) == 3
+    assert first["count"] == 3
+    assert first["total"] == everything["total"], "total 应该是筛完的总数，不是这一页的条数"
+    assert first["hasMore"] is True
+
+    second = client.get(f"{V1}/records", params={"limit": 3, "offset": 3}).json()
+    assert [i["id"] for i in second["items"]] != [i["id"] for i in first["items"]], \
+        "第二页和第一页是同一批"
+
+    # 关键：按类别筛之后，total 要是**那一类的总数**，而不是「前一页里恰好有几条」。
+    paid = client.get(f"{V1}/records", params={"type": "支付", "limit": 2}).json()
+    paid_all = client.get(f"{V1}/records", params={"type": "支付", "limit": 500}).json()
+    assert paid["total"] == paid_all["total"] == len(paid_all["items"])
+    assert paid["total"] >= len(paid["items"])
+
 
 def test_no_action_falls_through_to_the_generic_wording(client: TestClient) -> None:
     """记录页每一行都要说清是哪件事。
