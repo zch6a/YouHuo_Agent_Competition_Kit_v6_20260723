@@ -9,8 +9,8 @@
 <!-- 没有事务号：这不是错误，是「现在确实没有要您确认的事」。 -->
 <section class="card content" id="faEmpty" hidden style="margin-top:58px;padding:28px 22px;text-align:center">
   <img src="../art/png/confirm_security_badge.png" alt="" style="width:104px;height:104px;object-fit:contain">
-  <h2 style="margin:12px 0 0;font-size:24px">现在没有等您确认的事</h2>
-  <p class="muted" style="margin:10px 0 0;font-size:16px;line-height:1.55">老人那边发起一笔缴费、并把金额复述对了之后，这里才会出现要您点头的那一笔。</p>
+  <h2 style="margin:12px 0 0;font-size:calc(24px * var(--fs, 1))">现在没有等您确认的事</h2>
+  <p class="muted" style="margin:10px 0 0;font-size:calc(16px * var(--fs, 1));line-height:1.55">老人那边发起一笔缴费、并把金额复述对了之后，这里才会出现要您点头的那一笔。</p>
 </section>
 
 <!-- 这一笔本身 -->
@@ -18,15 +18,15 @@
   <img class="art" src="../art/png/cert_gold_seal.png" alt="" style="right:6px;top:30px;width:104px;opacity:.40">
   <div class="row between" style="align-items:flex-start">
     <div style="min-width:0">
-      <p class="muted" style="margin:0;font-size:16px">这一笔要付</p>
+      <p class="muted" style="margin:0;font-size:calc(16px * var(--fs, 1))">这一笔要付</p>
       <div class="amount" id="faAmount" style="margin-top:2px"></div>
     </div>
-    <span id="faStatus" style="font-size:15px;font-weight:760;padding:9px 12px;border-radius:13px;white-space:nowrap;margin-top:4px"></span>
+    <span id="faStatus" style="font-size:calc(15px * var(--fs, 1));font-weight:760;padding:9px 12px;border-radius:13px;white-space:nowrap;margin-top:4px"></span>
   </div>
   <div class="list">
     <div class="line"><span>缴费单位</span><b id="faCompany"></b></div>
     <div class="line"><span>发起人</span><b id="faInitiator"></b></div>
-    <div class="line"><span>事务号</span><b id="faPid" style="font-size:15px;letter-spacing:.02em"></b></div>
+    <div class="line"><span>事务号</span><b id="faPid" style="font-size:calc(15px * var(--fs, 1));letter-spacing:.02em"></b></div>
   </div>
 </section>
 
@@ -35,7 +35,7 @@
 <section class="card content" id="faChainCard" hidden style="padding:4px 16px 15px">
   <img class="art" src="../art/png/bill_safety_shield.png" alt="" style="right:13px;bottom:11px;width:46px;opacity:.30">
   <div id="faChain"></div>
-  <p class="muted" id="faChainNote" style="margin:13px 0 0;font-size:15px;line-height:1.5;padding-right:52px"></p>
+  <p class="muted" id="faChainNote" style="margin:13px 0 0;font-size:calc(15px * var(--fs, 1));line-height:1.5;padding-right:52px"></p>
 </section>
 
 <!-- 守卫说的话 / 办完之后的回执，都落在这一块。 -->
@@ -43,14 +43,14 @@
   <div class="row" style="gap:11px;align-items:flex-start">
     <img id="faNoticeIcon" src="../art/png/bill_safety_shield.png" alt="" style="width:28px;height:28px;object-fit:contain;flex:0 0 28px;margin-top:1px">
     <div style="flex:1;min-width:0">
-      <b id="faNoticeText" style="display:block;font-size:17px;line-height:1.45"></b>
-      <span class="muted" id="faNoticeHint" style="display:block;margin-top:7px;font-size:15px;line-height:1.5"></span>
+      <b id="faNoticeText" style="display:block;font-size:calc(17px * var(--fs, 1));line-height:1.45"></b>
+      <span class="muted" id="faNoticeHint" style="display:block;margin-top:7px;font-size:calc(15px * var(--fs, 1));line-height:1.5"></span>
     </div>
   </div>
 </section>
 
 <button class="btn primary content" id="faApprove" hidden style="width:100%;height:60px;margin-top:15px">同意并办理</button>
-<p class="muted content" id="faApproveHint" hidden style="margin:9px 0 0;text-align:center;font-size:15px">按下这一下，这笔钱才会真的付出去。</p>
+<p class="muted content" id="faApproveHint" hidden style="margin:9px 0 0;text-align:center;font-size:calc(15px * var(--fs, 1))">按下这一下，这笔钱才会真的付出去。</p>
 <button class="btn secondary content" id="faLater" hidden style="width:100%;height:56px;margin-top:11px">先不办</button>
 <button class="btn secondary content" id="faCert" data-action="open-cert" hidden style="width:100%;height:56px;margin-top:11px">看这张凭证 ›</button>
 <img class="scene" src="../art/png/cert_footer_scene.png" alt="" style="left:0;bottom:88px;width:100%;opacity:.46">

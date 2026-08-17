@@ -144,6 +144,14 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             due = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
             if due.date() != today:
                 continue
+            # 取消掉的不在今天的安排里。
+            #
+            # 原来只把 COMPLETED / ACKNOWLEDGED 当成"办完了"，于是一条**已取消**的
+            # 提醒既不算完成、也没被排除，照样进「今日安排」，还能被挑成「接下来」。
+            # 实测的样子：在用药页取消「吃钙片」，那一条当场变成「已取消」，
+            # 而首页顶上仍然写着「07:30 吃钙片」——同一条提醒，两个屏幕两种说法。
+            if r.status is ReminderStatus.CANCELLED:
+                continue
             done = r.status in {ReminderStatus.COMPLETED, ReminderStatus.ACKNOWLEDGED}
             items.append(
                 {

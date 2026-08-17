@@ -71,14 +71,24 @@
 
   // ---- 名单 ------------------------------------------------------------------
 
-  // 「还没有留电话」这枚标记。字号跟着 --fs 走（最大档 20.8px，整枚 145px 宽），
-  // 所以它和称呼是真的在抢那一行的宽度——量出来最大档只剩 13px 余量。
-  // `margin-left:auto` 是**兜底**：万一哪一家的称呼长到挤不下，它折行之后仍然贴右边，
+  // 「还没有留电话」这枚标记。
+  //
+  // **字号不跟着 --fs 放大**，用 app.css 给 `.service-flag` 定的 13px（元信息那一档）。
+  // 这不是偷懒，是量出来的：让它跟着放大到 20.8px 时整枚 145px 宽，而 390 宽的手机
+  // 在最大档下这一行只有 300px——「优活系统」四个字 121.6px 加图标和间距就是 326.6px，
+  // 标记被挤到第二行。截图上看就是「儿子」那行好好的，「优活系统」那行的标记掉下去了。
+  // 13px 时整枚 98px，最大档也还剩 20px 富余，两种宽度都不折行。
+  // 这一枚标记在 profile.html / services.html 上本来也是 13px 不放大的，一致。
+  //
+  // 「没有电话」这件事本身另有一整张卡片在讲，那张卡片的字是跟着放大的，
+  // 所以看不清这枚小标记的老人不会因此漏掉这个信息。
+  //
+  // `margin-left:auto` 是**兜底**：万一哪一家的称呼长到仍然挤不下，它折行之后依旧贴右边，
   // 看起来是「换了一行」而不是「掉到图标底下去了」。
   function noPhoneFlag() {
     var flag = document.createElement("span");
     flag.className = "service-flag";
-    flag.style.cssText = "font-size:" + fs(13) + ";flex:0 0 auto;margin-left:auto";
+    flag.style.cssText = "flex:0 0 auto;margin-left:auto";
     flag.textContent = "还没有留电话";
     return flag;
   }

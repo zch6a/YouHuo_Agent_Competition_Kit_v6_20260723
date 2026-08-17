@@ -9,7 +9,17 @@ const NAV_PAGE_MAP={
   "records.html":"records",
   "services.html":"services",
   "certificate.html":"home",
-  "profile.html":"profile"
+  "profile.html":"profile",
+  // 这七页不加进来的话，`mountGlobalNav` 会落到默认值 "home"——
+  // 于是站在「用药提醒」上，底部高亮的是「首页」。那不是少一个高亮，
+  // 是**告诉用户他在别的地方**。
+  "medication.html":"services",     // 从「服务」和「我的」都能进，归服务
+  "schedule.html":"home",           // 今日安排就是首页那两张卡的展开
+  "contacts.html":"services",
+  "settings.html":"profile",
+  "health.html":"services",
+  "me.html":"profile",
+  "family-approve.html":"home"      // 缴费那条链整条都归首页（账单/复述/成功/凭证同）
 };
 
 function currentPageFile(){
@@ -267,15 +277,51 @@ function renderRecognition(){
   hideEmptyRows();
 }
 
+// ---- 老人自己的字号与高对比，**每一页都要跟着** ----------------------------
+//
+// 设置页能把偏好存进后端，但那之前它**只在设置页自己生效**：`app.css` 里
+// `--fs` 出现 0 次，别的十六页一个字都不会变大。一个只在设置页生效的字号设置，
+// 比没有这个设置更糟——它让老人以为自己调过了。
+//
+// 变量设在 `<html>` 上而不是 `.phone` 上：`.modal` 是 position:fixed 且挂在
+// `.phone` 外面，设在 `.phone` 上它够不着。
+//
+// 这一批变量名和 `page-settings.js` 里那份是同一套。两处写同样的值是重复，
+// 但另一份归设置页所有；真正的事实源是后端 `GET /settings`，两边都读它。
+const CONTRAST_VARS = {
+  "--ink": "#100d0a",
+  "--muted": "#38322b",
+  "--line": "rgba(52,36,20,.42)",
+  "--card": "#fffdf8",
+  "--paper": "#fffdf6",
+  "--paper2": "#fffdf6",
+};
+
+function applyPrefs(prefs){
+  if (!prefs) return;
+  const root = document.documentElement;
+  const scale = Number(prefs.fontScale);
+  // 服务端已经夹过范围（0.9–1.6）。这里只挡住 NaN——读不到就当没设过，
+  // 而不是把整屏字号设成 NaN。
+  if (Number.isFinite(scale) && scale > 0) root.style.setProperty("--fs", String(scale));
+  for (const [key, value] of Object.entries(CONTRAST_VARS)){
+    if (prefs.highContrast) root.style.setProperty(key, value);
+    else root.style.removeProperty(key);
+  }
+}
+
 async function hydrate(){
   try{
     // agenda 只有首页要，其他页拿不到也不该报错——所以用 allSettled。
-    const [profile, bill, agenda] = await Promise.allSettled([
+    const [profile, bill, agenda, prefs] = await Promise.allSettled([
       YouhuoAPI.get("/profile"),
       YouhuoAPI.get("/bills/water/current"),
       YouhuoAPI.get("/agenda"),
+      YouhuoAPI.get("/settings"),
     ]);
     const v = r => (r.status === "fulfilled" ? r.value : null);
+    // 偏好先应用：晚一步应用会让整屏字号在眼前跳一下。
+    applyPrefs(v(prefs));
     bindData({profile: v(profile), bill: v(bill), agenda: v(agenda)});
     renderAgenda(v(agenda));
 
