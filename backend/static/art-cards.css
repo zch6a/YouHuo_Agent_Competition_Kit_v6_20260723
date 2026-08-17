@@ -30,8 +30,8 @@
 
 :root {
   /* 卡壳的原始比例，来自各自的 viewBox。改素材要同时改这里，否则会拉伸。 */
-  --art-shell-hero-ratio: 346 / 191;
-  --art-shell-wide-ratio: 231 / 97;
+  --art-shell-hero-ratio: 1774 / 887;
+  --art-shell-wide-ratio: 1903 / 826;
 
   /* 安全区：内容离卡壳描边的距离。按各卡壳的留白量分别给。 */
   --art-safe-hero: 22px 24px 20px;
@@ -170,6 +170,100 @@
 
 .art-framed[data-art-frame="primary"] {
   border-image-source: url("/static/art/ui/frame-primary.svg");
+}
+
+/* ------------------------------------------------------------ 行组件（药丸）
+ *
+ * ## 第一版是错的，错在方法不在参数
+ *
+ * 第一版把 `g8-02`（2172×724 的药丸素材）当 `background-size: 100% 100%`
+ * 铺在行上。实测：文字溢出药丸、图标重叠、底下原来的白卡还露着。
+ *
+ * 原因不是尺寸没调好——**那张图是 3:1 的固定构图，而行高由文字决定**。
+ * 文字两行就撑成 4:1（药丸被压扁），一行又填不满。拿固定构图去铺可变高度，
+ * 怎么调都不成立。
+ *
+ * ## 现在：三栏，CSS 画框，素材只出图标
+ *
+ *     [ 圆形图标 ] [ 文字（自由换行）] [ 状态点 + 箭头 ]
+ *        56px          1fr                auto
+ *
+ * 圆角、金边、纸色都由 CSS 给——它们跟着高度走，不会变形。
+ * 素材只负责图标位里那一张圆形意象，那是它擅长的（1254² 方图）。
+ */
+.art-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  min-height: 76px;              /* 触控目标；老人端主要操作 ≥56px */
+  box-sizing: border-box;
+  border-radius: 16px;
+  /* 纸色 + 一道金线。和卡框那条金线是同一套语言。 */
+  background: linear-gradient(180deg, #fdfaf3 0%, #f7f1e4 100%);
+  border: 1px solid rgba(190, 158, 96, .5);
+  box-shadow: 0 1px 3px rgba(120, 96, 62, .08);
+}
+
+/* 图标位：一个圆，里面是意象。 */
+.art-row > .art-scene {
+  position: static;              /* 覆盖 .art-scene 的 absolute */
+  grid-column: 1;
+  width: 56px;
+  height: 56px;
+  transform: none;
+  inset: auto;
+  max-width: none;
+  max-height: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(190, 158, 96, .45);
+  opacity: 1;
+}
+
+/* 文字进第二栏，自由换行——**不再有让位 padding**。
+   让位是给「画压在文字上」用的；三栏布局里画和字各占各的格，不重叠。 */
+.art-row > :not(.art-scene) {
+  grid-column: 2;
+  min-width: 0;
+  padding: 0;
+}
+
+/* 行尾那个箭头是绝对定位的，让它待在第三栏的位置上。 */
+.art-row.trust-more-link::after { right: 16px; }
+
+/* `.art-row` 自己排版，形状分类那三条让位规则一律不生效——
+   两套 padding 叠加会把文字挤成窄条（结论卡上实测过一次）。 */
+.art-row[data-shape-hint] > :not(.art-scene) {
+  padding-right: 0;
+  padding-bottom: 0;
+}
+
+/* 三档配色，对应三种语气。不是随机换颜色：绿=常态、玉=在办、珊瑚=要留意。 */
+.art-row[data-art-tone="jade"] {
+  background: linear-gradient(180deg, #f4f8f2 0%, #e9f0e6 100%);
+  border-color: rgba(94, 138, 106, .45);
+}
+.art-row[data-art-tone="coral"] {
+  background: linear-gradient(180deg, #fdf4ee 0%, #f9e8dc 100%);
+  border-color: rgba(198, 126, 88, .42);
+}
+
+@media (prefers-color-scheme: dark) {
+  .art-row {
+    background: linear-gradient(180deg, #1e1c19 0%, #191714 100%);
+    border-color: rgba(190, 158, 96, .32);
+  }
+  .art-row[data-art-tone="jade"] {
+    background: linear-gradient(180deg, #1a221c 0%, #161d18 100%);
+  }
+  .art-row[data-art-tone="coral"] {
+    background: linear-gradient(180deg, #241b16 0%, #1d1613 100%);
+  }
+  /* 图标是浅色纸面的画，深色下压暗；**不反色**，反色会把朱红变青。 */
+  .art-row > .art-scene { filter: brightness(.82) saturate(.95); }
 }
 
 /* --------------------------------------------------------------- 场景意象 */

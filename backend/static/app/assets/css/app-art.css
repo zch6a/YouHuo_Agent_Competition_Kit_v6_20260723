@@ -1,0 +1,119 @@
+/* 优活手机端 · 整页美术密度
+   ============================================================================
+
+   ## 这一层解决的是什么
+
+   `/app` 原来的做法是：`.phone` 一层平的纸色渐变，`.card` 一张磨砂白卡，
+   然后往卡的角上贴一张 PNG。交接包 09 号文档把这个列成反例——
+   「不是白卡加圆角再往角落贴花」。
+
+   把交接包那套 R10 原样跑起来看过：整页是一幅画（竹、梅、山、锦鲤、荷），
+   密度确实高得多。但同一张截图里它也是**空的**——「下一件」那张卡只有画，
+   没有时间没有标题；「今天」那一段只剩一个空的「查看全部」白条；
+   还硬编码了一个叫「李叔」的人名（系统里根本没有这个数据）。
+   那正是它自己 09 号反例 7 说的「只追求美术，忽略 App 逻辑」。
+
+   所以这一层搬的是**密度**，不是那些页面。`/app` 的 17 页业务、
+   `data-bind`、`data-action`、路由一个不动。
+
+   ## 三层，从下往上
+
+     1. `.phone::before`   顶部竹枝 + 底部松山，中间留空给内容
+     2. `.phone` 背景       纸纹（内联 SVG 噪点，不占请求）+ 暖色天光
+     3. `.card`             半透明，让下面那幅画透上来
+
+   第 3 条是关键：卡片不透，铺再多背景也只是「白卡下面藏了张画」。
+
+   ## 不做的事
+
+   - 不搬交接包那份 `pages.css`（**311 个 `!important`**，
+     它自己的工作单 P1 第一条就是要收敛这个）
+   - 不往列表项上贴东西（09 号反例 6：所有卡片都国风化会变成古风网页）
+   - 不用 `!important`
+   -------------------------------------------------------------------------- */
+
+.phone {
+  /* 纸纹 + 顶部天光。噪点用内联 data-URI：不多一次请求，也不会 404。 */
+  background-image:
+    linear-gradient(180deg, rgba(203, 178, 132, .20) 0, rgba(203, 178, 132, 0) 300px),
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, var(--paper), var(--paper2));
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-size: 100% 300px, 140px 140px, 100% 100%;
+}
+
+/* 底部松山。`.phone` 已经是 `position: relative; overflow: hidden`，
+   所以这一层不会溢出手机框。 */
+.phone::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 300px;
+  z-index: 0;                 /* 在 .scene(1) 之下、背景之上 */
+  pointer-events: none;
+  background: url("/static/art/decor/pine-band.svg") center bottom / cover no-repeat;
+  opacity: .34;
+}
+
+/* 顶部竹枝，右上角。和底部的松上下呼应，中间那一段留给内容——
+   09 号反例 6 要的「主次」在版面上就是这个：四角有景，中间干净。 */
+.phone::after {
+  content: "";
+  position: absolute;
+  right: -18px;
+  top: 84px;
+  width: 168px;
+  height: 250px;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/static/art/decor/bamboo-top.svg") right top / contain no-repeat;
+  opacity: .26;
+}
+
+/* 卡片透出景。
+   **这一条是关键**：卡不透，上面铺再多背景也只是「白卡下面藏了张画」，
+   而那就是原来的样子。`.card` 本来就有 `backdrop-filter: blur(8px)`，
+   把底色的不透明度降下来，那个模糊才真的在模糊**背后的画**。 */
+.card {
+  background: rgba(255, 253, 248, .74);
+  border-color: rgba(255, 255, 255, .7);
+}
+
+/* 主卡（带美术挂载的那些）再透一点，让它和普通卡拉开层级。 */
+.card.art-framed,
+.card.art-receipt {
+  background: rgba(255, 253, 248, .62);
+}
+
+/* 列表行的分隔线在半透明底上会糊，压深一档。 */
+.list { border-top-color: rgba(120, 96, 62, .22); }
+.line { border-bottom-color: rgba(120, 96, 62, .16); }
+
+/* 底部导航是**功能面**，不参与美术：它要在任何背景上都清清楚楚。
+   `--nav-bg` 本来就是 .975 不透明，这里只是写明白它是有意的，别被上面
+   那条 `.card` 半透明顺手改掉。 */
+.global-nav { --nav-bg: rgba(255, 253, 248, .975); }
+
+/* ------------------------------------------------------------------ 深色 */
+
+@media (prefers-color-scheme: dark) {
+  /* 深色下**不隐藏**这一层——R6 栽过一次：深色系统让艺术 CSS 完全不加载，
+     用户看到的是两套完全不同的产品。只压暗。 */
+  .phone::before { opacity: .18; filter: brightness(.55) saturate(.8); }
+  .phone::after { opacity: .14; filter: brightness(.55) saturate(.8); }
+  .card { background: rgba(28, 26, 23, .78); border-color: rgba(255, 255, 255, .07); }
+  .card.art-framed,
+  .card.art-receipt { background: rgba(28, 26, 23, .68); }
+}
+
+/* ---------------------------------------------------------------- 无障碍 */
+
+/* 高对比偏好下把底纹压到最弱，保证文字对比度。**不隐藏**——
+   隐藏会让版面塌一块，看起来像加载失败。 */
+@media (prefers-contrast: more) {
+  .phone::before { opacity: .1; }
+  .phone::after { opacity: .08; }
+  .card { background: rgba(255, 253, 248, .96); }
+}

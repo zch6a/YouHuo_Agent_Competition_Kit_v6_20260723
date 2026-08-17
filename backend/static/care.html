@@ -107,10 +107,15 @@
              而且 `wide-a` 本身就是「左边一幅画、右边留白」的题签构图——
              再贴一只鹤是重复。交接包 R8 那一段的注释写的正是这句：
              「卡壳已自带完整构图；这些 R7 局部贴图在同一张卡上会重复」。 -->
-        <div class="report-verdict" id="ovVerdict" data-art-shell="wide-a">
+        <!-- **不用 `wide-a` 卡壳。** 那张素材（`g5-06 梅花山水播放卡`）自带黑色边框
+             和假的内容横杠——它是一张**成品卡片设计稿**，不是可填内容的容器。
+             实测：黑框占满卡面、判定文字压在画上、右边还有几条不知道是什么的横杠。
+             改成 CSS 金边框 + 一枚圆徽章（`mark` 形状，56px，贴右上角）。 -->
+        <div class="report-verdict art-framed" id="ovVerdict"
+             data-art-frame="primary" data-art-scene="crane">
           <span class="report-badge">还没读到</span><strong>正在读今天的情况……</strong>
         </div>
-        <a class="trust-more-link" id="ovToday" href="#today">
+        <a class="trust-more-link art-row" id="ovToday" href="#today" data-art-scene="pavilion">
           <span><span>今天</span><br /><span class="meta">正在读今天的情况……</span></span>
         </a>
         <!-- 四类各一个意象，语义各不相同，**每类只有一个**（工作单：控制密度）：
@@ -120,16 +125,16 @@
                安全 → 松     稳、守
              都是 `mark`/`wide` 形状，贴角落，不进文字区。
              这四个是「分别选择合适意象」的落点，不是四处贴同一朵花。 -->
-        <a class="trust-more-link" id="ovMed" href="#med" data-art-scene="lotus">
+        <a class="trust-more-link art-row" id="ovMed" href="#med" data-art-tone="jade" data-art-scene="lotus">
           <span><span>在吃什么药</span><br /><span class="meta">正在读用药情况……</span></span>
         </a>
-        <a class="trust-more-link" id="ovBody" href="#body" data-art-scene="mountain">
+        <a class="trust-more-link art-row" id="ovBody" href="#body" data-art-scene="crane">
           <span><span>身体</span><br /><span class="meta">正在读体检与就诊记录……</span></span>
         </a>
-        <a class="trust-more-link" id="ovMood" href="#mood" data-art-scene="magnolia">
+        <a class="trust-more-link art-row" id="ovMood" href="#mood" data-art-tone="coral" data-art-scene="peony">
           <span><span>心情</span><br /><span class="meta">正在读最近两周的情况……</span></span>
         </a>
-        <a class="trust-more-link" id="ovSafety" href="#safety" data-art-scene="pine">
+        <a class="trust-more-link art-row" id="ovSafety" href="#safety" data-art-tone="jade" data-art-scene="chrysanth">
           <span><span>安全</span><br /><span class="meta">正在读安全设置……</span></span>
         </a>
       </div>

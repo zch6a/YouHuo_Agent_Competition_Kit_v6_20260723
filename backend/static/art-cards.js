@@ -31,16 +31,36 @@
        wide  宽>高    远山 237×91、锦鲤 246×207、卷轴 324×237、玉兰 458×278
        mark  近方形   莲 151×111、松 108×107、牡丹 186×189、月窗 239×240 */
   const SCENES = {
-    crane:       ['scene/crane.svg', 'tall'],
-    fan:         ['scene/fan.svg', 'tall'],
-    mountain:    ['scene/mountain.svg', 'wide'],
-    koi:         ['scene/koi.svg', 'wide'],
-    scroll:      ['scene/scroll.svg', 'wide'],
-    magnolia:    ['scene/magnolia.svg', 'wide'],
-    lotus:       ['scene/lotus.svg', 'mark'],
-    pine:        ['scene/pine.svg', 'mark'],
-    peony:       ['scene/peony.svg', 'mark'],
-    'moon-window': ['scene/moon-window.svg', 'mark']
+    bamboo              : ['scene/bamboo.svg', 'wide'],
+    'bamboo-screen'     : ['scene/bamboo-screen.svg', 'tall'],
+    'banner-tall'       : ['scene/banner-tall.svg', 'tall'],
+    chrysanth           : ['scene/chrysanth.svg', 'mark'],
+    cloud               : ['scene/cloud.svg', 'mark'],
+    'cloud-stream'      : ['scene/cloud-stream.svg', 'mark'],
+    crane               : ['scene/crane.svg', 'mark'],
+    'g5-03'             : ['scene/g5-03.svg', 'wide'],
+    'g5-04'             : ['scene/g5-04.svg', 'wide'],
+    'g5-06'             : ['scene/g5-06.svg', 'wide'],
+    'g7-06'             : ['scene/g7-06.svg', 'wide'],
+    'g8-01'             : ['scene/g8-01.svg', 'tall'],
+    'g8-02'             : ['scene/g8-02.svg', 'wide'],
+    'g8-03'             : ['scene/g8-03.svg', 'wide'],
+    'g8-04'             : ['scene/g8-04.svg', 'wide'],
+    'jade-badge'        : ['scene/jade-badge.svg', 'wide'],
+    koi                 : ['scene/koi.svg', 'tall'],
+    'landscape-wide'    : ['scene/landscape-wide.svg', 'wide'],
+    lotus               : ['scene/lotus.svg', 'mark'],
+    'lotus-flourish'    : ['scene/lotus-flourish.svg', 'mark'],
+    'lotus-vintage'     : ['scene/lotus-vintage.svg', 'mark'],
+    maple               : ['scene/maple.svg', 'tall'],
+    pavilion            : ['scene/pavilion.svg', 'mark'],
+    peony               : ['scene/peony.svg', 'mark'],
+    pine                : ['scene/pine.svg', 'tall'],
+    'pine-crane'        : ['scene/pine-crane.svg', 'wide'],
+    'plum-bar'          : ['scene/plum-bar.svg', 'wide'],
+    'plum-drop'         : ['scene/plum-drop.svg', 'tall'],
+    'portrait-scene'    : ['scene/portrait-scene.svg', 'tall'],
+    'scroll-desk'       : ['scene/scroll-desk.svg', 'tall']
   };
 
   const SHELLS = {
