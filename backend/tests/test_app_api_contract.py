@@ -95,10 +95,18 @@ def test_a_bad_token_is_401_and_never_falls_back_to_the_demo_elder(client: TestC
     过期或伪造的令牌静默退回演示身份，比完全没有鉴权更糟：
     调用方以为自己登录着，实际在操作别人的数据，而屏幕上一切正常。
     """
-    # 令牌只能是 ASCII——HTTP 头就是这么规定的。第一版拿中文当假令牌，
-    # 结果 httpx 在**发出去之前**就抛了 UnicodeEncodeError，这条断言压根没执行到。
-    r = client.get(f"{V1}/profile",
-                   headers={"Authorization": "Bearer not-a-real-token-0123456789"})
+    # 这个假令牌有两条约束，都是踩出来的：
+    #
+    # ① 只能是 ASCII——HTTP 头就是这么规定的。第一版拿中文当假令牌，
+    #    httpx 在**发出去之前**就抛了 UnicodeEncodeError，断言压根没执行到。
+    # ② 必须短于 24 个字符。`scan_secrets.py` 的规则是
+    #    `Bearer\s+[A-Za-z0-9._-]{24,}`，第二版写了 27 个字符的假串，
+    #    于是**密钥扫描当场报红**——这个仓库有过审计密钥进公开库的前科，
+    #    那道扫描不能为了迁就一个测试去放宽。
+    #
+    # 长度和这条测试要验的东西无关：`resolve_auth_token` 查不到就是 None，
+    # 走的是同一条 401 分支。
+    r = client.get(f"{V1}/profile", headers={"Authorization": "Bearer bad-token"})
     assert r.status_code == 401, f"无效令牌被放行了：{r.status_code} {r.text[:120]}"
     assert "王爷爷" not in r.text
 
