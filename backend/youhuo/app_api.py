@@ -330,9 +330,15 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             "unpaidTotal": _yuan(sum(i["amountCents"] for i in unpaid)),
         }
 
-    #: 注意声明顺序：`/bills/water/current` 必须排在 `/bills/{bill_id}` **前面**。
-    #: FastAPI 按声明顺序匹配，反过来的话 `water` 会被当成一个 bill_id 吃掉，
-    #: 前端那个一直在用的老端点当场 404——而它是账单详情页的数据源。
+    #: 单张账单。
+    #:
+    #: 这里原先写着一句「声明顺序有讲究，`/bills/water/current` 必须排在前面，
+    #: 否则 `water` 会被当成 bill_id 吃掉」——**那句是错的，我没验就写了下来。**
+    #: 变异测试时把一条 `/bills/{bill_id}` 塞到前面，`/bills/water/current` 照样 200：
+    #: 后者是三段路径，而路径参数只匹配一段，两者根本不可能相撞。
+    #:
+    #: 真正会被吃掉的是**同为两段**的路径。所以如果将来加
+    #: `/bills/unpaid` 这种，它才必须排在这一条前面。
     @router.get("/bills/{bill_id}")
     def one_bill(bill_id: str) -> dict[str, Any]:
         ctx = _ctx()
