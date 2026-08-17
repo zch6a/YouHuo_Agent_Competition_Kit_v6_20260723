@@ -139,6 +139,100 @@ class AppReminderChanged(StrictModel):
     message: str
 
 
+# ---- 用药 -------------------------------------------------------------------
+#
+# v4 那一侧（`/v4/medications*`）早就把用药计划、库存推算、服药记录都做完了，
+# 而 `/api/v1` 一个入口都没有——老人端只有「用药提醒」，那只是一条到点响的提醒，
+# 和「今天这几次吃了没」「药还能吃几天」是两回事。产品自己的帮助词
+# （`care_voice.answer_capability_help`）已经在对老人承诺后面这两件事。
+#
+# 这一层**只读和记录，不建计划、不改剂量**。这不是省事：`create_medication_plan`
+# 对 ELDER 角色建的计划直接 `active=True`，等于老人可以自己给自己开一份用药计划
+# 并立刻生效。产品在自己的话术里已经划过这条线——「要登记的话，可以让家人在
+# 家属端添加」「这些是家人确认过的计划，我不改剂量」。
+
+class AppDose(StrictModel):
+    """今天某一格：哪个药、几点、吃了没。"""
+    planId: str
+    name: str
+    #: 「一次一片」。原样来自计划，不做解析——把它拆成数字再拼回去，
+    #: 只会在某个写法上拼错，而这是药。
+    doseText: str
+    time: str
+    #: 已服用 / 没吃 / 漏服 / 待服用。界面直接显示，所以是中文，不是枚举值。
+    status: str
+    #: 还没记录的那些。界面靠它决定要不要摆「吃了」按钮。
+    pending: bool
+    #: 记录这一格要回传的时刻。客户端不用自己拼时区。
+    scheduledAt: str
+
+
+class AppMedicationPlan(StrictModel):
+    id: str
+    name: str
+    doseText: str
+    times: list[str]
+    #: 还能吃几天。没设服用频次时算不出来，回 null——不是 0。
+    daysRemaining: int | None = None
+    #: 预计哪天吃完，`YYYY-MM-DD`。
+    depletionDate: str | None = None
+    #: 充足 / 一周内用完 / 快吃完了 / 不清楚。同样是给人看的中文。
+    stockLabel: str
+    #: 原始告警档（normal/warning/critical/unknown），给客户端做样式判断用。
+    #: 界面上不显示它——显示的是上面那个中文。
+    alertLevel: str
+    stockUnits: float
+
+
+class AppMedicationToday(StrictModel):
+    #: 今天的每一格，按时间排。
+    doses: list[AppDose]
+    plans: list[AppMedicationPlan]
+    plannedCount: int
+    takenCount: int
+    #: 还没有任何记录的格数。**不等于** plannedCount - takenCount：
+    #: 记成「没吃」的那一格是有记录的，不该被算进「还差几次」。
+    pendingCount: int
+    #: 一句能直接念出来的话。语音端和界面用同一句，避免两处各写一遍。
+    summary: str
+    #: 有药要在一周内用完时非空，例如「降压药还能吃大约 5 天」。
+    stockWarning: str | None = None
+
+
+class AppPendingMedication(StrictModel):
+    id: str
+    name: str
+    doseText: str
+    times: list[str]
+    addedAt: str
+
+
+class AppPendingMedicationList(StrictModel):
+    items: list[AppPendingMedication]
+    count: int
+    message: str
+
+
+class AppMedicationDecided(StrictModel):
+    ok: bool
+    id: str
+    name: str
+    active: bool
+    message: str
+
+
+class AppDoseRecorded(StrictModel):
+    ok: bool
+    planId: str
+    scheduledAt: str
+    status: str
+    message: str
+    #: 记「吃了」会扣库存，所以这里回最新的剩余天数，界面不用再拉一次。
+    daysRemaining: int | None = None
+    #: 这一格之前已经记过了——第二次点不算失败，但也不重复扣库存。
+    alreadyRecorded: bool = False
+
+
 class AppAgendaNext(StrictModel):
     time: str
     title: str
@@ -377,12 +471,28 @@ class AppHealthRecorded(StrictModel):
     message: str
 
 
+class AppEscalationContact(StrictModel):
+    """接力名单上的一个人。号码是**打码**的——这一屏不该把完整号码摆出来。"""
+    name: str
+    #: 家人 / 社区。界面显示这个，不是 `family`/`community`。
+    role: str
+    contact: str
+    #: 越小越先联系。来自 `safety_contacts_v4.priority`。
+    priority: int
+
+
 class AppEmergencyResult(StrictModel):
     ok: bool
     status: str
     #: 真的被通知到的人。空表示**没有任何人被通知**——那时 `message` 会让他打 120。
     notified: list[str]
     message: str
+    #: 安全策略给出的接力名单。此前这一层完全不看策略，于是社区网格员
+    #: 永远不在名单里——而「家人没接就升级到社区」正是那份策略存在的理由。
+    escalation: list[AppEscalationContact] = []
+    #: 策略说要通知社区、并且确实有社区联系人。**不表示已经联系了社区**：
+    #: 这个原型不自动拨号，v4 那一侧同样只是「准备好」。
+    communityPrepared: bool = False
 
 
 __all__ = [name for name in dir() if name.startswith("App")]

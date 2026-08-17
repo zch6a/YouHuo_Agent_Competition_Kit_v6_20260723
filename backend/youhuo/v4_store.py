@@ -18,6 +18,7 @@ from .v4_models import (
     DeviceRegisterRequest,
     DoseRecord,
     DoseRecordRequest,
+    DoseStatus,
     EmotionAnalysis,
     EmotionEvent,
     HealthEventCreate,
@@ -976,6 +977,34 @@ class V4FeatureStore:
             raise ValueError("该时间点的服药记录已存在。") from exc
         self.db.append_audit(family_id, actor_id, "MEDICATION_DOSE_RECORDED", plan_id, {"status": record.status.value})
         return record
+
+    def list_doses(self, family_id: str, elder_id: str, start: date, end: date) -> list[DoseRecord]:
+        """这段日期内**逐条**的服药记录。
+
+        `medication_adherence` 给的是汇总数（吃了几次、漏了几次）。老人那一屏要的是
+        「早上八点那次吃了没」——按计划和时间点逐格显示。用汇总数拼不出来：
+        两片药各一次、吃了一次，汇总说 taken=1，但说不出是哪一片。
+        """
+        plan_ids = [plan.id for plan in self.list_medication_plans(family_id, elder_id)]
+        if not plan_ids:
+            return []
+        placeholders = ",".join("?" for _ in plan_ids)
+        rows = self.conn.execute(
+            f"""SELECT * FROM medication_doses_v4 WHERE plan_id IN ({placeholders})
+                AND scheduled_at>=? AND scheduled_at<? ORDER BY scheduled_at""",
+            [*plan_ids, f"{start.isoformat()}T00:00:00+00:00",
+             f"{(end + timedelta(days=1)).isoformat()}T00:00:00+00:00"],
+        ).fetchall()
+        return [
+            DoseRecord(
+                id=row["id"], plan_id=row["plan_id"],
+                scheduled_at=datetime.fromisoformat(row["scheduled_at"]),
+                status=DoseStatus(row["status"]),
+                recorded_at=datetime.fromisoformat(row["recorded_at"]),
+                note=row["note"] or "",
+            )
+            for row in rows
+        ]
 
     def medication_adherence(self, family_id: str, elder_id: str, start: date, end: date) -> dict[str, Any]:
         plans = self.list_medication_plans(family_id, elder_id)

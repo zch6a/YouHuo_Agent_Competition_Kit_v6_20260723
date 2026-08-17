@@ -47,13 +47,17 @@ from .app_schemas import (
     AppCertificate,
     AppContact,
     AppContactList,
+    AppDoseRecorded,
     AppEmergencyResult,
     AppHealthRecorded,
     AppHealthSummary,
+    AppMedicationDecided,
+    AppMedicationToday,
     AppNotificationList,
     AppNotificationRead,
     AppPaymentMoved,
     AppPaymentPrepared,
+    AppPendingMedicationList,
     AppProfile,
     AppRecordList,
     AppReminderChanged,
@@ -66,7 +70,7 @@ from .app_schemas import (
     AppWaterBill,
 )
 from .security import SafetyPolicy
-from .utils import request_fingerprint, semantic_hash
+from .utils import local_now, local_zone, request_fingerprint, semantic_hash
 from .models import (
     ActorRole,
     AuthContext,
@@ -122,6 +126,7 @@ _EV_CONTACT_PHONE_SET = "app.contact.phone_set"
 _EV_HEALTH_RECORDED = "app.health.recorded"
 _EV_REMINDER_MOVED = "app.reminder.moved"
 _EV_APPOINTMENT_CANCELLED = "app.appointment.cancelled"
+_EV_MEDICATION_DECIDED = "app.medication.decided"
 
 
 def _yuan(cents: int) -> str:
@@ -1098,6 +1103,16 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         "app.health.recorded": ("记了一次身体数据", "健康", "record_confirm"),
         "app.reminder.moved": ("改了提醒的时间", "健康", "record_confirm"),
         "app.appointment.cancelled": ("取消了一次就医安排", "健康", "record_confirm"),
+        "app.medication.decided": ("确认了一份用药计划", "健康", "record_confirm"),
+        # 服药记录由 `v4_store.record_dose` 自己写（大写下划线那一批）。
+        # 这一层不重复写一条：同一件事在记录页出现两行，看起来像吃了两次。
+        "MEDICATION_DOSE_RECORDED": ("记了一次服药", "健康", "record_confirm"),
+        "MEDICATION_PLAN_DECIDED": ("确认了一份用药计划", "健康", "record_confirm"),
+        "MEDICATION_PLAN_PROPOSED": ("家人加了一份用药计划", "健康", "record_family"),
+        # 登录本身对老人没意义，但它**已经在**审计链里，而记录页读的就是审计链。
+        # 不给它名字，它就以「办了一件事」出现在时间线上——看起来像个缺陷。
+        # 不删（这一层不该决定审计链里少一条），给它一句能读懂的话。
+        "DEMO_LOGIN": ("登录了优活", "服务", "record_request"),
     }
 
     _OUTCOME_WORDS = {
@@ -1486,12 +1501,47 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                 recent_sos = True
                 break
 
+        # 按**安全策略**取接力名单，而不是自己拍一个。
+        #
+        # 这一层原先完全不看 `safety_policies_v4`：它只找家庭成员发一条通知，
+        # 于是社区网格员永远不在名单里——而「家人没接就升级到社区」正是那份
+        # 策略存在的理由，`notify_community` 这个开关也就从来没有被读过。
+        # 同一个 App 里两套 SOS，其中一套绕开了产品自己的安全策略。
+        #
+        # 和 v4 那一侧对齐的一点：**不声称已经联系了社区**。那一侧也只是
+        # `community_escalation_prepared`——这个原型不自动拨号。
+        escalation: list[dict[str, Any]] = []
+        community_prepared = False
+        try:
+            policy = v4_store.get_safety_policy(ctx.family_id, _elder_of(ctx))
+            contacts = v4_store.safety_contacts(
+                ctx.family_id, _elder_of(ctx),
+                include_community=bool(policy.get("notify_community")),
+            )
+            for row in contacts:
+                role = str(row.get("contact_role") or "")
+                if role == "community":
+                    community_prepared = True
+                escalation.append({
+                    "name": str(row.get("name") or ""),
+                    "role": "社区" if role == "community" else "家人",
+                    # 已经打过码的那一列。这一屏不该出现完整号码。
+                    "contact": str(row.get("address_masked") or ""),
+                    "priority": int(row.get("priority") or 99),
+                })
+        except Exception:      # noqa: BLE001 —— 名单取不到不能让呼叫本身失败
+            escalation, community_prepared = [], False
+
         db.append_audit(
             family_id=ctx.family_id,
             actor_id=ctx.actor_id,
             event_type=_EV_SOS,
             entity_id=f"sos-{uuid.uuid4().hex[:10]}",
-            payload={"source": (body or {}).get("source", "elder-app")},
+            payload={
+                "source": (body or {}).get("source", "elder-app"),
+                "community_escalation_prepared": community_prepared,
+                "escalation_count": len(escalation),
+            },
         )
 
         # **真的把家人叫起来。**
@@ -1546,12 +1596,21 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             message = "已经记下这次呼叫，正在联系" + "、".join(notified) + "。"
         else:
             message = "已经记下这次呼叫。这个家庭还没有登记可以联系的家人，请直接拨打 120。"
+        if community_prepared:
+            # 措辞上**不说已经联系了社区**。名单上有，和已经打过，是两件事，
+            # 而这个原型不自动拨号。说成后者，是在紧急场景里给一个假保证。
+            message += "家人要是没接，社区网格员也在名单上。"
         return {
             "ok": True,
             "status": "contacting",
             "notified": notified,
             # 说的话要跟着实际发生的事走：真发出去了才说"正在联系"。
             "message": message,
+            # 顺序来自 `safety_contacts` 的 `ORDER BY priority`，这里不再排一遍：
+            # 变异证明那句 `sorted()` 永远改变不了任何结果——一行改不动东西的
+            # 代码，下次读它的人会以为顺序是这里定的，然后去改错地方。
+            "escalation": escalation,
+            "communityPrepared": community_prepared,
         }
 
     # ---- 提醒：用药 / 就医 / 其他 -------------------------------------------
@@ -1748,6 +1807,303 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             "status": "待进行",
             "message": f"改好了，{due.strftime('%H:%M')} 提醒您{title}。",
         }
+
+    # ---- 用药 ---------------------------------------------------------------
+    #
+    # 这一层此前只有「用药提醒」——一条到点响的提醒。而「今天这几次吃了没」
+    # 「药还能吃几天」是另一回事，v4 早就做完了（计划、库存推算、服药记录），
+    # 只是没有老人端入口。产品自己的帮助词已经在承诺这两件事：
+    # 「查今天的药吃了没和药还剩多少」。
+    #
+    # **只读和记录，不建计划、不改剂量。** `create_medication_plan` 对 ELDER
+    # 角色建的计划直接 `active=True`——把它接到老人端，等于老人可以自己给自己
+    # 开一份用药计划并立刻生效。产品在话术里已经划过这条线。
+
+    _STOCK_WORDS = {"normal": "充足", "warning": "一周内用完",
+                    "critical": "快吃完了", "unknown": "不清楚"}
+    _DOSE_WORDS = {"taken": "已服用", "skipped": "没吃", "missed": "漏服"}
+
+    def _forecast(plan):
+        """这份计划还能吃几天。v4 的 `InventoryService` 算，这里不另写一套。"""
+        from .v4_services import InventoryService
+
+        return InventoryService.forecast(
+            plan_id=plan.id,
+            stock_units=plan.stock_units,
+            units_per_dose=plan.units_per_dose,
+            doses_per_day=len(plan.times_local),
+            today=local_now(datetime.now(UTC)).date(),
+        )
+
+    def _slot_at(day, hhmm: str) -> datetime:
+        """把计划里的「08:00」变成那一天当地八点对应的 UTC 时刻。
+
+        计划里的时间是**墙上时间**。直接当 UTC 用的话，东八区的早八点会记成
+        下午四点——落到第二天的窗口里去，于是「今天吃了没」永远查不到刚记的那条。
+        """
+        hour, _, minute = hhmm.partition(":")
+        local = datetime.combine(day, datetime.min.time(), tzinfo=local_zone())
+        local = local.replace(hour=int(hour), minute=int(minute or 0))
+        return local.astimezone(UTC)
+
+    def _today_doses(ctx: AuthContext):
+        """今天的每一格 + 每份计划的库存，一次算完。
+
+        读与记录两个端点都要这份数据，分开算迟早有一处的时区或状态映射走样。
+        """
+        today = local_now(datetime.now(UTC)).date()
+        plans = [p for p in v4_store.list_medication_plans(ctx.family_id, _elder_of(ctx)) if p.active]
+        # 窗口按当地一天取。传当地日期给按 UTC 比较的 SQL 会漏掉当地深夜那几格，
+        # 所以前后各放一天，再按当地日期筛回来。
+        recorded = v4_store.list_doses(
+            ctx.family_id, _elder_of(ctx), today - timedelta(days=1), today + timedelta(days=1)
+        )
+        by_slot = {}
+        for d in recorded:
+            when = d.scheduled_at if d.scheduled_at.tzinfo else d.scheduled_at.replace(tzinfo=UTC)
+            by_slot[(d.plan_id, when.astimezone(UTC).isoformat())] = d
+
+        doses = []
+        for plan in plans:
+            for hhmm in plan.times_local:
+                slot = _slot_at(today, hhmm)
+                hit = by_slot.get((plan.id, slot.isoformat()))
+                doses.append({
+                    "planId": plan.id,
+                    "name": plan.display_name,
+                    "doseText": plan.dose_text,
+                    "time": hhmm,
+                    "status": _DOSE_WORDS.get(hit.status.value, "待服用") if hit else "待服用",
+                    "pending": hit is None,
+                    "scheduledAt": slot.isoformat(),
+                })
+        doses.sort(key=lambda d: d["time"])
+        return today, plans, doses
+
+    def _plan_views(plans):
+        views = []
+        for plan in plans:
+            f = _forecast(plan)
+            days = getattr(f, "days_remaining", None)
+            depletion = getattr(f, "estimated_depletion_date", None)
+            views.append({
+                "id": plan.id,
+                "name": plan.display_name,
+                "doseText": plan.dose_text,
+                "times": list(plan.times_local),
+                "daysRemaining": int(days) if days is not None else None,
+                "depletionDate": depletion.isoformat() if depletion else None,
+                "stockLabel": _STOCK_WORDS.get(f.alert_level, "不清楚"),
+                "alertLevel": f.alert_level,
+                "stockUnits": float(plan.stock_units),
+            })
+        return views
+
+    @router.get("/medications")
+    def medications_today(ctx: AuthContext = Depends(_actor)) -> AppMedicationToday:
+        """今天该吃什么、吃了没、还能吃几天。
+
+        `summary` 那句话是照 `care_voice.answer_medication_today` 的口径写的，
+        包括最后那半句「我只能看到记录」——**没有记录不等于没吃**，
+        这一层不许把「查不到」说成「您没吃」。
+        """
+        today, plans, doses = _today_doses(ctx)
+        views = _plan_views(plans)
+        planned = len(doses)
+        taken = sum(1 for d in doses if d["status"] == "已服用")
+        # 「还差几次」数的是**没有记录**的那些，不是「planned - taken」。
+        # 记成「没吃」的那一格是有记录的，它不该被算进「还差」——
+        # 三格全记过、其中一格没吃时，那个减法会说「还差1次」，
+        # 于是老人去找一次并不存在的药。
+        pending = sum(1 for d in doses if d["pending"])
+
+        if not plans:
+            summary = "您现在没有登记在册的用药计划。要登记的话，可以让家人在家属端添加。"
+        elif planned == 0:
+            summary = "您的用药计划还没有家人确认，暂时不用按它吃药。"
+        elif pending == 0 and taken >= planned:
+            summary = f"今天该吃的{planned}次药都记上了，您已经吃完了。"
+        elif pending == 0:
+            summary = f"今天该吃的{planned}次都记好了，其中{planned - taken}次记的是没吃。"
+        elif taken == 0 and pending == planned:
+            times = "、".join(sorted({d["time"] for d in doses}))
+            summary = f"今天还没有服药记录。按计划要吃{planned}次，时间是{times}。"
+        else:
+            summary = f"今天计划吃{planned}次，已经记下{planned - pending}次，还差{pending}次。"
+        if plans:
+            summary += " 我只能看到记录，如果您吃了但没记，可以让家人补一条。"
+
+        # 一周内会用完的，单独给一句——库存这件事埋在列表里老人看不见。
+        low = [v for v in views if v["alertLevel"] in ("warning", "critical")]
+        low.sort(key=lambda v: v["daysRemaining"] if v["daysRemaining"] is not None else 10**6)
+        warning = None
+        if low:
+            head = low[0]
+            if head["daysRemaining"] is not None:
+                warning = f"{head['name']}还能吃大约{head['daysRemaining']}天，方便时补一下。"
+            else:
+                warning = f"{head['name']}的库存算不出能吃几天，麻烦家人核对一下。"
+
+        return {
+            "doses": doses,
+            "plans": views,
+            "plannedCount": planned,
+            "takenCount": taken,
+            "pendingCount": pending,
+            "summary": summary,
+            "stockWarning": warning,
+        }
+
+    def _record_dose(ctx: AuthContext, plan_id: str, body: dict[str, Any] | None, status_value: str):
+        body = body or {}
+        today, plans, doses = _today_doses(ctx)
+        plan = next((p for p in plans if p.id == plan_id), None)
+        if plan is None:
+            raise HTTPException(status_code=404, detail="没有找到这份用药计划。")
+
+        raw = str(body.get("scheduledAt") or body.get("time") or "").strip()
+        if raw:
+            slot = next((d for d in doses if d["planId"] == plan_id
+                         and raw in (d["scheduledAt"], d["time"])), None)
+            if slot is None:
+                raise HTTPException(status_code=400, detail="今天这份药没有这个时间点。")
+        else:
+            # 没指定就取**今天还没记的最早一格**。老人按的是「吃了」这个动作，
+            # 不该要求他先选是哪一次。都记过了才报错——那时再默默记一条，
+            # 记的就是一件没发生的事。
+            slot = next((d for d in doses if d["planId"] == plan_id and d["pending"]), None)
+            if slot is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"今天{plan.display_name}该吃的都记过了。",
+                )
+
+        if not slot["pending"]:
+            # 同一格再点一次：不重复扣库存，也不当成失败。
+            fresh = next((v for v in _plan_views(plans) if v["id"] == plan_id), None)
+            return {
+                "ok": True,
+                "planId": plan_id,
+                "scheduledAt": slot["scheduledAt"],
+                "status": slot["status"],
+                "message": f"{slot['time']}这次已经记过「{slot['status']}」了。",
+                "daysRemaining": fresh["daysRemaining"] if fresh else None,
+                "alreadyRecorded": True,
+            }
+
+        from .v4_models import DoseRecordRequest, DoseStatus
+
+        # 构造放在 try **外面**。放里面的话 Pydantic 的校验错会被下面那个
+        # `except ValueError` 吞成 409「已经记过了」——实测过一次：`note=""`
+        # 触发了「不能为空」的校验器，端点回的却是「这一格记过了」，
+        # 而那一格根本还没记。不填 note 就别传，它有默认值。
+        request = DoseRecordRequest(
+            scheduled_at=datetime.fromisoformat(slot["scheduledAt"]),
+            status=DoseStatus(status_value),
+        )
+        try:
+            v4_store.record_dose(ctx.family_id, ctx.actor_id, plan_id, request)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            # 表上 `UNIQUE(plan_id, scheduled_at)`。上面已经挡过一次，
+            # 走到这里说明两个请求同时进来了——仍然不是失败。
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+        after = v4_store.get_medication_plan(plan_id)
+        fresh = _plan_views([after])[0] if after else None
+        word = _DOSE_WORDS[status_value]
+        message = f"记下了，{slot['time']}的{plan.display_name}{word}。"
+        if status_value == "taken" and fresh and fresh["alertLevel"] in ("warning", "critical"):
+            message += f"这个药还能吃大约{fresh['daysRemaining']}天，方便时补一下。"
+        return {
+            "ok": True,
+            "planId": plan_id,
+            "scheduledAt": slot["scheduledAt"],
+            "status": word,
+            "message": message,
+            "daysRemaining": fresh["daysRemaining"] if fresh else None,
+            "alreadyRecorded": False,
+        }
+
+    @router.post("/medications/{plan_id}/taken")
+    def record_taken(plan_id: str, body: dict[str, Any] | None = None,
+                     ctx: AuthContext = Depends(_actor)) -> AppDoseRecorded:
+        """记一次「吃了」。会扣库存。"""
+        return _record_dose(ctx, plan_id, body, "taken")
+
+    @router.post("/medications/{plan_id}/skipped")
+    def record_skipped(plan_id: str, body: dict[str, Any] | None = None,
+                       ctx: AuthContext = Depends(_actor)) -> AppDoseRecorded:
+        """记一次「没吃」。**不扣库存**——药还在。"""
+        return _record_dose(ctx, plan_id, body, "skipped")
+
+    # ---- 家人加的药，等老人点头 -------------------------------------------
+    #
+    # `create_medication_plan` 对 FAMILY 角色建的计划是 `active=False`，
+    # 而 `/v4/medications/decide` **只允许老人本人**调用
+    # （`v4_api.py:342`「只有老人本人可以激活家属补充的用药计划」）。
+    #
+    # 也就是说这条流程按设计必须由老人这一端完成，而老人这一端此前没有入口：
+    # 女儿在家属端加了一份钙片，它就永远停在待确认，老人看不见、也点不了同意，
+    # 而且**不报任何错**——两边界面都正常。
+
+    @router.get("/medications/pending")
+    def pending_medications(ctx: AuthContext = Depends(_actor)) -> AppPendingMedicationList:
+        """家人加了、还等着您点头的用药计划。"""
+        rows = [p for p in v4_store.list_medication_plans(ctx.family_id, _elder_of(ctx))
+                if not p.active]
+        items = [{
+            "id": p.id,
+            "name": p.display_name,
+            "doseText": p.dose_text,
+            "times": list(p.times_local),
+            "addedAt": p.created_at.isoformat(),
+        } for p in rows]
+        return {
+            "items": items,
+            "count": len(items),
+            "message": ("家里人给您加了" + "、".join(i["name"] for i in items)
+                        + "，您看要不要开始吃。") if items else "没有等您确认的用药计划。",
+        }
+
+    def _decide_plan(ctx: AuthContext, plan_id: str, approve: bool) -> dict[str, Any]:
+        plan = v4_store.get_medication_plan(plan_id)
+        if plan is None or plan.family_id != ctx.family_id or plan.elder_id != _elder_of(ctx):
+            raise HTTPException(status_code=404, detail="没有找到这份用药计划。")
+        if plan.active:
+            # 已经同意过的再点一次不算失败——但也不能说成「刚刚同意了」。
+            return {"ok": True, "id": plan_id, "name": plan.display_name,
+                    "active": True, "message": f"{plan.display_name}之前已经确认过了。"}
+        try:
+            after = v4_store.approve_medication_plan(ctx.family_id, _elder_of(ctx), plan_id, approve)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_MEDICATION_DECIDED,
+            entity_id=plan_id,
+            payload={"approved": approve, "name": plan.display_name},
+        )
+        return {
+            "ok": True,
+            "id": plan_id,
+            "name": plan.display_name,
+            "active": bool(after.active),
+            "message": (f"好，{plan.display_name}从今天开始按计划吃。" if approve
+                        else f"好，{plan.display_name}先不吃，我把它取消了。"),
+        }
+
+    @router.post("/medications/{plan_id}/approve")
+    def approve_medication(plan_id: str, ctx: AuthContext = Depends(_actor)) -> AppMedicationDecided:
+        """同意开始吃这份药。"""
+        return _decide_plan(ctx, plan_id, True)
+
+    @router.post("/medications/{plan_id}/decline")
+    def decline_medication(plan_id: str, ctx: AuthContext = Depends(_actor)) -> AppMedicationDecided:
+        """先不吃。计划会被删掉，家人可以重新加。"""
+        return _decide_plan(ctx, plan_id, False)
 
     @router.post("/appointments/{appointment_id}/cancel")
     def cancel_appointment(
