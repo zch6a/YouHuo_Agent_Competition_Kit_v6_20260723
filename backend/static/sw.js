@@ -18,10 +18,17 @@
 //: `task-detail.js`。不升这个字符串，已安装的设备会继续用 v8 那份**缺两个模块**
 //: 的清单——而 `elder.js` 是 `type="module"`，一个 import 取不到就是整个模块图
 //: 一起失败，离线的老人端不是降级而是白屏。
-: v10 → v11：加了美术卡片层（`art-cards.css` + `art-cards.js`，family/care/trust
-: 三页都引）。不升这个字符串，已安装的设备会继续用 v10 那份缺两个文件的清单——
-: 缺 JS 是整页白屏，缺 CSS 是卡壳图层没有定位规则，SVG 会以原始尺寸铺满全页。
-const VERSION = 'youhuo-shell-v11';
+//: v10 → v11：加了美术卡片层（`art-cards.css` + `art-cards.js`，family/care/trust
+//: 三页都引）。不升这个字符串，已安装的设备会继续用 v10 那份缺两个文件的清单——
+//: 缺 JS 是整页白屏，缺 CSS 是卡壳图层没有定位规则，SVG 会以原始尺寸铺满全页。
+//:
+//: ⚠ 上面这三行我第一次写的时候漏了 `//`，只写了 `: v10 → v11…`。
+//: 后果不是「注释格式不好看」——**整个文件语法错误，service worker 从此没装上过**。
+//: `register-sw.js` 结尾是 `.catch(() => {})`，把 `ServiceWorker script evaluation
+//: failed` 完整吃掉，控制台一声不响。浏览器里 `getRegistrations()` 返回 0，
+//: 离线外壳没有、PWA 装不上，而这个文件里每一句关于缓存版本的话都成了空话。
+//: `node --check backend/static/sw.js` 一秒能查出来，而它此前不在任何门里。
+const VERSION = 'youhuo-shell-v12';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:

@@ -77,6 +77,12 @@
     img.setAttribute('aria-hidden', 'true');
     img.setAttribute('role', 'presentation');
     img.decoding = 'async';
+    // **必须 lazy。** 这些素材单张 2–7 MB，而挂载点里有相当一部分在
+    // `hidden` 的分区里（老人端「记录」「家人」两格、家人端「我的」那一段）。
+    // 不设 lazy 的话它们在首屏就全下：实测 `/elder` 一进来拉 10.09 MB，
+    // 其中 6.96 MB 是两个还没打开的分区的。
+    // 这个 worker 自己的注释写着目标是「移动数据下也能用」。
+    img.loading = 'lazy';
     img.draggable = false;
     return img;
   }

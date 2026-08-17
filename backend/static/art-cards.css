@@ -231,6 +231,27 @@
   padding: 0;
 }
 
+/* **最后一个子元素进第三栏。**
+   第一版把所有非图标子元素都钉在第 2 栏，于是真实的箭头 `<span>` 落到
+   文字**下面**而不是右边。`care.html` 躲过了这个坑纯属侥幸——它的箭头是
+   `::after` 伪元素，不算子元素。`/app` 那批用的是真 `<span>`，就露馅了。
+
+   判据用 `:nth-last-child(1)` 而不是 `:last-child`：图标是 `prepend` 进来的，
+   永远在最前，所以最后一个一定是内容侧的收尾元素。
+   只有两个以上内容子元素时才生效——只有一段文字的行不该被拆栏。 */
+.art-row > :not(.art-scene):nth-last-child(1):not(:nth-child(2)) {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* 行自己画边框，宿主上的内联 `border:0` 会把金线抹掉。
+   这不是假设：`/app` 那批行原本带着 `style="border:0"`（旧组件需要它），
+   套上 `.art-row` 之后那行金线就没了，而卡片看起来只是「淡了一点」。 */
+.art-row[style*="border:0"],
+.art-row[style*="border: 0"] {
+  border: 1px solid rgba(190, 158, 96, .5);
+}
+
 /* 行尾那个箭头是绝对定位的，让它待在第三栏的位置上。 */
 .art-row.trust-more-link::after { right: 16px; }
 
