@@ -509,7 +509,9 @@ def test_a_cancelled_reminder_leaves_todays_agenda(client: TestClient) -> None:
     **阳性对照在前**：先证明它确实进过「接下来」，否则「取消后不见了」
     可能只是因为它从来没在过。
     """
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, datetime
+
+    from youhuo.utils import local_now, local_zone
 
     # 先把当天已有的未办事项清空。
     #
@@ -522,8 +524,20 @@ def test_a_cancelled_reminder_leaves_todays_agenda(client: TestClient) -> None:
             client.post(f"{V1}/reminders/{item['id']}/done")
     assert client.get(f"{V1}/agenda").json()["next"] is None, "清空没生效，下面的对照不成立"
 
-    soon = (datetime.now(UTC) + timedelta(minutes=45)).isoformat()
-    rid = client.post(f"{V1}/reminders", json={"title": "吃钙片", "at": soon}
+    # 「45 分钟后」还是按钟点变——只是换了一个钟点会红。
+    #
+    # `/agenda` 按**当地日期**筛（时区那一轮改的）。本地 23:22 跑的时候，
+    # 45 分钟后是当地第二天 00:07，于是这一条压根不在今天的日程里，
+    # 阳性对照 `next is None`，测试红。第二次栽在同一类问题上。
+    #
+    # 现在锚在**当地今天 00:30**：任何钟点跑都落在今天，而且一定是最早的一条。
+    # 「接下来」的定义是「今天还没做的第一件」，不要求它在未来——
+    # 已经过点的那条会带 `overdue`，但仍然是接下来要办的。
+    today_local = local_now(datetime.now(UTC)).date()
+    anchor = datetime.combine(today_local, datetime.min.time(), tzinfo=local_zone())
+    anchor = anchor.replace(hour=0, minute=30)
+    rid = client.post(f"{V1}/reminders",
+                      json={"title": "吃钙片", "at": anchor.astimezone(UTC).isoformat()}
                       ).json()["item"]["id"]
     nxt = client.get(f"{V1}/agenda").json()["next"]
     assert nxt and nxt["title"] == "吃钙片", "阳性对照不成立，下面那条断言没有意义"
