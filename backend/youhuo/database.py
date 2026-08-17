@@ -333,7 +333,12 @@ class Database:
                 (ids.family_id, "优活示范家庭"),
             )
             for actor_id, role, name in (
-                (ids.elder_id, "elder", "王奶奶"),
+                # 名字跟着头像走。`app/art/png/avatar.png` 与
+                # `profile_avatar_large.png` 是同一位老先生，而演示里这个名字
+                # 会出现在「我的」「我的资料」和每一张凭证上——名字和照片对不上，
+                # 是评委第一眼就会看到的东西。这套素材只有这一张人像，
+                # 所以改名字，不是改图。
+                (ids.elder_id, "elder", "王爷爷"),
                 (ids.daughter_id, "family", "女儿"),
                 (ids.son_id, "family", "儿子"),
                 (ids.system_id, "system", "优活系统"),
@@ -489,6 +494,60 @@ class Database:
         return AuthContext(
             actor_id=row["id"], family_id=row["family_id"], role=ActorRole(row["role"]), display_name=row["display_name"]
         )
+
+    def list_bills(self, family_id: str) -> list[sqlite3.Row]:
+        """这个家庭的全部账单。
+
+        原先没有这个方法，于是 `/api/v1` 只能暴露**一张写死的水费**
+        （`app_api._WATER_BILL`）——而库里其实躺着三张（水费 68.40、电费 126.50、
+        燃气费 52.30）。前端那张「我的账单」于是永远只有一件事可办。
+        未付的排前面，同组按到期日——快到期的先看到。
+        """
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM bills WHERE family_id=? ORDER BY paid ASC, due_date ASC",
+                (family_id,),
+            ).fetchall()
+
+    def get_bill(self, bill_id: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute("SELECT * FROM bills WHERE id=?", (bill_id,)).fetchone()
+
+    def list_appointments(self, family_id: str, elder_id: str | None = None) -> list[sqlite3.Row]:
+        """就医安排。表和 `insert_appointment` 一直都在，**没有任何地方读它**。"""
+        sql = "SELECT * FROM appointments WHERE family_id=?"
+        args: list[Any] = [family_id]
+        if elder_id:
+            sql += " AND elder_id=?"
+            args.append(elder_id)
+        sql += " ORDER BY appointment_date ASC, appointment_time ASC"
+        with self._lock:
+            return self._conn.execute(sql, tuple(args)).fetchall()
+
+    def mark_notification_read(self, notification_id: str, family_id: str, when: datetime) -> bool:
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE notifications SET read_at=? WHERE id=? AND family_id=? AND read_at IS NULL",
+                (iso(when), notification_id, family_id),
+            )
+            return cur.rowcount > 0
+
+    def first_audit_at(self, family_id: str) -> datetime | None:
+        """这个家庭最早那条审计的时间——「优活陪伴您 N 天」的**真实**依据。
+
+        `families` 表没有建档日期，所以此前 `/profile` 的 `days` 只能回 null。
+        审计链的第一条就是这份记录的开端，那是真数据，不是编的。
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT MIN(created_at) FROM audit_events WHERE family_id=?", (family_id,)
+            ).fetchone()
+        if not row or not row[0]:
+            return None
+        try:
+            return datetime.fromisoformat(str(row[0]).replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
     def list_actors(self, family_id: str) -> list[sqlite3.Row]:
         """一个家庭里的所有成员。

@@ -235,6 +235,11 @@
     show("faApproveHint", waiting);
     show("faLater", waiting);
     show("faCert", done);
+
+    // 那枚金印上烤着「交易成功」四个字（`cert_gold_seal.png` 里画着的，
+    // 不是页面上的文字）。它原先无条件铺在这一屏上——而这一屏正是您还在决定
+    // 同不同意的时候。所以它跟着状态走：真办好了才露面。
+    if (window.setSuccessSeal) window.setSuccessSeal(done);
   }
 
   function renderEmpty() {

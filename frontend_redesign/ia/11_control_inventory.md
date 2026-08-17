@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 314 |
+| 总数 | 316 |
 |---|---|
-| 有 id | 314 |
+| 有 id | 316 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 16 |
@@ -321,6 +321,8 @@
 | `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
 | `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
 | `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#voiceInput` | app/pages/voice-listening | — | input | — | app/assets/js/speech.js:showTyping | — | consumer | app | shell | hidden-until-state |
+| `#voiceSend` | app/pages/voice-listening | — | button | click | app/assets/js/speech.js:stop | — | consumer | app | shell | hidden-until-state |
 | `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
 | `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
 | `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |

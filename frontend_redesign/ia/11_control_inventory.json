@@ -1,5 +1,5 @@
 {
-  "count": 314,
+  "count": 316,
   "controls": [
     {
       "key": "href=/elder",
@@ -5532,7 +5532,7 @@
       "key": "data-action=voice-start",
       "id": "",
       "tag": "button",
-      "text": "",
+      "text": "我听到的是",
       "source_file": "app/pages/voice-listening.html",
       "route": "/app",
       "panel": "",
@@ -5544,6 +5544,42 @@
       "handler_file": "app/assets/js/app.js",
       "handler": "hydrate",
       "interaction_type": "",
+      "apis": []
+    },
+    {
+      "key": "id=voiceInput",
+      "id": "voiceInput",
+      "tag": "input",
+      "text": "",
+      "source_file": "app/pages/voice-listening.html",
+      "route": "/app",
+      "panel": "",
+      "hidden": true,
+      "surface": "consumer",
+      "shell": "app",
+      "module": "shell",
+      "visibility": "hidden-until-state",
+      "handler_file": "app/assets/js/speech.js",
+      "handler": "showTyping",
+      "interaction_type": "",
+      "apis": []
+    },
+    {
+      "key": "id=voiceSend",
+      "id": "voiceSend",
+      "tag": "button",
+      "text": "说给它",
+      "source_file": "app/pages/voice-listening.html",
+      "route": "/app",
+      "panel": "",
+      "hidden": true,
+      "surface": "consumer",
+      "shell": "app",
+      "module": "shell",
+      "visibility": "hidden-until-state",
+      "handler_file": "app/assets/js/speech.js",
+      "handler": "stop",
+      "interaction_type": "click",
       "apis": []
     },
     {

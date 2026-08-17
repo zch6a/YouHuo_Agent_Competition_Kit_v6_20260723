@@ -34,6 +34,37 @@
 
 ## P2
 
+### -1. 那 87 张美术素材里，有十来张烤着界面文字的残留
+
+**在哪** `backend/static/app/art/png/`。
+
+**什么样** 把 87 张拼成一张联络表看了一眼就看出来了——不是搜出来的，是**看**出来的：
+
+| 素材 | 里面画着 | 用在 |
+|---|---|---|
+| `cert_gold_seal.png` | 绿徽章 +「**交易成功**」+ 对勾 | certificate、family-approve |
+| `scene_tree_left.png` | 「请」 | voice-listening |
+| `scene_pavilion_right.png` | 「听」 | voice-listening |
+| `bill_scene_right.png` | 「息」 | bill-detail |
+| `success_scene_right.png` | 「已」 | payment-success |
+| `cert_scene_left/right`、`confirm_gold_cloud`、`confirm_scene_right`、`bill_safe_mountain_r` | 零星字块 | 各页 |
+
+看起来是从**带界面文字的稿子上裁下来的**，文字用的是和 App 同一款黑体，不是书法。
+
+**其中只有一张是断言，已经修了。** `cert_gold_seal` 上那句「交易成功」原先无条件铺在
+凭证页和**家人确认页**上——后者正是家人还在决定同不同意的那一屏。一笔没批准的钱，
+旁边一张图说它成功了。这和本项目的 P0 是同一件事，只是这次断言画在图里：
+代码里的状态文案早就对了（会显示「等家人确认」），而**所有现有判据都只查文字**，
+所以全绿。
+
+改法是让它跟着状态走（默认 `hidden`，只在 `completed` 时露面），不是改图：
+绿徽章在 y147–181 而金环跨 y56–209，裁不掉、抠掉会在环上留洞。
+`test_art_does_not_claim_success.py` 钉住了这一条。
+
+**其余的没修**：它们出现在山水背景里，是观感问题不是断言。修它们要重做素材，
+而这一批素材过了它自己那套 QC（`data/art_asset_manifest.json` + `ART_QC_REPORT.md`）
+——**那套 QC 没有检查这个**。
+
 ### 0. 山水版老人端只有浅色一种模式
 
 **在哪** `/app` 那十七个页面（`backend/static/app/assets/css/app.css`）。

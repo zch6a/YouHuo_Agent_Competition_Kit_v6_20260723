@@ -362,10 +362,18 @@ document.addEventListener("click",async e=>{const el=e.target.closest("[data-act
 if(a==="nav"){go(el.dataset.to);return}if(a==="back"){history.back();return}
 if(a==="nav-voice"){await YouhuoAPI.post("/voice/sessions",{channel:"elder",entry:"global-nav"});go("listen");return}
 if(a==="voice-start"){
-  // 这一次开的会话**没有话**（没有语音识别，前端拿不到老人说了什么），
-  // 所以引擎不可能理解任何东西。原来这里直接跳「识别结果」，那一页于是
-  // 顶着「我已理解您的需求」+ 一张水费账单——而用户一个字都没说过。
-  // 落到「正在听」：那是这一刻真实的状态。
+  // 「正在听」那一页加载了 `speech.js`，那里有**真的**语音识别——交给它。
+  // 它自己会处理权限被拒、没听到声音、重复按这些情况，并把结果送去识别页。
+  if (window.YouhuoSpeech){ YouhuoSpeech.start(); return; }
+
+  // 别的页面上的话筒（首页那个）：先落到「正在听」，识别在那一页开始。
+  // **不在这里自动开始识别**：跳转之后没有用户手势，浏览器的麦克风权限
+  // 多半会当场拒掉，于是老人第一次用就看到一句「我没有拿到麦克风的许可」——
+  // 而他其实什么都没做错。让他在那一页按一下那个 170px 的大话筒，
+  // 手势是真的，权限框也才有意义。
+  //
+  // 原来这里更糟：直接跳「识别结果」，那一页于是顶着「我已理解您的需求」
+  // 加一张水费账单，而用户一个字都没说过。
   el.classList.add("pulse"); toast("正在听您说话…");
   await YouhuoAPI.post("/voice/sessions",{channel:"elder"});
   setTimeout(()=>go("listen"),650); return;
@@ -503,11 +511,29 @@ const CERT_STATE = {
   cancelled:                 ["已取消",         "#8a8580"],
   failed:                    ["没有办成",       "#c0392b"],
 };
+//: 那枚金印**只在真的办好之后才露面**。
+//:
+//: `cert_gold_seal.png` 里烤着一枚绿徽章，白纸黑字写着「交易成功」（还带对勾）。
+//: 它原先无条件铺在凭证页和**家人确认页**上——后者正是家人还在决定同不同意的
+//: 那一屏。于是一笔没批准的钱，旁边摆着一张图说它成功了。
+//:
+//: 这和刚修过的那条 P0 是同一件事，只是这次断言是**画在图里的**：
+//: 代码里的状态文案改对了，图片照样替它说了反话。所以判据不能只看文字。
+//:
+//: 为什么不改图：绿徽章在 y147–181，而金环跨 y56–209——裁不掉，抠掉会在环上留洞。
+//: 而且「成功的印章在成功之后出现」本来就是对的，不是将就。
+function setSuccessSeal(on){
+  const seal = document.querySelector("#certSuccessSeal");
+  if (seal) seal.hidden = !on;
+}
+window.setSuccessSeal = setSuccessSeal;
+
 function renderCert(cert){
   const box = document.querySelector("#certElements");
   if (!box || !cert) return;
   // 留着给「查看完整凭证」用——那一格要展示整条链，而链只在这一次响应里。
   _certCache = cert;
+  setSuccessSeal(cert.status === "completed");
 
   // 这一页的每一个字都来自这一笔凭证自己。
   //
