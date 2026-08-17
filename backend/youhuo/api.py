@@ -298,6 +298,25 @@ def create_app(
     def elder_app_entry() -> RedirectResponse:
         return RedirectResponse(url="/static/app/pages/home.html")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        """浏览器不管你有没有，每开一页都会去要一次 `/favicon.ico`。
+
+        没有这条路由的后果实测：山水版那十七页（它们不像老六页那样自己声明
+        `<link rel="icon">`）每次加载都在控制台留一条
+        「Failed to load resource: 404」。那不是产品缺陷，但它是**噪音**——
+        而噪音的代价是真错误混在里面看不出来。这一轮扫十七页时，
+        每一页唯一那条「控制台错误」都是它。
+
+        图标复用 PWA 那一套现成的（`manifest.webmanifest` 指的就是这几个），
+        不另做一份，免得哪天换了品牌图只改一处。
+        """
+        return FileResponse(
+            static_dir / "icons" / "icon-192.png",
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
     @app.get("/sw.js", include_in_schema=False)
     def service_worker() -> FileResponse:
         # Must be served from the origin root: a worker's scope cannot rise above
