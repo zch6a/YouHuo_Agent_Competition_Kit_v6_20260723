@@ -275,6 +275,64 @@ def test_the_audit_chain_keeps_the_failed_restatement(client: TestClient) -> Non
     assert len(restatements) == 2, f"念错那一次不见了：{chain}"
 
 
+# ---- 语音会话：整个语音入口 --------------------------------------------------
+#
+# 收口核对时发现这个端点**一条契约测试都没有**——而它是老人说话之后
+# 第一个被打到的地方。补上。
+
+def test_a_session_without_words_understands_nothing(client: TestClient) -> None:
+    """没带话的会话，`understood` 必须是 null。
+
+    这一条直接对应界面上那个 P0：识别页原先顶着「我已理解您的需求」+ 一张水费账单，
+    而用户一个字都没说过。后端这一侧的保证是：**没有话就不产出理解**，
+    前端才有可能不编。
+    """
+    r = client.post(f"{V1}/voice/sessions", json={"channel": "elder"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["understood"] is None, f"没说话却理解出了东西：{body['understood']}"
+    assert body["id"], "会话号都没有"
+    assert body["status"] == "listening"
+
+
+def test_an_utterance_really_goes_through_the_engine(client: TestClient) -> None:
+    """带了话就真的过一遍语义引擎，不是回一句模板。"""
+    r = client.post(f"{V1}/voice/sessions", json={"utterance": "帮我交这个月的水费"}).json()
+    u = r["understood"]
+    assert u, "带了话却没有理解结果"
+    assert u["taskType"] == "bill_payment", f"没认出是缴费：{u['taskType']}"
+    # 回复里要有这一笔的真实金额——模板句里不会有它。
+    assert "68.40" in u["reply"], f"引擎回的不是这个家庭的真实账单：{u['reply']}"
+    assert u["code"]
+
+
+def test_the_engine_refuses_to_start_the_same_bill_twice(client: TestClient) -> None:
+    """引擎自己的防重复。
+
+    第二次说同一件事，回的是「已经在办理或已经完成」——这条守卫原先被前端
+    整个扔掉了（响应没人读），所以老人看不到它。后端这一侧必须先有。
+    """
+    first = client.post(f"{V1}/voice/sessions",
+                        json={"utterance": "帮我交这个月的水费"}).json()["understood"]
+    second = client.post(f"{V1}/voice/sessions",
+                         json={"utterance": "帮我交这个月的水费"}).json()["understood"]
+    assert first["code"] != second["code"], "第二次说同一件事，引擎没有区别对待"
+    assert "重复" in second["reply"] or "已经" in second["reply"], second["reply"]
+
+
+def test_voice_sessions_are_scoped_to_the_family(client: TestClient) -> None:
+    visitor = client.post("/v2/auth/visitor", json={})
+    if visitor.status_code != 200:
+        pytest.skip("这个部署没有访客沙箱")
+    theirs = {"Authorization": "Bearer " + visitor.json()["elder_token"]}
+    mine = client.post(f"{V1}/voice/sessions", json={"utterance": "帮我交这个月的水费"}).json()
+    ours = client.post(f"{V1}/voice/sessions", headers=theirs,
+                       json={"utterance": "帮我交这个月的水费"}).json()
+    assert mine["id"] != ours["id"]
+    # 别的家庭说同一句话，不该被判成「重复」——那意味着它看到了我这一笔。
+    assert (ours["understood"] or {}).get("code") != "duplicate_blocked"
+
+
 # ---- 账单 ------------------------------------------------------------------
 
 def test_every_bill_is_payable_not_just_water(client: TestClient) -> None:
