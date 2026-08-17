@@ -327,6 +327,57 @@ def test_the_legacy_water_route_still_answers(client: TestClient) -> None:
     assert r.json()["type"] == "水费支付"
 
 
+def test_both_bill_endpoints_talk_about_the_same_bill(client: TestClient) -> None:
+    """`/bills/water/current` 和 `/bills` 必须说的是同一张。
+
+    实测过它们**不是**：前者返回硬编码的 `water-current`，后者返回真 id
+    `bill-water-2026-07-demo`。客户端拿前者的 id 去 `GET /bills/{id}` 当场 404——
+    两条路说的是同一件事，id 却对不上。
+    """
+    water = client.get(f"{V1}/bills/water/current").json()
+    listed = next(b for b in client.get(f"{V1}/bills").json()["items"] if b["type"] == "水费")
+    assert water["id"] == listed["id"], f"{water['id']} vs {listed['id']}"
+    assert water["amount"] == listed["amount"]
+    # id 要真的取得到——这才是「同一张」的意思。
+    assert client.get(f"{V1}/bills/{water['id']}").status_code == 200
+
+
+def test_an_unpaid_bill_has_no_payment_time(client: TestClient) -> None:
+    """**这一条是这组里最要紧的。**
+
+    原先 `paidAt` 去扫「任意一笔已完成的缴费事务」取时间，而演示种子里本来就有
+    一笔（`task-seed-bill-demo`）。于是一张**没付的**账单，显示着另一笔交易的
+    支付时间——和凭证页写死「交易成功」是同一类错误：宣称一件没发生的事。
+    """
+    water = client.get(f"{V1}/bills/water/current").json()
+    listed = next(b for b in client.get(f"{V1}/bills").json()["items"] if b["type"] == "水费")
+    assert listed["paid"] is False, "这条判据要求水费一开始是未缴的"
+    assert water["paidAt"] is None, f"没付的账单带着支付时间：{water['paidAt']}"
+
+
+def test_paying_updates_both_endpoints_together(client: TestClient) -> None:
+    _pay_to(client, "done")
+    water = client.get(f"{V1}/bills/water/current").json()
+    listed = next(b for b in client.get(f"{V1}/bills").json()["items"] if b["type"] == "水费")
+    assert listed["paid"] is True
+    assert water["paidAt"], "付完了，老端点还说没付"
+    assert water["id"] == listed["id"]
+
+
+def test_preparing_without_a_bill_id_uses_the_real_water_bill(client: TestClient) -> None:
+    """不指名时用的必须是真表里那张，不是源码里那个编出来的 id。"""
+    listed = next(b for b in client.get(f"{V1}/bills").json()["items"] if b["type"] == "水费")
+    pid = client.post(f"{V1}/payments/prepare", json={}).json()["id"]
+    cert = client.get(f"{V1}/payments/{pid}/certificate").json()
+    assert cert["amount"] == listed["amount"]
+    # 办完之后结掉的必须**就是**那一张。
+    client.post(f"{V1}/payments/{pid}/teach-back", json={"text": f"确认支付 {listed['amount']} 元"})
+    client.post(f"{V1}/payments/{pid}/execute", json={})
+    client.post(f"{V1}/payments/{pid}/family-approve", json={})
+    after = next(b for b in client.get(f"{V1}/bills").json()["items"] if b["id"] == listed["id"])
+    assert after["paid"] is True, "不指名时办的那一笔，没有结掉真表里那张水费"
+
+
 def test_an_unknown_bill_is_a_404_not_a_500(client: TestClient) -> None:
     """顺带守住一件真会发生的事：`/bills/{id}` 不许变成什么都接的兜底。
 

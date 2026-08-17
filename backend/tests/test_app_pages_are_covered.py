@@ -25,6 +25,7 @@ r"""把 `backend/static/app/` 那十个新页面拉进判据网里。
 from __future__ import annotations
 
 import ast
+from functools import lru_cache
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -298,7 +299,66 @@ def _contract(route: str) -> tuple[set[str], set[str]]:
             top |= _dict_keys(node.value)
         if isinstance(node, ast.Dict):
             deep |= _dict_keys(node)
+
+    # 返回**注解**上那个响应模型，才是现在最权威的那份契约。
+    #
+    # 上面那套「抠 `return {...}` 字面量」是在响应模型还不存在的时候写的，
+    # 而它有一个致命的失败方式：一旦某个端点改成 `return _water_view(row)`
+    # （把拼装挪进辅助函数），字面量就没了，`top` 变成空集——
+    # 于是这一页**每一个** `data-bind` 都被判成「后端不会返回这个字段」。
+    # 实测发生过：`/bills/water/current` 改成读真表之后，三个页面共 13 处报红，
+    # 而那些字段一个都没少，`AppWaterBill` 里写得清清楚楚。
+    #
+    # 模型是声明式的、FastAPI 会拿它校验真实响应，比解析函数体可靠得多。
+    # 两者取并集：老写法仍然管用，新写法也不会被误判。
+    model = getattr(fn.returns, "id", None)
+    if model:
+        fields = _model_fields(model)
+        top |= fields
+        deep |= fields
     return top, deep
+
+
+@lru_cache(maxsize=None)
+def _schema_models() -> dict[str, set[str]]:
+    """`app_schemas.py` 里每个模型的字段名。
+
+    照样用 AST（不 import），和这个文件其余部分保持一致：判据不该因为
+    被测代码 import 期间的副作用而变绿或变红。
+    """
+    src = (ROOT / "backend" / "youhuo" / "app_schemas.py").read_text(encoding="utf-8")
+    out: dict[str, set[str]] = {}
+    for node in ast.parse(src).body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        names: set[str] = set()
+        for stmt in node.body:
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                names.add(stmt.target.id)
+        out[node.name] = names
+    return out
+
+
+def _model_fields(name: str, _seen: frozenset[str] = frozenset()) -> set[str]:
+    """一个模型的字段，连同它嵌套引用到的模型的字段。
+
+    嵌套那一层是给 `agenda.next.time` 这种两级路径用的：`next` 的类型是
+    `AppAgendaNext`，`time` 在那里面。`_seen` 防自引用死循环。
+    """
+    models = _schema_models()
+    if name not in models or name in _seen:
+        return set()
+    fields = set(models[name])
+    src = (ROOT / "backend" / "youhuo" / "app_schemas.py").read_text(encoding="utf-8")
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.ClassDef) and node.name == name:
+            for stmt in node.body:
+                if not isinstance(stmt, ast.AnnAssign):
+                    continue
+                for ref in ast.walk(stmt.annotation):
+                    if isinstance(ref, ast.Name) and ref.id.startswith("App"):
+                        fields |= _model_fields(ref.id, _seen | {name})
+    return fields
 
 
 # ---- 判据 1：十个页面都在，且都加载 app.js -----------------------------------

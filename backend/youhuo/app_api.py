@@ -364,31 +364,63 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
 
     @router.get("/bills/water/current")
     def current_water_bill(ctx: AuthContext = Depends(_actor)) -> AppWaterBill:
-        """当前这一笔水费。
+        """当前这一笔水费。**读真表，不再返回源码里那个字典。**
 
-        `paidAt` 原先是写死的 `None`——于是凭证页和成功页的「完成时间 / 支付时间」
-        两行**永远是空的**，而且看不出是「还没付」还是「接口没给」。
-        现在去查这个家庭最近一笔真的走完的缴费事务：付掉了就给真时间，
-        没付掉就仍然是 null（那时它本来就该空着）。
+        原先这里返回硬编码的 `_WATER_BILL`，`paidAt` 则去扫「任意一笔已完成的
+        缴费事务」取时间。两个缺陷都是实测出来的：
+
+        ① **两个端点报的不是同一张账单。** 这里回 `water-current`，而 `/bills`
+           回的是真 id `bill-water-2026-07-demo`。客户端拿前者去
+           `GET /bills/{id}` 当场 404——两条路说的是同一件事，id 却对不上。
+
+        ② **付之前 `paidAt` 就已经有值了。** 那个扫描不区分是哪一张账单，
+           而演示种子里本来就有一笔已完成的缴费（`task-seed-bill-demo`）。
+           于是一张没付的账单，显示着另一笔交易的支付时间——
+           和凭证页写死「交易成功」是同一类错误：宣称一件没发生的事。
+
+        现在 `paidAt` 取这张账单**自己的** `paid_at`。
         """
-        b = _WATER_BILL
-        paid_at = None
-        for task in db.list_tasks(ctx.family_id, limit=60):
-            if (
-                task.task_type is TaskType.BILL_PAYMENT
-                and task.status is TaskStatus.COMPLETED
-            ):
-                when = task.updated_at
-                if when:
-                    paid_at = when.strftime("%Y-%m-%d %H:%M")
-                break
+        row = _current_water_row(ctx)
+        if row is None:
+            raise HTTPException(status_code=404, detail="现在没有水费账单。")
+        return _water_view(row)
+
+    def _current_water_row(ctx: AuthContext):
+        """这个家庭「当前」那张水费。
+
+        优先未缴的（那才是老人要办的事）；全都缴清了就给最近一张，
+        让界面能显示「已缴清」而不是空白。`list_bills` 已经按
+        「未缴在前、到期日升序」排好。
+        """
+        water = [r for r in db.list_bills(ctx.family_id) if r["bill_type"] == "水费"]
+        if not water:
+            return None
+        return next((r for r in water if not r["paid"]), water[0])
+
+    def _water_view(row) -> dict[str, Any]:
+        """老端点 `/bills/water/current` 的形状。
+
+        和 `_bill_view` 不一样，而且不能合并：这个形状是前端先定稿、后端跟着补的，
+        它有 `accountTail` 而没有 `paid`/`period`。合并会让调用方当场读不到字段。
+        `accountTail` 库里没有这一列，取账单 id 的后四位——它是稳定的、
+        而且不是编出来的号码。
+        """
+        period = str(row["period"] or "")
+        paid_at = row["paid_at"]
+        if paid_at:
+            try:
+                when = datetime.fromisoformat(str(paid_at).replace("Z", "+00:00"))
+                paid_at = when.strftime("%Y-%m-%d %H:%M")
+            except ValueError:
+                pass
         return {
-            "id": b["id"],
-            "type": b["type"],
-            "amount": _yuan(b["amount_cents"]),
-            "company": b["company"],
-            "accountTail": b["account_tail"],
-            "month": b["month"],
+            "id": row["id"],
+            # 前端那一页显示的是「水费支付」，而库里的 `bill_type` 是「水费」。
+            "type": f"{row['bill_type']}支付",
+            "amount": _yuan(int(row["amount_cents"] or 0)),
+            "company": _BILL_COMPANY.get(row["bill_type"]) or "",
+            "accountTail": str(row["id"])[-4:],
+            "month": (period.split("-", 1)[1].lstrip("0") + "月") if "-" in period else period,
             "paidAt": paid_at,
         }
 
@@ -599,29 +631,35 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         风险取 HIGH：`TeachBackVerifier.requires_teach_back` 只在 `BILL_PAYMENT`
         且 risk >= 3 时要求复述——这正是这一版演示要展示的那条线。
         """
-        b = dict(_WATER_BILL)
-
-        # 前端可以指名要付哪一张。
+        # 要付哪一张。
         #
-        # 原先这里无视 body，永远建一笔水费——而库里有三张账单。
-        # 「我的账单」上点电费，办出来的却是水费，是这一层最容易发生、
-        # 又最难在界面上看出来的一种错（金额在复述那一步才对不上）。
+        # 指名了就按 id 取；没指名就取**当前这张水费**——那是这个产品的主路径。
+        #
+        # 两处历史：原先这里无视 body，永远建一笔水费（而库里有三张账单，
+        # 「我的账单」上点电费办出来的却是水费）；而不指名时用的是源码里那个
+        # 硬编码字典 `_WATER_BILL`，它的 id 是编的 `water-current`，
+        # 和 `/bills` 报的真 id 对不上。现在两条路都落到同一张真表上。
         wanted = str((body or {}).get("billId") or "").strip()
         if wanted and wanted != _WATER_BILL["id"]:
             row = db.get_bill(wanted)
             if row is None or row["family_id"] != ctx.family_id:
                 raise HTTPException(status_code=404, detail="没有找到这张账单。")
-            if row["paid"]:
-                raise HTTPException(status_code=409, detail="这一张已经交过了。")
-            period = str(row["period"] or "")
-            b = {
-                "id": row["id"],
-                "type": row["bill_type"],
-                "amount_cents": int(row["amount_cents"] or 0),
-                "company": _BILL_COMPANY.get(row["bill_type"]) or "",
-                "account_tail": str(row["id"])[-4:],
-                "month": (period.split("-", 1)[1].lstrip("0") + "月") if "-" in period else period,
-            }
+        else:
+            row = _current_water_row(ctx)
+            if row is None:
+                raise HTTPException(status_code=404, detail="现在没有水费账单。")
+        if row["paid"]:
+            raise HTTPException(status_code=409, detail="这一张已经交过了。")
+
+        period = str(row["period"] or "")
+        b = {
+            "id": row["id"],
+            "type": row["bill_type"],
+            "amount_cents": int(row["amount_cents"] or 0),
+            "company": _BILL_COMPANY.get(row["bill_type"]) or "",
+            "account_tail": str(row["id"])[-4:],
+            "month": (period.split("-", 1)[1].lstrip("0") + "月") if "-" in period else period,
+        }
 
         # 槽位**从真实账单查询里来**，不在这里手工拼一份。
         #
