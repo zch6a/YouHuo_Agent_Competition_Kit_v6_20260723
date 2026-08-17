@@ -177,8 +177,16 @@ def test_every_endpoint_documents_what_it_returns(client: TestClient) -> None:
         if not path.startswith(V1):
             continue
         for method, op in ops.items():
-            schema = (op.get("responses", {}).get("200", {})
-                        .get("content", {}).get("application/json", {}).get("schema", {}))
+            content = op.get("responses", {}).get("200", {}).get("content", {})
+            # 返回二进制的端点没有 JSON schema，这是对的，不是漏写。
+            #
+            # `POST /speech` 回的是 WAV。这条规则是为 JSON 端点写的——
+            # 要求一个音频流去声明 `properties` 没有意义。豁免的条件是
+            # **显式声明了非 JSON 的 content type**（`responses={200: {"content":
+            # {"audio/wav": {}}}}`），也就是说作者是有意为之，不是忘了写注解。
+            if any(k != "application/json" for k in content):
+                continue
+            schema = content.get("application/json", {}).get("schema", {})
             # 有 `$ref` 就是指向一个具名模型；否则必须自带 properties。
             if "$ref" not in schema and not schema.get("properties"):
                 bare.append(f"{method.upper()} {path}")
@@ -779,6 +787,93 @@ def test_without_a_key_nothing_changes(client: TestClient) -> None:
     a = client.post(f"{V1}/health/events", json={"type": "体重", "value": "62.5"})
     assert a.status_code == 200
     assert "Idempotency-Replayed" not in a.headers
+
+
+# ---- 朗读：语速这个设置终于有人读了 -----------------------------------------
+
+def test_speech_status_reports_the_elders_own_speed(client: TestClient) -> None:
+    """设置页能存语速，而在这之前**没有任何东西按这个速度念**。
+
+    速度放在这个端点里给，而不是让调用方自己去 `/settings` 拼：
+    本地合成和浏览器合成两条路的语速必须一致，分成两处取迟早会不一致。
+    """
+    client.put(f"{V1}/settings", json={"voiceSpeed": 0.8})
+    st = client.get(f"{V1}/speech/status").json()
+    assert st["speed"] == 0.8, f"存的是 0.8，朗读端说的是 {st['speed']}"
+    assert isinstance(st["available"], bool)
+    assert st["fallback"], "念不了的时候要说清楚回落到哪里"
+
+
+def test_speech_says_so_when_it_cannot_speak(client: TestClient) -> None:
+    """模型不在时回 503 并说清楚，**不假装念了**。
+
+    这台机器上就是这样：`sherpa-onnx` 装着，但 `data/tts/` 下没有模型
+    （它不进交付包，体积太大）。所以这条在 CI 上走的是 503 分支——
+    如果哪天模型进了包，它会走 200 分支，下面那条断言跟着放行。
+    """
+    st = client.get(f"{V1}/speech/status").json()
+    r = client.post(f"{V1}/speech", json={"text": "您好"})
+    if st["available"]:
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("audio/")
+    else:
+        assert r.status_code == 503
+        assert "朗读" in r.json()["detail"] or "语音" in r.json()["detail"]
+
+
+def test_synthesis_really_uses_the_saved_speed(tmp_path, monkeypatch) -> None:
+    """**合成调用本身**要按老人存的语速来。
+
+    这条是被变异测试逼出来的：原来只有 `GET /speech/status` 那条断言，
+    而它自己读偏好——把 `POST /speech` 里的语速写死成 1.0，
+    那条**纹丝不动**。也就是说「语速终于有人读了」这句话只验了一半。
+
+    这台机器上没有语音模型（不进交付包），真合成走 503，测不到速度。
+    所以塞一个假引擎进去，记录它被传了什么——验的是**接线**，
+    不是合成质量，而接线正是这一轮要补的东西。
+    """
+    import youhuo.api as api_mod
+
+    calls: list[tuple[str, float]] = []
+
+    class _FakeVoice:
+        available = True
+
+        def status(self):
+            return {"available": True, "engine": "fake", "fallback": "browser_speech_synthesis"}
+
+        def synthesize(self, text, speed=1.0):
+            calls.append((text, speed))
+            return b"RIFF0000WAVEfake", 16000
+
+        def warm_up_async(self):
+            return None
+
+    monkeypatch.setattr(api_mod, "NeuralVoice", lambda *_a, **_k: _FakeVoice())
+    app = create_app(tmp_path / "speak.db", demo_mode=True, seed_baseline_history=True)
+    with TestClient(app) as c:
+        c.put(f"{V1}/settings", json={"voiceSpeed": 0.8})
+        r = c.post(f"{V1}/speech", json={"text": "您好"})
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"].startswith("audio/")
+        assert calls == [("您好", 0.8)], f"合成时用的速度不是他存的那个：{calls}"
+        assert r.headers["X-Speech-Speed"] == "0.80"
+
+        # 显式传 speed 时以传入的为准——试听要能不改设置就听不同档。
+        calls.clear()
+        c.post(f"{V1}/speech", json={"text": "试听", "speed": 1.2})
+        assert calls == [("试听", 1.2)]
+
+        # 超范围的要夹住，别让一个 9.9 传进合成器。
+        calls.clear()
+        c.post(f"{V1}/speech", json={"text": "试听", "speed": 9.9})
+        assert calls == [("试听", 1.6)]
+
+
+def test_speech_refuses_an_empty_or_huge_utterance(client: TestClient) -> None:
+    assert client.post(f"{V1}/speech", json={"text": ""}).status_code == 400
+    # 合成是同步的，一次三百字以上会占住这个进程，而老人早就走开了。
+    assert client.post(f"{V1}/speech", json={"text": "啊" * 400}).status_code == 400
 
 
 # ---- 联系人 / 档案 / 设置 --------------------------------------------------

@@ -60,6 +60,7 @@ from .app_schemas import (
     AppReminderCreated,
     AppReminderList,
     AppSettings,
+    AppSpeechStatus,
     AppTeachBackResult,
     AppVoiceSession,
     AppWaterBill,
@@ -169,7 +170,7 @@ def _parse_when(raw: str) -> datetime:
         raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。") from None
 
 
-def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> APIRouter:
+def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice=None) -> APIRouter:
 
     class _IdempotentRoute(APIRoute):
         """带 `Idempotency-Key` 的写请求，重放同一个响应。
@@ -1242,6 +1243,84 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
             },
         }
 
+    # ---- 念给他听 ------------------------------------------------------------
+    #
+    # 设置页能存「语速」，而在这之前**没有任何东西按这个速度念**——
+    # 这一层根本没有合成入口。存了一个没人读的偏好，比不提供这个设置更糟：
+    # 老人以为自己调过了。
+    #
+    # 后端其实是齐的：`NeuralVoice.synthesize(text, speed)` 在，
+    # `/v6/speech/synthesize` 也在。缺的是**把存下来的语速接到合成调用上**，
+    # 以及一个不需要 v2 令牌的入口。
+
+    @router.get("/speech/status")
+    def speech_status(ctx: AuthContext = Depends(_actor)) -> AppSpeechStatus:
+        """能不能本地合成，以及**这位老人**的语速是多少。
+
+        客户端拿它决定走本地合成还是浏览器合成——两条路的语速要一致，
+        所以速度也在这里给，不让调用方自己去 `/settings` 拼。
+        """
+        prefs = _read_prefs(ctx)
+        st = voice.status() if voice is not None else {
+            "available": False, "engine": None,
+            "fallback": "browser_speech_synthesis",
+            "note": "这台服务没有装离线合成。",
+        }
+        return {
+            "available": bool(st.get("available")),
+            "engine": st.get("engine"),
+            "speed": float(prefs["voiceSpeed"]),
+            "fallback": st.get("fallback") or "browser_speech_synthesis",
+            "note": st.get("note"),
+        }
+
+    @router.post("/speech", responses={200: {"content": {"audio/wav": {}}}})
+    def speak(
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> Response:
+        """把一句话念出来，**用这位老人自己存的语速**。
+
+        `speed` 可以显式传（试听时要能不改设置就听不同档），不传就读他的偏好——
+        那才是「语速这个设置真的生效了」的意思。
+
+        模型不在时回 503 并说清楚回落到哪里，不假装念了。
+        （这台机器上就是这样：`sherpa-onnx` 装着，但 `data/tts/` 下没有模型，
+        它不进交付包。）
+        """
+        body = body or {}
+        text = str(body.get("text") or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="没有要念的话。")
+        if len(text) > 300:
+            # 一次念三百字以上，老人早就走开了；而合成是同步的，会占住这个进程。
+            raise HTTPException(status_code=400, detail="一次念的话太长了，分成几句。")
+
+        prefs = _read_prefs(ctx)
+        raw_speed = body.get("speed")
+        speed = float(raw_speed) if raw_speed is not None else float(prefs["voiceSpeed"])
+        speed = min(max(speed, 0.6), 1.6)
+
+        if voice is None or not voice.available:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="这台服务上没有离线语音，请用设备自带的朗读。",
+            )
+        try:
+            wav, sample_rate = voice.synthesize(text, speed)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return Response(
+            content=wav,
+            media_type="audio/wav",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Sample-Rate": str(sample_rate),
+                # 让调用方能核对「用的确实是我存的那个语速」。
+                "X-Speech-Speed": f"{speed:.2f}",
+            },
+        )
+
     # ---- 记一次身体数据 ------------------------------------------------------
     #
     # `/health-summary` 读 `health_events_v4`，而**此前没有任何地方往里写**——
@@ -1798,13 +1877,23 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
                 return item
         return None
 
-    @router.get("/settings")
-    def get_settings(ctx: AuthContext = Depends(_actor)) -> AppSettings:
+    def _read_prefs(ctx: AuthContext) -> dict[str, Any]:
+        """这位老人存下来的偏好，没存过就是默认值。
+
+        抽出来是因为**朗读那一端也要读它**：语速存在这里，而
+        `POST /speech` 必须按它来念，否则那个设置又变成一个没人读的值。
+        两处各写一遍解析，迟早有一处忘了兜默认。
+        """
         item = _pref_item(ctx)
         values = dict(_PREF_DEFAULTS)
         if item is not None and isinstance(item.value, dict):
             values.update(item.value)
-        return {**values, "saved": item is not None}
+        values["saved"] = item is not None
+        return values
+
+    @router.get("/settings")
+    def get_settings(ctx: AuthContext = Depends(_actor)) -> AppSettings:
+        return _read_prefs(ctx)
 
     @router.put("/settings")
     def put_settings(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppSettings:

@@ -344,6 +344,17 @@ class AppHealthSummary(StrictModel):
     note: str | None = None
 
 
+class AppSpeechStatus(StrictModel):
+    #: 这台服务能不能本地合成。false = 客户端该用设备自带的朗读。
+    available: bool
+    engine: str | None = None
+    #: **这位老人自己存的语速。** 放在这里而不是让调用方去 `/settings` 拼，
+    #: 是因为本地合成和浏览器合成两条路的语速必须一致——分成两处取，迟早会不一致。
+    speed: float
+    fallback: str
+    note: str | None = None
+
+
 class AppHealthRecorded(StrictModel):
     ok: bool
     id: str

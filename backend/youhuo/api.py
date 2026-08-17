@@ -186,7 +186,11 @@ def create_app(
             # Static assets, UI pages and speech synthesis never touch the
             # database; speech in particular takes ~1.5s per clause and holding
             # the shared lock would stall every other request.
-            if path.startswith("/static/") or path in _LOCK_EXEMPT_PATHS or path.startswith("/v6/speech/"):
+            # `/api/v1/speech` 和 `/v6/speech/` 同样豁免：合成一句要 ~1.5 秒，
+            # 而这把锁是全进程共享的——不豁免的话，老人点一次朗读，
+            # 别人的每一个请求都要排在它后面。
+            if (path.startswith("/static/") or path in _LOCK_EXEMPT_PATHS
+                    or path.startswith("/v6/speech/") or path == "/api/v1/speech"):
                 await self.app(scope, receive, send)
                 return
             async with sqlite_request_lock:
@@ -708,7 +712,7 @@ def create_app(
     # 真实业务上——复述核验、任务状态机、审计链都是同一份，不是第二套。
     # demo_mode 决定「没带令牌」是退回演示老人还是 401。
     # 不传的话这一层在真实部署里也会把演示家庭的数据发给任何人。
-    app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode))
+    app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode, voice=neural_voice))
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
     app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))
