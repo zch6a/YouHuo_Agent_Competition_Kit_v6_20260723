@@ -37,6 +37,7 @@ import json
 import re
 import sys
 from html.parser import HTMLParser
+import posixpath
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,7 +48,21 @@ STATIC = ROOT / "backend" / "static"
 OUT_JSON = ROOT / "frontend_redesign" / "ia" / "11_control_inventory.json"
 OUT_MD = ROOT / "frontend_redesign" / "ia" / "11_control_inventory.md"
 
-PAGES = list(PAGE_TO_ROUTE)
+#: 老六页（外加 `/app` 的主页）由路由表给出，山水版那一套**按目录取**。
+#:
+#: 只写 `list(PAGE_TO_ROUTE)` 的后果实测如下：`surfaces.py` 只登记了
+#: `/app → app/pages/home.html` 一条，于是这份自称「事实源」的清单
+#: **17 个 app 页面里只覆盖了 1 个**。加了七个新页面、四十多个按钮之后，
+#: 清单总数一动不动——而「数字没变」在结果里和「没有新东西」长得一样。
+#:
+#: 为什么不把十七页全登记进 `SURFACES`：那张表记的是**路由**，
+#: 而这些是 `/app` 这一个 shell 内部的页面，不是十七个 URL 入口。
+#: 登记进去会让一批按路由遍历的闸门去访问不存在的 URL。
+_APP_PAGES = sorted(
+    str(p.relative_to(STATIC)).replace("\\", "/")
+    for p in (STATIC / "app" / "pages").glob("*.html")
+)
+PAGES = list(dict.fromkeys(list(PAGE_TO_ROUTE) + _APP_PAGES))
 
 #: `check_page_runtime.py` 在真浏览器里**按到**的数量（它只按 `button, summary`）。
 #:
@@ -67,8 +82,35 @@ RUNTIME_PRESSES = {"index.html": 0, "elder.html": 28, "family.html": 6, "care.ht
 #: 控件就是 select）和 `<input>` 会整类不在册。
 CONTROL_TAGS = {"button", "summary", "select", "input", "textarea", "a", "form"}
 
-_SRC_RE = re.compile(r'<script\b[^>]*\bsrc="/static/([\w.-]+\.js)"')
-_IMPORT_RE = re.compile(r"""\bfrom\s+['"]/static/([\w.-]+\.js)['"]""")
+#: 正则只负责认出「这里引了一个 .js」，**路径长什么样不写在里面**。
+#:
+#: 原来是 `src="/static/([\w.-]+\.js)"`：`/static/` 焊死、字符类还不含斜杠。
+#: 后果是子目录里的页面（`app/pages/*.html` 用的是 `../assets/js/app.js`）
+#: 一律解析成空清单——十个页面的脚本从此在视野之外，而闸门全绿。
+#: 同一条坏正则在 `test_app_surface_speaks_no_engineering.py` 里已经修过一次，
+#: 那次的报告明确写着「这里还有第二份拷贝，而且是**静默**返回空」。就是这一份。
+_SRC_RE = re.compile(r'<script\b[^>]*\bsrc="([^"\s>]+\.js)"')
+_IMPORT_RE = re.compile(r"""\bfrom\s+['"]([^'"\n]+\.js)['"]""")
+
+
+def _resolve_script(src: str, base: str) -> str | None:
+    """把一处引用解析成 STATIC 下的相对路径；解析不到就丢弃。
+
+    `base` 是**写下这处引用的那份文件**。基准必须是引用方自己而不是 STATIC 根：
+    `app/pages/home.html` 里的 `../assets/js/app.js` 要落到 `app/assets/js/app.js`，
+    同一串字写在根目录页面里会指到 static 之外。
+    """
+    if src.startswith(("http://", "https://", "//")):
+        return None
+    if src.startswith("/static/"):
+        rel = src[len("/static/"):]
+    elif src.startswith("/"):
+        return None
+    else:
+        rel = posixpath.normpath(posixpath.join(posixpath.dirname(base), src))
+    if rel.startswith(".."):
+        return None
+    return rel if (STATIC / rel).is_file() else None
 
 
 def scripts_for(page: str) -> list[str]:
@@ -79,13 +121,15 @@ def scripts_for(page: str) -> list[str]:
     """
     html = (STATIC / page).read_text(encoding="utf-8")
     seen: list[str] = []
-    queue = _SRC_RE.findall(html)
+    queue = [(ref, page) for ref in _SRC_RE.findall(html)]
     while queue:
-        name = queue.pop(0)
-        if name in seen or not (STATIC / name).is_file():
+        ref, base = queue.pop(0)
+        name = _resolve_script(ref, base)
+        if name is None or name in seen:
             continue
         seen.append(name)
-        queue += _IMPORT_RE.findall((STATIC / name).read_text(encoding="utf-8"))
+        # 跟着 import 走时，基准换成那个脚本自己。
+        queue += [(r, name) for r in _IMPORT_RE.findall((STATIC / name).read_text(encoding="utf-8"))]
     return seen
 
 
@@ -95,7 +139,18 @@ def scripts_for(page: str) -> list[str]:
 #: 刻意**不用** class（`.secondary` 改成 `.ghost` 就断）、**不用**位置（重构必然变）、
 #: **不用**可见文字（文案轮会全改一遍，而这个项目已经有一轮专门改文案的 Phase）。
 _KEY_ATTRS = ("id", "data-section", "data-text", "data-run", "data-jump",
-              "data-sheet-open", "data-sheet-close", "data-panel", "name")
+              "data-sheet-open", "data-sheet-close", "data-panel", "name",
+              # 下面这批是山水版那一套的词汇。原来这张表**只有老前端的属性**，
+              # 于是新前端 63 个控件被判成「没有稳定身份」——它们当然有身份，
+              # 只是用的是另一套属性名。一份把「我这张表没列到」写成
+              # 「这个控件没身份」的清单，会让人去补一堆本来就有的 id。
+              #
+              # 刻意**不含 `data-action`**：它太泛（`close-modal` 一页出现两次），
+              # 放在这里会顶掉 `id=sosModal/button` 这种更有信息量的祖先身份。
+              # 它作为最后的兜底放在 `_stable_key` 末尾。
+              "data-service", "data-to", "data-do", "data-kind",
+              "data-font-scale", "data-voice-speed", "data-contrast",
+              "data-open", "data-close", "data-goback", "data-sos", "data-label")
 
 #: 能给后代提供身份的祖先属性。
 #:
@@ -122,6 +177,14 @@ def _stable_key(tag: str, attrs: dict[str, str], ancestors: list[dict[str, str]]
         for attr in _ANCESTOR_KEY_ATTRS:
             if parent.get(attr):
                 return f"{attr}={parent[attr]}/{tag}"
+    # 最后兜底：`data-action`。放在祖先之后而不是 `_KEY_ATTRS` 里，
+    # 是因为它一页里会重复（`close-modal` 两个弹窗各一个），而
+    # `id=sosModal/button` 这种祖先身份更能说明「是哪一个」。
+    # 但对返回箭头（`data-action="back"`，一页只有一个、又没有 id 也没有
+    # 带身份的祖先）来说，它是唯一可用的稳定身份——没有它，十七页的返回键
+    # 会全部被判成「无身份」。
+    if attrs.get("data-action"):
+        return f"data-action={attrs['data-action']}"
     return ""
 
 
@@ -381,7 +444,17 @@ OVERRIDES: dict[str, tuple[str | None, str | None]] = {}
 
 def main() -> int:
     diff_only = "--diff" in sys.argv
-    bodies = {p.name: p.read_text(encoding="utf-8") for p in STATIC.glob("*.js")}
+    # 键用**相对 STATIC 的路径**，不是文件名。
+    #
+    # 原来是 `{p.name: ...}` 配 `STATIC.glob("*.js")`——只收根目录、还按裸文件名索引。
+    # 山水版的脚本住在 `app/assets/js/` 下，`scripts_for()` 现在解析出的是
+    # `app/assets/js/config.js` 这样的路径，拿它去查裸文件名的表当场 KeyError。
+    # 按文件名索引还有个更安静的坑：两个目录里同名的 `config.js` 会互相覆盖，
+    # 而覆盖之后追踪到的 handler 属于另一份文件——不报错，只是答案是错的。
+    bodies = {
+        str(p.relative_to(STATIC)).replace("\\", "/"): p.read_text(encoding="utf-8")
+        for p in STATIC.rglob("*.js")
+    }
 
     rows: list[dict] = []
     for page in PAGES:
@@ -403,7 +476,10 @@ def main() -> int:
                 "tag": control["tag"],
                 "text": control["text_hint"] or control["aria_label"],
                 "source_file": page,
-                "route": PAGE_TO_ROUTE[page],
+                # 山水版内部页面没有各自的路由——它们全都由 `/app` 这一个 URL 承载。
+                # 记 `/app` 而不是编一个 `/app/pages/xxx`：后者会让人以为
+                # 那是个能访问的地址。哪一页由 `source_file` 记着。
+                "route": PAGE_TO_ROUTE.get(page, "/app"),
                 "panel": control["panel"],
                 "hidden": control["hidden"],
                 "surface": info.surface,

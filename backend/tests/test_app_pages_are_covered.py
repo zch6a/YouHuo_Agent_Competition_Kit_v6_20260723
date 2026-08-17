@@ -55,6 +55,17 @@ PAGES = [
     "services.html",
     "certificate.html",
     "profile.html",
+    # 下面七个是「让每个控件都有真去处」那一轮加的。原先有 20 个控件点下去只弹
+    # 一句「还没有做好」，它们各自补上了其中一块：
+    "medication.html",      # 用药提醒（profile / services / 正在听 各有一处指向它）
+    "schedule.html",        # 今日安排、就医安排、复诊详情
+    "contacts.html",        # 紧急联系人
+    "settings.html",        # 字号与语音
+    "health.html",          # 健康助手
+    "me.html",              # 我的资料
+    # 闭环原先在界面上点不到：`family-approve` 这个接口存在且可用，
+    # 却没有任何按钮调它，只能靠脚本补一刀。
+    "family-approve.html",
 ]
 
 #: `app.js` 的 `hydrate()` 把三个接口的响应装进这三个顶层分组，再交给 `bindData()`：

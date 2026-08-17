@@ -1,0 +1,57 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>家人确认 · 优活</title><link rel="stylesheet" href="../assets/css/app.css"></head><body data-surface="consumer"><main class="phone"><div class="status"><span>9:41</span><i class="island"></i><span class="sys">▮▮▮ ◉ ▰</span></div><div class="header-grid" style="grid-template-columns:48px 1fr 48px"><button class="back" data-action="back" aria-label="返回" style="width:48px;height:48px;display:grid;place-items:center;margin-left:-6px">‹</button><h1>家人确认</h1><span></span></div>
+<img class="scene" src="../art/png/cert_scene_left.png" alt="" style="left:-12px;top:118px;width:158px;opacity:.55">
+<img class="scene" src="../art/png/cert_scene_right.png" alt="" style="right:-12px;top:110px;width:146px;opacity:.66">
+
+<!-- 这一句由脚本按真实状态填。HTML 里留空是有意的：接口没回来的时候，
+     宁可这里什么都不写，也不能顶着一句「有一笔在等您点头」——那可能是假的。 -->
+<p class="sub content" id="faLead" style="text-align:center;margin-top:6px;min-height:23px"></p>
+
+<!-- 没有事务号：这不是错误，是「现在确实没有要您确认的事」。 -->
+<section class="card content" id="faEmpty" hidden style="margin-top:58px;padding:28px 22px;text-align:center">
+  <img src="../art/png/confirm_security_badge.png" alt="" style="width:104px;height:104px;object-fit:contain">
+  <h2 style="margin:12px 0 0;font-size:24px">现在没有等您确认的事</h2>
+  <p class="muted" style="margin:10px 0 0;font-size:16px;line-height:1.55">老人那边发起一笔缴费、并把金额复述对了之后，这里才会出现要您点头的那一笔。</p>
+</section>
+
+<!-- 这一笔本身 -->
+<section class="card content" id="faBill" hidden style="margin-top:58px;padding:20px">
+  <img class="art" src="../art/png/cert_gold_seal.png" alt="" style="right:6px;top:30px;width:104px;opacity:.40">
+  <div class="row between" style="align-items:flex-start">
+    <div style="min-width:0">
+      <p class="muted" style="margin:0;font-size:16px">这一笔要付</p>
+      <div class="amount" id="faAmount" style="margin-top:2px"></div>
+    </div>
+    <span id="faStatus" style="font-size:15px;font-weight:760;padding:9px 12px;border-radius:13px;white-space:nowrap;margin-top:4px"></span>
+  </div>
+  <div class="list">
+    <div class="line"><span>缴费单位</span><b id="faCompany"></b></div>
+    <div class="line"><span>发起人</span><b id="faInitiator"></b></div>
+    <div class="line"><span>事务号</span><b id="faPid" style="font-size:15px;letter-spacing:.02em"></b></div>
+  </div>
+</section>
+
+<!-- 审计链：这一页的核心。每一步、谁做的、摘要前八位。 -->
+<h2 class="section-title content" id="faChainTitle" hidden style="margin:18px 0 9px">这一笔走过的每一步</h2>
+<section class="card content" id="faChainCard" hidden style="padding:4px 16px 15px">
+  <img class="art" src="../art/png/bill_safety_shield.png" alt="" style="right:13px;bottom:11px;width:46px;opacity:.30">
+  <div id="faChain"></div>
+  <p class="muted" id="faChainNote" style="margin:13px 0 0;font-size:15px;line-height:1.5;padding-right:52px"></p>
+</section>
+
+<!-- 守卫说的话 / 办完之后的回执，都落在这一块。 -->
+<section class="card soft content" id="faNotice" hidden aria-live="polite" style="margin-top:12px;padding:15px 16px">
+  <div class="row" style="gap:11px;align-items:flex-start">
+    <img id="faNoticeIcon" src="../art/png/bill_safety_shield.png" alt="" style="width:28px;height:28px;object-fit:contain;flex:0 0 28px;margin-top:1px">
+    <div style="flex:1;min-width:0">
+      <b id="faNoticeText" style="display:block;font-size:17px;line-height:1.45"></b>
+      <span class="muted" id="faNoticeHint" style="display:block;margin-top:7px;font-size:15px;line-height:1.5"></span>
+    </div>
+  </div>
+</section>
+
+<button class="btn primary content" id="faApprove" hidden style="width:100%;height:60px;margin-top:15px">同意并办理</button>
+<p class="muted content" id="faApproveHint" hidden style="margin:9px 0 0;text-align:center;font-size:15px">按下这一下，这笔钱才会真的付出去。</p>
+<button class="btn secondary content" id="faLater" hidden style="width:100%;height:56px;margin-top:11px">先不办</button>
+<button class="btn secondary content" id="faCert" data-action="open-cert" hidden style="width:100%;height:56px;margin-top:11px">看这张凭证 ›</button>
+<img class="scene" src="../art/png/cert_footer_scene.png" alt="" style="left:0;bottom:88px;width:100%;opacity:.46">
+</main><script src="../assets/js/config.js"></script><script src="../assets/js/mock-api.js"></script><script src="../assets/js/api-client.js"></script><script src="../assets/js/app.js"></script><script src="../assets/js/page-family-approve.js"></script></body></html>

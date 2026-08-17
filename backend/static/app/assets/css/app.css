@@ -168,6 +168,16 @@ body{background:#d4d0c9;display:flex;justify-content:center}.phone{position:rela
   object-position:center !important;
   filter:drop-shadow(0 7px 13px rgba(57,91,216,.19)) !important;
   border-radius:0 !important;
+  /* 把这张图的四条硬边化开。
+     `nav_voice_control.png` 实测是 **alpha 全 255 的不透明图**（四角
+     238,226,210 → 245,239,230 的米色渐变），而它落在 #fbf5e9→#fffaf2 的页面上，
+     于是十七个页面的底部导航正中，都有一个 138×96 的米色矩形硬切在背景上。
+     更糟的是它和 `.global-nav::before` 那个 102px 的圆顶不同宽也不同色——
+     圆顶从矩形上沿露出一截，看起来像两层拱形打架。
+     抠图不行：底色是渐变，键控会在云纹和金线边上留一圈晕。
+     所以用径向遮罩让边缘渐隐——中间的球和云纹全留着，矩形的边界消失。 */
+  -webkit-mask-image:radial-gradient(66% 74% at 50% 54%, #000 52%, transparent 92%);
+  mask-image:radial-gradient(66% 74% at 50% 54%, #000 52%, transparent 92%);
 }
 .global-nav .nav-tab{
   z-index:5 !important;

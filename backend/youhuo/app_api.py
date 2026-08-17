@@ -21,14 +21,23 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from .memory_vault import (
+    MemoryItem,
+    MemoryScope,
+    MemorySensitivity,
+    MemoryStatus,
+)
+from .security import SafetyPolicy
+from .utils import semantic_hash
 from .models import (
     AuthContext,
     ChatRequest,
+    ReminderRecord,
     ReminderStatus,
     RiskLevel,
     SessionState,
@@ -67,6 +76,12 @@ _EV_PREPARED = "app.payment.prepared"
 _EV_TEACH_BACK = "app.payment.teach_back"
 _EV_AWAITING_FAMILY = "app.payment.awaiting_family"
 _EV_SOS = "app.emergency.requested"
+#: 提醒与设置。**加一个事件类型就必须同时加一条 `_WORDS`**——否则记录页会
+#: 落到兜底文案「办了一件事」，而那一行看起来完全正常，没有任何东西会报红。
+_EV_REMINDER_CREATED = "app.reminder.created"
+_EV_REMINDER_DONE = "app.reminder.completed"
+_EV_REMINDER_CANCELLED = "app.reminder.cancelled"
+_EV_SETTINGS_CHANGED = "app.settings.changed"
 
 
 def _yuan(cents: int) -> str:
@@ -293,13 +308,33 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         """
         ctx = _ctx()
         b = _WATER_BILL
-        slots = {
+
+        # 槽位**从真实账单查询里来**，不在这里手工拼一份。
+        #
+        # 原来这里是手写的 5 个键，没有 `bill_id`。后果只在跨端时才显形：
+        # 这一笔在旧家人端 `/v2/tasks` 里看得见（同一张任务表），女儿点「同意」，
+        # 审批通过、状态推到 `executing`，**然后 `billing.settle` 抛 KeyError('bill_id')
+        # 挂在半路**——一笔卡在「执行中」的钱，两端都显示不出它到底怎么了。
+        #
+        # `engine.py:725` 的写法就是 `task.slots.update(lookup.data)`。照它来，
+        # 这一层才真的是门面而不是第二套业务——那正是这个文件开头写的话。
+        # 查不到就退回本地那份演示账单：宁可少一个字段，也不要在这里编一个 bill_id
+        # 让 `settle` 拿着去结一笔不存在的账。
+        slots: dict[str, Any] = {
             "bill_type": b["type"].replace("支付", ""),
             "amount_cents": b["amount_cents"],
             "company": b["company"],
             "account_tail": b["account_tail"],
             "month": b["month"],
         }
+        lookup = None
+        try:
+            lookup = engine.services.billing.lookup(db, ctx.family_id, slots["bill_type"])
+        except Exception:  # noqa: BLE001 —— 查询挂了不该让老人点不动按钮
+            lookup = None
+        if lookup is not None and getattr(lookup, "ok", False) and lookup.data:
+            slots.update(lookup.data)
+
         now = datetime.now(UTC)
         task = TaskRecord(
             id=f"pay-{uuid.uuid4().hex[:12]}",
@@ -309,7 +344,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             status=TaskStatus.AWAITING_ELDER_CONFIRMATION,
             risk_level=RiskLevel.HIGH,
             slots=slots,
-            semantic_key=f"bill:{b['id']}:{b['amount_cents']}",
+            # 语义键跟着真实 bill_id 走，这样查重才和主引擎认的是同一件事。
+            semantic_key=f"bill:{slots.get('bill_id') or b['id']}:{slots['amount_cents']}",
             created_at=now,
             updated_at=now,
         )
@@ -346,6 +382,22 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 "heard": check.heard_display,
             },
         )
+        if check.outcome is TeachBackOutcome.VERIFIED:
+            # 复述核对通过，在语义上**就是**老人的确认——所以在这里就把
+            # `elder_confirmed` 落进槽位，和 `engine.py:882` 那两行一致。
+            #
+            # 不落的后果只在跨端时显形：这一笔在旧家人端看得见、女儿点得动，
+            # 审批还会返回 200——然后 `TaskVerifier.verify` 查
+            # `slots["elder_confirmed"]` 查不到，判「缺少老人确认」，把任务打成
+            # `failed`。老人**明明念对了**，链上也有 verified 那一条，
+            # 却因为门面少写一个槽位，被判成没确认过。
+            done = task.model_copy(update={"slots": {
+                **task.slots,
+                "elder_confirmed": True,
+                "elder_confirmation_hash": semantic_hash(["elder-confirmation", text]),
+            }})
+            db.update_task(done)
+            task = db.get_task(task.id) or done
         words = {
             TeachBackOutcome.VERIFIED: "念对了，可以继续。",
             TeachBackOutcome.MISMATCH: "听到的金额和账单上的不一样，先停下。",
@@ -389,16 +441,34 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         moved = task.model_copy(
             update={
                 "status": TaskStatus.AWAITING_FAMILY_APPROVAL,
+                "approval_digest": None,
                 "updated_at": datetime.now(UTC),
             }
         )
         db.update_task(moved)
+
+        # 审批摘要。**这一段照 `engine.py:893-899` 的两步来，顺序不能换。**
+        #
+        # 实测发现的缺口：这一笔在旧家人端 `/v2/tasks` 里**看得见**（同一张任务表、
+        # 同一个 `bill_payment`），但 `approval_digest` 是 null，而
+        # `/v2/family/approve` 要求它是字符串——于是女儿在 `/family` 上点「同意」
+        # 收到 422。两块屏幕看的是同一笔事务，却只有一块能推动它。
+        #
+        # 为什么必须先写、再读回来、再算：摘要要盖在**持久化之后**的任务上
+        # （版本号已经 +1）。在内存里的副本上算，`engine.py:1046` 那次重算会对不上，
+        # 审批当场被判成「摘要不符」——那是一条防篡改判据，不该被自己人绊倒。
+        # 第二次写 `bump_version=False`，否则版本又变了，摘要再次失效。
+        stored = db.get_task(task.id) or moved
+        stored.approval_digest = SafetyPolicy.approval_digest(stored)
+        db.update_task(stored, bump_version=False)
+
         db.append_audit(
             family_id=ctx.family_id,
             actor_id=ctx.actor_id,
             event_type=_EV_AWAITING_FAMILY,
             entity_id=task.id,
-            payload={"amount_cents": task.slots.get("amount_cents")},
+            payload={"amount_cents": task.slots.get("amount_cents"),
+                     "approval_digest": stored.approval_digest},
         )
         return {
             "ok": True,
@@ -489,6 +559,10 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         "app.payment.teach_back": ("复述确认", "支付", "record_confirm"),
         "app.payment.awaiting_family": ("等家人确认", "支付", "record_family"),
         "app.emergency.requested": ("紧急呼叫", "服务", "record_family"),
+        "app.reminder.created": ("加了一条提醒", "健康", "record_confirm"),
+        "app.reminder.completed": ("办好了一件事", "健康", "record_confirm"),
+        "app.reminder.cancelled": ("取消了一条提醒", "健康", "record_confirm"),
+        "app.settings.changed": ("改了设置", "服务", "record_request"),
     }
 
     _OUTCOME_WORDS = {
@@ -554,11 +628,38 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             }
             for e in reversed(events)
         ]
+        # 谁点的头。**两条路径都要认。**
+        #
+        # 这一笔可以由两个地方批准：山水版自己的 `/api/v1/.../family-approve`
+        # （写 `FAMILY_APPROVED_AND_EXECUTED`，payload 里带 `approved_by`），
+        # 或者旧家人端 `/family` 的「同意」按钮（走 `/v2/family/approve`，
+        # 它把批准人写进 `slots["family_approver"]`）。实测两块屏幕看的是
+        # **同一笔事务**，所以只认自己那条事件，就会在女儿从 `/family` 点头时
+        # 把「谁点的头」显示成空——而凭证上这一格恰恰是最不能空的。
+        approved_by = None
+        for e in reversed(events):
+            who = (e.payload or {}).get("approved_by")
+            if who:
+                approved_by = who
+                break
+        if approved_by is None:
+            approver_id = task.slots.get("family_approver")
+            if approver_id:
+                row = db.actor(approver_id)
+                approved_by = row["display_name"] if row else approver_id
+
         return {
             "id": payment_id,
             "amount": _yuan(int(task.slots.get("amount_cents", 0) or 0)),
             "company": task.slots.get("company"),
             "status": str(task.status),
+            "approvedBy": approved_by,
+            # 办完的时刻。没办完就是 null——不拿「现在」冒充「办好的时候」。
+            "paidAt": (
+                task.updated_at.strftime("%Y-%m-%d %H:%M")
+                if task.status is TaskStatus.COMPLETED and task.updated_at
+                else None
+            ),
             # 整条链是否没被动过——真的重算一遍哈希。
             "chainValid": db.verify_audit_chain(ctx.family_id),
             "chain": chain,
@@ -599,5 +700,294 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             "status": "contacting",
             "message": "已记录这次呼叫，并按顺序联系紧急联系人。",
         }
+
+    # ---- 提醒：用药 / 就医 / 其他 -------------------------------------------
+    #
+    # `reminders` 表**没有类型字段**（只有 title / due_at / status / source），
+    # 所以类别只能从标题认。这不是猜：`seed_demo_reminders` 写进去的就是
+    # 「吃降压药」「心内科复诊」这种，语音引擎建的提醒也走同一批词。
+    # 认不出来的一律归「其他」——不硬塞进某一类，否则界面上「用药提醒」里会
+    # 冒出一件跟药无关的事，而那比少一条更糟。
+
+    # 顺序有意义：先匹配到的先算。「复诊前准备病历」既有「复诊」也没有药，
+    # 归就医；而「取药」两个词都沾，按这个顺序归用药——去医院取的还是药。
+    _KIND_WORDS: dict[str, tuple[str, ...]] = {
+        # 只写「药」不够：实测新建「吃钙片」被归成了「其他」——钙片、胶囊、
+        # 维生素都是用药，却一个「药」字都没有。**不能只写「片」**，
+        # 那会把「看照片」也算进来。所以逐个写完整词。
+        "用药": ("药", "服药", "吃药", "钙片", "含片", "胶囊", "维生素",
+                 "冲剂", "滴眼", "胰岛素", "降压", "降糖", "输液", "打针"),
+        "就医": ("复诊", "门诊", "挂号", "看病", "医院", "体检", "检查", "取号"),
+        "健康": ("量血压", "测血糖", "血压", "血糖", "体重", "散步", "锻炼", "运动"),
+    }
+
+    def _kind_of(title: str) -> str:
+        for kind, words in _KIND_WORDS.items():
+            if any(w in title for w in words):
+                return kind
+        return "其他"
+
+    def _reminder_view(r: Any, now: datetime) -> dict[str, Any]:
+        due = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
+        done = r.status in {ReminderStatus.COMPLETED, ReminderStatus.ACKNOWLEDGED}
+        cancelled = r.status == ReminderStatus.CANCELLED
+        return {
+            "id": r.id,
+            "title": r.title,
+            "kind": _kind_of(r.title),
+            "time": due.strftime("%H:%M"),
+            "date": due.strftime("%m月%d日"),
+            "at": due.isoformat(),
+            "done": done,
+            "cancelled": cancelled,
+            # 界面上不出现英文枚举值——这里就把状态翻成人话，前端直接显示。
+            "status": "已取消" if cancelled else ("已完成" if done else "待进行"),
+            "overdue": (not done) and (not cancelled) and due < now,
+        }
+
+    def _my_reminders(ctx: AuthContext) -> list[Any]:
+        return [
+            r for r in db.list_reminders(ctx.family_id, limit=200)
+            if r.elder_id == _DEMO_ELDER
+        ]
+
+    @router.get("/reminders")
+    def reminders(kind: str | None = Query(default=None)) -> dict[str, Any]:
+        """用药提醒 / 就医安排 / 今日事项 三个界面共用的真实数据源。
+
+        `kind` 取「用药」「就医」「其他」，不传就是全部。传一个不认识的值回空表，
+        不报错——界面上一个筛选按钮点出 500 比点出空列表糟得多。
+        """
+        ctx = _ctx()
+        now = datetime.now(UTC)
+        items = [_reminder_view(r, now) for r in _my_reminders(ctx)]
+        if kind:
+            items = [it for it in items if it["kind"] == kind]
+        return {
+            "items": items,
+            "count": len(items),
+            "kinds": sorted({it["kind"] for it in items}),
+        }
+
+    @router.post("/reminders")
+    def create_reminder(body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """老人自己加一条提醒。**真的写进提醒表**，不是回一个 ok 就算了。
+
+        时间用 `HH:MM`（今天）或完整 ISO 串。给的时间已经过点就顺延到明天——
+        对一位老人来说「设 8 点吃药」在 9 点设，意思显然是明天 8 点，
+        而不是一条建出来就已经过期的提醒。
+        """
+        body = body or {}
+        title = str(body.get("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="还没有说要提醒什么。")
+
+        now = datetime.now(UTC)
+        raw = str(body.get("at") or body.get("time") or "").strip()
+        due = None
+        if raw:
+            try:
+                if len(raw) <= 5 and ":" in raw:
+                    hh, mm = (int(x) for x in raw.split(":", 1))
+                    due = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    if due < now:
+                        due = due + timedelta(days=1)
+                else:
+                    due = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    if due.tzinfo is None:
+                        due = due.replace(tzinfo=UTC)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。")
+        if due is None:
+            due = now + timedelta(hours=1)
+
+        ctx = _ctx()
+        record = ReminderRecord(
+            id=f"rem-{uuid.uuid4().hex[:12]}",
+            family_id=ctx.family_id,
+            elder_id=_DEMO_ELDER,
+            title=title,
+            due_at=due,
+            escalation_after_minutes=int(body.get("escalationAfterMinutes") or 30),
+            status=ReminderStatus.SCHEDULED,
+            source="elder-app",
+            created_by=ctx.actor_id,
+            created_at=now,
+        )
+        if not db.insert_reminder(record):
+            raise HTTPException(status_code=409, detail="这一条没能存下来，请再试一次。")
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_REMINDER_CREATED,
+            entity_id=record.id,
+            payload={"title": title, "due_at": due.isoformat()},
+        )
+        return {"ok": True, "item": _reminder_view(record, now),
+                "message": f"记好了，{due.strftime('%H:%M')} 提醒您{title}。"}
+
+    @router.post("/reminders/{reminder_id}/done")
+    def complete_reminder(reminder_id: str) -> dict[str, Any]:
+        """办完了。写的是真状态，记录页当场就能看到这一条。"""
+        ctx = _ctx()
+        now = datetime.now(UTC)
+        existing = db.get_reminder(reminder_id)
+        if existing is None or existing.family_id != ctx.family_id:
+            raise HTTPException(status_code=404, detail="没有找到这一条提醒。")
+        if not db.update_reminder_status(
+                reminder_id, ReminderStatus.COMPLETED, "completed_at", now):
+            raise HTTPException(status_code=409, detail="这一条现在改不了。")
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_REMINDER_DONE,
+            entity_id=reminder_id,
+            payload={"title": existing.title},
+        )
+        return {"ok": True, "id": reminder_id, "status": "已完成",
+                "message": f"好的，{existing.title}已经记成办好了。"}
+
+    @router.post("/reminders/{reminder_id}/cancel")
+    def cancel_reminder(reminder_id: str) -> dict[str, Any]:
+        ctx = _ctx()
+        existing = db.get_reminder(reminder_id)
+        if existing is None or existing.family_id != ctx.family_id:
+            raise HTTPException(status_code=404, detail="没有找到这一条提醒。")
+        if not db.cancel_reminder(reminder_id, ctx.family_id, _DEMO_ELDER):
+            raise HTTPException(status_code=409, detail="这一条现在取消不了。")
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_REMINDER_CANCELLED,
+            entity_id=reminder_id,
+            payload={"title": existing.title},
+        )
+        return {"ok": True, "id": reminder_id, "status": "已取消",
+                "message": f"已经把「{existing.title}」取消了。"}
+
+    # ---- 紧急联系人 ----------------------------------------------------------
+
+    #: 家庭角色 → 界面上的称呼。库里的 `role` 只有 elder/family/system 三个值，
+    #: 而屏幕上不许出现英文枚举值。`display_name` 本身就是「女儿」「儿子」，
+    #: 所以称呼直接用它，这张表只兜底 role。
+    _ROLE_WORDS = {"family": "家人", "system": "系统", "elder": "本人"}
+
+    @router.get("/contacts")
+    def contacts() -> dict[str, Any]:
+        """紧急联系人。真的读家庭成员表，不是三行写死的卡片。
+
+        **没有电话号码这个字段。** `actors` 表只有 id / family_id / role /
+        display_name。所以这里回 `phone: null`，由界面决定怎么显示——
+        编一个号码出来，老人真按下去会拨错人。
+        """
+        ctx = _ctx()
+        people = []
+        for row in db.list_actors(ctx.family_id):
+            if row["id"] == _DEMO_ELDER:
+                continue
+            people.append({
+                "id": row["id"],
+                "name": row["display_name"],
+                "role": _ROLE_WORDS.get(row["role"], "家人"),
+                "phone": None,
+                "primary": row["id"] == _DEMO_FAMILY,
+            })
+        return {"items": people, "count": len(people)}
+
+    # ---- 设置：字号与语音 ----------------------------------------------------
+    #
+    # 存在 `memory_items` 里，`sensitivity='preference'`。这不是借地方放东西：
+    # 那张表的枚举里本来就有 `preference`，而「记住老人的偏好、并且可撤回」
+    # 正是这个产品的同意记忆机制。设置项走它，等于自动获得撤回与审计。
+
+    _PREF_KEY = "elder_app_settings"
+    _PREF_DEFAULTS = {"fontScale": 1.0, "voiceSpeed": 1.0, "highContrast": False}
+
+    def _pref_item(ctx: AuthContext):
+        for item in db.list_memories(ctx.family_id, _DEMO_ELDER):
+            if item.key == _PREF_KEY and item.status != MemoryStatus.REVOKED:
+                return item
+        return None
+
+    @router.get("/settings")
+    def get_settings() -> dict[str, Any]:
+        ctx = _ctx()
+        item = _pref_item(ctx)
+        values = dict(_PREF_DEFAULTS)
+        if item is not None and isinstance(item.value, dict):
+            values.update(item.value)
+        return {**values, "saved": item is not None}
+
+    @router.put("/settings")
+    def put_settings(body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """改字号 / 语速。**真的存下来**，换一页、重开都还在。"""
+        body = body or {}
+        ctx = _ctx()
+        now = datetime.now(UTC)
+        values = dict(_PREF_DEFAULTS)
+        item = _pref_item(ctx)
+        if item is not None and isinstance(item.value, dict):
+            values.update(item.value)
+        for key, cast in (("fontScale", float), ("voiceSpeed", float),
+                          ("highContrast", bool)):
+            if key in body:
+                try:
+                    values[key] = cast(body[key])
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail=f"{key} 这个值看不懂。")
+        # 字号夹在能用的范围里。前端滑到 3 倍会让整屏只剩两个字。
+        values["fontScale"] = min(max(float(values["fontScale"]), 0.9), 1.6)
+        values["voiceSpeed"] = min(max(float(values["voiceSpeed"]), 0.6), 1.6)
+
+        if item is None:
+            item = MemoryItem(
+                id=f"mem-{uuid.uuid4().hex[:12]}",
+                family_id=ctx.family_id,
+                elder_id=_DEMO_ELDER,
+                key=_PREF_KEY,
+                value=values,
+                sensitivity=MemorySensitivity.PREFERENCE,
+                scope=MemoryScope.PRIVATE,
+                purpose="记住这位老人的字号与语音偏好，用于渲染界面与朗读。",
+                status=MemoryStatus.ACTIVE,
+                created_at=now,
+                updated_at=now,
+                expires_at=now + timedelta(days=3650),
+                consent_actor_id=ctx.actor_id,
+            )
+            db.create_memory(item)
+        else:
+            db.update_memory(item.model_copy(update={"value": values, "updated_at": now}))
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_SETTINGS_CHANGED,
+            entity_id=_PREF_KEY,
+            payload=values,
+        )
+        return {**values, "saved": True, "message": "设置已经记住了。"}
+
+    # ---- 通知 ---------------------------------------------------------------
+
+    @router.get("/notifications")
+    def notifications() -> dict[str, Any]:
+        """给老人看的通知。读真表，取不到就是空表，不编。"""
+        ctx = _ctx()
+        items = []
+        try:
+            from .models import ActorRole
+            rows = db.list_notifications(ctx.family_id, ActorRole.ELDER, 50)
+        except Exception:
+            rows = []
+        for n in rows:
+            created = getattr(n, "created_at", None)
+            items.append({
+                "id": getattr(n, "id", None),
+                "title": getattr(n, "title", None) or getattr(n, "body", ""),
+                "body": getattr(n, "body", None),
+                "at": created.isoformat() if created else None,
+                "time": created.strftime("%m月%d日 %H:%M") if created else None,
+            })
+        return {"items": items, "count": len(items)}
 
     return router

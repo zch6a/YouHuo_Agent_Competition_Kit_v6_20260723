@@ -50,8 +50,126 @@ function mountGlobalNav(){
 }
 
 
-const ROUTES={home:"home.html",listen:"voice-listening.html",recognize:"recognition.html",bill:"bill-detail.html",confirm:"voice-confirm.html",success:"payment-success.html",records:"records.html",services:"services.html",cert:"certificate.html",profile:"profile.html"};
-function go(n){location.href=ROUTES[n]||n}function toast(m){let t=document.querySelector(".toast");if(!t){t=document.createElement("div");t.className="toast";document.body.appendChild(t)}t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800)}
+const ROUTES={
+  home:"home.html", listen:"voice-listening.html", recognize:"recognition.html",
+  bill:"bill-detail.html", confirm:"voice-confirm.html", success:"payment-success.html",
+  records:"records.html", services:"services.html", cert:"certificate.html",
+  profile:"profile.html",
+  // 下面六个是这一轮新建的。加它们的理由：原先有 20 个控件点下去只弹一句
+  // 「还没有做好」——用户要的是「点击需要有反馈或者跳转界面或者进入当前功能」。
+  med:"medication.html",        // 用药提醒
+  schedule:"schedule.html",     // 今日安排 / 就医安排
+  contacts:"contacts.html",     // 紧急联系人
+  settings:"settings.html",     // 字号与语音
+  approve:"family-approve.html",// 家人点头——闭环原先在界面上点不到
+  health:"health.html",         // 健康助手
+  me:"me.html",                 // 我的资料
+};
+//: 「服务」类控件点下去到哪儿。**这是唯一的映射源。**
+//:
+//: 原先这 19 个控件共用一句 toast「入口已预留，可直接接后端」——不但是工程话，
+//: 而且它把「哪个格子该去哪」这件事整个抹掉了：19 个不同的功能，一句一样的话，
+//: 谁也说不出少的是什么。写成表之后，缺一条就是表里少一行，是能指着看的。
+//:
+//: key 用 `data-service` 上那个中文名，因为那正是屏幕上印的字——
+//: 屏幕上写「用药提醒」而代码里跳去别处，是这一轮刚修过的一类错误。
+const SERVICE_DEST = {
+  "用药提醒": "med",
+  "紧急联系人": "contacts",
+  "就医安排": "schedule",
+  "今日事项": "schedule",
+  "我的待办": "schedule",
+  "复诊详情": "schedule",
+  "我的账单": "bill",
+  "我的凭证": "cert",
+  "健康助手": "health",
+  "设置": "settings",
+  "字体与语音设置": "settings",
+  "设备与安全": "settings",
+  "我的资料": "me",
+};
+
+function go(n){location.href=ROUTES[n]||n}
+
+// ---- 临时浮层：不预先写在每一页的 HTML 里，用到时才建 -----------------------
+// 十个页面各写一遍同样的 `.modal` 只会漂——本项目已经为「同一段 markup 抄三份」
+// 付过一次代价（底部导航条目数在页面之间不一致）。
+function showSheet(title, lines, actions){
+  document.querySelector("#appSheet")?.remove();
+  const box = document.createElement("div");
+  box.id = "appSheet";
+  box.className = "modal show";
+  const inner = document.createElement("div");
+  inner.className = "modal-box";
+  const h = document.createElement("h2"); h.textContent = title;
+  inner.appendChild(h);
+  for (const line of lines){
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.style.cssText = "margin:9px 0 0;font-size:16px;line-height:1.55";
+    p.textContent = line;
+    inner.appendChild(p);
+  }
+  for (const [label, route] of (actions || [])){
+    const b = document.createElement("button");
+    b.className = "btn secondary";
+    b.style.cssText = "width:100%;margin-top:10px";
+    b.dataset.action = "nav";
+    b.dataset.to = route;
+    b.textContent = label;
+    inner.appendChild(b);
+  }
+  const ok = document.createElement("button");
+  ok.className = "btn primary";
+  ok.style.cssText = "width:100%;margin-top:14px";
+  ok.dataset.action = "close-modal";
+  ok.textContent = "知道了";
+  inner.appendChild(ok);
+  box.appendChild(inner);
+  document.body.appendChild(box);
+}
+
+//: 「常用功能直达」这一格。它印在服务页上，而服务页本身就是功能列表——
+//: 跳去它自己毫无意义。所以它做的是「把最常用的四个直接摆出来」，
+//: 这正是它标签上写的那件事。
+function openQuickMenu(){
+  showSheet("常用功能", ["下面这四件是用得最多的。"], [
+    ["用药提醒", "med"],
+    ["紧急联系人", "contacts"],
+    ["我的账单", "bill"],
+    ["办理记录", "records"],
+  ]);
+}
+
+//: 完整审计链。凭证页默认只列四个凭证要素，链本身是这个产品的核心，
+//: 但原先「查看完整凭证」点了只弹一句「可接凭证详情接口」。
+let _certCache = null;
+function showChainSheet(){
+  const chain = (_certCache && _certCache.chain) || [];
+  if (!chain.length){
+    showSheet("完整凭证", ["这一笔还没有可展示的链。"]);
+    return;
+  }
+  const who = {"elder-demo":"老人本人","daughter-demo":"女儿","son-demo":"儿子","system-demo":"优活系统"};
+  const lines = chain.map(c =>
+    `${CHAIN_WORDS[c.action] || c.action}　·　${who[c.by] || c.by}　·　${String(c.digest||"").slice(0,8)}`);
+  lines.push(_certCache.chainValid === true
+    ? "整条链自校验通过：每一步的摘要都对得上。"
+    : "这条链没有通过自校验，请联系家人。");
+  showSheet("完整凭证", lines);
+}
+
+//: 审计事件 → 人话。和后端 `_WORDS` 是同一批词，但这里只用于链的展示。
+const CHAIN_WORDS = {
+  "app.payment.prepared": "发起申请",
+  "app.payment.teach_back": "复述确认",
+  "app.payment.awaiting_family": "等家人确认",
+  "FAMILY_APPROVED_AND_EXECUTED": "家人同意后已办好",
+  "FAMILY_APPROVAL_RECORDED": "家人已点头",
+  "TASK_CREATED": "开始办一件事",
+  "ELDER_CONFIRMED": "您确认了",
+  "TEACH_BACK_VERIFIED": "复述核对通过",
+};function toast(m){let t=document.querySelector(".toast");if(!t){t=document.createElement("div");t.className="toast";document.body.appendChild(t)}t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800)}
 // 后端拿不到的字段一律留空，**绝不显示写死的假值**。
 // 原来的写法是 `if(val!==undefined) el.textContent=val`——null 会被写进去，
 // 而 HTML 里那些 "68.40"/"李叔" 的兜底文本在请求失败时会原样留在屏幕上。
@@ -257,7 +375,36 @@ if(a==="records-filter"){
   renderRecords(el.dataset.kind || el.textContent.trim());
   return;
 }
-if(a==="service"){toast(el.dataset.service+"：这一项还没有做好");return}if(a==="cert-detail"){toast(el.dataset.label+"：这一项的详情还没有做好");return}
+if(a==="service"){
+  const name = (el.dataset.service || "").trim();
+  const dest = SERVICE_DEST[name];
+  if (dest){ go(dest); return; }
+  if (name === "帮助与客服"){ document.querySelector("#helpModal")?.classList.add("show"); return; }
+  if (name === "常用服务"){ openQuickMenu(); return; }
+  if (name === "全部记录"){
+    // 「查看全部记录」就在记录页上——它要做的是把筛选清掉，不是跳去别处。
+    document.querySelectorAll("[data-action=records-filter]").forEach(x=>x.classList.remove("active"));
+    document.querySelector("[data-action=records-filter]")?.classList.add("active");
+    renderRecords("全部");
+    document.querySelector("#recordList")?.scrollIntoView({behavior:"smooth", block:"start"});
+    toast("已经显示全部记录"); return;
+  }
+  // 走到这里说明 SERVICE_DEST 少了一条。说出缺的是哪一个，
+  // 别再回到那句谁也定位不了的「还没有做好」。
+  console.warn("SERVICE_DEST 里没有这一项：", name);
+  toast(name + "：这一项还没有接上，我记下了");
+  return;
+}
+if(a==="cert-detail"){
+  const label = el.dataset.label || "这一项";
+  if (label === "完整凭证"){ showChainSheet(); return; }
+  const value = (el.querySelector("span:last-child")?.textContent || "").replace("　›","").trim();
+  showSheet(label, value && value !== "还没有采集"
+    ? [value, "这一条写在审计链上，任何一方都改不动。"]
+    : ["这一条还没有采集到。",
+       "凭证上只写真的采到的东西——没采到就空着，不补一个看起来合理的值。"]);
+  return;
+}
 if(a==="emergency"){document.querySelector("#sosModal")?.classList.add("show");return}if(a==="emergency-confirm"){await YouhuoAPI.post("/emergency/call",{source:"elder-app"});el.closest(".modal")?.classList.remove("show");toast("正在联系紧急联系人");return}
 }catch(err){console.error(err);toast("操作失败，请稍后重试")}});
 
@@ -313,6 +460,8 @@ const CERT_STATE = {
 function renderCert(cert){
   const box = document.querySelector("#certElements");
   if (!box || !cert) return;
+  // 留着给「查看完整凭证」用——那一格要展示整条链，而链只在这一次响应里。
+  _certCache = cert;
 
   // 这一页的每一个字都来自这一笔凭证自己。
   //

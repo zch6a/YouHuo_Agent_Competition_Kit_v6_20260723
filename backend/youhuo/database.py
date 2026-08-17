@@ -490,6 +490,21 @@ class Database:
             actor_id=row["id"], family_id=row["family_id"], role=ActorRole(row["role"]), display_name=row["display_name"]
         )
 
+    def list_actors(self, family_id: str) -> list[sqlite3.Row]:
+        """一个家庭里的所有成员。
+
+        原先只有按 id 单取的 `actor()`，于是「紧急联系人」这类要**列出家人**的界面
+        无处取数，只能把 `elder-demo` / `daughter-demo` / `son-demo` 这几个 id
+        写死在调用方——那等于把演示数据焊进产品代码，换一个家庭就全空。
+        排序把老人自己放最后：这张表是给老人看的联系人，他不需要联系自己。
+        """
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM actors WHERE family_id=? "
+                "ORDER BY CASE role WHEN 'family' THEN 0 WHEN 'system' THEN 1 ELSE 2 END, display_name",
+                (family_id,),
+            ).fetchall()
+
     def actor_in_family(self, actor_id: str, family_id: str, required_role: str | None = None) -> bool:
         row = self.actor(actor_id)
         if row is None or row["family_id"] != family_id:

@@ -3,12 +3,12 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 200 |
+| 总数 | 314 |
 |---|---|
-| 有 id | 200 |
+| 有 id | 314 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
-| 追不到 handler（非 `<a>`） | 15 |
+| 追不到 handler（非 `<a>`） | 16 |
 
 ## 全部控件
 
@@ -86,11 +86,11 @@
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | trust | — | a | navigate | —:— | — | consumer | family | shell | primary |
-| `#homeFollowupDetail` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#homeFollowupDetail` | app/pages/home | — | button | — | app/assets/js/app.js:items | — | consumer | app | shell | primary |
 | `#homeVoiceStart` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
-| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
-| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | primary |
-| `#` | app/pages/home | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#` | app/pages/home | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/home | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/home | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
 | `#directorToggle` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
 | `#playStory` | stage | — | button | — | stage.js:playStory | — | presentation | stage | shell | presentation-only |
@@ -214,3 +214,117 @@
 | `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
 | `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
 | `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | secondary |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/bill-detail | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/certificate | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/certificate | — | button | — | —:— | — | consumer | app | shell | primary |
+| `#` | app/pages/certificate | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/certificate | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/certificate | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | primary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | primary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | primary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/contacts | — | button | DOMContentLoaded | app/assets/js/page-contacts.js:goBack | — | consumer | app | shell | primary |
+| `#` | app/pages/family-approve | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#faApprove` | app/pages/family-approve | — | button | — | app/assets/js/page-family-approve.js:render | — | consumer | app | shell | hidden-until-state |
+| `#faLater` | app/pages/family-approve | — | button | — | app/assets/js/page-family-approve.js:render | — | consumer | app | shell | hidden-until-state |
+| `#faCert` | app/pages/family-approve | — | button | — | app/assets/js/page-family-approve.js:render | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/health | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | secondary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | secondary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/me | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/medication | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#medAddToggle` | app/pages/medication | — | button | click | app/assets/js/page-medication.js:start | — | consumer | app | shell | primary |
+| `#medTitle` | app/pages/medication | — | input | click | app/assets/js/page-medication.js:start | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | hidden-until-state |
+| `#medTime` | app/pages/medication | — | input | click | app/assets/js/page-medication.js:start | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | hidden-until-state |
+| `#` | app/pages/medication | — | button | — | app/assets/js/page-medication.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/payment-success | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/profile | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | secondary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/recognition | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/records | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/records | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#` | app/pages/records | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#` | app/pages/records | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#` | app/pages/records | — | button | — | —:— | — | consumer | app | shell | secondary |
+| `#` | app/pages/records | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/records | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/records | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/records | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/page-schedule.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/page-schedule.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/page-schedule.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/page-schedule.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/schedule | — | button | — | app/assets/js/page-schedule.js:onClick | — | consumer | app | shell | secondary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/services | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | primary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | DOMContentLoaded | app/assets/js/page-settings.js:goBack | — | consumer | app | shell | secondary |
+| `#` | app/pages/settings | — | button | — | app/assets/js/page-settings.js:render | — | consumer | app | shell | secondary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-confirm | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:hydrate | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:mountGlobalNav | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:said | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
+| `#` | app/pages/voice-listening | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |

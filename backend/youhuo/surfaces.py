@@ -191,6 +191,20 @@ def surface_of(page_or_route: str) -> RouteSurface:
     if page_or_route in SURFACES:
         return SURFACES[page_or_route]
     route = PAGE_TO_ROUTE.get(page_or_route)
-    if route is None:
-        raise KeyError(f"{page_or_route!r} 不在 SURFACES 里——新页面要先在这里登记")
-    return SURFACES[route]
+    if route is not None:
+        return SURFACES[route]
+    # 山水版那一套的**内部页面**。
+    #
+    # `app/pages/*.html` 有十七个，但它们不是十七个路由——它们全都住在 `/app`
+    # 这一个 shell 里，靠 `app.js` 的 `ROUTES` 互相跳转。所以它们共享 `/app`
+    # 的 surface 与 shell，`entry` 记成各自的文件名（那才是它们彼此的区别）。
+    #
+    # 为什么不把它们逐个登记进 `SURFACES`：那张表记的是**服务器发得出的路由**，
+    # 有一批闸门按它遍历去真的访问 URL。登记进去等于声称有十七个 URL 入口，
+    # 而实际只有 `/app` 一个——那些闸门会去敲十六个 404，然后把 404 报成产品缺陷。
+    if page_or_route.startswith("app/pages/") and page_or_route.endswith(".html"):
+        base = SURFACES["/app"]
+        return RouteSurface(base.surface, base.shell,
+                            page_or_route.rsplit("/", 1)[-1][: -len(".html")],
+                            page_or_route)
+    raise KeyError(f"{page_or_route!r} 不在 SURFACES 里——新页面要先在这里登记")
