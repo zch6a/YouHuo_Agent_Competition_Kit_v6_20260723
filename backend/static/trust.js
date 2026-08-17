@@ -301,6 +301,20 @@ async function renderReceipt() {
   head.appendChild(el('span', `pill ${done ? 'good' : 'bad'}`, done ? '已办好' : '未完成'));
   host.appendChild(head);
 
+  // 印章由**这一笔的真实状态**决定，不写在 HTML 里。
+  //
+  // 写死在 markup 上的话，「正在读这件事的记录……」那一屏上就已经盖着章了，
+  // 未完成的那一笔也会盖着章——在一整页都在讲「这里的每一条都可核验」的地方，
+  // 一枚盖错的印章比没有印章糟得多。
+  //
+  // 每次重绘都要显式取反：只在 done 时设、不在 !done 时删的话，
+  // 一笔办好的凭证之后切到一笔未完成的，章会留在上面。
+  if (done) host.dataset.artSeal = 'true';
+  else {
+    delete host.dataset.artSeal;
+    host.querySelector(':scope > .art-seal')?.remove();
+  }
+
   // --- 没有进链的那一句 ---
   //
   // 这里原先有两种说法，靠 `asked` 分支：亲手办的那一次知道他说了什么，可以把原话

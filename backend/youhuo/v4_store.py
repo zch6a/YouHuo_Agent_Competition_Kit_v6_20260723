@@ -524,6 +524,29 @@ class V4FeatureStore:
                 )
         return {"routines": len(routines), "occurrences_created": created, "duplicates": duplicates}
 
+    def set_routine_status(self, family_id: str, elder_id: str, routine_id: str,
+                           status: RoutineStatus) -> RoutineRecord:
+        """暂停 / 恢复一条例程。
+
+        没有删除：例程停掉之后 `materialize_routines` 不再为它生成新的发生，
+        但已经生成的提醒和历史发生原样留着。删掉的话，那些提醒会变成
+        指向一个不存在的例程的孤儿。
+        """
+        row = self.conn.execute(
+            "SELECT * FROM recurring_routines WHERE id=? AND family_id=? AND elder_id=?",
+            (routine_id, family_id, elder_id),
+        ).fetchone()
+        if not row:
+            raise PermissionError("循环事务不属于当前老人。")
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE recurring_routines SET status=?,updated_at=? WHERE id=?",
+                (status.value, iso(utcnow()), routine_id),
+            )
+        return self._row_routine(
+            self.conn.execute("SELECT * FROM recurring_routines WHERE id=?", (routine_id,)).fetchone()
+        )
+
     def list_occurrences(self, family_id: str, elder_id: str | None = None) -> list[RoutineOccurrence]:
         query = "SELECT * FROM routine_occurrences WHERE family_id=?"
         args: list[Any] = [family_id]

@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <link rel="stylesheet" href="/static/art-cards.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -95,22 +96,40 @@
       <div id="overviewBody" aria-live="polite">
         <!-- 结论在最前，和「今天」那一段用的是同一个组件（`.report-verdict`）：
              同一个判定在两处必须长得一样，否则人会以为它们是两件事。 -->
-        <div class="report-verdict" id="ovVerdict">
+        <!-- 被照护者 + 今日整体情况：整张卡的轮廓来自 `art/shell/wide-a.svg`，
+             再叠一只立鹤。鹤是这位老人的意象（长者、安康），不是通用装饰——
+             工作单要求这里是「一张成熟主卡」，而成熟的意思是它跟别的卡不一样。
+
+             判定文字仍然由 `care.js` 写进 `.report-badge` 和 `<strong>`；
+             美术层是 prepend 的 `aria-hidden` 图层，不动这两个节点。 -->
+        <!-- **只挂卡壳，不再叠鹤。** 第一版两个一起挂，实测卡片塌了：
+             两套让位 padding 打架，绿色状态药丸溢出卡壳、正文掉到卡外。
+             而且 `wide-a` 本身就是「左边一幅画、右边留白」的题签构图——
+             再贴一只鹤是重复。交接包 R8 那一段的注释写的正是这句：
+             「卡壳已自带完整构图；这些 R7 局部贴图在同一张卡上会重复」。 -->
+        <div class="report-verdict" id="ovVerdict" data-art-shell="wide-a">
           <span class="report-badge">还没读到</span><strong>正在读今天的情况……</strong>
         </div>
         <a class="trust-more-link" id="ovToday" href="#today">
           <span><span>今天</span><br /><span class="meta">正在读今天的情况……</span></span>
         </a>
-        <a class="trust-more-link" id="ovMed" href="#med">
+        <!-- 四类各一个意象，语义各不相同，**每类只有一个**（工作单：控制密度）：
+               用药 → 莲     清、药性
+               身体 → 远山   起伏、趋势
+               心情 → 玉兰   舒展
+               安全 → 松     稳、守
+             都是 `mark`/`wide` 形状，贴角落，不进文字区。
+             这四个是「分别选择合适意象」的落点，不是四处贴同一朵花。 -->
+        <a class="trust-more-link" id="ovMed" href="#med" data-art-scene="lotus">
           <span><span>在吃什么药</span><br /><span class="meta">正在读用药情况……</span></span>
         </a>
-        <a class="trust-more-link" id="ovBody" href="#body">
+        <a class="trust-more-link" id="ovBody" href="#body" data-art-scene="mountain">
           <span><span>身体</span><br /><span class="meta">正在读体检与就诊记录……</span></span>
         </a>
-        <a class="trust-more-link" id="ovMood" href="#mood">
+        <a class="trust-more-link" id="ovMood" href="#mood" data-art-scene="magnolia">
           <span><span>心情</span><br /><span class="meta">正在读最近两周的情况……</span></span>
         </a>
-        <a class="trust-more-link" id="ovSafety" href="#safety">
+        <a class="trust-more-link" id="ovSafety" href="#safety" data-art-scene="pine">
           <span><span>安全</span><br /><span class="meta">正在读安全设置……</span></span>
         </a>
       </div>
@@ -192,5 +211,8 @@
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/care.js" defer></script>
+    <!-- `defer` 跟着 care.js：两个都 defer 时按出现顺序执行，
+         美术层在业务 JS 首次渲染之后挂，少一次重排。 -->
+    <script src="/static/art-cards.js" defer></script>
 </body>
 </html>

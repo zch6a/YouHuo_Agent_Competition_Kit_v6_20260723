@@ -199,6 +199,46 @@ class AppMedicationToday(StrictModel):
     stockWarning: str | None = None
 
 
+# ---- 固定安排（循环例程）---------------------------------------------------
+#
+# 和「提醒」不是同一件事：提醒是一次性的一条，例程是**生成器**。
+# `materialize_routines` 会为每一次发生真的插一条提醒
+# （`source="routine:<id>"`），并在 `routine_occurrences.reminder_id` 上留下关联。
+# 所以老人端的今日安排会自动认它们，这一层不用再拼一遍。
+
+class AppRoutine(StrictModel):
+    id: str
+    title: str
+    #: 每天 / 每周一、三 / 每月 5 号。给人看的一句话，不是枚举值。
+    repeatText: str
+    time: str
+    #: 生活 / 用药 / 就医 / 缴费 / 社交。
+    category: str
+    #: 进行中 / 已暂停。
+    status: str
+    active: bool
+    #: 下一次什么时候。已暂停的仍然给出原本的下次时间，界面上灰着显示。
+    nextAt: str | None = None
+    nextText: str | None = None
+
+
+class AppRoutineList(StrictModel):
+    items: list[AppRoutine]
+    count: int
+    message: str
+
+
+class AppRoutineChanged(StrictModel):
+    ok: bool
+    id: str
+    title: str
+    status: str
+    message: str
+    #: 这次操作真的生成了几条提醒。0 表示**什么都没排上**——
+    #: 那时界面不能说「已经排好了」。
+    scheduled: int = 0
+
+
 class AppPendingMedication(StrictModel):
     id: str
     name: str

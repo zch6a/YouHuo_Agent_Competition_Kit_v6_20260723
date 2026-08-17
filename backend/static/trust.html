@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <link rel="stylesheet" href="/static/art-cards.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -70,7 +71,15 @@
            这里不需要说是哪一种——要证明的是「每一步都留下了记录」。 -->
       <p class="section-note">一次真实的缴费：开口、核对账单、念一遍金额、家人点头、拿回执。
         每一步都留下了记录，中间改一步，后面全部对不上。</p>
-      <article class="panel receipt" id="receipt" aria-live="polite">
+      <!-- 票据，不是健康卡。
+           外框来自 `art/ui/receipt-frame.svg`——它是可拉伸的描边框
+           （`border-image`，四角原样、只拉边），所以凭证有几行都不会变形。
+           完整卡壳（hero/wide）在这里用不了：那是有构图的画，高度一变就拉扁。
+
+           印章**不写在这里**。`trust.js` 只有在这一笔真的核验通过时才加
+           `data-art-seal="true"`；写死在 HTML 上的话，一张还在「正在读」
+           的凭证上就已经盖着章了——在这一页上那是最不能出的错。 -->
+      <article class="panel receipt art-receipt" id="receipt" aria-live="polite">
         <p class="receipt-pending">正在读这件事的记录……</p>
       </article>
     </section>
@@ -141,5 +150,6 @@
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/trust.js" defer></script>
+    <script src="/static/art-cards.js" defer></script>
 </body>
 </html>

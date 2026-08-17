@@ -21,6 +21,9 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <!-- 美术卡片层。放在 pages.css **之后**：它要覆盖 `.panel` 那类通用白卡背景，
+       靠层叠顺序而不是 `!important`（交接包那份 pages.css 里累了 311 个）。 -->
+  <link rel="stylesheet" href="/static/art-cards.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -36,7 +39,13 @@
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
   <main id="main" class="shell family-app">
-    <header class="fam-head">
+    <!-- 结论卡：整张卡的轮廓、纸张、山水就是 `art/shell/hero.svg` 本身，
+         HTML 只在它的留白区放那句结论。这是「SVG 参与 UI 结构」的落点——
+         不是白卡加圆角再往角上贴一朵花。
+
+         选 hero 卡壳给这里，是因为这一页第一屏只有一个结论要说；
+         整页最重的视觉分量应当落在唯一那句话上，而不是平摊给三张一样的白卡。 -->
+    <header class="fam-head" data-art-shell="hero">
       <div class="fam-head-text">
         <!-- 第一句话就是结论。
              这里原先是「家里今天」加一行「最后更新 08:14」——一个栏目名和一个时间戳，
@@ -105,8 +114,11 @@
       <div id="tasks"></div>
       <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
 
+      <!-- 日报那一段用锦鲤：两条鱼是「家里两个人」的关系意象，
+           对应工作单里「关系/家庭信息可使用花鸟或梅兰类局部元素」。
+           贴右下角（koi 是 246×207 的横构图），不压住 aria-live 的正文。 -->
       <h2 class="section-head">今天怎么样</h2>
-      <div id="dailyReport" aria-live="polite">正在生成……</div>
+      <div id="dailyReport" aria-live="polite" data-art-scene="koi">正在生成……</div>
       <div class="metric-row">
         <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
         <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
@@ -146,8 +158,10 @@
       <p id="chain" class="notice"></p>
       <div id="audit"></div>
       <p class="section-note">这里是给家人看的说法。逐条记录和它们怎么被核对上的，在<a href="/trust" class="inline-tap">可信中心</a>。</p>
+      <!-- 「做过的事」用卷轴：这一段是审计记录，卷轴是它自己的语义，
+           不是随便找一张画贴上去。 -->
       <h2 class="section-head">其他</h2>
-      <div class="fam-links">
+      <div class="fam-links" data-art-scene="scroll">
         <a href="/care" class="fam-link">照护档案</a>
         <a href="/trust" class="fam-link">可信中心</a>
         <!-- 「首页」从底部导航搬到这里，**不是删掉**。
@@ -182,5 +196,9 @@
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/family.js"></script>
+    <!-- 排在业务 JS **之后**：`family.js` 会用 innerHTML 整块重写 `#tasks`
+         这些容器，先挂的图层会被冲掉。art-cards.js 自带 MutationObserver
+         补挂，但初次顺序对了能少一次重排。 -->
+    <script src="/static/art-cards.js"></script>
 </body>
 </html>

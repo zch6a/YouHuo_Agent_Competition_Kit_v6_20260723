@@ -27,7 +27,7 @@ from .models import (
     TaskStatus,
     TaskType,
 )
-from .utils import canonical_json
+from .utils import canonical_json, local_now, local_zone
 
 
 class IdempotencyConflict(RuntimeError):
@@ -486,13 +486,20 @@ class Database:
         这和 `api.py` 给作息历史做回填的理由是同一条：演示家庭需要一段过去，
         才看得出产品在做什么。
 
-        锚在「今天 08:00 UTC」而不是 `now`：同一天里反复调用要落在同一个 `due_at` 上，
+        锚在「今天当地 08:00」而不是 `now`：同一天里反复调用要落在同一个 `due_at` 上，
         否则表上的 `UNIQUE(elder_id,title,due_at)` 挡不住重复，刷几次就堆出十几条。
         用相对偏移而不是绝对日期，是为了它在比赛当天不会变成过去时——那样首页又空了，
         只是这次以一种更难发现的方式。
+
+        **当地**而不是 UTC：原先锚在 08:00 UTC，配上同样不换算的显示端，
+        界面上看起来是对的（存 11:00 显示 11:00），但存下来的是 11:00 UTC——
+        东八区的晚上七点。这一层内部自洽，跨出去就错：循环例程排出来的提醒
+        存的是真实时刻，「每天早上八点」于是显示成 00:00。
+        现在两端都按当地时区处理，**界面上的字符串和原来完全一样**，
+        变的是它们背后指向的时刻。
         """
         now = utcnow()
-        midnight = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+        midnight = datetime.combine(local_now(now).date(), dtime(8, 0), tzinfo=local_zone())
         made = 0
         with self.transaction() as conn:
             for offset_h, title in ((3, "复诊前准备病历"),

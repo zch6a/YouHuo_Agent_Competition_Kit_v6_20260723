@@ -63,6 +63,8 @@ from .app_schemas import (
     AppReminderChanged,
     AppReminderCreated,
     AppReminderList,
+    AppRoutineChanged,
+    AppRoutineList,
     AppSettings,
     AppSpeechStatus,
     AppTeachBackResult,
@@ -127,6 +129,9 @@ _EV_HEALTH_RECORDED = "app.health.recorded"
 _EV_REMINDER_MOVED = "app.reminder.moved"
 _EV_APPOINTMENT_CANCELLED = "app.appointment.cancelled"
 _EV_MEDICATION_DECIDED = "app.medication.decided"
+_EV_ROUTINE_CREATED = "app.routine.created"
+_EV_ROUTINE_PAUSED = "app.routine.paused"
+_EV_ROUTINE_RESUMED = "app.routine.resumed"
 
 
 def _yuan(cents: int) -> str:
@@ -167,7 +172,16 @@ def _parse_when(raw: str) -> datetime:
     try:
         if len(raw) <= 5 and ":" in raw:
             hh, mm = (int(x) for x in raw.split(":", 1))
-            due = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            # 老人说的「八点」是**墙上时间**，不是 UTC 的八点。
+            #
+            # 原先这里直接 `now(UTC).replace(hour=8)`，配上显示端同样直接
+            # `strftime` 回去——这一层内部自洽（说八点看到八点），
+            # 但存下来的时刻是 08:00 UTC，在东八区实际是下午四点。
+            # 提醒的到点判定、升级计时、和例程排出来的提醒都按真实时刻走，
+            # 所以这一条只在**跨出这一层**的时候暴露：
+            # 例程建的「每天八点」显示成 00:00，因为那是真的八点。
+            local = local_now(now).replace(hour=hh, minute=mm, second=0, microsecond=0)
+            due = local.astimezone(UTC)
             return due + timedelta(days=1) if due < now else due
         due = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         return due if due.tzinfo else due.replace(tzinfo=UTC)
@@ -379,12 +393,17 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         `place` 后端没有这个字段，回 null；界面上宁可不显示地点，也不编一个医院。
         """
         now = datetime.now(UTC)
-        today = now.date()
+        today = local_now(now).date()      # 「今天」按老人所在时区切，不按 UTC
         items = []
         for r in db.list_reminders(ctx.family_id, limit=60):
             if r.elder_id != _elder_of(ctx):
                 continue
-            due = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
+            # 一律换算到老人所在时区再比日期、再读钟点。
+            #
+            # 原先这里直接拿 UTC 的 `date()` 和 `strftime`。同一层内自洽，
+            # 但**跨出这一层就错**：例程排出来的提醒存的是真实时刻，
+            # 「每天早上八点」于是显示成 00:00。
+            due = local_now(r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC))
             if due.date() != today:
                 continue
             # 取消掉的不在今天的安排里。
@@ -1113,6 +1132,12 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         # 不给它名字，它就以「办了一件事」出现在时间线上——看起来像个缺陷。
         # 不删（这一层不该决定审计链里少一条），给它一句能读懂的话。
         "DEMO_LOGIN": ("登录了优活", "服务", "record_request"),
+        "app.routine.created": ("加了一件固定安排", "健康", "record_confirm"),
+        "app.routine.paused": ("暂停了一件固定安排", "健康", "record_confirm"),
+        "app.routine.resumed": ("恢复了一件固定安排", "健康", "record_confirm"),
+        # 例程排期由 `v4_store.materialize_routines` 那一侧写。
+        "ROUTINES_MATERIALIZED": ("排好了接下来的固定安排", "健康", "record_confirm"),
+        "ROUTINE_OCCURRENCE_COMPLETED": ("完成了一件固定安排", "健康", "record_confirm"),
     }
 
     _OUTCOME_WORDS = {
@@ -1155,6 +1180,9 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             elif payload.get("amount_cents") is not None:
                 note = f"金额 ¥{_yuan(int(payload['amount_cents']))}"
             when = e.created_at
+            # 记录页的钟点也按老人所在时区读。审计时刻本来就是真实 UTC 时刻，
+            # 直接 strftime 会让「刚才那一笔」显示成八小时前。
+            shown = local_now(when if when.tzinfo else when.replace(tzinfo=UTC)) if when else None
             items.append(
                 {
                     "id": e.id,
@@ -1162,7 +1190,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                     "note": note,
                     "kind": kind,
                     "icon": icon,
-                    "time": when.strftime("%H:%M") if when else "",
+                    "time": shown.strftime("%H:%M") if shown else "",
                     "at": when.isoformat() if when else None,
                     "entityId": e.entity_id,
                 }
@@ -1640,7 +1668,9 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         return "其他"
 
     def _reminder_view(r: Any, now: datetime) -> dict[str, Any]:
-        due = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
+        utc = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
+        # 钟点和日期给人看，要用老人所在时区；`at` 仍给 UTC 时刻（机器用）。
+        due = local_now(utc)
         done = r.status in {ReminderStatus.COMPLETED, ReminderStatus.ACKNOWLEDGED}
         cancelled = r.status == ReminderStatus.CANCELLED
         return {
@@ -1649,12 +1679,12 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             "kind": _kind_of(r.title),
             "time": due.strftime("%H:%M"),
             "date": due.strftime("%m月%d日"),
-            "at": due.isoformat(),
+            "at": utc.isoformat(),
             "done": done,
             "cancelled": cancelled,
             # 界面上不出现英文枚举值——这里就把状态翻成人话，前端直接显示。
             "status": "已取消" if cancelled else ("已完成" if done else "待进行"),
-            "overdue": (not done) and (not cancelled) and due < now,
+            "overdue": (not done) and (not cancelled) and utc < now,
         }
 
     def _my_reminders(ctx: AuthContext) -> list[Any]:
@@ -2037,6 +2067,202 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                        ctx: AuthContext = Depends(_actor)) -> AppDoseRecorded:
         """记一次「没吃」。**不扣库存**——药还在。"""
         return _record_dose(ctx, plan_id, body, "skipped")
+
+    # ---- 固定安排（循环例程）----------------------------------------------
+    #
+    # 此前这一层只能建**一次性**提醒：想说「每天早上八点提醒我量血压」，
+    # 唯一的办法是一天建一条。而 v4 的 `recurring_routines` 早就做完了，
+    # 只是**两张表都是空的**——建好了从没被用过。
+    #
+    # 和提醒不是两个事实源：例程是生成器，`materialize_routines` 为每一次发生
+    # 真的插一条提醒（`source="routine:<id>"`），所以 `/agenda` 自动认它们。
+    #
+    # ## 为什么建完要立刻 materialize
+    #
+    # `POST /v4/routines/materialize` **只允许家属或系统触发**
+    # （`v4_api.py:122`）。老人自己建的例程如果不当场排期，就会一直停在那儿
+    # **什么都不发生**——而界面上它看起来建好了。这一层是产品自己的后端，
+    # 建完顺手把这条例程近期的发生排出来，是把老人刚才那个请求做完，
+    # 不是替他触发一次全家范围的重排。
+
+    _ROUTINE_CATEGORIES = {"life": "生活", "medication": "用药", "medical": "就医",
+                           "payment": "缴费", "social": "社交"}
+    _CATEGORY_BACK = {v: k for k, v in _ROUTINE_CATEGORIES.items()}
+    _WEEKDAY_WORDS = ["一", "二", "三", "四", "五", "六", "日"]
+    #: 建完立刻排多久。45 天（v4 的默认）会一口气生成 45 条提醒，
+    #: 把今日安排和提醒列表冲垮。老人这一屏要的是「最近这一周」。
+    _ROUTINE_HORIZON_DAYS = 7
+
+    def _repeat_text(r) -> str:
+        freq = getattr(r.frequency, "value", str(r.frequency))
+        if freq == "daily":
+            return "每天" if r.interval == 1 else f"每{r.interval}天"
+        if freq == "weekly":
+            if r.weekdays:
+                days = "、".join(_WEEKDAY_WORDS[d] for d in sorted(r.weekdays)
+                                 if 0 <= d < len(_WEEKDAY_WORDS))
+                return f"每周{days}"
+            return "每周"
+        if freq == "monthly":
+            return f"每月{r.day_of_month}号" if r.day_of_month else "每月"
+        return "定期"
+
+    def _routine_view(r) -> dict[str, Any]:
+        status = getattr(r.status, "value", str(r.status))
+        nxt = getattr(r, "next_due_at", None)
+        local = local_now(nxt if nxt and nxt.tzinfo else
+                          (nxt.replace(tzinfo=UTC) if nxt else datetime.now(UTC)))
+        return {
+            "id": r.id,
+            "title": r.title,
+            "repeatText": _repeat_text(r),
+            "time": r.time_local,
+            "category": _ROUTINE_CATEGORIES.get(
+                getattr(r.category, "value", str(r.category)), "生活"),
+            "status": "进行中" if status == "active" else "已暂停",
+            "active": status == "active",
+            "nextAt": nxt.isoformat() if nxt else None,
+            "nextText": local.strftime("%m月%d日 %H:%M") if nxt else None,
+        }
+
+    def _materialize(ctx: AuthContext) -> int:
+        """把这个家庭近期该发生的例程排成提醒，返回新排上的条数。"""
+        try:
+            result = v4_store.materialize_routines(
+                ctx.family_id, datetime.now(UTC), _ROUTINE_HORIZON_DAYS
+            )
+        except Exception:      # noqa: BLE001 —— 排期失败不能让建例程本身失败
+            return 0
+        # 键名是 `occurrences_created`。第一版猜成了 `created`，于是恒为 0——
+        # 而端点照样回 200，说「最近一周还没有要排的」，**实际排了 8 条**。
+        # 猜字段名的代价就是这个：不报错，只是说了句假话。
+        return int((result or {}).get("occurrences_created", 0))
+
+    @router.get("/routines")
+    def list_routines(ctx: AuthContext = Depends(_actor)) -> AppRoutineList:
+        """我的固定安排。每天/每周/每月要做的那些事。"""
+        rows = v4_store.list_routines(ctx.family_id, _elder_of(ctx))
+        items = [_routine_view(r) for r in rows]
+        running = [i for i in items if i["active"]]
+        return {
+            "items": items,
+            "count": len(items),
+            "message": (f"您有{len(running)}件固定安排。" if running
+                        else "您还没有固定安排。像「每天早上八点量血压」这种，可以让我记下来。"),
+        }
+
+    @router.post("/routines")
+    def create_routine(body: dict[str, Any] | None = None,
+                       ctx: AuthContext = Depends(_actor)) -> AppRoutineChanged:
+        """加一件固定安排，并把最近一周该发生的排成提醒。"""
+        body = body or {}
+        title = str(body.get("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="这件事要叫什么名字？")
+
+        raw_time = str(body.get("time") or body.get("at") or "").strip()
+        if not re.fullmatch(r"\d{1,2}:\d{2}", raw_time):
+            raise HTTPException(status_code=400, detail="时间要写成「08:00」这样。")
+        hour, minute = (int(x) for x in raw_time.split(":"))
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise HTTPException(status_code=400, detail="这个时间不存在。")
+        time_local = f"{hour:02d}:{minute:02d}"
+
+        repeat = str(body.get("repeat") or "每天").strip()
+        freq = {"每天": "daily", "daily": "daily", "每周": "weekly", "weekly": "weekly",
+                "每月": "monthly", "monthly": "monthly"}.get(repeat)
+        if freq is None:
+            raise HTTPException(status_code=400, detail="重复方式只支持每天、每周、每月。")
+
+        weekdays = body.get("weekdays") or []
+        try:
+            weekdays = sorted({int(d) for d in weekdays})
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="星期几这个值看不懂。")
+        if any(d < 0 or d > 6 for d in weekdays):
+            raise HTTPException(status_code=400, detail="星期几要在 0（周一）到 6（周日）之间。")
+        if freq == "weekly" and not weekdays:
+            raise HTTPException(status_code=400, detail="每周的话，要说清是周几。")
+
+        day_of_month = body.get("dayOfMonth")
+        if freq == "monthly":
+            try:
+                day_of_month = int(day_of_month)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="每月的话，要说清是几号。")
+            # 上限 28：29–31 号不是每个月都有，排到二月就会静默少一次，
+            # 而老人只会看到「这个月怎么没提醒我」。
+            if not 1 <= day_of_month <= 28:
+                raise HTTPException(status_code=400, detail="日期要在 1 到 28 号之间。")
+        else:
+            day_of_month = None
+
+        category = _CATEGORY_BACK.get(str(body.get("category") or "").strip(), "life")
+
+        from .v4_models import RoutineCreate
+
+        try:
+            record = v4_store.create_routine(
+                ctx.family_id, ctx.actor_id,
+                RoutineCreate(
+                    elder_id=_elder_of(ctx), title=title, category=category,
+                    frequency=freq, weekdays=weekdays, day_of_month=day_of_month,
+                    time_local=time_local,
+                    start_date=local_now(datetime.now(UTC)).date(),
+                ),
+            )
+        except Exception as exc:      # noqa: BLE001 —— 校验失败要说人话
+            raise HTTPException(status_code=400, detail=f"这件事没能记下来：{exc}") from exc
+
+        scheduled = _materialize(ctx)
+        view = _routine_view(record)
+        db.append_audit(
+            family_id=ctx.family_id, actor_id=ctx.actor_id,
+            event_type=_EV_ROUTINE_CREATED, entity_id=record.id,
+            payload={"title": title, "repeat": view["repeatText"],
+                     "time": time_local, "scheduled": scheduled},
+        )
+        # 话跟着实际发生的事走：一条都没排上就不能说「已经排好了」。
+        message = (f"好，{view['repeatText']}{time_local}提醒您{title}。"
+                   if scheduled else
+                   f"记下了：{view['repeatText']}{time_local}{title}。最近一周还没有要排的。")
+        return {"ok": True, "id": record.id, "title": title,
+                "status": view["status"], "message": message, "scheduled": scheduled}
+
+    def _switch_routine(ctx: AuthContext, routine_id: str, active: bool) -> dict[str, Any]:
+        from .v4_models import RoutineStatus
+
+        try:
+            record = v4_store.set_routine_status(
+                ctx.family_id, _elder_of(ctx), routine_id,
+                RoutineStatus.ACTIVE if active else RoutineStatus.PAUSED,
+            )
+        except PermissionError:
+            raise HTTPException(status_code=404, detail="没有找到这件固定安排。")
+        scheduled = _materialize(ctx) if active else 0
+        db.append_audit(
+            family_id=ctx.family_id, actor_id=ctx.actor_id,
+            event_type=_EV_ROUTINE_RESUMED if active else _EV_ROUTINE_PAUSED,
+            entity_id=routine_id, payload={"title": record.title, "scheduled": scheduled},
+        )
+        return {
+            "ok": True, "id": routine_id, "title": record.title,
+            "status": "进行中" if active else "已暂停",
+            # 暂停**不撤已经排出去的提醒**。说清楚，否则老人以为今天那条也没了。
+            "message": (f"好，{record.title}继续按原来的安排提醒您。" if active
+                        else f"好，{record.title}先不提醒了。已经排出去的那几条还在。"),
+            "scheduled": scheduled,
+        }
+
+    @router.post("/routines/{routine_id}/pause")
+    def pause_routine(routine_id: str, ctx: AuthContext = Depends(_actor)) -> AppRoutineChanged:
+        """先不提醒了。不删——已经排出去的提醒原样留着。"""
+        return _switch_routine(ctx, routine_id, False)
+
+    @router.post("/routines/{routine_id}/resume")
+    def resume_routine(routine_id: str, ctx: AuthContext = Depends(_actor)) -> AppRoutineChanged:
+        """继续提醒。"""
+        return _switch_routine(ctx, routine_id, True)
 
     # ---- 家人加的药，等老人点头 -------------------------------------------
     #

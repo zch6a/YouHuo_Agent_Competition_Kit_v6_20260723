@@ -1,0 +1,146 @@
+/* 优活 · 美术卡片层的挂载
+   ============================================================================
+
+   把 `data-art-shell` / `data-art-scene` / `data-art-seal` 变成真实 DOM 图层。
+
+   ## 为什么是声明式的，不是选择器表
+
+   交接包里的 `r7-art.js` 有一张 13 条的「CSS 选择器 → SVG 文件」硬编码表
+   （`['.task', 'card_112.svg']` 这种）。它的失败方式是：页面结构一改，
+   选择器对不上，**一张图都挂不上，而页面看起来完全正常**——
+   这正是交接包 09 号文档列的第一条反例「素材复制进项目但看不见」。
+   实测过：这个仓库的 `family.html` / `care.html` 里，那 13 个选择器
+   只有 1 个还存在。
+
+   所以挂载点写在 HTML 上。挂不上就是 HTML 里没写，改 HTML 的人看得见它。
+
+   ## 它不改内容，只加图层
+
+   每个挂载都是 `prepend` 一个 `aria-hidden` 的 `<img>`。不动既有节点、
+   不改文本、不拦事件。业务 JS 往这些容器里 `innerHTML = ...` 的时候
+   会把图层冲掉——所以有 MutationObserver 补挂。
+   -------------------------------------------------------------------------- */
+(() => {
+  'use strict';
+
+  const ART = '/static/art/';
+
+  /* 场景意象的形状分类。决定它贴在卡片的哪一侧、占多大。
+     取自各 SVG 的 viewBox 长宽比，不是拍脑袋：
+       tall  高>宽    鹤 148×248、扇 170×286
+       wide  宽>高    远山 237×91、锦鲤 246×207、卷轴 324×237、玉兰 458×278
+       mark  近方形   莲 151×111、松 108×107、牡丹 186×189、月窗 239×240 */
+  const SCENES = {
+    crane:       ['scene/crane.svg', 'tall'],
+    fan:         ['scene/fan.svg', 'tall'],
+    mountain:    ['scene/mountain.svg', 'wide'],
+    koi:         ['scene/koi.svg', 'wide'],
+    scroll:      ['scene/scroll.svg', 'wide'],
+    magnolia:    ['scene/magnolia.svg', 'wide'],
+    lotus:       ['scene/lotus.svg', 'mark'],
+    pine:        ['scene/pine.svg', 'mark'],
+    peony:       ['scene/peony.svg', 'mark'],
+    'moon-window': ['scene/moon-window.svg', 'mark']
+  };
+
+  const SHELLS = {
+    hero:     'shell/hero.svg',
+    'wide-a': 'shell/wide-a.svg',
+    'wide-b': 'shell/wide-b.svg'
+  };
+
+  function layer(src, className) {
+    const img = document.createElement('img');
+    img.className = className;
+    img.src = ART + src;
+    img.alt = '';                       // 装饰性图像：空 alt，不是没有 alt
+    img.setAttribute('aria-hidden', 'true');
+    img.setAttribute('role', 'presentation');
+    img.decoding = 'async';
+    img.draggable = false;
+    return img;
+  }
+
+  function mountShell(el) {
+    const key = el.dataset.artShell;
+    const src = SHELLS[key];
+    // 写错名字要能看见。静默跳过的话，卡片变成一个没有边框的裸文本块，
+    // 而那看起来像「这一版就是这么设计的」。
+    if (!src) { console.warn('[art-cards] 未知卡壳：', key, el); return; }
+    if (el.querySelector(':scope > .art-shell')) return;
+    el.classList.add('art-card');
+    el.prepend(layer(src, 'art-shell'));
+  }
+
+  function mountScene(el) {
+    const key = el.dataset.artScene;
+    const entry = SCENES[key];
+    if (!entry) { console.warn('[art-cards] 未知意象：', key, el); return; }
+    if (el.querySelector(':scope > .art-scene')) return;
+    const [src, shape] = entry;
+    el.classList.add('art-scene-host');
+    // 形状同时写到宿主上：CSS 靠它给内容让出位置（padding-right 之类）。
+    // 只给图层写的话，文字会压在画上。
+    el.dataset.shapeHint = shape;
+    const img = layer(src, 'art-scene');
+    img.dataset.shape = shape;
+    el.prepend(img);
+  }
+
+  function mountSeal(el) {
+    if (el.querySelector(':scope > .art-seal')) return;
+    el.append(layer('ui/status-seal.svg', 'art-seal'));
+  }
+
+  const MOUNTS = [
+    ['[data-art-shell]', mountShell],
+    ['[data-art-scene]', mountScene],
+    ['[data-art-seal="true"]', mountSeal]
+  ];
+
+  function scan(root) {
+    if (!root || root.nodeType !== 1 && root !== document) return;
+    for (const [selector, fn] of MOUNTS) {
+      if (root !== document && root.matches?.(selector)) fn(root);
+      root.querySelectorAll?.(selector).forEach(fn);
+    }
+  }
+
+  function boot() {
+    document.documentElement.classList.add('art-cards-ready');
+    scan(document);
+
+    // 业务 JS 重绘时会把图层冲掉。补挂。
+    //
+    // **要扫的是 `r.target`，不只是 `r.addedNodes`。** 第一版只扫新增节点，
+    // 实测两处都没挂上：
+    //
+    //   · `care.js` 对 `#ovVerdict` 调 `replaceChildren(...)`——宿主本身没被
+    //     重新插入，只是孩子换了。新增的是那些孩子，而带 `data-art-shell` 的
+    //     是它们的**父节点**，`scan(child)` 既不 matches 也不 querySelectorAll
+    //     到它。结果：主卡的卡壳和鹤一张都没有，而页面完全正常。
+    //   · `trust.js` 在初次扫描之后才设 `dataset.artSeal`——那是**属性**变更，
+    //     childList 根本看不见。一笔「已办好」的凭证上没有印章。
+    //
+    // 所以：childList 时连宿主一起扫，再单独订阅那三个属性。
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        if (r.type === 'attributes') { scan(r.target); continue; }
+        if (r.target && r.target.nodeType === 1) scan(r.target);
+        r.addedNodes.forEach((n) => { if (n.nodeType === 1) scan(n); });
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-art-shell', 'data-art-scene', 'data-art-seal']
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+})();

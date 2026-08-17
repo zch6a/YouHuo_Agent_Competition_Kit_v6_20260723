@@ -18,7 +18,10 @@
 //: `task-detail.js`。不升这个字符串，已安装的设备会继续用 v8 那份**缺两个模块**
 //: 的清单——而 `elder.js` 是 `type="module"`，一个 import 取不到就是整个模块图
 //: 一起失败，离线的老人端不是降级而是白屏。
-const VERSION = 'youhuo-shell-v10';
+: v10 → v11：加了美术卡片层（`art-cards.css` + `art-cards.js`，family/care/trust
+: 三页都引）。不升这个字符串，已安装的设备会继续用 v10 那份缺两个文件的清单——
+: 缺 JS 是整页白屏，缺 CSS 是卡壳图层没有定位规则，SVG 会以原始尺寸铺满全页。
+const VERSION = 'youhuo-shell-v11';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -37,6 +40,12 @@ const SHELL = [
   '/static/base.css',
   '/static/components.css',
   '/static/pages.css',
+  // 美术卡片层。CSS 和 JS 都要在：JS 缺了是整页白屏（闸门
+  // `test_shell_covers_every_module` 抓的就是这一条），CSS 缺了更隐蔽——
+  // 卡壳 `<img>` 还会被插进 DOM，只是没有 `position:absolute`，
+  // 于是一张 156KB 的山水图以原始尺寸把整页推开。
+  '/static/art-cards.css',
+  '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：
   //   landing.css    离线时缺它 = 首页裸奔（它是这一页专属的第五层样式）
