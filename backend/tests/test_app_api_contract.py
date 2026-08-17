@@ -61,6 +61,92 @@ def _pay_to(client: TestClient, step: str, bill_id: str | None = None) -> str:
     return pid
 
 
+# ---- 身份：这一层此前根本没有 ----------------------------------------------
+#
+# `/api/v1` 原来无条件返回 `elder-demo` 的数据，身份写死在源码里。演示时看不出
+# 问题（只有一个家庭），但那意味着：真部署出去，**任何人**访问都会拿到演示家庭的
+# 账单、支付和整条审计链。下面这一组守的是新加的三条路，以及最要紧的那条性质——
+# 跨家庭不可见。
+
+def _login(client: TestClient, actor_id: str) -> dict[str, str]:
+    r = client.post("/v2/auth/demo", json={"actor_id": actor_id})
+    assert r.status_code == 200, r.text
+    return {"Authorization": "Bearer " + r.json()["access_token"]}
+
+
+def test_a_valid_token_decides_who_the_request_is_about(client: TestClient) -> None:
+    got = client.get(f"{V1}/profile", headers=_login(client, "elder-demo")).json()
+    assert got["name"] == "王爷爷"
+
+
+def test_a_family_token_sees_the_elders_data(client: TestClient) -> None:
+    """家人拿令牌进来，看的仍然是老人的日程和账单——这一层是老人端的门面。
+
+    写死 `elder-demo` 的时候，这个区别根本无法表达。
+    """
+    fam = _login(client, "daughter-demo")
+    assert client.get(f"{V1}/agenda", headers=fam).status_code == 200
+    assert client.get(f"{V1}/reminders", headers=fam).json()["count"] >= 3
+
+
+def test_a_bad_token_is_401_and_never_falls_back_to_the_demo_elder(client: TestClient) -> None:
+    """**这一条是这组里最重要的。**
+
+    过期或伪造的令牌静默退回演示身份，比完全没有鉴权更糟：
+    调用方以为自己登录着，实际在操作别人的数据，而屏幕上一切正常。
+    """
+    # 令牌只能是 ASCII——HTTP 头就是这么规定的。第一版拿中文当假令牌，
+    # 结果 httpx 在**发出去之前**就抛了 UnicodeEncodeError，这条断言压根没执行到。
+    r = client.get(f"{V1}/profile",
+                   headers={"Authorization": "Bearer not-a-real-token-0123456789"})
+    assert r.status_code == 401, f"无效令牌被放行了：{r.status_code} {r.text[:120]}"
+    assert "王爷爷" not in r.text
+
+
+def test_without_a_token_a_non_demo_deployment_refuses(tmp_path) -> None:
+    """没有令牌时退回演示老人，**只有演示模式下才允许**。
+
+    非演示部署下，这一层不许把任何人的数据发给一个没有身份的请求。
+    """
+    app = create_app(tmp_path / "prod.db", demo_mode=False, seed_baseline_history=True)
+    with TestClient(app) as c:
+        r = c.get(f"{V1}/profile")
+        assert r.status_code == 401, f"非演示模式下无令牌被放行：{r.status_code}"
+
+
+def test_one_family_cannot_see_another_familys_data(client: TestClient) -> None:
+    """跨家庭不可见。
+
+    这条性质在身份写死的时候**不存在**——那时所有人看的都是同一个家庭。
+    用 `/v2/auth/visitor` 开一个全新家庭，确认它看不到演示家庭的账单，
+    而且账单 id 也取不到。
+    """
+    visitor = client.post("/v2/auth/visitor", json={})
+    if visitor.status_code != 200:
+        pytest.skip(f"这个部署没有访客沙箱：{visitor.status_code}")
+    token = visitor.json().get("elder_token")
+    assert token, f"访客沙箱没给令牌：{sorted(visitor.json())}"
+    theirs = {"Authorization": "Bearer " + token}
+
+    demo_bills = client.get(f"{V1}/bills").json()["items"]
+    assert demo_bills, "演示家庭一张账单都没有，下面的对比没有意义"
+
+    their_bills = client.get(f"{V1}/bills", headers=theirs).json()
+    demo_ids = {b["id"] for b in demo_bills}
+    their_ids = {b["id"] for b in their_bills["items"]}
+    assert not (demo_ids & their_ids), f"看到了别的家庭的账单：{demo_ids & their_ids}"
+
+    # 直接按 id 取也不行——列表过滤住了不等于详情也过滤住了。
+    r = client.get(f"{V1}/bills/{demo_bills[0]['id']}", headers=theirs)
+    assert r.status_code == 404, f"跨家庭按 id 取到了账单：{r.status_code}"
+
+
+def test_the_security_scheme_shows_up_in_openapi(client: TestClient) -> None:
+    """新前端要看得出这些端点接受 Bearer。"""
+    spec = client.get("/openapi.json").json()
+    assert "HTTPBearer" in spec.get("components", {}).get("securitySchemes", {})
+
+
 # ---- OpenAPI：契约要能被工具消费 -------------------------------------------
 
 def test_every_endpoint_documents_what_it_returns(client: TestClient) -> None:

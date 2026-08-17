@@ -24,7 +24,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .memory_vault import (
     MemoryItem,
@@ -59,6 +60,7 @@ from .app_schemas import (
 from .security import SafetyPolicy
 from .utils import semantic_hash
 from .models import (
+    ActorRole,
     AuthContext,
     ChatRequest,
     ReminderRecord,
@@ -114,10 +116,43 @@ def _yuan(cents: int) -> str:
     return f"{cents / 100:.2f}"
 
 
-def build_app_router(db, engine, v4_store=None) -> APIRouter:
+def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> APIRouter:
     router = APIRouter(prefix="/api/v1", tags=["elder-app"])
+    bearer = HTTPBearer(auto_error=False)
 
-    def _ctx() -> AuthContext:
+    def _actor(
+        credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    ) -> AuthContext:
+        """这次请求是谁。
+
+        原先这一层**没有身份概念**：`_ctx()` 无条件返回 `elder-demo`，
+        写死在源码里。演示时看不出问题（只有一个家庭），但它意味着
+        这一整层不能给第二个人用——而且真要部署出去的话，
+        任何人访问 `/api/v1/*` 都会拿到演示家庭的账单、支付和整条审计链。
+
+        现在三条路，顺序不能换：
+
+        ① 带了令牌 → 按令牌解析，和 `/v2` 走的是同一个 `resolve_auth_token`
+        ② 带了令牌但无效 → **401，不许退回演示身份**。
+           过期令牌静默变成演示老人，是比没有鉴权更糟的一种失败：
+           调用方以为自己登录着，实际在操作别人的数据。
+        ③ 没带令牌 → **只有演示模式下**才退回演示老人。
+           非演示部署下没令牌就是 401。
+        """
+        if credentials is not None and credentials.scheme.casefold() == "bearer":
+            actor = db.resolve_auth_token(credentials.credentials)
+            if actor is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="访问令牌无效或已过期。",
+                )
+            return actor
+
+        if not demo_mode:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="缺少访问令牌。",
+            )
         ctx = db.auth_context_for_actor(_DEMO_ELDER)
         if ctx is None:
             raise HTTPException(
@@ -125,6 +160,44 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 detail="演示数据还没有铺好。",
             )
         return ctx
+
+    def _elder_of(ctx: AuthContext) -> str:
+        """这次请求是在看**哪位老人**的数据。
+
+        老人自己登录 → 就是他本人。家人登录 → 他家里那位老人
+        （这一层是老人端的门面，家人拿令牌进来时看的仍然是老人的日程和账单）。
+        写死 `elder-demo` 的时候这个区别不存在，所以它一直没有被表达出来。
+        """
+        if ctx.role is ActorRole.ELDER:
+            return ctx.actor_id
+        for row in db.list_actors(ctx.family_id):
+            if row["role"] == "elder":
+                return row["id"]
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="这个家庭里还没有登记老人。"
+        )
+
+    def _approver_of(ctx: AuthContext) -> AuthContext:
+        """谁来点这个头。
+
+        原先写死 `daughter-demo`。现在取这个家庭里的家人成员；
+        请求本身就是家人发来的话，就是他自己——**家人点头必须记真人**，
+        凭证上「谁点的头」这一格是这个产品的核心。
+        """
+        if ctx.role is ActorRole.FAMILY:
+            return ctx
+        preferred = sorted(
+            (r for r in db.list_actors(ctx.family_id) if r["role"] == "family"),
+            key=lambda a: (a["id"] != _DEMO_FAMILY, a["display_name"]),
+        )
+        for row in preferred:
+            approver = db.auth_context_for_actor(row["id"])
+            if approver is not None:
+                return approver
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="这个家庭还没有登记可以确认的家人。",
+        )
 
     def _task_or_404(ctx: AuthContext, task_id: str) -> TaskRecord:
         task = db.get_task(task_id)
@@ -137,8 +210,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 档案 ---------------------------------------------------------------
 
     @router.get("/profile")
-    def profile() -> AppProfile:
-        ctx = _ctx()
+    def profile(ctx: AuthContext = Depends(_actor)) -> AppProfile:
         # 「优活已陪伴您 N 天」。
         #
         # 原先这里是写死的 `None`，注释写着「后端没有建档日期这个字段，不编」——
@@ -163,7 +235,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 今日日程 -----------------------------------------------------------
 
     @router.get("/agenda")
-    def agenda() -> AppAgenda:
+    def agenda(ctx: AuthContext = Depends(_actor)) -> AppAgenda:
         """首页那两张卡（「接下来」和「今日安排」）的真实数据源。
 
         原稿这两张卡是写死的——「14:00 心内科复诊 · 和睦家医院 2号楼3层」「08:00
@@ -171,12 +243,11 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
 
         `place` 后端没有这个字段，回 null；界面上宁可不显示地点，也不编一个医院。
         """
-        ctx = _ctx()
         now = datetime.now(UTC)
         today = now.date()
         items = []
         for r in db.list_reminders(ctx.family_id, limit=60):
-            if r.elder_id != _DEMO_ELDER:
+            if r.elder_id != _elder_of(ctx):
                 continue
             due = r.due_at if r.due_at.tzinfo else r.due_at.replace(tzinfo=UTC)
             if due.date() != today:
@@ -226,7 +297,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 健康概览（「我的」那一屏）------------------------------------------
 
     @router.get("/health-summary")
-    def health_summary() -> AppHealthSummary:
+    def health_summary(ctx: AuthContext = Depends(_actor)) -> AppHealthSummary:
         """「我的」页那一排健康数字的真实来源。
 
         原稿这里写死了「今日健康 良好 / 心率 72 次每分 / 血压 120/78 / 睡眠 7.5 小时」。
@@ -236,15 +307,13 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         所以这里回的是「记到了什么」，不是「他现在怎么样」——这两件事差得很远，
         而把后者编出来正是这个产品最不该做的。取不到的一律 null。
         """
-        ctx = _ctx()
         metrics: list[dict[str, Any]] = []
         events = []
         if v4_store is not None:
             try:
-                from .models import ActorRole
 
                 events = v4_store.list_health_events(
-                    ctx.family_id, _DEMO_ELDER, ActorRole.ELDER
+                    ctx.family_id, _elder_of(ctx), ActorRole.ELDER
                 )
             except Exception:
                 events = []
@@ -278,7 +347,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 账单 ---------------------------------------------------------------
 
     @router.get("/bills/water/current")
-    def current_water_bill() -> AppWaterBill:
+    def current_water_bill(ctx: AuthContext = Depends(_actor)) -> AppWaterBill:
         """当前这一笔水费。
 
         `paidAt` 原先是写死的 `None`——于是凭证页和成功页的「完成时间 / 支付时间」
@@ -286,7 +355,6 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         现在去查这个家庭最近一笔真的走完的缴费事务：付掉了就给真时间，
         没付掉就仍然是 null（那时它本来就该空着）。
         """
-        ctx = _ctx()
         b = _WATER_BILL
         paid_at = None
         for task in db.list_tasks(ctx.family_id, limit=60):
@@ -336,14 +404,13 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.get("/bills")
-    def list_bills() -> AppBillList:
+    def list_bills(ctx: AuthContext = Depends(_actor)) -> AppBillList:
         """这个家庭的**全部**账单。
 
         原先 `/api/v1` 只暴露一张写死的水费，而库里躺着三张（水费 68.40、
         电费 126.50、燃气费 52.30）。于是前端那张「我的账单」永远只有一件事可办，
         而演示里最容易被问到的一句话正是「除了水费还能干什么」。
         """
-        ctx = _ctx()
         rows = db.list_bills(ctx.family_id)
         items = [_bill_view(r) for r in rows]
         unpaid = [i for i in items if not i["paid"]]
@@ -364,8 +431,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     #: 真正会被吃掉的是**同为两段**的路径。所以如果将来加
     #: `/bills/unpaid` 这种，它才必须排在这一条前面。
     @router.get("/bills/{bill_id}")
-    def one_bill(bill_id: str) -> AppBill:
-        ctx = _ctx()
+    def one_bill(bill_id: str, ctx: AuthContext = Depends(_actor)) -> AppBill:
         row = db.get_bill(bill_id)
         if row is None or row["family_id"] != ctx.family_id:
             raise HTTPException(status_code=404, detail="没有找到这张账单。")
@@ -374,13 +440,12 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 就医安排 -----------------------------------------------------------
 
     @router.get("/appointments")
-    def list_appointments() -> AppAppointmentList:
+    def list_appointments(ctx: AuthContext = Depends(_actor)) -> AppAppointmentList:
         """挂号/复诊。`appointments` 表和 `insert_appointment` 一直都在，
         **没有任何地方读它**——所以「就医安排」那一页此前只能拿提醒凑。
         """
-        ctx = _ctx()
         items = []
-        for row in db.list_appointments(ctx.family_id, _DEMO_ELDER):
+        for row in db.list_appointments(ctx.family_id, _elder_of(ctx)):
             items.append({
                 "id": row["id"],
                 "hospital": row["hospital"],
@@ -397,7 +462,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         return {"items": items, "count": len(items)}
 
     @router.post("/appointments")
-    def create_appointment(body: dict[str, Any] | None = None) -> AppAppointmentCreated:
+    def create_appointment(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppAppointmentCreated:
         """记一次就医安排，并**同时建一条到点提醒**。
 
         只写 `appointments` 表是不够的：那张表没有任何东西会到点提醒老人，
@@ -414,14 +479,13 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         if not date:
             raise HTTPException(status_code=400, detail="还没有说哪一天。")
 
-        ctx = _ctx()
         now = datetime.now(UTC)
         appt_id = f"appt-{uuid.uuid4().hex[:12]}"
         department = str(body.get("department") or "").strip()
         ok = db.insert_appointment({
             "id": appt_id,
             "family_id": ctx.family_id,
-            "elder_id": _DEMO_ELDER,
+            "elder_id": _elder_of(ctx),
             "hospital": hospital,
             "department": department,
             "doctor": str(body.get("doctor") or "").strip(),
@@ -439,7 +503,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             record = ReminderRecord(
                 id=f"rem-{uuid.uuid4().hex[:12]}",
                 family_id=ctx.family_id,
-                elder_id=_DEMO_ELDER,
+                elder_id=_elder_of(ctx),
                 title=title,
                 due_at=due,
                 escalation_after_minutes=60,
@@ -471,9 +535,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 通知 ---------------------------------------------------------------
 
     @router.post("/notifications/{notification_id}/read")
-    def read_notification(notification_id: str) -> AppNotificationRead:
+    def read_notification(notification_id: str, ctx: AuthContext = Depends(_actor)) -> AppNotificationRead:
         """标成已读。没有这一步，通知只会越堆越多，红点永远下不去。"""
-        ctx = _ctx()
         if not db.mark_notification_read(notification_id, ctx.family_id, datetime.now(UTC)):
             raise HTTPException(status_code=404, detail="没有找到这条通知，或者它已经读过了。")
         return {"ok": True, "id": notification_id, "status": "已读"}
@@ -481,16 +544,15 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 语音会话 -----------------------------------------------------------
 
     @router.post("/voice/sessions")
-    def open_voice_session(body: dict[str, Any] | None = None) -> AppVoiceSession:
+    def open_voice_session(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppVoiceSession:
         """开一个真实会话；带了 `utterance` 就真的过一遍语义引擎。"""
-        ctx = _ctx()
         now = datetime.now(UTC)
         # 字段名是 `session_id` 不是 `id`；`StrictModel` 是 extra="forbid"，
         # 传错一个键就直接 500，不会静默忽略。
         session = SessionState(
             session_id=f"sess-{uuid.uuid4().hex[:12]}",
             family_id=ctx.family_id,
-            elder_id=_DEMO_ELDER,
+            elder_id=_elder_of(ctx),
             created_at=now,
             updated_at=now,
         )
@@ -515,13 +577,12 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 支付：准备 / 复述 / 执行 --------------------------------------------
 
     @router.post("/payments/prepare")
-    def prepare_payment(body: dict[str, Any] | None = None) -> AppPaymentPrepared:
+    def prepare_payment(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppPaymentPrepared:
         """建一件**真的**缴费事务，并把复述提示词一并给前端。
 
         风险取 HIGH：`TeachBackVerifier.requires_teach_back` 只在 `BILL_PAYMENT`
         且 risk >= 3 时要求复述——这正是这一版演示要展示的那条线。
         """
-        ctx = _ctx()
         b = dict(_WATER_BILL)
 
         # 前端可以指名要付哪一张。
@@ -576,7 +637,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         task = TaskRecord(
             id=f"pay-{uuid.uuid4().hex[:12]}",
             family_id=ctx.family_id,
-            elder_id=_DEMO_ELDER,
+            elder_id=_elder_of(ctx),
             task_type=TaskType.BILL_PAYMENT,
             status=TaskStatus.AWAITING_ELDER_CONFIRMATION,
             risk_level=RiskLevel.HIGH,
@@ -602,9 +663,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/teach-back")
-    def teach_back(payment_id: str, body: dict[str, Any] | None = None) -> AppTeachBackResult:
+    def teach_back(payment_id: str, body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppTeachBackResult:
         """真的核对老人念出来的金额。念错就停——这一条是整个产品的支点。"""
-        ctx = _ctx()
         task = _task_or_404(ctx, payment_id)
         text = str((body or {}).get("text") or "")
         check = TeachBackVerifier.verify(task.task_type, task.slots, text, required=True)
@@ -651,13 +711,12 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/execute")
-    def execute_payment(payment_id: str, body: dict[str, Any] | None = None) -> AppPaymentMoved:
+    def execute_payment(payment_id: str, body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppPaymentMoved:
         """推进这件事。
 
         **不会因为前端调了就直接扣钱。** 高风险缴费要家人点头，所以这里把状态推到
         「等家人确认」并写审计。前端拿到 `awaiting_family` 就该照实显示。
         """
-        ctx = _ctx()
         task = _task_or_404(ctx, payment_id)
         if task.status is TaskStatus.COMPLETED:
             return {"ok": True, "status": "paid", "certificateId": task.id}
@@ -715,7 +774,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/payments/{payment_id}/family-approve")
-    def family_approve(payment_id: str, body: dict[str, Any] | None = None) -> AppPaymentMoved:
+    def family_approve(payment_id: str, body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppPaymentMoved:
         """家人点头，这一笔才真的走完。
 
         没有这一步，链条就停在 `awaiting_family` 永远不动——凭证页会一直显示
@@ -724,7 +783,6 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         **这是家人的动作，不是老人的。** 所以身份取家人，写进审计的也是家人的
         `actor_id`——凭证上「谁点的头」必须是真的。老人自己点不动这一步。
         """
-        ctx = _ctx()
         task = _task_or_404(ctx, payment_id)
         if task.status is TaskStatus.COMPLETED:
             return {"ok": True, "status": "paid", "certificateId": task.id}
@@ -734,12 +792,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 detail="这一笔还没有走到等家人确认这一步。",
             )
 
-        approver = db.auth_context_for_actor(_DEMO_FAMILY)
-        if approver is None or approver.family_id != ctx.family_id:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="这个家庭还没有登记可以确认的家人。",
-            )
+        approver = _approver_of(ctx)
 
         # **真的去把那张账单结掉。**
         #
@@ -838,9 +891,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     }
 
     @router.get("/records")
-    def records(type: str | None = Query(default=None)) -> AppRecordList:
+    def records(type: str | None = Query(default=None), ctx: AuthContext = Depends(_actor)) -> AppRecordList:
         """真实审计流水，翻成人话之后再给前端。"""
-        ctx = _ctx()
         events = db.list_audit(ctx.family_id, limit=80)
         items = []
         for e in reversed(events):
@@ -875,13 +927,12 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 凭证 ---------------------------------------------------------------
 
     @router.get("/payments/{payment_id}/certificate")
-    def certificate(payment_id: str) -> AppCertificate:
+    def certificate(payment_id: str, ctx: AuthContext = Depends(_actor)) -> AppCertificate:
         """一件事的**完整**审计链。
 
         `list_audit` 带 `entity_id` 走 SQL 过滤，拿到的是这一件事从头到尾的每一步，
         而不是最近 200 条里恰好属于它的那几条。凭证的全部价值就是「每一步都在」。
         """
-        ctx = _ctx()
         task = _task_or_404(ctx, payment_id)
         events = db.list_audit(ctx.family_id, limit=500, entity_id=payment_id)
         chain = [
@@ -950,9 +1001,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 紧急呼叫 -----------------------------------------------------------
 
     @router.post("/emergency/call")
-    def emergency_call(body: dict[str, Any] | None = None) -> AppEmergencyResult:
+    def emergency_call(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppEmergencyResult:
         """记一次真实的紧急呼叫。不会真的拨号——那要电话能力，这里只留证据。"""
-        ctx = _ctx()
         db.append_audit(
             family_id=ctx.family_id,
             actor_id=ctx.actor_id,
@@ -970,7 +1020,6 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         # 发不出去不能让这次呼叫本身失败——那会让老人以为没按上。
         notified: list[str] = []
         try:
-            from .models import ActorRole
             # 主要联系人排最前。
             #
             # `list_actors` 按 role 再按名字排，于是「儿子」排在「女儿」前面——
@@ -982,7 +1031,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 key=lambda a: (a["id"] != _DEMO_FAMILY, a["display_name"]),
             )
             for row in people:
-                if row["id"] == _DEMO_ELDER or row["role"] != "family":
+                if row["id"] == _elder_of(ctx) or row["role"] != "family":
                     continue
                 engine.services.notification.send(
                     db,
@@ -1060,17 +1109,16 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     def _my_reminders(ctx: AuthContext) -> list[Any]:
         return [
             r for r in db.list_reminders(ctx.family_id, limit=200)
-            if r.elder_id == _DEMO_ELDER
+            if r.elder_id == _elder_of(ctx)
         ]
 
     @router.get("/reminders")
-    def reminders(kind: str | None = Query(default=None)) -> AppReminderList:
+    def reminders(kind: str | None = Query(default=None), ctx: AuthContext = Depends(_actor)) -> AppReminderList:
         """用药提醒 / 就医安排 / 今日事项 三个界面共用的真实数据源。
 
         `kind` 取「用药」「就医」「其他」，不传就是全部。传一个不认识的值回空表，
         不报错——界面上一个筛选按钮点出 500 比点出空列表糟得多。
         """
-        ctx = _ctx()
         now = datetime.now(UTC)
         items = [_reminder_view(r, now) for r in _my_reminders(ctx)]
         if kind:
@@ -1082,7 +1130,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         }
 
     @router.post("/reminders")
-    def create_reminder(body: dict[str, Any] | None = None) -> AppReminderCreated:
+    def create_reminder(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppReminderCreated:
         """老人自己加一条提醒。**真的写进提醒表**，不是回一个 ok 就算了。
 
         时间用 `HH:MM`（今天）或完整 ISO 串。给的时间已经过点就顺延到明天——
@@ -1113,11 +1161,10 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         if due is None:
             due = now + timedelta(hours=1)
 
-        ctx = _ctx()
         record = ReminderRecord(
             id=f"rem-{uuid.uuid4().hex[:12]}",
             family_id=ctx.family_id,
-            elder_id=_DEMO_ELDER,
+            elder_id=_elder_of(ctx),
             title=title,
             due_at=due,
             escalation_after_minutes=int(body.get("escalationAfterMinutes") or 30),
@@ -1139,9 +1186,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 "message": f"记好了，{due.strftime('%H:%M')} 提醒您{title}。"}
 
     @router.post("/reminders/{reminder_id}/done")
-    def complete_reminder(reminder_id: str) -> AppReminderChanged:
+    def complete_reminder(reminder_id: str, ctx: AuthContext = Depends(_actor)) -> AppReminderChanged:
         """办完了。写的是真状态，记录页当场就能看到这一条。"""
-        ctx = _ctx()
         now = datetime.now(UTC)
         existing = db.get_reminder(reminder_id)
         if existing is None or existing.family_id != ctx.family_id:
@@ -1160,12 +1206,11 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
                 "message": f"好的，{existing.title}已经记成办好了。"}
 
     @router.post("/reminders/{reminder_id}/cancel")
-    def cancel_reminder(reminder_id: str) -> AppReminderChanged:
-        ctx = _ctx()
+    def cancel_reminder(reminder_id: str, ctx: AuthContext = Depends(_actor)) -> AppReminderChanged:
         existing = db.get_reminder(reminder_id)
         if existing is None or existing.family_id != ctx.family_id:
             raise HTTPException(status_code=404, detail="没有找到这一条提醒。")
-        if not db.cancel_reminder(reminder_id, ctx.family_id, _DEMO_ELDER):
+        if not db.cancel_reminder(reminder_id, ctx.family_id, _elder_of(ctx)):
             raise HTTPException(status_code=409, detail="这一条现在取消不了。")
         db.append_audit(
             family_id=ctx.family_id,
@@ -1185,17 +1230,16 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     _ROLE_WORDS = {"family": "家人", "system": "系统", "elder": "本人"}
 
     @router.get("/contacts")
-    def contacts() -> AppContactList:
+    def contacts(ctx: AuthContext = Depends(_actor)) -> AppContactList:
         """紧急联系人。真的读家庭成员表，不是三行写死的卡片。
 
         **没有电话号码这个字段。** `actors` 表只有 id / family_id / role /
         display_name。所以这里回 `phone: null`，由界面决定怎么显示——
         编一个号码出来，老人真按下去会拨错人。
         """
-        ctx = _ctx()
         people = []
         for row in db.list_actors(ctx.family_id):
-            if row["id"] == _DEMO_ELDER:
+            if row["id"] == _elder_of(ctx):
                 continue
             people.append({
                 "id": row["id"],
@@ -1216,14 +1260,13 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     _PREF_DEFAULTS = {"fontScale": 1.0, "voiceSpeed": 1.0, "highContrast": False}
 
     def _pref_item(ctx: AuthContext):
-        for item in db.list_memories(ctx.family_id, _DEMO_ELDER):
+        for item in db.list_memories(ctx.family_id, _elder_of(ctx)):
             if item.key == _PREF_KEY and item.status != MemoryStatus.REVOKED:
                 return item
         return None
 
     @router.get("/settings")
-    def get_settings() -> AppSettings:
-        ctx = _ctx()
+    def get_settings(ctx: AuthContext = Depends(_actor)) -> AppSettings:
         item = _pref_item(ctx)
         values = dict(_PREF_DEFAULTS)
         if item is not None and isinstance(item.value, dict):
@@ -1231,10 +1274,9 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         return {**values, "saved": item is not None}
 
     @router.put("/settings")
-    def put_settings(body: dict[str, Any] | None = None) -> AppSettings:
+    def put_settings(body: dict[str, Any] | None = None, ctx: AuthContext = Depends(_actor)) -> AppSettings:
         """改字号 / 语速。**真的存下来**，换一页、重开都还在。"""
         body = body or {}
-        ctx = _ctx()
         now = datetime.now(UTC)
         values = dict(_PREF_DEFAULTS)
         item = _pref_item(ctx)
@@ -1255,7 +1297,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
             item = MemoryItem(
                 id=f"mem-{uuid.uuid4().hex[:12]}",
                 family_id=ctx.family_id,
-                elder_id=_DEMO_ELDER,
+                elder_id=_elder_of(ctx),
                 key=_PREF_KEY,
                 value=values,
                 sensitivity=MemorySensitivity.PREFERENCE,
@@ -1282,7 +1324,7 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
     # ---- 通知 ---------------------------------------------------------------
 
     @router.get("/notifications")
-    def notifications(role: str | None = Query(default=None)) -> AppNotificationList:
+    def notifications(role: str | None = Query(default=None), ctx: AuthContext = Depends(_actor)) -> AppNotificationList:
         """通知。默认是**发给老人自己**的那些。
 
         `role=家人` 取发给家人的那一批——按了紧急呼叫之后，老人那一屏要能回答
@@ -1291,10 +1333,8 @@ def build_app_router(db, engine, v4_store=None) -> APIRouter:
         没有这个参数的话，这个端点在演示里永远是空的——因为这套演示数据里
         唯一会产生通知的动作，产生的都是家人那一侧的。
         """
-        ctx = _ctx()
         items = []
         try:
-            from .models import ActorRole
             wanted = ActorRole.FAMILY if role in ("家人", "family") else ActorRole.ELDER
             rows = db.list_notifications(ctx.family_id, wanted, 50)
         except Exception:

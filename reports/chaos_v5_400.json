@@ -9,5 +9,5 @@
   "failed": 0,
   "failures": [],
   "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。",
-  "source_digest": "49193b9581a4f9c55610ec43bd60704faca00e4ff7bb6e7103cd4b3c95a5fbb1"
+  "source_digest": "7cfe39cee43804e724a5186e985ad18e756e0f8aa5aa1c0b99c9297ac87cc3b2"
 }
