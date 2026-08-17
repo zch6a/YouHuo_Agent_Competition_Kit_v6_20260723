@@ -44,6 +44,7 @@ from .app_schemas import (
     AppContact,
     AppContactList,
     AppEmergencyResult,
+    AppHealthRecorded,
     AppHealthSummary,
     AppNotificationList,
     AppNotificationRead,
@@ -113,6 +114,7 @@ _EV_SETTINGS_CHANGED = "app.settings.changed"
 _EV_APPOINTMENT_CREATED = "app.appointment.created"
 _EV_SOS_NOTIFY_FAILED = "app.emergency.notify_failed"
 _EV_CONTACT_PHONE_SET = "app.contact.phone_set"
+_EV_HEALTH_RECORDED = "app.health.recorded"
 
 
 def _yuan(cents: int) -> str:
@@ -321,19 +323,30 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
             except Exception:
                 events = []
 
+        # 按**测量项**去重，不是按事件类别。
+        #
+        # 原先的 key 是 `kind`，而 `HealthEventKind` 只有 checkup/visit/medication/note
+        # 四个值——血压、体重、血糖、体温**全都是 checkup**。于是先记血压再记体重，
+        # 体重把血压顶掉，那一屏只剩最后记的那一项。实测：连记两条，`metrics` 只有一条。
         latest: dict[str, Any] = {}
         for e in events:                       # 已按时间倒序，第一条即最新
-            kind = str(getattr(e, "kind", "")) or "其他"
-            if kind not in latest:
-                latest[kind] = e
+            label = str(getattr(e, "title", "")) or str(getattr(e, "kind", "")) or "其他"
+            if label not in latest:
+                latest[label] = e
 
-        for kind, e in list(latest.items())[:4]:
+        for label, e in list(latest.items())[:6]:
             payload = getattr(e, "payload", None) or {}
-            value = payload.get("value") or payload.get("text") or getattr(e, "title", "")
+            # 拿不到值就**留空**，不要把标题填进去。
+            #
+            # 原先兜底到 `title`，于是标签和值变成同一串字：屏幕上是
+            # 「早晨量了血压:132/84 —— 早晨量了血压:132/84」。那些事件的 payload 里
+            # 存的是 `systolic`/`diastolic` 这类结构化字段，本来就没有 `value`；
+            # 兜底把「这条记录没有单一读数」显示成了「读数等于它的标题」。
+            raw = payload.get("value") or payload.get("text")
             metrics.append(
                 {
-                    "label": getattr(e, "title", kind),
-                    "value": str(value) if value else None,
+                    "label": label,
+                    "value": str(raw) if raw else None,
                     "unit": payload.get("unit"),
                     "at": e.event_at.isoformat() if getattr(e, "event_at", None) else None,
                 }
@@ -885,6 +898,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
         "app.appointment.created": ("记下一次就医安排", "健康", "record_confirm"),
         "app.emergency.notify_failed": ("紧急呼叫没能通知到家人", "服务", "record_family"),
         "app.contact.phone_set": ("登记了紧急联系电话", "服务", "record_family"),
+        "app.health.recorded": ("记了一次身体数据", "健康", "record_confirm"),
     }
 
     _OUTCOME_WORDS = {
@@ -1000,6 +1014,104 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True) -> AP
                     else None
                 ),
             },
+        }
+
+    # ---- 记一次身体数据 ------------------------------------------------------
+    #
+    # `/health-summary` 读 `health_events_v4`，而**此前没有任何地方往里写**——
+    # 三个演示状态（empty/normal/attention）下 `metrics` 都是 `[]`，
+    # 那一屏永远显示「还没有记到身体数据。」。接口是通的，只是没有入口。
+    #
+    # `HealthEventKind` 是**事件类别**（checkup/visit/medication/note），不是体征。
+    # 老人要记的是「今天量了血压 128/82」，所以落成 `checkup` 加一个带值和单位的
+    # payload——不新造枚举，那张表和 v4 的其他消费方共用。
+
+    #: 老人说得出的那几种 → (事件类别, 默认单位)。
+    #: 认不出来的按「随手记一笔」处理，**不硬塞进某一类**——
+    #: 一条归错类的健康记录，比一条没归类的更难发现。
+    _VITAL_KINDS: dict[str, tuple[str, str | None]] = {
+        "血压": ("checkup", "mmHg"),
+        "血糖": ("checkup", "mmol/L"),
+        "体重": ("checkup", "kg"),
+        "体温": ("checkup", "℃"),
+        "心率": ("checkup", "次/分"),
+        "用药": ("medication", None),
+        "就诊": ("visit", None),
+    }
+
+    _SCOPE_WORDS = {"私密": "private", "家人可见": "family_summary", "家人详情": "family_shared"}
+
+    @router.post("/health/events")
+    def record_health_event(
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppHealthRecorded:
+        """记一次身体数据。
+
+        `value` 保持**字符串**：血压是「128/82」，不是一个数。
+        强行拆成两个数字字段，会让「128/82」和「体重 62.5」没法用同一条路径记，
+        而老人念出来的就是这两种形状。
+        """
+        if v4_store is None:
+            raise HTTPException(status_code=503, detail="这台服务上没有开健康记录。")
+        body = body or {}
+        label = str(body.get("type") or body.get("label") or "").strip()
+        value = str(body.get("value") or "").strip()
+        if not label:
+            raise HTTPException(status_code=400, detail="还没有说记的是哪一项。")
+        if not value:
+            raise HTTPException(status_code=400, detail=f"还没有说{label}是多少。")
+
+        kind, default_unit = _VITAL_KINDS.get(label, ("note", None))
+        unit = str(body.get("unit") or "").strip() or default_unit
+        scope = _SCOPE_WORDS.get(str(body.get("scope") or ""), "family_summary")
+
+        from .v4_models import HealthEventCreate
+
+        now = datetime.now(UTC)
+        raw_at = str(body.get("at") or "").strip()
+        event_at = now
+        if raw_at:
+            try:
+                event_at = datetime.fromisoformat(raw_at.replace("Z", "+00:00"))
+                if event_at.tzinfo is None:
+                    event_at = event_at.replace(tzinfo=UTC)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="这个时间看不懂，请再说一遍。")
+
+        try:
+            record = v4_store.create_health_event(
+                ctx.family_id,
+                HealthEventCreate(
+                    elder_id=_elder_of(ctx),
+                    kind=kind,
+                    title=label,
+                    event_at=event_at,
+                    payload={"value": value, **({"unit": unit} if unit else {})},
+                    source="elder-app",
+                    scope=scope,
+                ),
+            )
+        except Exception as exc:      # noqa: BLE001 —— 校验失败要说人话，不是 500
+            raise HTTPException(status_code=400, detail=f"这一条没能记下来：{exc}") from exc
+
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_HEALTH_RECORDED,
+            entity_id=record.id,
+            # 值本身**不进审计链**。链会被导出、会被人看，而体征是健康隐私；
+            # 记「记了哪一项、什么时候」足够回答「这条数据哪来的」。
+            payload={"label": label, "kind": kind},
+        )
+        return {
+            "ok": True,
+            "id": record.id,
+            "label": label,
+            "value": value,
+            "unit": unit,
+            "at": event_at.isoformat(),
+            "message": f"记好了，{label} {value}{unit or ''}。",
         }
 
     # ---- 紧急呼叫 -----------------------------------------------------------

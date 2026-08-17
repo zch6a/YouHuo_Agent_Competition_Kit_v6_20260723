@@ -572,6 +572,21 @@ def test_a_phone_cannot_be_set_across_families(client: TestClient) -> None:
     assert r.status_code == 404, f"跨家庭写入了紧急联系电话：{r.status_code}"
 
 
+def _audit_blob(client: TestClient) -> str:
+    """审计表里所有 payload 拼成一串。
+
+    **不要用 `/records` 来验「秘密没进审计」。** 实测：`/records` 输出的是
+    `id/title/note/kind/icon/time/at/entityId`，`note` 恒为空串，
+    **payload 一个字都不输出**。也就是说，拿 `/records` 的响应去 grep 一个号码，
+    无论审计表里存了什么都会绿——那是一条声称守着隐私、实际什么都没看的测试，
+    比没有更糟。我写的头两条就是这样，靠变异测试才发现（变体把读数写进审计，
+    对应断言纹丝不动）。
+    """
+    db = client.app.state.db
+    rows = db._conn.execute("SELECT payload_json FROM audit_events").fetchall()
+    return " ".join(str(r[0]) for r in rows)
+
+
 def test_the_audit_never_stores_the_phone_number_itself(client: TestClient) -> None:
     """审计链会被导出、会被人看，而号码是 PII。
 
@@ -579,9 +594,114 @@ def test_the_audit_never_stores_the_phone_number_itself(client: TestClient) -> N
     """
     fam = _login(client, "daughter-demo")
     client.put(f"{V1}/contacts/son-demo/phone", headers=fam, json={"phone": "13800001111"})
-    dump = client.get(f"{V1}/records", headers=fam).text
-    assert "13800001111" not in dump, "号码被写进审计流水了"
-    assert "登记了紧急联系电话" in dump, "这件事没有留下任何痕迹"
+    assert "13800001111" not in _audit_blob(client), "号码被写进审计 payload 了"
+    assert "登记了紧急联系电话" in client.get(f"{V1}/records", headers=fam).text, \
+        "这件事没有留下任何痕迹"
+
+
+# ---- 身体数据：此前只能读，没有任何地方能写 --------------------------------
+
+def test_health_summary_starts_empty_and_says_so(client: TestClient) -> None:
+    """**阳性对照**：先证明它一开始确实是空的。
+
+    不先证明这一点，下面「记了一条之后就有了」可能只是因为它本来就有。
+    """
+    got = client.get(f"{V1}/health-summary").json()
+    assert got["metrics"] == []
+    assert got["recorded"] == 0
+    assert got["note"], "空的时候要说一句话，不能只留白"
+    assert got["overall"] is None, "后端没有下结论的依据，就不许下结论"
+
+
+def test_recording_a_vital_makes_it_show_up(client: TestClient) -> None:
+    r = client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
+    assert r.status_code == 200, r.text
+    assert r.json()["unit"] == "mmHg", "血压的默认单位没带上"
+
+    after = client.get(f"{V1}/health-summary").json()
+    assert after["recorded"] == 1
+    assert after["metrics"], "记进去了却读不出来"
+    m = after["metrics"][0]
+    assert m["label"] == "血压" and m["value"] == "128/82" and m["unit"] == "mmHg"
+    assert after["note"] is None, "有数据了就不该再说「还没有记到」"
+
+
+def test_a_blood_pressure_stays_one_string(client: TestClient) -> None:
+    """「128/82」不是一个数。
+
+    拆成两个数字字段的话，它和「体重 62.5」就没法用同一条路径记，
+    而老人念出来的就是这两种形状。
+    """
+    client.post(f"{V1}/health/events", json={"type": "体重", "value": "62.5"})
+    client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
+    values = {m["label"]: m["value"] for m in client.get(f"{V1}/health-summary").json()["metrics"]}
+    assert values["血压"] == "128/82"
+    assert values["体重"] == "62.5"
+
+
+def test_recording_a_vital_needs_a_type_and_a_value(client: TestClient) -> None:
+    assert client.post(f"{V1}/health/events", json={"value": "128/82"}).status_code == 400
+    assert client.post(f"{V1}/health/events", json={"type": "血压"}).status_code == 400
+
+
+def test_an_unknown_measurement_is_not_forced_into_a_category(client: TestClient) -> None:
+    """认不出来的按「随手记一笔」处理。
+
+    一条归错类的健康记录，比一条没归类的更难发现——它会安静地混进
+    某一类的统计里，而没有任何东西显得不对。
+    """
+    r = client.post(f"{V1}/health/events", json={"type": "今天走了几步", "value": "3200"})
+    assert r.status_code == 200
+    assert r.json()["unit"] is None, "不认识的项不该被安上一个单位"
+
+
+def test_the_audit_never_stores_the_reading_itself(client: TestClient) -> None:
+    """体征是健康隐私，而审计链会被导出、会被人看。
+
+    链上记「记了哪一项、什么时候」，足够回答「这条数据哪来的」。
+    """
+    client.post(f"{V1}/health/events", json={"type": "血糖", "value": "6.7"})
+    assert "6.7" not in _audit_blob(client), "血糖读数被写进审计 payload 了"
+    assert "记了一次身体数据" in client.get(f"{V1}/records").text, "这件事没有留下任何痕迹"
+
+
+def test_a_reading_without_a_single_value_does_not_echo_its_own_title(client: TestClient) -> None:
+    """拿不到读数时要**留空**，不能把标题填进去当值。
+
+    实测的样子（访客沙箱自带的演示事件，payload 里存的是
+    `systolic`/`diastolic` 这类结构化字段，本来就没有 `value`）：
+    屏幕上是「早晨量了血压：132/84 —— 早晨量了血压：132/84」，标签和值同一串字。
+    兜底把「这条记录没有单一读数」显示成了「读数等于它的标题」。
+    """
+    visitor = client.post("/v2/auth/visitor", json={})
+    if visitor.status_code != 200:
+        pytest.skip("这个部署没有访客沙箱")
+    theirs = {"Authorization": "Bearer " + visitor.json()["elder_token"]}
+    metrics = client.get(f"{V1}/health-summary", headers=theirs).json()["metrics"]
+    assert metrics, "访客沙箱没有演示健康事件，这条判据没有依据"
+    same = [m for m in metrics if m["value"] is not None and m["value"] == m["label"]]
+    assert not same, f"标签和值是同一串字：{same}"
+
+
+def test_health_events_do_not_leak_across_families(client: TestClient) -> None:
+    """守的是「看不到我的」，**不是**「它那边是空的」。
+
+    第一版断言 `recorded == 0`，红了——实测那 3 条是访客沙箱**自己种的**演示数据
+    （`fam-ve55450bee234`），它并没有看到我的 128/82。
+    「新沙箱一开始一定是空的」这个前提早就不成立了，而这个仓库的
+    `verify_features_v6.py:162-176` 里**逐字写着**同一个教训。我还是踩了。
+
+    空列表也能是「接口坏了返回空」，所以正确的判据有两条：
+    ① 看不到我这条读数；② 它看到的每一条都属于它自己。
+    """
+    client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
+    visitor = client.post("/v2/auth/visitor", json={})
+    if visitor.status_code != 200:
+        pytest.skip("这个部署没有访客沙箱")
+    theirs = {"Authorization": "Bearer " + visitor.json()["elder_token"]}
+    got = client.get(f"{V1}/health-summary", headers=theirs).json()
+    assert "128/82" not in [m["value"] for m in got["metrics"]], "看到了别的家庭的读数"
+    assert "血压" not in [m["label"] for m in got["metrics"] if m["value"] == "128/82"]
 
 
 def test_the_profile_reports_days_but_never_invents_weather(client: TestClient) -> None:

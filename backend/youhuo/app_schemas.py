@@ -339,6 +339,18 @@ class AppHealthSummary(StrictModel):
     note: str | None = None
 
 
+class AppHealthRecorded(StrictModel):
+    ok: bool
+    id: str
+    label: str
+    #: 保持字符串：血压是「128/82」，不是一个数。拆成两个数字字段的话，
+    #: 「128/82」和「体重 62.5」就没法用同一条路径记，而老人念出来的就是这两种形状。
+    value: str
+    unit: str | None = None
+    at: str
+    message: str
+
+
 class AppEmergencyResult(StrictModel):
     ok: bool
     status: str
