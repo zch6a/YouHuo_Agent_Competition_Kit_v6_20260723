@@ -5461,3 +5461,27 @@ body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::
   line-height: 1;
 }
 body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::before { content: none; }
+
+
+/* ==========================================================================
+   指标卡角标：从右下挪到右上
+   ..........................................................................
+   卡片只有 123×102，而角标被前面几条覆写放到 56–64px 贴在右下角——
+   数值「完好」的盒子横跨 x 33→126，角标占 x 77→133，重叠近一半，
+   opacity .22 足够让菊花从字底下透上来。
+
+   不是 z-index 的事：`elementFromPoint` 打在字中心返回的是 `strong#mChain`，
+   字在最上面。是两个东西抢同一块 123px 见方的地方。
+
+   上半张卡只有一个 62px 宽的标签，右上是空的；挪过去并收到 40px 之后，
+   角标的垂直区间（距顶 6→46px）完全在数值上方，不再相交。
+   意象一个不删——`nth-child` 那三条（莲/亭/鹤）照旧生效。
+   ========================================================================== */
+.metric::after {
+  top: 6px;
+  right: 6px;
+  bottom: auto;
+  width: 40px;
+  height: 40px;
+  opacity: .2;
+}
