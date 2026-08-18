@@ -28,7 +28,14 @@
 //: failed` 完整吃掉，控制台一声不响。浏览器里 `getRegistrations()` 返回 0，
 //: 离线外壳没有、PWA 装不上，而这个文件里每一句关于缓存版本的话都成了空话。
 //: `node --check backend/static/sw.js` 一秒能查出来，而它此前不在任何门里。
-const VERSION = 'youhuo-shell-v12';
+//: v12 → v13：老人端换成 v8 版式，多出 `elder-family-v3.css`（第五层，20KB）。
+//:
+//: **不升这个字符串的后果不只是离线**。用户在浏览器里点进 /elder 看到的还是
+//: 旧版——sw.js 是 stale-while-revalidate（`hit || fetching`），已安装的 worker
+//: 先返回 v12 缓存里的那份 `elder.html`，新版要等下一次启动才生效。
+//: 我装完 v8 之后忘了这一步，用户打开看到的是旧页面，而服务器上明明是新的。
+//: 装任何一次前端包，「改文件」和「让浏览器拿到」是两件事。
+const VERSION = 'youhuo-shell-v13';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -53,6 +60,10 @@ const SHELL = [
   // 于是一张 156KB 的山水图以原始尺寸把整页推开。
   '/static/art-cards.css',
   '/static/art-cards-family.css',
+  // 老人端 v8 的第五层。漏缓存它，离线时 /elder 会少掉一整层版式规则——
+  // 而那一层管的是壳结构、麦克风区和四个面板的排布，缺了不是"样式差一点"，
+  // 是回到没有布局的裸文档流。
+  '/static/elder-family-v3.css',
   '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：
