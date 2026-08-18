@@ -85,26 +85,50 @@ main.shell.app-frame {
      改成 auto：定高的设计意图保留（窗格不会把整页撑长），内容超出时可以滚到。
      `overscroll-behavior: contain` 防止滚到底之后把整页一起带动——
      老人端最忌讳「我明明在读这一段，屏幕自己跑了」。 */
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* 滚动条样式逐条照抄家人端的 `.phone-scroll`（art-cards-family.css:2313）。
+     默认滚动条在这套国风配色里是一条突兀的灰柱——用户截图里那条就是。
+     `scrollbar-gutter: stable` 尤其重要：内容忽长忽短时，没有它整页会随着
+     滚动条出现/消失横向抖 6px。 */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(118,141,128,.46) transparent;
   position: relative;
   margin: 0;
 }
+.elder-layout::-webkit-scrollbar { width: 6px; }
+.elder-layout::-webkit-scrollbar-track { background: transparent; margin: 8px 0 10px; }
+.elder-layout::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(118,141,128,.66), rgba(89,110,99,.66));
+  border: 2px solid rgba(247,243,233,.96);
+}
+/* `.panel.stage` **不再是滚动容器**。
+   ..........................................................................
+   它原本也是 `height: 100%; overflow-y: auto`，而外面的 `.elder-layout` 同样是
+   `overflow-y: auto`——**两层嵌套滚动**。后果：右边出现两条滚动条，
+   而且滚哪一条取决于指针落在哪，滚到内层底部还要再"接力"到外层。
+
+   家人端只有一层（`.phone-scroll`），分工是：
+       shell        定高、overflow: hidden，不滚
+       phone-scroll flex: 1 1 auto; min-height: 0; overflow-y: auto  ← 唯一的滚动层
+       tabbar       flex: 0 0 auto，固定在底部
+
+   老人端照同一套：`.elder-layout` 是唯一的滚动层，`.panel.stage` 回到普通块。
+   `height: 100%` 也去掉——它在一个可滚容器里会把面板钉成一屏高，
+   内容再多也撑不开，那正是「滚不动」的另一半原因。 */
 .panel.stage {
-  height: 100%;
   min-height: 0;
   padding: 18px 2px 20px;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   background: transparent;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: visible;
 }
-.panel.stage::-webkit-scrollbar { display: none; }
 
 /* 所有老人端分区严格单列，绝不再出现 desktop rail/sidebar。 */
 .elder-panel { width: 100%; min-width: 0; }
