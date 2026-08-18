@@ -35,7 +35,8 @@
 //: 先返回 v12 缓存里的那份 `elder.html`，新版要等下一次启动才生效。
 //: 我装完 v8 之后忘了这一步，用户打开看到的是旧页面，而服务器上明明是新的。
 //: 装任何一次前端包，「改文件」和「让浏览器拿到」是两件事。
-const VERSION = 'youhuo-shell-v13';
+//: v13 → v14：家人端设计二上线（/family2），多出四个文件。
+const VERSION = 'youhuo-shell-v14';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -64,6 +65,13 @@ const SHELL = [
   // 而那一层管的是壳结构、麦克风区和四个面板的排布，缺了不是"样式差一点"，
   // 是回到没有布局的裸文档流。
   '/static/elder-family-v3.css',
+  // 家人端设计二（/family2）。四屏合一的壳，和设计一并行。
+  // 业务逻辑共用 family.js / care.js，这里只多出它自己的版式和视觉脚本。
+  '/family2',
+  '/static/family-v6.html',
+  '/static/family-v6.css',
+  '/static/family-v6-a.js',
+  '/static/family-v6-b.js',
   '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：

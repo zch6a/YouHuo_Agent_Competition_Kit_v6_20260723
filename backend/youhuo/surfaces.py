@@ -59,6 +59,12 @@ SURFACES: dict[str, RouteSurface] = {
     "/":       RouteSurface("consumer",     "entry",    None,   "index.html"),
     "/elder":  RouteSurface("consumer",     "elder",    None,   "elder.html"),
     "/family": RouteSurface("consumer",     "family",   "today", "family.html"),
+    # 家人端**设计二**。和 `/family` 并行，供比较；业务逻辑共用 family.js/care.js。
+    #
+    # 它是**四屏合一**的壳（今天/待办/照护/我的都在一个文档里），而设计一把照护
+    # 拆到独立的 `/care`。所以它的 entry 是 `today`、shell 仍是 `family`——
+    # surface 描述的是意图，不是 URL，这一点是这个文件开头就写明的。
+    "/family2": RouteSurface("consumer",    "family",   "today", "family-v6.html"),
     # `/care` 与 `/trust` 是 family shell 的两个 deep link，不是独立网站。
     "/care":   RouteSurface("consumer",     "family",   "care",  "care.html"),
     # `/trust` 的 entry 原先写的是 `"care"`，和这个文件**自己第 11 行的文档**矛盾
@@ -91,6 +97,7 @@ DEFAULT_PANEL: dict[str, str | None] = {
     "/":       None,
     "/elder":  "home",
     "/family": "today",
+    "/family2": "today",
     "/care":   "today",
     "/trust":  None,    # 一张凭证没有分区
     "/stage":  "product",

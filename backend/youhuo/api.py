@@ -361,6 +361,21 @@ def create_app(
     def care_ui() -> FileResponse:
         return FileResponse(static_dir / "care.html")
 
+    # ---- 并行的第二套设计 ------------------------------------------------
+    #
+    # 两套设计同时在线，各走一条路由，**共用同一份业务逻辑**
+    # （`family.js` / `care.js` / `common.js` / `identity.js`）。
+    #
+    # 不给设计二单写一份接线：这个项目已经因为「两套实现各自往返都绿、
+    # 跨子系统才红」栽过一次（字号语速和 SOS 各有两套实现）。
+    # 一份逻辑、两张皮，是唯一不会分叉的做法。
+    #
+    # 设计二是**四屏合一**的壳（今天/待办/照护/我的），而设计一把照护拆成
+    # 独立的 `/care`。这个差异是有意的，不是没对齐——它正是要比较的东西。
+    @app.get("/family2", include_in_schema=False)
+    def family_v6_ui() -> FileResponse:
+        return FileResponse(static_dir / "family-v6.html")
+
     @app.get("/trust", include_in_schema=False)
     def trust_ui() -> FileResponse:
         return FileResponse(static_dir / "trust.html")

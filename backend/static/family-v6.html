@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>优活 · 四屏 V6.0 老人端同源风格预览</title>
+<link rel="stylesheet" href="/static/family-v6.css">
+</head>
+<body data-surface="consumer">
+<div class="preview-stage">
+<main class="phone" id="familyPhone" data-tab="today">
+    <a class="back-link" href="/">← 返回首页</a>
+
+    <!-- 操作回执。care.js 唯一缺的那个 id。语气由后端决定，不由前端猜——「今天该吃的都记过了」是 409，不能画成绿色成功框。 -->
+    <p class="notice" aria-live="polite" id="careNotice" hidden></p>
+
+
+<div class="ink-mountains">
+<svg viewBox="0 0 430 265" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="fadeM4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#769487" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#769487" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blurM4"><feGaussianBlur stdDeviation="2.2"/></filter>
+  </defs>
+  <path d="M0 157 C46 132 70 93 104 101 C126 106 140 137 162 130 C196 118 212 61 249 71 C286 81 291 125 318 127 C350 129 372 89 430 73 L430 0 L0 0Z" fill="url(#fadeM4)" filter="url(#blurM4)"/>
+  <path d="M0 178 C62 151 83 119 116 127 C148 135 157 163 187 149 C226 131 238 95 270 103 C303 111 315 151 346 148 C374 145 394 121 430 112" fill="none" stroke="#5d7e70" stroke-opacity=".28" stroke-width="1.3"/>
+  <path d="M272 92 C286 79 297 68 306 48 M305 49 C296 48 291 44 286 38 M305 49 C314 42 319 36 323 29" fill="none" stroke="#957045" stroke-opacity=".28" stroke-width="1.2"/>
+  <ellipse cx="286" cy="38" rx="7" ry="3" fill="#789489" fill-opacity=".28" transform="rotate(24 286 38)"/>
+  <ellipse cx="323" cy="29" rx="7" ry="3" fill="#789489" fill-opacity=".25" transform="rotate(-30 323 29)"/>
+</svg>
+</div>
+
+
+<div class="bottom-grass">
+<svg viewBox="0 0 430 150" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 137 C40 126 62 132 98 120 C136 107 169 124 205 115 C248 104 278 118 318 110 C355 102 391 108 430 94 L430 150 L0 150Z" fill="#8fa18b" fill-opacity=".10"/>
+  <g fill="none" stroke="#638173" stroke-opacity=".27" stroke-width="1.1">
+    <path d="M34 148 C39 128 38 111 31 94 M39 128 C49 117 55 108 59 94"/>
+    <path d="M103 150 C103 129 108 115 118 98 M107 126 C97 115 91 104 89 91"/>
+    <path d="M336 150 C334 128 328 112 318 97 M331 127 C345 118 354 106 358 92"/>
+    <path d="M386 150 C388 129 397 113 410 102"/>
+  </g>
+  <g fill="#799181" fill-opacity=".25">
+    <ellipse cx="59" cy="94" rx="8" ry="3" transform="rotate(-42 59 94)"/>
+    <ellipse cx="89" cy="91" rx="8" ry="3" transform="rotate(38 89 91)"/>
+    <ellipse cx="118" cy="98" rx="9" ry="3" transform="rotate(-36 118 98)"/>
+    <ellipse cx="318" cy="97" rx="9" ry="3" transform="rotate(35 318 97)"/>
+    <ellipse cx="358" cy="92" rx="8" ry="3" transform="rotate(-35 358 92)"/>
+  </g>
+</svg>
+</div>
+
+<header class="topbar">
+  <div class="brand-mark">
+    <div class="brand-seal">优</div>
+    <div class="brand-copy"><strong>优活</strong><small>FAMILY · CARE</small></div>
+  </div>
+  <div class="top-weather"><strong>家人端 · 张敏</strong><span id="famUpdated">今天 17:26 更新</span></div>
+</header>
+
+<div class="app-viewport" id="main">
+  <section class="panel family-panel" data-panel="today" aria-label="今天">
+    <div class="identity-island">
+      <div class="hello">爸爸 · 张建国</div>
+      <h1 id="famVerdict">今天整体平稳</h1>
+      <p id="famHeadline">没有明显异常，有一件小事需要您确认。</p>
+      <div class="role-chip">最近一次活动 17:48 · 在家</div>
+    </div>
+
+    <div class="status-ribbon"><i></i><span>生活节律已回到平常范围 · 安全状态正常</span></div>
+
+    <div class="companion-note">
+      <svg class="heart-line" viewBox="0 0 36 32"><path d="M18 28C12 23 4 17 4 10.5 4 6 9 4 13 7.2 15.2 8.9 16.4 11 18 13.4 20 9.3 22 6 26.3 5.8 31.2 5.6 33 9.5 31.3 13.7 29 19.2 23.7 23.5 18 28Z"/></svg>
+      <strong>今天不用一直盯着看</strong>
+      <span>上午起床稍晚，但下午已经恢复。晚饭后有一次血压测量，结果出来会继续放在这里。</span>
+    </div>
+
+    <div class="section-head"><h2>需要您确认</h2><span>NEED · YOU</span></div>
+    <div id="tasks" class="confirm-zone">
+      <article class="confirm-card">
+        <strong>周五复诊前，需要确认接送方式</strong>
+        <p>社区医院 · 8月21日 09:30。爸爸本人已经知道这件事，现在只等家里决定谁陪同。</p>
+        <button type="button">去确认 →</button>
+      </article>
+    </div>
+    <p id="familyNotice" class="notice-line" role="status" aria-live="polite" hidden></p>
+
+    <div class="section-head"><h2>今天怎么样</h2><span>DAILY · REPORT</span></div>
+    <article id="dailyReport" class="report-strip" aria-live="polite">
+      <strong>和平常差不多</strong>
+      <p>活动量、用药和安全都没有明显变化。午后有一次短暂心情低落，没有持续。</p>
+    </article>
+
+    <div class="metric-row">
+      <div class="metric"><span>待您确认</span><strong id="mNeedYou">1</strong></div>
+      <div class="metric"><span>进行中</span><strong id="mActive">2</strong></div>
+      <div class="metric"><span>今天到期</span><strong id="mToday">1</strong></div>
+    </div>
+
+    <div class="section-head"><h2>其他正在办的事</h2><span>IN · PROGRESS</span></div>
+    <div id="otherTasks" class="reminders">
+      <div class="reminder-item"><time>19:30</time><div><strong>晚间量血压</strong><small>结果会同步到照护档案</small></div><em>待完成</em></div>
+      <div class="reminder-item"><time>20:00</time><div><strong>晚间用药</strong><small>氨氯地平 · 1片</small></div><em>待提醒</em></div>
+    </div>
+    <button id="refresh" class="more-btn" type="button">刷新今天的情况 ↻</button>
+  </section>
+
+  <section class="panel family-panel" data-panel="todo" aria-label="待办" hidden>
+    <p class="panel-kicker">FAMILY · PLAN</p>
+    <h2 class="tab-head">待办与提醒</h2>
+    <p class="tab-note">先按日期看，再决定要不要给爸爸添一件事。重要的放前面，不把所有提醒铺满一屏。</p>
+
+    <div id="calendar" class="todo-calendar">
+      <div class="day-pill"><span>周一</span><b>17</b><span>2件</span></div>
+      <div class="day-pill active"><span>今天</span><b>18</b><span>3件</span></div>
+      <div class="day-pill"><span>周三</span><b>19</b><span>1件</span></div>
+      <div class="day-pill"><span>周四</span><b>20</b><span>1件</span></div>
+      <div class="day-pill"><span>周五</span><b>21</b><span>复诊</span></div>
+    </div>
+
+    <div class="companion-note">
+      <svg class="heart-line" viewBox="0 0 36 32"><path d="M18 28C12 23 4 17 4 10.5 4 6 9 4 13 7.2 15.2 8.9 16.4 11 18 13.4 20 9.3 22 6 26.3 5.8 31.2 5.6 33 9.5 31.3 13.7 29 19.2 23.7 23.5 18 28Z"/></svg>
+      <strong>今天还有两件事</strong>
+      <span>晚间血压和用药都已经安排好，系统会先提醒爸爸本人，不需要家人一直催。</span>
+    </div>
+
+    <div class="section-head"><h2>今天</h2><span>TODAY · TASKS</span></div>
+    <div class="todo-list">
+      <div class="todo-item"><time>19:30</time><div><strong>量血压</strong><small>在家 · 自动提醒</small></div><em>待完成</em></div>
+      <div class="todo-item"><time>20:00</time><div><strong>服晚间药</strong><small>氨氯地平 1片</small></div><em>待提醒</em></div>
+      <div class="todo-item"><time>21:30</time><div><strong>给女儿回电话</strong><small>可稍后 · 非紧急</small></div><em>可稍后</em></div>
+    </div>
+
+    <div class="section-head"><h2>给他添一件事</h2><span>ADD · REMINDER</span></div>
+    <form id="reminderForm" class="family-form">
+      <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历"></label>
+      <label>时间<input id="reminderDue" type="datetime-local" required></label>
+      <label>多久没确认再通知家人<input id="escalation" type="number" min="5" max="1440" value="30"></label>
+      <button type="submit">同步到他的手机</button>
+    </form>
+
+    <div class="section-head"><h2>通知</h2><span>NOTICES</span></div>
+    <div id="notices">
+      <div class="notice-line">今天没有新的超时提醒。</div>
+    </div>
+  </section>
+
+  <section class="panel family-panel" data-panel="care" aria-label="照护" hidden>
+    <p class="panel-kicker">CARE · OVERVIEW</p>
+    <h2 class="tab-head">照护中心</h2>
+    <p class="tab-note" id="careUpdated">先看“他最近怎么样”，再进入用药、身体、心情和安全。所有细节仍在，但第一屏先看人。</p>
+    <p id="status" class="notice-line" aria-live="polite">照护信息已连接 · 最近更新 17:26</p>
+
+    <nav class="care-seg" aria-label="照护分区">
+      <button class="is-current" data-care-section="overview">概览</button>
+      <button data-care-section="today">今天</button>
+      <button data-care-section="med">用药</button>
+      <button data-care-section="body">身体</button>
+      <button data-care-section="mood">心情</button>
+      <button data-care-section="safety">安全</button>
+      <button data-care-section="trend">趋势</button>
+    </nav>
+
+    <section class="care-detail" data-care-panel="overview">
+      <article id="ovVerdict" class="care-verdict">
+        <small>OVERVIEW · 结论</small>
+        <strong>最近一周总体稳定</strong>
+        <p>今天与自己的常态接近。用药按时，身体记录没有新增高风险信号，安全设置正常。</p>
+      </article>
+      <div id="overviewBody" class="care-rows" aria-live="polite">
+        <div id="ovToday" class="care-row" data-care-target="today"><span class="care-symbol">今</span><div><strong>今天</strong><small>和平常差不多 · 还有2件事</small></div><em>查看 →</em></div>
+        <div id="ovMed" class="care-row" data-care-target="med"><span class="care-symbol">药</span><div><strong>在吃什么药</strong><small>3项长期用药 · 今天均正常</small></div><em>正常</em></div>
+        <div id="ovBody" class="care-row" data-care-target="body"><span class="care-symbol">身</span><div><strong>身体</strong><small>血压最近7天在个人常态附近</small></div><em>平稳</em></div>
+        <div id="ovMood" class="care-row" data-care-target="mood"><span class="care-symbol">心</span><div><strong>心情</strong><small>最近两周大多平稳</small></div><em>平稳</em></div>
+        <div id="ovSafety" class="care-row" data-care-target="safety"><span class="care-symbol">安</span><div><strong>安全</strong><small>紧急联系人与静默规则已设置</small></div><em>正常</em></div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="today" hidden>
+      <div class="section-head"><h2>他今天怎么样</h2><span>RHYTHM</span></div>
+      <div id="todayBody" aria-live="polite">
+        <div class="companion-note"><strong>今天没有明显偏离常态</strong><span>起床晚了38分钟，午后活动量恢复；晚饭时间正常。</span></div>
+        <div class="reminders">
+          <div class="reminder-item"><time>08:05</time><div><strong>起床</strong><small>比平常晚38分钟</small></div><em>已恢复</em></div>
+          <div class="reminder-item"><time>12:10</time><div><strong>午间用药</strong><small>已确认</small></div><em>完成</em></div>
+          <div class="reminder-item"><time>17:42</time><div><strong>晚饭</strong><small>和平常接近</small></div><em>完成</em></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="med" hidden>
+      <div class="section-head"><h2>在吃什么药</h2><span>MEDICATION</span></div>
+      <div id="medBody" class="organic-flow" aria-live="polite">
+        <article class="record-bubble"><span class="record-time">08:00</span><strong>阿司匹林肠溶片</strong><p>100mg · 1片 · 今天已确认</p></article>
+        <article class="record-bubble"><span class="record-time">12:00</span><strong>二甲双胍</strong><p>0.5g · 1片 · 今天已确认</p></article>
+        <article class="record-bubble"><span class="record-time">20:00</span><strong>氨氯地平</strong><p>5mg · 1片 · 等待晚间提醒</p></article>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="body" hidden>
+      <div class="section-head"><h2>身体</h2><span>BODY</span></div>
+      <div id="bodyBody" aria-live="polite">
+        <article class="care-verdict"><small>最近一次血压</small><strong>128 / 78 mmHg</strong><p>与爸爸自己的近30天常态接近。</p></article>
+        <div class="care-chart"><i class="h55"></i><i class="h66"></i><i class="h60"></i><i class="h72"></i><i class="h63"></i><i class="h68"></i><i class="h64"></i></div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="mood" hidden>
+      <div class="section-head"><h2>心情</h2><span>MOOD</span></div>
+      <div id="moodBody" aria-live="polite"><div class="companion-note"><strong>最近两周大多平稳</strong><span>只有类别和趋势，不展示陪伴聊天原文。今天午后有一次短暂低落，没有持续。</span></div></div>
+    </section>
+
+    <section class="care-detail" data-care-panel="safety" hidden>
+      <div class="section-head"><h2>安全</h2><span>SAFETY</span></div>
+      <div id="safetyBody" class="service-grid" aria-live="polite">
+        <div class="service-item"><b>紧急联系人</b><span>女儿张敏 · 第一联系人</span></div>
+        <div class="service-item"><b>静默提醒</b><span>长时间无活动后先问本人</span></div>
+        <div class="service-item"><b>外出范围</b><span>超过常用活动范围才提醒</span></div>
+        <div class="service-item"><b>设备状态</b><span>手机在线 · 电量78%</span></div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="trend" hidden>
+      <div class="section-head"><h2>这一周</h2><span>TREND</span></div>
+      <div id="weekly" aria-live="polite">
+        <article class="care-verdict"><small>只和自己比</small><strong>本周整体没有明显变化</strong><p>生活节律、用药确认和心情趋势都在个人常态附近。</p></article>
+        <div class="care-chart"><i class="h48"></i><i class="h55"></i><i class="h61"></i><i class="h57"></i><i class="h65"></i><i class="h60"></i><i class="h63"></i></div>
+      </div>
+    </section>
+  </section>
+
+  <section class="panel family-panel" data-panel="mine" aria-label="我的" hidden>
+    <p class="panel-kicker">MY · FAMILY</p>
+    <h2 class="tab-head">我的与可信记录</h2>
+    <p class="tab-note">把做过的事和入口收在这里。默认看结果，不让家人先面对一长串技术细节。</p>
+
+    <div class="identity-island">
+      <div class="hello">家人账号 · 张敏</div>
+      <h1>陪伴不是盯梢</h1>
+      <p>优活只在需要接力的时候把事情交给您。</p>
+    </div>
+
+    <div class="metric-row metric-row-one">
+      <div class="metric"><span>本月可信记录</span><strong id="mChain">18</strong></div>
+      <div class="metric"><span>已协助完成</span><strong>7</strong></div>
+      <div class="metric"><span>需要追踪</span><strong>0</strong></div>
+    </div>
+    <p id="chain" class="notice-line">最近一条：今天 15:42，已确认周五复诊挂号结果。</p>
+
+    <div class="section-head"><h2>做过的事</h2><span>可信记录</span></div>
+    <div id="audit" class="record-flow">
+      <div class="record-row"><strong>复诊挂号已确认</strong><span>今天 15:42 · 张敏确认 · 社区医院返回成功</span></div>
+      <div class="record-row"><strong>用药提醒同步完成</strong><span>昨天 20:05 · 系统返回已送达老人端</span></div>
+      <div class="record-row"><strong>家庭联系人更新</strong><span>8月15日 · 张敏确认 · 王叔设为紧急备用</span></div>
+    </div>
+
+    <div class="section-head"><h2>其他</h2><span>MORE</span></div>
+    <div class="fam-links">
+      <a class="fam-link" href="javascript:void(0)">可信中心</a>
+      <a class="fam-link" href="javascript:void(0)">家庭成员</a>
+      <a class="fam-link" href="javascript:void(0)">通知设置</a>
+      <a class="fam-link" href="javascript:void(0)">换一个人用</a>
+    </div>
+
+    <div class="trust-strip">
+      <strong>关于可信结果</strong><br>
+      只有真实系统返回成功，优活才会显示“已完成”；重要操作会记录由谁确认和最终结果。
+    </div>
+  </section>
+</div>
+
+<nav class="dock family-tabs" aria-label="主要分区">
+  <button type="button" class="seg is-current" data-section="today" aria-current="page"><span class="nav-icon"></span><span>今天</span></button>
+  <button type="button" data-section="todo" class="seg"><span class="nav-icon"></span><span>待办</span></button>
+  <button type="button" data-section="care" class="seg"><span class="nav-icon"></span><span>照护</span></button>
+  <button type="button" data-section="mine" class="seg"><span class="nav-icon"></span><span>我的</span></button>
+</nav>
+</main>
+</div>
+
+<div class="youhuo-robot-mascot" id="youhuoRobotMascot" aria-live="polite" aria-label="优活小优向导">
+  <div class="youhuo-robot-bubble" id="youhuoRobotBubble" role="status"></div>
+  <canvas class="youhuo-robot-canvas" id="youhuoRobotCanvas" width="56" height="90" aria-hidden="true"></canvas>
+</div>
+
+<script src="/static/family-v6-a.js"></script>
+<script src="/static/family-v6-b.js"></script>
+
+  <!-- 业务逻辑一律用仓库的这四份，和设计一同一份代码。
+       包自带的 family-v6-a/b.js 是 fetch×0 的纯 UI 壳（吉祥物拖拽、动效），
+       只负责视觉；两者分工不重叠。
+       顺序要紧：identity → common 提供 window.YouHuo，family/care 依赖它。 -->
+  <script src="/static/identity.js"></script>
+  <script src="/static/common.js"></script>
+  <!-- 这两份必须是 `type="module"`。
+       两个文件顶层都写了 `const {api, byId, errorWords} = window.YouHuo`，
+       在同一个全局作用域里同时加载会
+       `SyntaxError: Identifier 'api' has already been declared`
+       ——**整个文件不执行**，四屏里有两屏是死的。
+
+       设计一不会撞：`/family` 只加载前者、`/care` 只加载后者。
+       设计二是四屏合一，两份同时在。模块各有自己的顶层作用域，撞不上。 -->
+  <!-- 顺序也要紧：care 在前、family 在后。
+       两份都在末尾调 `window.YouHuo.initSections(...)`，默认分区不同
+       （care 传 'overview'，family 传 'today'）。后跑的那个说了算。
+
+       设计二的分区集是**家人端那套**（today/todo/care/mine），没有 'overview'。
+       care.js 先跑时它的 'overview' 解析不到、退回第一个分区，随后 family.js
+       再按 'today' 定一次，结果一致。反过来的话，最后生效的是一个
+       解析不到的名字——实测首屏 `当前打开 []`，四个面板全关着，
+       要手动点一下才出内容。 -->
+  <script type="module" src="/static/care.js"></script>
+  <script type="module" src="/static/family.js"></script>
+</body>
+</html>

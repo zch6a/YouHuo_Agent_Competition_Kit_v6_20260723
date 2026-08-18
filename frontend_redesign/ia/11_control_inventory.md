@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 316 |
+| 总数 | 339 |
 |---|---|
-| 有 id | 316 |
+| 有 id | 339 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 16 |
@@ -63,6 +63,29 @@
 | `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | family | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
+| `#` | family-v6 | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#` | family-v6 | today | button | — | family-v6-b.js:waitForWorkspace | — | consumer | family | today | primary |
+| `#refresh` | family-v6 | today | button | click | family-v6-a.js:showCare | — | consumer | family | today | primary |
+| `#reminderForm` | family-v6 | todo | form | submit | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
+| `#reminderTitle` | family-v6 | todo | input | — | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
+| `#reminderDue` | family-v6 | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
+| `#escalation` | family-v6 | todo | input | change | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
+| `#` | family-v6 | todo | button | submit | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
+| `#` | family-v6 | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family-v6 | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family-v6 | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family-v6 | mine | a | navigate | —:— | — | consumer | family | mine | hidden-until-state |
+| `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
