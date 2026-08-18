@@ -408,9 +408,28 @@ main.shell.app-frame {
   box-shadow: 0 -20px 50px rgba(30,39,35,.22);
   overflow-y: auto !important;
   transform: translate3d(0, 105%, 0);
-  transition: transform .30s cubic-bezier(.22,.8,.2,1);
+  /* `visibility` 是必需的，不是加固——只靠 transform 藏不干净。
+     ......................................................................
+     这个抽屉锚的是 `.elder-layout` 的底边（高 850），而视口是 932：
+     平移 105% 之后顶边落在 **874**，底边 1345，于是有 **58px 露在屏幕上**——
+     用户看到的就是那条卡在半空、怎么滚都不动的蓝色圆角块（那是它的把手）。
+
+     百分比平移是按元素**自己的高度**算的，而它藏不藏得住取决于
+     「锚点到视口底边还有多远」。这两个数没有任何关系，所以调百分比只是
+     在碰运气：内容多一行、视口矮一点，它就又露出来。
+
+     `visibility: hidden` 不依赖几何。它也让抽屉里的按钮真正退出可及性树——
+     只靠 transform 挪走的话，读屏和 Tab 键仍然能走进去，而那是一个
+     用户看不见的界面。 */
+  visibility: hidden;
+  transition: transform .30s cubic-bezier(.22,.8,.2,1), visibility 0s linear .30s;
 }
-.rail.sheet.is-open { transform: translate3d(0,0,0); }
+.rail.sheet.is-open {
+  transform: translate3d(0,0,0);
+  visibility: visible;
+  /* 打开时 visibility 立刻生效，不能等 .30s——否则滑入的前 300ms 是看不见的。 */
+  transition: transform .30s cubic-bezier(.22,.8,.2,1), visibility 0s;
+}
 .rail.sheet .rail-card { margin:0; }
 .sheet-grip { width:42px; height:5px; border-radius:999px; background:#a8ada9; }
 
