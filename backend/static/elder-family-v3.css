@@ -93,19 +93,18 @@ main.shell.app-frame {
      默认滚动条在这套国风配色里是一条突兀的灰柱——用户截图里那条就是。
      `scrollbar-gutter: stable` 尤其重要：内容忽长忽短时，没有它整页会随着
      滚动条出现/消失横向抖 6px。 */
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(118,141,128,.46) transparent;
+  /* 手机式滚动条：不占位、不显形。
+     用户截图里那条带上下箭头的是**桌面默认滚动条**——一条常驻的灰柱，
+     在这套国风配色里格外突兀，而这一页的读者是老人，它只是噪音。
+     手机上滚动条本来就是覆盖式的、滚完就消失。
+     `scrollbar-gutter: stable` 也一并去掉：它是为常驻滚动条预留 6px 的，
+     滚动条不显形了就没有理由再占着那 6px。 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   position: relative;
   margin: 0;
 }
-.elder-layout::-webkit-scrollbar { width: 6px; }
-.elder-layout::-webkit-scrollbar-track { background: transparent; margin: 8px 0 10px; }
-.elder-layout::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(118,141,128,.66), rgba(89,110,99,.66));
-  border: 2px solid rgba(247,243,233,.96);
-}
+.elder-layout::-webkit-scrollbar { width: 0; height: 0; display: none; }
 /* `.panel.stage` **不再是滚动容器**。
    ..........................................................................
    它原本也是 `height: 100%; overflow-y: auto`，而外面的 `.elder-layout` 同样是
@@ -838,3 +837,114 @@ body[data-activity="offline"] .mic-big img { filter:grayscale(.16) saturate(.78)
     margin: 0;
   }
 }
+
+
+/* ==========================================================================
+   美术层：搬家人端那三个手法
+   ..........................................................................
+   家人端好看不是因为图多，是因为三个手法用得一致。老人端此前只有首页
+   一枚麦克风圆牌，其余全是白卡，所以显得空。
+
+     ① 章节标题下一条**金栏**（bar-*-gold.webp），而不是一条灰线
+     ② 卡片右上角一枚**低透明度意象**（medallion-*.webp）
+        —— 家人端 `.metric::after` 就是这个手法。放右上不放右下：
+           右下会压住卡片里的主数值，这一条上一轮量过（123x102 的卡上
+           重叠近一半）
+     ③ 面板底部一层**场景水印**（scene-*-tall.webp），极低透明度，
+        给空白一点分量而不抢文字
+
+   意象按语义选，不是随机配色：
+       今天/待办 → 亭   一日之居
+       家人     → 莲   清、亲近
+       记录     → 鹤   长久、可追溯
+       我的     → 竹   有节
+
+   全部 `pointer-events: none`：装饰不该拦住手指。
+   ========================================================================== */
+
+/* ① 章节标题下的金栏 */
+.tab-head,
+.today-head {
+  position: relative;
+  padding-bottom: 11px;
+}
+.tab-head::after,
+.today-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 44px;
+  height: 3px;
+  border-radius: 999px;
+  /* 用渐变，不用图。
+     ......................................................................
+     这一条我试了两版位图都不行：
+       `auto 100%` 配 7px 高 → 整条栏被压成 7px，宽度按比例缩到十几像素，
+                               屏幕上是一颗小绿丸
+       `100% 100%` 配 12px 高 → 强行拉到 128×12，纹样横向抻开，像一支牙刷
+     `bar-*-gold.webp` 是一条**有固定长宽比的纹样**，而标题下的分隔线需要的是
+     「宽度随标题走、高度固定 3px」——这两个要求互斥，位图满足不了。
+
+     家人端在同样的位置用的就是纯渐变（`art-cards-family.css` 的
+     `.metric::before`：`linear-gradient(90deg,#c79a50,#4b7867)`）。
+     金到竹青，两个色都在这套色板里，缩放不失真。 */
+  background: linear-gradient(90deg, #c79a50, #4b7867);
+  opacity: .95;
+  pointer-events: none;
+}
+/* 每个分区一个色向，和它的意象一路。换渐变不换图——
+   上面那条注释解释了为什么这里的位图行不通。 */
+.elder-panel[data-panel="kin"] .tab-head::after {
+  background: linear-gradient(90deg, #c79a50, #8a6ea0);   /* 莲 */
+}
+.elder-panel[data-panel="log"] .tab-head::after {
+  background: linear-gradient(90deg, #c79a50, #7a8ba0);   /* 鹤 */
+}
+
+/* ② 卡片右上角的意象 */
+#reminders .task,
+.kin-person,
+.today-block,
+.profile-tools {
+  position: relative;
+  overflow: hidden;
+}
+#reminders .task::after,
+.kin-person::after,
+.today-block::after,
+.profile-tools::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  /* 44px 而不是家人端的 56px：老人端的卡片更窄，右上角要留给文字。
+     .20 是家人端 `.metric::after` 量过的那个值——再高就开始和字抢。 */
+  opacity: .2;
+  background: url("/static/art/v2/medallion-pavilion.webp") center / contain no-repeat;
+  pointer-events: none;
+}
+.kin-person::after { background-image: url("/static/art/v2/medallion-lotus.webp"); }
+.today-block::after { background-image: url("/static/art/v2/medallion-crane.webp"); }
+.profile-tools::after { background-image: url("/static/art/v2/medallion-golden-lotus.webp"); }
+
+/* ③ 场景水印：**试过，砍掉了**。
+   ..........................................................................
+   我先给 `.elder-layout::before` 贴了一层山水（opacity .085），
+   又给「家人」那一屏贴了竹屏。截图核过之后两处都不能要：
+
+     · 两张都是**硬边矩形**——图片自己的边框横切过卡片，
+       读起来像一张没加载完的坏图，不像水印。
+     · 竹屏那处更糟：我直接写在 `.elder-panel` 的 `background` 上，
+       而 `background-image` **不吃 opacity**，所以是原图强度贴上去的。
+
+   一张水印要成立得同时满足两件事：**边缘化得开**（mask 渐隐，不能是矩形）、
+   **强度压得住**（≤10%）。这两条我一条都没做到。
+
+   「多用美术资源」不等于「多贴图」。贴一张读起来像坏图的图，比留白更糟——
+   而这一页的读者是老人，一块看不懂的灰绿色块只会让人以为屏幕坏了。
+
+   真要做，下一轮用 `mask-image: linear-gradient(...)` 让它从底部渐隐，
+   并且贴在 `.elder-layout::before` 这种能单独控 opacity 的伪元素上。 */
