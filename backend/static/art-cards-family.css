@@ -5200,7 +5200,7 @@ button:not(.seg):not(.tab),
    ========================================================================== */
 
 :root {
-  --v17-overview-frame: url("/static/art/user-frames-v17/care-overview-banner.png");
+  --v17-overview-frame: none;
   --v17-title-color: #8d5f17;
   --v17-meta-color: #756250;
   --v17-arrow-color: #8d6a2f;
