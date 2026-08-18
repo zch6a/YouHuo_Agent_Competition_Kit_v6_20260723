@@ -40,10 +40,33 @@ main.shell.app-frame {
   flex-direction: column;
   width: 100%;
   max-width: 430px;
+  /* 三个高度属性一起钉死——照抄家人端 `art-cards-family.css:2262` 的写法。
+     ......................................................................
+     这里原本只有 `min-height: 100dvh`。**只有下限没有上限，壳就跟着内容长**：
+     实测 667×375 下家人端的壳是 764px（视口 800），老人端是 **1487px**（视口 375）。
+     壳一长，作为最后一个 flex 子元素的 `nav.tabbar` 就被推到折叠线外——
+     用户看到的「底栏没固定」就是这个，它不是定位问题，是**容器没有上界**。
+
+     家人端凭什么不长（`body[data-nav="tabbar"][data-surface="consumer"] > .shell`）：
+         height:     min(884px, calc(100vh - 36px));
+         min-height: min(884px, calc(100vh - 36px));
+         max-height: min(884px, calc(100vh - 36px));
+         overflow: hidden;
+     三个都写是有意的：只写 max-height，flex 子元素的 `flex: 1 1 auto` 仍然可能
+     算出超出的高度；只写 height，`min-height: auto` 的默认值又会把它顶开。
+
+     老人端这里用 dvh 而不是家人端那个 884px 上限：家人端在宽屏上画的是一个
+     带边框的手机模型（`border: 10px solid`），需要一个绝对高度；老人端在手机上
+     是满屏的，用动态视口高度更准（iOS 地址栏收起时 100vh 会多出 ~60px）。 */
+  height: 100dvh;
   min-height: 100dvh;
+  max-height: 100dvh;
   margin: 0 auto;
   padding: 0 14px;
   background: linear-gradient(180deg, #f8f5ee 0%, #f3efe7 100%);
+  /* `overflow: hidden` 配上面三条才成立：壳自己不滚，滚的是 `.elder-layout`
+     （它是 `flex: 1 1 auto; min-height: 0; overflow-y: auto`），
+     和家人端 `.phone-scroll` 是同一套分工。 */
   overflow: hidden;
   position: relative;
 }
