@@ -1478,6 +1478,46 @@ body[data-task-view] .elder-focus > #chat {
 }
 
 .care-block { margin: var(--space-4) 0 0; }
+/* 照护页的动作层。
+   ..........................................................................
+   这一页此前是纯读的，所以既没有按钮排，也没有表单。现在「用药」能记一次、
+   「身体」能记一笔、「安全」能添一位亲友，三处共用下面这三个类。
+
+   按钮本身**不在这里定义**：裸 `<button>` 和 `.secondary` 在 `components.css`
+   和 `base.css` 里已经有完整的一套（尺寸、圆角、按下反馈、焦点环）。这里只管
+   它们怎么排。新造一套 `.btn` 会让这一页的按钮和另外六页长得不一样，而这次的
+   要求恰恰是「使用相同的组件」。 */
+.care-actions {
+  display: flex;
+  flex-wrap: wrap;                 /* 320px 上「记一次已吃」+「这次没吃」放不下一行 */
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+/* 两个动作平分一行，而不是一个撑满、一个缩到文字宽——后者读起来像主次关系，
+   而「吃了」和「没吃」是对等的两件事，把「没吃」做小会让漏服更难被记录。 */
+.care-actions > button { flex: 1 1 auto; min-width: 8em; }
+
+/* 圆角写字面值：这个项目没有 --radius-* 令牌，全项目都是字面 px。
+   我第一版写的 `var(--radius-lg)` 是编的——CSS 不报错，它把**整条声明丢掉**
+   （invalid at computed-value time），于是表单变成直角，而且只有截图看得出来。
+   `test_no_undefined_custom_properties` 抓到了这一条。 */
+.care-form {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.care-field { display: grid; gap: var(--space-1); margin-bottom: var(--space-3); }
+/* 标签是可见的，不是 placeholder：一边打电话问老人一边填的时候，
+   placeholder 在打第一个字时就消失了。 */
+.care-field > label { font-size: var(--text-sm); color: var(--ink-2); font-weight: 650; }
+.care-field > input {
+  width: 100%;
+  min-height: 48px;                /* 触控目标下限；这一页和老人端用同一个数 */
+  box-sizing: border-box;
+}
+
 .care-block-head {
   display: flex;
   align-items: center;

@@ -35,6 +35,213 @@ function el(tag, className, text) {
   return node;
 }
 
+/* ==========================================================================
+   动作
+   ..........................................................................
+   这一页此前是**纯读**的：七个分区、零个写操作。而它同时在「安全」那一段的
+   `futureBlock` 里写着「您可以添：写名字、什么关系、电话」——承诺了一个界面上
+   根本不存在的能力。「用药」那一段列出每天几点吃什么，却没有任何办法记一次。
+
+   要和 /stage 分清楚：这一页原先那十三个按钮（「上报屋里 13.5℃」「加载能力矩阵」）
+   是**演示夹具**，搬去 /stage 是对的，那条迁移记在 MIGRATIONS 里。下面这些不是
+   夹具，是家属每天真的要做的事——替他记一次药、添一位亲友、记一笔血压。
+
+   三条共同约定：
+     · 语气由后端给。`toneOf(data)` 而不是一律绿色——「今天该吃的都记过了」是 200。
+     · `once()` 包住。慢网络下连点两次「吃了」会扣两次库存。
+     · 办完重新拉一次那一段。乐观更新在这里不合适：库存、剩余天数、概览那一行的
+       摘要都会跟着变，前端自己算一遍就是第二个事实源。
+   ========================================================================== */
+
+/** 操作回执。语气由后端决定，不由这里猜。 */
+function notify(message, tone) {
+  const host = byId('careNotice');
+  if (!host) return;
+  host.className = `notice ${tone || 'good'}`;
+  host.textContent = message;
+  host.hidden = false;
+}
+
+/** 一排动作按钮。
+ *
+ * 用 `.care-actions` 包着，高度和间距在 CSS 里定，保证触控目标不小于 48px——
+ * 这一页的读者是子女，但它和老人端共用一套按钮尺寸，没有理由在这里缩水。
+ */
+function actionRow(...buttons) {
+  const row = el('div', 'care-actions');
+  buttons.filter(Boolean).forEach((b) => row.appendChild(b));
+  return row;
+}
+
+/** 一个会真的打后端的按钮。
+ *
+ * @param label   按钮上的字
+ * @param tone    'primary' | null——只有主动作用实心
+ * @param run     async () => 返回后端的响应体
+ * @param after   成功之后重新加载哪一段
+ */
+function actionButton(label, tone, run, after) {
+  // 类名照这个项目的约定：裸 `<button>` 就是主按钮（`components.css` 和 `base.css`
+  // 给了基础样式），次要动作加 `.secondary`（全项目 35 处），危险动作加 `.danger`。
+  // 我第一版写的是 `.btn primary` / `.btn ghost`——那是**新造的一套**，
+  // 在这份样式表里一个都没定义，出来会是两个浏览器默认灰按钮。
+  const btn = el('button', tone === 'primary' ? null : 'secondary', label);
+  btn.type = 'button';
+  btn.addEventListener('click', () => window.YouHuo.once(btn, async () => {
+    try {
+      const data = await run();
+      notify(data && data.message ? data.message : '办好了。',
+             window.YouHuo.toneOf ? window.YouHuo.toneOf(data) : 'good');
+      if (after) await after();
+    } catch (error) {
+      notify(errorWords(error).text, 'warning');
+    }
+  }));
+  return btn;
+}
+
+/** 一个带可见标签的输入框。
+ *
+ * 标签是**可见的** `<label for>`，不是 placeholder。placeholder 一开始打字就消失，
+ * 而这一页的读者常常是在电话里一边问老人一边填——填到第三格已经不记得第一格是什么。
+ */
+function field(id, label, type, attrs = {}) {
+  const wrap = el('div', 'care-field');
+  const lab = el('label', null, label);
+  lab.htmlFor = id;
+  const input = el('input');
+  input.id = id;
+  input.type = type;
+  Object.entries(attrs).forEach(([k, v]) => input.setAttribute(k, v));
+  wrap.append(lab, input);
+  return {wrap, input};
+}
+
+/** 添一位他身边的人。
+ *
+ * 对得上 `ContactCreate`：elder_id / display_name / relation 必填，phone 可空。
+ * `scope` 不给——后端有默认值，而这一页没有理由替家属决定可见范围。
+ */
+function contactForm() {
+  const form = el('form', 'care-form');
+  form.noValidate = true;                 // 校验话术自己说，浏览器那句是英文的
+  form.appendChild(el('h3', 'care-block-head', '添一位他身边的人'));
+
+  const name = field('cName', '称呼', 'text', {maxlength: '20', autocomplete: 'off'});
+  const rel = field('cRel', '和他什么关系', 'text', {maxlength: '12', autocomplete: 'off'});
+  const tel = field('cTel', '电话（可以不填）', 'tel', {autocomplete: 'off'});
+  form.append(name.wrap, rel.wrap, tel.wrap);
+
+  const submit = el('button', null, '添上');
+  submit.type = 'submit';
+  form.appendChild(actionRow(submit));
+
+  // 这两条原先在「怎么才会有」那段里，是**规则**，人在提交之后才关心。
+  form.appendChild(el('p', 'meta',
+    '您添的这一位先记成「等他确认」，要他本人点头才生效——家属这一侧没有批准权限。'
+    + '电话存进去就是打码的，原号不会出现在这一页上。'));
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const displayName = name.input.value.trim();
+    const relation = rel.input.value.trim();
+    // 只打空格时 `required` 是满足的（值不是空字符串）。这条坑 family.js 踩过，
+    // 表现是点了没反应、再点还是没反应，而屏幕上什么都不说。
+    if (!displayName) {
+      notify('还没写称呼。写他平时怎么叫这个人，比如「小芳」。', 'warning');
+      name.input.focus();
+      return;
+    }
+    if (!relation) {
+      notify('还没写关系。比如「女儿」「邻居」「社区网格员」。', 'warning');
+      rel.input.focus();
+      return;
+    }
+    window.YouHuo.once(submit, async () => {
+      try {
+        const payload = {elder_id: state.elderId, display_name: displayName, relation};
+        const phone = tel.input.value.trim();
+        if (phone) payload.phone = phone;
+        await api('/v4/contacts', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        }, 'family');
+        notify(`已经把${displayName}添上了，等他本人确认。`, 'good');
+        form.reset();
+        await loadSafety();
+      } catch (error) {
+        notify(errorWords(error).text, 'warning');
+      }
+    });
+  });
+  return form;
+}
+
+/** 记一笔身体数据。
+ *
+ * `value` 是**字符串**不是数字：血压念出来是「128/82」，体重是「62.5」。
+ * 后端 `record_health_event` 的注释把这一条写得很清楚，前端不能自作主张拆成两个数。
+ */
+function healthForm() {
+  const form = el('form', 'care-form');
+  form.noValidate = true;
+  form.appendChild(el('h3', 'care-block-head', '记一笔'));
+
+  const what = field('hLabel', '记什么', 'text',
+                     {maxlength: '20', list: 'hCommon', autocomplete: 'off'});
+  // 常见项做成候选，不做成下拉——下拉会把「今天膝盖疼」这种记不进来。
+  const list = el('datalist');
+  list.id = 'hCommon';
+  ['血压', '血糖', '体重', '体温', '心率'].forEach((x) => {
+    const o = el('option');
+    o.value = x;
+    list.appendChild(o);
+  });
+  const value = field('hValue', '数值', 'text', {maxlength: '24', autocomplete: 'off'});
+  const unit = field('hUnit', '单位（可以不填）', 'text', {maxlength: '10', autocomplete: 'off'});
+  form.append(what.wrap, list, value.wrap, unit.wrap);
+
+  const submit = el('button', null, '记上');
+  submit.type = 'submit';
+  form.appendChild(actionRow(submit));
+  form.appendChild(el('p', 'meta',
+    '这里只记数，不做判断。要不要紧请问医生——这一页不会告诉您某个数字是否正常。'));
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const label = what.input.value.trim();
+    const val = value.input.value.trim();
+    if (!label) {
+      notify('还没写记什么。比如「血压」。', 'warning');
+      what.input.focus();
+      return;
+    }
+    if (!val) {
+      notify('还没写数值。血压这种写成「128/82」就行。', 'warning');
+      value.input.focus();
+      return;
+    }
+    window.YouHuo.once(submit, async () => {
+      try {
+        const payload = {label, value: val};
+        const u = unit.input.value.trim();
+        if (u) payload.unit = u;
+        const data = await api('/api/v1/health/events', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        }, 'family');
+        notify(data && data.message ? data.message : `记上了：${label} ${val}`,
+               window.YouHuo.toneOf ? window.YouHuo.toneOf(data) : 'good');
+        form.reset();
+        await loadHealth();
+      } catch (error) {
+        notify(errorWords(error).text, 'warning');
+      }
+    });
+  });
+  return form;
+}
+
 /** 空态里的一组小标题 + 条目。
  *
  * 「以后会有什么」和「怎么才会有」两块的形状完全一样，写两遍会分叉。
@@ -339,6 +546,30 @@ async function loadMedications() {
         card.appendChild(el('p', days <= 3 ? 'notice warning' : 'meta',
           days <= 0 ? '药已经吃完了。' : `按现在的吃法还够 ${days} 天。`));
       }
+      // 替他记一次。只给还在吃的方子——已停的方子记一笔，记的是一件没发生的事。
+      //
+      // 不带 `scheduledAt`：后端会取今天**最早一格还没记的**。让家属先在几个时间点
+      // 里选一个，是把后端已经能算的事推给人；而且他们多半也不知道老人是几点吃的。
+      // 都记过了后端返 409 并说「今天降压药该吃的都记过了」，`errorWords` 会把这句
+      // 原样显示——那不是一个错误，是一个正确的回答。
+      //
+      // 「没吃」不扣库存（后端 `_record_dose` 的 skipped 分支），所以两个动作不是
+      // 一件事的正反面，都得有。少了「没吃」，家属唯一能表达的就是「吃了」，
+      // 于是漏服在数据里永远看不见。
+      if (plan.active) {
+        card.appendChild(actionRow(
+          actionButton('记一次已吃', 'primary',
+            () => api(`/api/v1/medications/${plan.id}/taken`,
+                      {method: 'POST', headers: {'Content-Type': 'application/json'},
+                       body: '{}'}, 'family'),
+            loadMedications),
+          actionButton('这次没吃', null,
+            () => api(`/api/v1/medications/${plan.id}/skipped`,
+                      {method: 'POST', headers: {'Content-Type': 'application/json'},
+                       body: '{}'}, 'family'),
+            loadMedications),
+        ));
+      }
       host.appendChild(card);
     });
   } catch (error) {
@@ -445,6 +676,9 @@ async function loadHealth() {
         ]},
       ]);
       await longTermMedication(host);
+      // 空态那段「怎么才会有」第二条写着「也可以直接添一条……您和他都能添」。
+      // 那句话此前没有对应的入口——和「安全」那一段是同一个毛病。
+      host.appendChild(healthForm());
       host.appendChild(el('p', 'meta', '这里只做整理，不做诊断。看病请以医生的判断为准。'));
       return;
     }
@@ -465,6 +699,8 @@ async function loadHealth() {
       // 一个英文枚举值。这一条记录真正有用的三样已经在上面了：哪一类、哪一天、写了什么。
       host.appendChild(card);
     });
+    // 有记录的时候也要能再添一条——只在空态给入口，等于「第一条能添，第二条不能」。
+    host.appendChild(healthForm());
     host.appendChild(el('p', 'meta', '这里只做整理，不做诊断。看病请以医生的判断为准。'));
   } catch (error) {
     failed(host, error);
@@ -775,12 +1011,16 @@ async function loadSafety() {
         '一个打过码的电话——原号不显示，也不落在这一页上',
         '哪几位是他自己点过头的，哪几位还等着他确认',
       ]);
-      futureBlock(host, '怎么才会有', [
-        '您可以添：写名字、什么关系、电话。电话存进去就是打码的',
-        '家人添的先记成「等他确认」，要**他本人**点头才生效——家属这一侧没有批准权限',
-        '他自己添的当场生效；他也可以把某一位设成只给自己看，那一位不会出现在这一页',
-      ]);
     }
+
+    // 「怎么才会有」原先是一段 `futureBlock`，三条里第一条写着「您可以添：写名字、
+    // 什么关系、电话」——而这一页上没有任何地方能添。一段解释「你可以做 X」的文字，
+    // 配一个做不了 X 的界面，比什么都不写更糟：读的人会去找那个入口，找不到，
+    // 然后怀疑是自己没看见。
+    //
+    // 所以把那段解释换成真的表单。三条里剩下两条是**规则**不是承诺（要他本人点头、
+    // 他可以设成只给自己看），它们移到表单底下，因为提交之后人才会关心。
+    host.appendChild(contactForm());
 
     host.appendChild(el('p', 'meta',
       '位置只在需要的时候看一眼，按最小必要留存。定位精度不够时不会自动报警——'
