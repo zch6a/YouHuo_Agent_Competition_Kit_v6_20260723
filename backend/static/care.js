@@ -976,7 +976,13 @@ async function loadSafety() {
       contacts.slice(0, 6).forEach((person) => {
         // 电话是打过码的（后端存的就是 `phone_masked`，原号只留一个摘要）。
         // 没填电话时不写「无」，直接不提这一项。
-        const parts = [`${person.display_name}（${person.relation}）`];
+        // 称呼和关系相同时不重复印。演示数据里这两位就是这样：这个产品
+        // **不编人名**（elder.js 那段注释写着「与其编一个名字，不如说清有几位、
+        // 各是什么关系」），所以 display_name 就是「女儿」「儿子」。
+        // 照原样拼会印出「儿子（儿子）」。
+        const parts = [person.display_name === person.relation
+          ? person.display_name
+          : `${person.display_name}（${person.relation}）`];
         if (person.phone_masked) parts.push(person.phone_masked);
         // 状态只在**不是** active 的时候说。一位他已经确认过的亲友，后面再挂一个
         // 「他确认过」的尾巴，是把默认状态当新闻讲——和这一页对 `typical` 判定的

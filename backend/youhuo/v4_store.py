@@ -355,6 +355,59 @@ class V4FeatureStore:
         ids = DemoIdentities.for_suffix(suffix)
         today = utcnow().replace(hour=9, minute=0, second=0, microsecond=0)
 
+        #: 亲友档案：两位。**这张表此前从来没被种过。**
+        #:
+        #: 上面 `seed_demo()` 种的是 `safety_contacts_v4`（应急接力名单，一位社区
+        #: 网格员）——那是配置。而 `/v4/contacts/{elder}` 读的是**另一张表**
+        #: `contact_profiles_v4`，它一直是 0 行。两处界面因此同时是空的：
+        #:
+        #:   /elder 的「家人」屏   只印「女儿」「儿子」两个词，没有关系、没有电话。
+        #:                        elder.js 的注释写着「`/v4/contacts/{elder}` 在演示
+        #:                        数据下是空的（实测），与其编一个名字，不如说清
+        #:                        有几位、各是什么关系」——那个退让是对的，
+        #:                        但它退让的前提是这张表空着。
+        #:   /care 的「安全」屏   「还没有登记亲友」，而它上面刚写着「12 小时没动静
+        #:                        就找人」。设置在、人不在。
+        #:
+        #: 所以补在这里而不是改渲染：一处补上，两屏同时活，而且两边读的是同一份
+        #: 真数据，不是各自编的兜底。
+        #:
+        #: `consent_status='active'` 且 `consented_by=elder_id`：这两位是老人自己的
+        #: 子女，本人认的。`create_contact` 里家属添的记 `proposed`（要本人点头），
+        #: 老人自己添的当场 `active`——种子走的是后者这条语义。
+        #:
+        #: 电话过 `_mask_phone`，不手写掩码串：演示数据的形状必须和真实写入路径
+        #: 一样。缴费种子那边栽过一次（漏了 `attempts`，凭证正文印出
+        #: 「第 undefined 次通过」），教训是同一条。
+        kin = [
+            ("daughter", "女儿", "13800138001", "住得近，平时来得多"),
+            ("son", "儿子", "13900139002", "在外地，周末打电话"),
+        ]
+        with self.db.transaction() as conn:
+            for tag, relation, phone, note in kin:
+                masked, digest = self._mask_phone(phone)
+                conn.execute(
+                    """INSERT OR IGNORE INTO contact_profiles_v4(
+                        id,family_id,elder_id,display_name,relation,phone_masked,phone_digest,
+                        notes,scope,face_template_digest,consented_by,consent_status,
+                        created_at,updated_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (f"person-{tag}-{suffix}", ids.family_id, ids.elder_id,
+                     # `scope` 必须是 ShareScope 的成员：private / family_summary /
+                     # family_shared。我第一版写的是 `"family"`——**不在枚举里**，
+                     # 于是 `GET /v4/contacts/{elder}` 反序列化时 500。
+                     #
+                     # 而那个 500 在界面上**看不出来**：care.js 那一行是
+                     # `api(...).catch(() => [])`，服务端错误被吞成空数组，
+                     # 屏幕上显示「还没有登记他身边的人」——和真的没数据一模一样。
+                     # 我因此差点判成「种子没跑」，实际库里两行都在。
+                     #
+                     # 取 family_shared 而不是 family_summary：这两位是家属看得见
+                     # 全貌的人（关系 + 打码电话），不是只给一个汇总数字。
+                     relation, relation, masked, digest, note, "family_shared",
+                     None, ids.elder_id, "active", iso(today), iso(today)),
+                )
+
         #: 身体：三条，都在过去。一次体检、一次门诊、一条记录。
         health = [
             (7, "checkup", "社区体检：血压 138/86",

@@ -30,9 +30,6 @@
     "backend\\data\\youhuo.db",
     "backend\\data\\youhuo.db-shm",
     "backend\\data\\youhuo.db-wal",
-    "backend\\data\\youhuo.db.audit.key",
-    "data\\youhuo.db",
-    "data\\youhuo.db-shm",
-    "data\\youhuo.db-wal"
+    "backend\\data\\youhuo.db.audit.key"
   ]
 }

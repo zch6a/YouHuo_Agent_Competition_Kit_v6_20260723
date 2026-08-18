@@ -1316,7 +1316,19 @@ async function renderKin() {
     const contacts = await api(`/v4/contacts/${encodeURIComponent(ELDER_ID)}`);
     const approved = (contacts || []).filter(c => c.status !== 'proposed');
     if (approved.length) {
-      people = approved.map(c => ({relation: c.relation || '家人', name: c.display_name || ''}));
+      // 称呼和关系相同就不算「有名字」。这个产品**不编人名**（见上面
+      // KIN_RELATION 那段注释），所以演示数据里 display_name 就是「女儿」
+      // 「儿子」——照原样传下去，下面会把它同时放进主位和次位，
+      // 屏幕上是「儿子 / 儿子」两行。
+      //
+      // 顺带把电话带上：`phone_masked` 是打过码的（后端存的就是掩码，
+      // 原号只留摘要）。这一屏此前只有关系词，而「出事找谁」这个问题
+      // 需要的是「找谁 + 怎么找」。
+      people = approved.map(c => ({
+        relation: c.relation || '家人',
+        name: (c.display_name && c.display_name !== c.relation) ? c.display_name : '',
+        phone: c.phone_masked || '',
+      }));
     }
   } catch (_) {
     // 取不到就用 fallback。这一屏的价值是「谁能帮我」，那一条不依赖这个接口。
@@ -1345,6 +1357,15 @@ async function renderKin() {
     rel.className = person.name ? 'kin-rel' : 'kin-name';
     rel.textContent = person.relation;
     row.appendChild(rel);
+    // 打过码的电话。「出事找谁」这个问题要的是「找谁 + 怎么找」，
+    // 这一屏此前只回答了前半句。原号不显示、也不落在这一页上——
+    // 后端存的就是掩码，前端拿不到完整号码。
+    if (person.phone) {
+      const tel = document.createElement('p');
+      tel.className = 'kin-rel';
+      tel.textContent = person.phone;
+      row.appendChild(tel);
+    }
     host.appendChild(row);
   });
 }
