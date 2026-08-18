@@ -148,7 +148,16 @@
       <h2 class="section-head">按日期</h2>
       <div id="calendar"></div>
       <h2 class="section-head">给他添一件事</h2>
-      <form id="reminderForm">
+      <!-- `novalidate` 是必需的，不是图省事。
+           下面两个字段都带 `required`，浏览器会在 submit 事件**之前**就拦下来，
+           于是 `createReminder()` 里那两句中文校验（「事项还没填。写一句他看得懂的话，
+           比如「复诊前准备病历」。」和「时间还没选。」）从来没机会运行——
+           驱动测试点「同步到他的手机」，结果是**什么都没发生**。
+
+           而浏览器自己弹的那个气泡是英文的（"Please fill out this field"），
+           这违反项目的硬约束：界面上不许出现英文。关掉原生校验，把话交回 JS。
+           `required` 保留：它还给读屏软件提供「这一项必填」的语义。 -->
+      <form id="reminderForm" novalidate>
         <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历" /></label>
         <label>时间<input id="reminderDue" type="datetime-local" required /></label>
         <label>到期后多少分钟没确认就通知我<input id="escalation" type="number" min="5" max="1440" value="30" /></label>
