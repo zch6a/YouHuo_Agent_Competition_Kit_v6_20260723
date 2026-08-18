@@ -35,12 +35,12 @@ html::before {
 .yh-hero { display: grid; grid-template-columns: 1fr auto; gap: var(--space-8); align-items: center; opacity: 0; animation: yh-fade-up 0.7s var(--ease-out) 0.1s both; }
 @keyframes yh-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 .yh-hero-text { display: flex; flex-direction: column; gap: var(--space-3); }
-.yh-eyebrow { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; display: flex; align-items: center; gap: var(--space-2); }
+.yh-eyebrow { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; display: flex; align-items: center; gap: var(--space-2); }
 .yh-eyebrow-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--wuyou-orange); }
 /* 标题从 clamp(40px, 8.5vw, 72px) 收到普通页标题的量级。
    任务 D 要的是「`/` 只做入口」，删掉「巨大 Hero」——这一页的主角是那两张身份卡，
    不是一句 72px 的主张。逐字入场动画同时去掉（那 8 个 span 也从 HTML 里压平了）。 */
-.yh-hero-title { margin: 0; font-size: clamp(26px, 5vw, 36px); font-weight: 800; line-height: var(--lh-tight); letter-spacing: -0.015em; color: var(--ink); }
+.yh-hero-title { margin: 0; font-size: clamp(26px, 5vw, 36px); font-weight: 700; line-height: var(--lh-tight); letter-spacing: -0.015em; color: var(--ink); }
 .yh-sub { margin: 0; font-size: var(--text-base); color: var(--ink-2); line-height: var(--lh-snug); opacity: 0; animation: yh-fade-up 0.6s var(--ease-out) 0.45s both; }
 /* 插画尺寸保持原值。任务 D 要删的「巨大」是那句 72px 的主张，不是这张画——
    我先前顺手把它也缩了，结果 2.2 的描边在 150px 宽里只剩 1 个物理像素，
@@ -81,9 +81,9 @@ html::before {
  * 现在：延迟压到 0.12 秒（一帧多一点，够读作"淡入"而不是"卡住"），时长 0.4 秒。
  * 装饰性的东西（页脚、印章、插画）可以慢慢来，要按的东西不行。 */
 .yh-choose { display: flex; flex-direction: column; gap: var(--space-4); opacity: 0; animation: yh-fade-up 0.4s var(--ease-out) 0.12s both; }
-.yh-choose-eyebrow { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; display: flex; align-items: center; gap: var(--space-2); }
+.yh-choose-eyebrow { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 0; display: flex; align-items: center; gap: var(--space-2); }
 .yh-choose-eyebrow span { display: inline-block; width: 20px; height: 2px; background: var(--line-strong); }
-.yh-choose-title { margin: 0; font-size: clamp(22px, 4vw, 30px); font-weight: 800; line-height: var(--lh-tight); color: var(--ink); }
+.yh-choose-title { margin: 0; font-size: clamp(22px, 4vw, 30px); font-weight: 700; line-height: var(--lh-tight); color: var(--ink); }
 .yh-choose-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin-top: var(--space-5); }
 .yh-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); text-decoration: none; color: inherit; box-shadow: var(--shadow-1); transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out); position: relative; overflow: hidden; }
 .yh-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-2); border-color: var(--line-strong); }
@@ -99,7 +99,7 @@ html::before {
 .yh-card-icon .yh-ic-paper { fill: var(--surface-3); }
 .yh-card-elder .yh-card-icon, .yh-card-family .yh-card-icon { color: var(--role-ink); }
 .yh-card-body { display: flex; flex-direction: column; gap: var(--space-1); }
-.yh-card-body strong { font-size: var(--text-xl); font-weight: 800; color: var(--ink); margin: 0; }
+.yh-card-body strong { font-size: var(--text-xl); font-weight: 700; color: var(--ink); margin: 0; }
 .yh-card-tag { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
 .yh-card-note { font-size: var(--text-sm); color: var(--ink-2); line-height: var(--lh-snug); margin: 0; }
 /* `--role-accent`（#4A90D9）是块面强调色，白底上只有 3.29:1——正文要 4.5。

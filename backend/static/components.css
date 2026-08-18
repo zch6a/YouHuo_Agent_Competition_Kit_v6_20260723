@@ -82,7 +82,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-radius: 999px;
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-sm);
   color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
   background: color-mix(in srgb, var(--youhuo-blue) 15%, var(--surface));
@@ -109,7 +109,7 @@
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-3) var(--space-4); border-radius: var(--r-sm);
   background: var(--surface); border: 1px solid var(--line);
-  text-decoration: none; font-weight: 750; color: var(--ink-2);
+  text-decoration: none; font-weight: 700; color: var(--ink-2);
   box-shadow: var(--shadow-1);
   transition: transform .18s ease, border-color .18s ease;
 }
@@ -175,7 +175,7 @@ button {
   border: 1px solid transparent;
   border-radius: var(--r-md);
   padding: var(--space-3) var(--space-5);
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-base);
   line-height: var(--lh-snug);
   /* Chinese button labels are short and dense; a hair of tracking stops
@@ -378,7 +378,7 @@ pre {
   flex: 0 0 auto;
   padding: var(--space-2) var(--space-4);
   border-radius: 999px;
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-sm);
   /* 默认中性；下面按结论着色。颜色不是唯一通道——徽标里写的就是结论本身。 */
   background: var(--surface-3);
@@ -740,7 +740,7 @@ button.block { width: 100%; margin-top: var(--space-3); }
   font-size: var(--text-sm);
 }
 .empty-state svg { color: color-mix(in srgb, var(--role-accent) 55%, var(--ink-3)); }
-.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 750; }
+.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 700; }
 
 /* --------------------------------------------------------------------------
    Design §4.4 — large central microphone
@@ -964,7 +964,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 }
 .mic-big:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 22px 54px var(--role-glow), 0 2px 0 rgba(255,255,255,.42) inset; }
 .mic-big:active:not(:disabled) { transform: scale(.98); }
-.mic-hint { font-size: 17px; font-weight: 750; color: var(--ink-2); }
+.mic-hint { font-size: 17px; font-weight: 700; color: var(--ink-2); }
 .mic { min-width: 58px; font-size: 22px; }
 
 .home-entries { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
@@ -1045,7 +1045,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
      「不上网也听得懂」「不会自动扣钱」——是产品对老人做的承诺，正是最该看清的字。
      `.trust-line` 本来就是 `flex-wrap: wrap`，放大一档只会换行，不会挤坏。 */
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 /* Whether a language model is advising the semantic layer is a fact about the
    deployment, not a promise, so it gets a neutral rather than a green chip. */
@@ -1062,7 +1062,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 .status-chip {
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-1) var(--space-3); border-radius: 999px;
-  font-size: var(--text-sm); font-weight: 750;   /* 同上：14px 不在字阶里 */
+  font-size: var(--text-sm); font-weight: 700;   /* 同上：14px 不在字阶里 */
   border: 1px solid transparent;
   white-space: nowrap;
 }
@@ -1104,7 +1104,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   color: var(--ink);
 }
 .reliance-row:first-of-type { border-top: 0; }
-.reliance-row strong { color: var(--ink-3); font-weight: 750; font-size: var(--text-sm); }
+.reliance-row strong { color: var(--ink-3); font-weight: 700; font-size: var(--text-sm); }
 .reliance-card ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); line-height: 1.68; color: var(--ink-2); }
 .reliance-card .notice { margin-top: var(--space-3); }
 
@@ -1120,7 +1120,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   border: 1px solid var(--line-strong);
   background: var(--surface);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
   color: var(--ink-2);
   min-height: 44px;
 }
@@ -1158,7 +1158,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   color: var(--ink);
 }
 .log-item time { display: block; color: var(--ink-3); font-size: var(--text-xs); margin-top: var(--space-1); }
-.log-item .who { font-weight: 800; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
+.log-item .who { font-weight: 700; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
 
 /* 有主体的记录行是**真按钮**（点进去看这件事的经过），没有主体的仍是 div。
 
@@ -1265,7 +1265,7 @@ button.log-item:focus-visible {
   font-size: 16px;
 }
 .calendar-day .calendar-entry:first-of-type { border-top: 0; }
-.calendar-entry time { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.calendar-entry time { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* Family console overview strip. */
 .metric-row {
@@ -1286,7 +1286,7 @@ button.log-item:focus-visible {
 .metric-label { font-size: var(--text-xs); color: var(--ink-3); font-weight: 700; }
 .metric strong {
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
   color: var(--ink);
@@ -1308,7 +1308,7 @@ button.log-item:focus-visible {
   background: var(--surface);
 }
 .digest-row:nth-child(even) { background: var(--surface-2); }
-.digest-row strong { color: var(--ink-3); font-weight: 750; }
+.digest-row strong { color: var(--ink-3); font-weight: 700; }
 
 /* 做过的事：一行一条，谁做了什么在左、时间在右。原先是带左边框和渐变底的
    "迷你卡片"，里面套一个等宽字体的事件码——那既是装饰，也是在告诉家属这是

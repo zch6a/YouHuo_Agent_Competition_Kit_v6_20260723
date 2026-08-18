@@ -36,7 +36,7 @@
   width: 72px; height: 72px;
   display: grid; place-items: center;
   border-radius: var(--r-2xl);
-  font-size: 34px; font-weight: 800; line-height: 1;
+  font-size: 34px; font-weight: 700; line-height: 1;
   color: var(--ink-invert);
   background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
@@ -71,7 +71,7 @@
   color: var(--youhuo-blue-ink);
   background: color-mix(in srgb, var(--youhuo-blue) 12%, var(--surface-2));
 }
-.role-pick strong { font-size: var(--text-xl); font-weight: 800; color: var(--ink); }
+.role-pick strong { font-size: var(--text-xl); font-weight: 700; color: var(--ink); }
 .role-pick-note { font-size: var(--text-sm); color: var(--ink-3); line-height: var(--lh-snug); }
 /* 家人那一格用陪伴模式的暖色，两个身份从第一眼就不是同一个颜色。 */
 .role-pick[data-role="family"] .role-pick-icon {
@@ -242,14 +242,14 @@
   background: var(--surface);
   border-color: var(--line-strong);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .page-section > :first-child { margin-top: 0; }
 .section-head {
   margin: var(--space-6) 0 var(--space-2);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: var(--lh-tight);
   color: var(--ink);
 }
@@ -297,7 +297,7 @@
   color: inherit;
   text-decoration: none;
 }
-.promise > strong { font-size: var(--text-sm); font-weight: 800; color: var(--ink); }
+.promise > strong { font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
 .promise > span { font-size: var(--text-sm); line-height: var(--lh-snug); color: var(--ink-2); }
 /* 只有**是链接**的那种才画箭头。
    手机框里那四条底线现在是 `<li class="promise">`（框里没有可跳的分区了），
@@ -570,7 +570,7 @@ body[data-task-view] .elder-focus > #chat {
 .task-amount {
   margin: 0;
   font-size: var(--text-3xl);
-  font-weight: 800;
+  font-weight: 700;
   line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -680,7 +680,7 @@ body[data-task-view] .elder-focus > #chat {
 .next-label {
   margin: 0;
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .1em;
   color: var(--ink-3);
 }
@@ -689,7 +689,7 @@ body[data-task-view] .elder-focus > #chat {
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-size: 28px;
-  font-weight: 750;
+  font-weight: 700;
   line-height: var(--lh-tight);
   color: var(--ink);
 }
@@ -702,7 +702,7 @@ body[data-task-view] .elder-focus > #chat {
 .today-head {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .06em;
   color: var(--ink-3);
 }
@@ -720,7 +720,7 @@ body[data-task-view] .elder-focus > #chat {
 .tab-head {
   margin: var(--space-5) 0 var(--space-2);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 .elder-panel > .tab-head:first-child { margin-top: 0; }
@@ -733,7 +733,7 @@ body[data-task-view] .elder-focus > #chat {
 
 /* 家人。不做社交系统：谁能帮我、能帮什么、怎么找她，三件事。 */
 .kin-card { display: grid; gap: var(--space-1); }
-.kin-name { margin: 0; font-size: 26px; font-weight: 750; color: var(--ink); }
+.kin-name { margin: 0; font-size: 26px; font-weight: 700; color: var(--ink); }
 .kin-rel { margin: 0; font-size: 17px; color: var(--ink-2); }
 /* 一位家人一格。多于一位时用缩进的发丝线分开——这个家庭真实有两位
    （身份里的 daughter_id 与 son_id），而这一屏原先只写死了一位。
@@ -945,12 +945,12 @@ body[data-task-view] .elder-focus > #chat {
 .detail-head { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); }
 .detail-subject { margin: 0; font-size: var(--text-lg); }
 .detail-amount {
-  margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.01em;
+  margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em;
   font-variant-numeric: tabular-nums;
 }
 /* 状态不只靠颜色：文字和颜色同时给。MedCore 与 Medito 独立得出同一条结论，
    两边都实测过（前者的 e2e 刻意钉住文案「so a colour-swap regression surfaces here」）。 */
-.detail-status { margin: 0; font-weight: 750; }
+.detail-status { margin: 0; font-weight: 700; }
 .detail-status.good { color: color-mix(in srgb, var(--ok) 42%, var(--ink)); }
 .detail-status.warning { color: color-mix(in srgb, var(--warn) 46%, var(--ink)); }
 .detail-status.bad { color: color-mix(in srgb, var(--danger) 46%, var(--ink)); }
@@ -1005,7 +1005,7 @@ body[data-task-view] .elder-focus > #chat {
   letter-spacing: .1em;
   color: var(--ink-3);
 }
-.receipt-title { margin: 0; font-size: 22px; font-weight: 750; line-height: var(--lh-tight); }
+.receipt-title { margin: 0; font-size: 22px; font-weight: 700; line-height: var(--lh-tight); }
 
 /* 没有进链的那一句。放在时间轴**之前**是有意的：先说清楚这份凭证不记什么，
    再看它记了什么。 */
@@ -1325,7 +1325,7 @@ body[data-task-view] .elder-focus > #chat {
   width: 44px; height: 44px; flex: none;
   display: grid; place-items: center;
   border-radius: var(--r-lg);
-  font-size: var(--text-xl); font-weight: 800; line-height: 1;
+  font-size: var(--text-xl); font-weight: 700; line-height: 1;
   color: var(--ink-invert);
   background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
@@ -1336,7 +1336,7 @@ body[data-task-view] .elder-focus > #chat {
 .stage-group h2 {
   margin: 0;
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .08em;
   color: var(--ink-3);
   text-transform: none;
@@ -1365,7 +1365,7 @@ body[data-task-view] .elder-focus > #chat {
   border-color: var(--ink-3);
   background: var(--surface-3);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 /* 命中区 48px。对比度闸门量出来这个链接是 156×16——`min-height` 对行内元素无效，
    这是这个项目第三次踩同一个坑（首页的演示入口、家人端正文里的可信中心链接）。
@@ -1885,7 +1885,7 @@ body.is-clean .stage-proof { display: none; }
      的注释——这一轮已经在三处踩过同一个坑。） */
   color: var(--youhuo-blue-ink);
 }
-.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: var(--text-xs); }
+.score-ribbon span { color: var(--ink-3); font-weight: 700; font-size: var(--text-xs); }
 
 /* --------------------------------------------------------------------------
    评委页的七拍
@@ -1958,7 +1958,7 @@ body.is-clean .stage-proof { display: none; }
   display: grid; place-items: center;
   border-radius: var(--r-lg);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   /* 演过的那一拍才上色。没演过是空心的——这一页打开时七拍都还没发生，用七个实心
      蓝块假装它们已经发生过，是这一页最不该做的事。 */
@@ -1984,7 +1984,7 @@ body.is-clean .stage-proof { display: none; }
 .beat-title {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .08em;
   color: var(--ink-3);
 }
@@ -2024,7 +2024,7 @@ body.is-clean .stage-proof { display: none; }
   line-height: var(--lh-loose);
   color: var(--ink-2);
 }
-.beat-why strong { color: var(--ink); font-weight: 750; }
+.beat-why strong { color: var(--ink); font-weight: 700; }
 
 /* Proof 层。 */
 .beat-proof { margin-top: var(--space-3); }
@@ -2113,7 +2113,7 @@ body.is-clean .stage-proof { display: none; }
   color: #14224a;
   background: #fff;
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 700;
   transition: transform .18s ease;
 }
 .button-link:hover { transform: translateY(-2px); }

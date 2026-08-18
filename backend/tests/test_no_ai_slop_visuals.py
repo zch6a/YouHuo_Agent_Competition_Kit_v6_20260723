@@ -190,13 +190,29 @@ def test_the_key_action_tap_tier_is_actually_used() -> None:
 def test_the_latin_font_is_range_limited() -> None:
     """自托管的拉丁字体必须限定 unicode-range。
 
-    Atkinson Hyperlegible 没有汉字。不限区间的话，浏览器会为**每一个汉字**先来这个
-    字体里找字形，找不到再回退——而回退期间那些字是不可见的（FOIT）。也就是说：
+    一款没有汉字的拉丁字体，不限区间的话浏览器会为**每一个汉字**先来它里面
+    找字形，找不到再回退——而回退期间那些字是不可见的（FOIT）。也就是说：
     一个为了让数字更清楚而加的字体，会让整页中文先闪一次白。
+
+    ## 这条判据现在是条件句
+
+    它原来第一行是 `assert faces`——**要求必须有自托管字体**，比它自己的
+    标题（「自托管的拉丁字体*必须限定* unicode-range」）更强。
+    那是「当时恰好有一个」留下的痕迹，不是它要守的性质。
+
+    Atkinson Hyperlegible 拿掉了，原因量过：它只覆盖拉丁与数字，汉字落到
+    系统栈，于是「11:00 复诊前准备病历」里数字和汉字是**两套字形、两个重心**。
+    中文字体自己的数字和汉字是一起设计的，宽度、基线、笔画都对得上。
+
+    **代价要说清楚**：Atkinson 是为低视力设计的，`0/O`、`1/l/I`、`6/9`
+    在它里面互相区分得比系统字体好。换回系统数字之后这一点弱了。
+    要补回来得找一款**带汉字**的高辨识度字体，那是另一件事。
+
+    守的性质没变：**有**自托管拉丁字体的话，它必须限区间、必须有
+    font-display、必须不覆盖汉字区、文件必须在包里。
     """
     tokens = _strip_comments(_css("tokens.css"))
     faces = re.findall(r"@font-face\s*\{(.*?)\}", tokens, re.S)
-    assert faces, "没有 @font-face —— 自托管字体没接上"
     for face in faces:
         assert "unicode-range" in face, f"这个 @font-face 没有 unicode-range：{face[:90]}"
         assert "font-display" in face, f"这个 @font-face 没有 font-display：{face[:90]}"

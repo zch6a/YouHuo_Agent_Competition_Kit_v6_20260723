@@ -153,7 +153,7 @@ body::before {
 h1, h2, h3, h4 {
   line-height: 1.18;
   letter-spacing: -.015em;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 h1 { margin: 0 0 var(--space-3); font-size: clamp(32px, 5.4vw, 60px); }
@@ -164,7 +164,7 @@ a { color: color-mix(in srgb, var(--role-accent) 78%, var(--ink)); text-underlin
 
 .eyebrow {
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
   /* Mostly ink with a hue cast, so small uppercase text still clears 4.5:1. */

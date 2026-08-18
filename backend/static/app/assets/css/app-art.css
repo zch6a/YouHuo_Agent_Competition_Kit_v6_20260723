@@ -162,14 +162,33 @@
   .phone > .header-grid:first-child { margin-top: 56px !important; }
 
   /* 底栏原来 `position: fixed` 贴视口底——套了手机框之后它会贴在
-     **桌面**的底部，飘在手机外面。改成贴手机框内壁。 */
+     **桌面**的底部，飘在手机外面。
+
+     ## 必须是 `sticky`，不能是 `absolute`
+
+     第一版写的 `absolute; bottom: 0`。`.phone` 是可滚动容器
+     （`overflow-y: auto`，内容 1198px > 可视 932px），而 absolute 的包含块是
+     **padding box 的整个可滚动区域**——于是底栏钉在「全部内容的底部」，
+     一滚动它就飘到内容中间，下面还露出半张语音卡。
+
+     **我在 scrollTop=0 量过一次，`navBottom - phoneBottom = 0`，看起来是对的。**
+     一个位置量对了不等于所有位置都对——这个缺陷只有滚动之后才出现。
+
+     `sticky` 也不行：`.phone` 有 `padding-bottom: 132px`（那是给 fixed 底栏
+     留的位置），sticky 贴的是**内容边缘**、在 padding 之上，于是稳定地偏 188px。
+     再去清 padding 又要动 flex 布局，越改越远。
+
+     ## 最后用回 `fixed`，把位置**算出来**
+
+     手机在 `100vh` 的 flex 容器里垂直居中，高 932px，所以框底距视口底
+     正好 `(100vh - 932px) / 2`。底栏钉在那里就贴着框底内壁。
+     `left/transform/width` 沿用 app.css 的——它本来就是居中 430px，
+     和手机框重合。
+
+     这是「算出来」而不是「试出来」：视口一变高度，位置自动跟着对。 */
   .global-nav {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    transform: none;
-    width: 100%;
+    position: fixed;
+    bottom: max(0px, calc((100vh - 932px) / 2));
     border-radius: 0 0 46px 46px;
   }
 }
