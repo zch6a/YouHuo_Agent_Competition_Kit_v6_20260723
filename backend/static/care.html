@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
-  <link rel="stylesheet" href="/static/art-cards.css" />
+  <link rel="stylesheet" href="/static/art-cards-family.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -36,7 +36,8 @@
     在项目根目录运行 <b>run_demo.ps1</b>（Windows）或 <b>run_demo.sh</b>，
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
-  <main class="shell">
+  <main class="shell care-app">
+    <div class="phone-scroll">
     <header class="fam-head">
       <div class="fam-head-text">
         <h1>照护中心</h1>
@@ -111,7 +112,7 @@
              和假的内容横杠——它是一张**成品卡片设计稿**，不是可填内容的容器。
              实测：黑框占满卡面、判定文字压在画上、右边还有几条不知道是什么的横杠。
              改成 CSS 金边框 + 一枚圆徽章（`mark` 形状，56px，贴右上角）。 -->
-        <div class="report-verdict art-framed" id="ovVerdict" data-art-inlay="pine-crane"
+        <div class="report-verdict art-framed" id="ovVerdict" data-art-inlay="bamboo"
              data-art-frame="primary" data-art-scene="crane">
           <span class="report-badge">还没读到</span><strong>正在读今天的情况……</strong>
         </div>
@@ -191,6 +192,8 @@
          `/care` 没有叫 `todo` / `mine` 的分区，所以这两格是跨文档并带 hash——
          不带 hash 会落到 family 的默认分区，而用户点的是「待办」。
          这一页保留 `.back-link`（宽屏可见），所以「首页」这个出口不必再进导航。 -->
+    </div>
+
     <nav class="tabbar" aria-label="主要分区">
       <a href="/family" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-today" /></svg><span>今天</span></a>
       <a href="/family#todo" class="tab"><svg class="tab-icon" width="24" height="24" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-todo" /></svg><span>待办</span></a>

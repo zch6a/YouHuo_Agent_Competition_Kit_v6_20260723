@@ -52,6 +52,7 @@ const SHELL = [
   // 卡壳 `<img>` 还会被插进 DOM，只是没有 `position:absolute`，
   // 于是一张 156KB 的山水图以原始尺寸把整页推开。
   '/static/art-cards.css',
+  '/static/art-cards-family.css',
   '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：

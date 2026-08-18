@@ -1,0 +1,5353 @@
+/* 优活 · 美术卡片层
+   ============================================================================
+
+   把国风 SVG 作为**卡片本体**参与 UI 结构，而不是在白卡角落贴一朵花。
+
+   ## 为什么不是把交接包的 R7–R10 搬过来
+
+   那四层是叠加式的：R7 往卡片里注装饰、R8 换成完整卡壳、R9 加安全区、
+   R10 关掉 R8 里面又长出来的白块。四层各自都在修上一层的副作用，
+   `pages.css` 里累出 **311 个 `!important`**（这个仓库的其余部分一共 8 个）。
+   交接包自己的工作单 P1 第一条就是「把它们收敛，减少 !important」。
+   所以这里是收敛后的一层，不是第五层。
+
+   ## 三条规则
+
+   1. **美术永远在内容下面。** `z-index` 分层 + `pointer-events:none` +
+      `aria-hidden`。艺术层不许挡住数值、状态和按钮——那是照护数据。
+   2. **构图不拉伸。** 完整卡壳（hero/wide）是有构图的画，按 `aspect-ratio`
+      给它固定比例；高度不定的卡片用可拉伸的描边框（`border-image`），
+      不要拿画去撑。「统一安全区硬套不同构图」是交接包列的反例之一。
+   3. **深色模式下不许整层消失。** R6 栽过一次：深色系统让艺术 CSS 完全不加载。
+      这里深色只降不透明度、换滤镜，不做 `display:none`。
+
+   ## 挂载方式是声明式的
+
+   HTML 上写 `data-art-shell="hero"` / `data-art-scene="lotus"`，
+   `art-cards.js` 照着挂。**不用选择器表**——R7 那张 13 条的
+   「选择器 → 文件」硬编码表，页面结构一改就静默失效，而页面看起来完全正常。
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* 卡壳的原始比例，来自各自的 viewBox。改素材要同时改这里，否则会拉伸。 */
+  --art-shell-hero-ratio: 1774 / 887;
+  --art-shell-wide-ratio: 1903 / 826;
+
+  /* 安全区：内容离卡壳描边的距离。按各卡壳的留白量分别给。 */
+  --art-safe-hero: 22px 24px 20px;
+  --art-safe-wide: 16px 20px;
+
+  --art-scene-opacity: .92;
+  --art-frame-opacity: 1;
+}
+
+/* --------------------------------------------------------------- 完整卡壳 */
+
+.art-card {
+  position: relative;
+  isolation: isolate;          /* 卡内的 z-index 不外溢到页面别处 */
+  border: 0;
+  background: transparent;     /* 卡壳自带纸张，再铺一层白就是「SVG 外壳里又加大白卡」 */
+}
+
+.art-card > .art-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  /* fill 而不是 contain：卡壳要铺满卡片才是「卡片的轮廓」。
+     比例由 .art-card 的 aspect-ratio 保证，所以 fill 不会变形。 */
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 内容层。`> *` 而不是给每个孩子加类：漏掉一个孩子的后果是它被卡壳盖住，
+   而那看起来像「这一项没加载出来」。 */
+.art-card > *:not(.art-shell) {
+  position: relative;
+  z-index: 1;
+}
+
+.art-card[data-art-shell="hero"] {
+  aspect-ratio: var(--art-shell-hero-ratio);
+  padding: var(--art-safe-hero);
+  /* **不改宿主的 display。** 第一版这里写了 `flex-direction: column`，
+     把 `.fam-head` 原本的「文字在左、刷新按钮在右」拆成上下两行，
+     刷新按钮掉到卡片正中间飘着。美术层的职责是给卡片一张皮，
+     不是重排里面的东西。 */
+}
+
+/* 文字压在构图上读不出来。
+   hero 那张卡是山水 + 飞鹤 + 红日的完整构图，标题直接放上去时
+   「和平」两个字正好落在鹤的深色头部上——实测截图里认不出来。
+
+   解法不是再铺一张白卡（那是交接包列的反例「SVG 外壳里又加大白卡」），
+   而是给文字块本身一层**从纸色渐隐**的衬底：它读起来是这张纸的一部分，
+   不是压在画上的另一张卡。 */
+.art-card[data-art-shell="hero"] > * {
+  /* 两个色停都用同一个变量（末端 alpha 归零）。
+     第一版末端写死成 `rgba(250,247,240,0)`——深色下把 `--art-scrim` 换成暗色
+     之后，渐变从暗色渐到**透明的纸色**，中间那段是脏的。
+     一个变量控两端，翻深色只要改一处。 */
+  --art-scrim: 250, 247, 240;
+  background:
+    linear-gradient(90deg,
+      rgba(var(--art-scrim), .84) 0%,
+      rgba(var(--art-scrim), .84) 58%,
+      rgba(var(--art-scrim), 0) 100%);
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin: -6px -10px;
+}
+
+/* 按钮不要衬底：它自己有底色，再加一层会变成双层。 */
+.art-card[data-art-shell="hero"] > button,
+.art-card[data-art-shell="hero"] > .fam-refresh {
+  background: none;
+  margin: 0;
+  padding: revert;
+}
+
+/* wide-a / wide-b 是「左边一幅画、右边留白」的题签式构图。
+   内容进右边那块留白，左边让给画。
+
+   **不设 `aspect-ratio`。** 第一版设了 231/97（2.38:1），而这张卡要装
+   一个状态药丸加一句判定——实测装不下：药丸溢出卡壳、正文掉到卡片外面。
+   有构图的画拉伸会变形，所以改成 `min-height` 兜底 + 卡壳按 `100% 100%`
+   贴合：这张卡壳的构图是横向的，纵向拉一点不影响识别，
+   而内容被裁掉是不能接受的。 */
+.art-card[data-art-shell="wide-a"],
+.art-card[data-art-shell="wide-b"] {
+  /* 宿主可能是 inline-flex / fit-content（`.report-verdict` 就是），
+     那样卡壳只包住内容宽度，长句子会从卡壳右缘伸出去——实测过一次。 */
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 92px;
+  padding: 14px 18px 14px 38%;   /* 左侧 38% 让给卡壳里那幅画 */
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* flex 子项默认 `min-width: auto`，不会收缩到比内容窄——于是长句子把卡片
+   撑出去，而卡壳是 `inset:0` 贴着卡片的，看起来就是「字跑到框外面」。 */
+.art-card > *:not(.art-shell) {
+  min-width: 0;
+}
+
+@media (max-width: 400px) {
+  /* 390px 下 38% 只剩 240px 放内容，一句判定会折成三行。缩到 32%。 */
+  .art-card[data-art-shell="wide-a"],
+  .art-card[data-art-shell="wide-b"] { padding-left: 32%; }
+}
+
+/* 内容比卡壳高时，宁可让卡片长高、卡壳跟着拉，也不许裁掉内容。
+   `aspect-ratio` 在有 `min-height` 内容时本来就会让位——这里把它写明白，
+   免得下一个人以为是坏了。字号放大到 1.6 倍时走的就是这条。 */
+.art-card {
+  min-height: 0;
+  height: auto;
+}
+
+/* ------------------------------------------------- 可拉伸描边框（高度不定） */
+
+/* hero/wide 是有构图的画，拉不得。高度随内容变的卡片用这个：
+   `border-image` 只拉伸边、四角原样保留，所以任意高度都不变形。 */
+.art-framed {
+  position: relative;
+  isolation: isolate;
+  border: 14px solid transparent;
+  border-image-source: url("/static/art/ui/frame-quiet.svg");
+  border-image-slice: 24 fill;
+  border-image-width: 14px;
+  border-image-repeat: stretch;
+  background: transparent;
+}
+
+.art-framed[data-art-frame="primary"] {
+  border-image-source: url("/static/art/ui/frame-primary.svg");
+}
+
+/* ---------------------------------------------------------------- 卡内景
+ *
+ * ## 这一层回答的是「圆角矩形里面怎么有美术」
+ *
+ * 前面那两种做法各自解决一半：
+ *   `art-scene`   在角落放一枚意象——卡的**大部分**还是白的
+ *   `art-shell`   整张卡就是一幅画——文字没地方放，而且画拉不得
+ *
+ * 这一层是第三种：**景从卡的一侧进来，在触到文字之前淡掉。**
+ * 卡内不再是白的，但文字区始终干净。三个手法：
+ *
+ *   1. `mask-image` 斜向渐隐 —— 景在右侧最实，往左 38% 处归零。
+ *      不是整层调低透明度：那样文字底下也蒙一层灰，对比度全掉。
+ *      遮罩让「有景的地方够看，没景的地方全白」。
+ *   2. `auto 130%` 让画超出卡高，只露中间一段 —— 一幅完整构图缩进
+ *      一张 100px 高的卡里会变成一团糊，露一段反而看得出是什么。
+ *   3. `overflow: hidden` + 继承卡的圆角 —— 景要被卡的轮廓裁住，
+ *      否则四角会露出直角。
+ *
+ * ## 怎么挑图
+ *
+ * 用 `wide`/`tall` 的整幅画，不要用圆徽章——徽章自带圆框，
+ * 渐隐之后会露出半个圆环，看起来像没加载完。
+ */
+.art-inlay {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.art-inlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--art-inlay-src);
+  background-position: right center;
+  background-size: auto 130%;
+  background-repeat: no-repeat;
+  opacity: .5;
+  -webkit-mask-image: linear-gradient(100deg,
+    transparent 0%, transparent 34%, rgba(0, 0, 0, .55) 58%, #000 100%);
+  mask-image: linear-gradient(100deg,
+    transparent 0%, transparent 34%, rgba(0, 0, 0, .55) 58%, #000 100%);
+}
+
+.art-inlay > * { position: relative; z-index: 1; }
+
+/* 内容不要顶到景最实的地方。留 22% ——比角落意象的 34% 少，
+   因为景是渐隐的，压上去一点也读得清。
+
+   **`position: absolute` 的子元素排除在外。** 它们自己定了位置，
+   本来就不在文档流里，给它们加 `padding-right` 只会压窄它们**内部**的内容区。
+   实测：`#homeFollowupDetail` 是 `absolute; width:127px` 的「查看详情 ›」按钮，
+   吃到 22% 之后可用宽度只剩 99px，四个字折成两行还被切掉半个。
+   一个装饰性的让位规则，把一个按钮弄成了读不出来的样子。 */
+.art-inlay > :not(.art-scene) { padding-right: 22%; }
+.art-inlay > [style*="absolute"],
+.art-inlay > .btn,
+.art-inlay > button { padding-right: revert; }
+
+/* 窄屏景收窄：390px 上 22% 只剩 300px 放文字。 */
+@media (max-width: 420px) {
+  .art-inlay::before { background-size: auto 118%; opacity: .42; }
+  .art-inlay > :not(.art-scene) { padding-right: 16%; }
+}
+
+@media (prefers-color-scheme: dark) {
+  /* 压暗而不是反色——反色会把一幅画变成底片，这个坑这一层栽过一次。 */
+  .art-inlay::before { opacity: .3; filter: brightness(.6) saturate(.85); }
+}
+
+@media (prefers-contrast: more) {
+  /* 高对比下把景压到最弱，**不隐藏**——隐藏会让版面塌一块。 */
+  .art-inlay::before { opacity: .16; }
+}
+
+/* ------------------------------------------------------------ 行组件（药丸）
+ *
+ * ## 第一版是错的，错在方法不在参数
+ *
+ * 第一版把 `g8-02`（2172×724 的药丸素材）当 `background-size: 100% 100%`
+ * 铺在行上。实测：文字溢出药丸、图标重叠、底下原来的白卡还露着。
+ *
+ * 原因不是尺寸没调好——**那张图是 3:1 的固定构图，而行高由文字决定**。
+ * 文字两行就撑成 4:1（药丸被压扁），一行又填不满。拿固定构图去铺可变高度，
+ * 怎么调都不成立。
+ *
+ * ## 现在：三栏，CSS 画框，素材只出图标
+ *
+ *     [ 圆形图标 ] [ 文字（自由换行）] [ 状态点 + 箭头 ]
+ *        56px          1fr                auto
+ *
+ * 圆角、金边、纸色都由 CSS 给——它们跟着高度走，不会变形。
+ * 素材只负责图标位里那一张圆形意象，那是它擅长的（1254² 方图）。
+ */
+.art-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  min-height: 76px;              /* 触控目标；老人端主要操作 ≥56px */
+  box-sizing: border-box;
+  border-radius: 16px;
+  /* 纸色 + 一道金线。和卡框那条金线是同一套语言。 */
+  background: linear-gradient(180deg, #fdfaf3 0%, #f7f1e4 100%);
+  border: 1px solid rgba(190, 158, 96, .5);
+  box-shadow: 0 1px 3px rgba(120, 96, 62, .08);
+}
+
+/* 图标位：一个圆，里面是意象。 */
+.art-row > .art-scene {
+  position: static;              /* 覆盖 .art-scene 的 absolute */
+  grid-column: 1;
+  width: 56px;
+  height: 56px;
+  transform: none;
+  inset: auto;
+  max-width: none;
+  max-height: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(190, 158, 96, .45);
+  opacity: 1;
+}
+
+/* 文字进第二栏，自由换行——**不再有让位 padding**。
+   让位是给「画压在文字上」用的；三栏布局里画和字各占各的格，不重叠。 */
+.art-row > :not(.art-scene) {
+  grid-column: 2;
+  min-width: 0;
+  padding: 0;
+}
+
+/* **最后一个子元素进第三栏。**
+   第一版把所有非图标子元素都钉在第 2 栏，于是真实的箭头 `<span>` 落到
+   文字**下面**而不是右边。`care.html` 躲过了这个坑纯属侥幸——它的箭头是
+   `::after` 伪元素，不算子元素。`/app` 那批用的是真 `<span>`，就露馅了。
+
+   判据用 `:nth-last-child(1)` 而不是 `:last-child`：图标是 `prepend` 进来的，
+   永远在最前，所以最后一个一定是内容侧的收尾元素。
+   只有两个以上内容子元素时才生效——只有一段文字的行不该被拆栏。 */
+.art-row > :not(.art-scene):nth-last-child(1):not(:nth-child(2)) {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* 行自己画边框，宿主上的内联 `border:0` 会把金线抹掉。
+   这不是假设：`/app` 那批行原本带着 `style="border:0"`（旧组件需要它），
+   套上 `.art-row` 之后那行金线就没了，而卡片看起来只是「淡了一点」。 */
+.art-row[style*="border:0"],
+.art-row[style*="border: 0"] {
+  border: 1px solid rgba(190, 158, 96, .5);
+}
+
+/* 行尾那个箭头是绝对定位的，让它待在第三栏的位置上。 */
+.art-row.trust-more-link::after { right: 16px; }
+
+/* 让位规则的清零挪到文件**后面**去了（见「场景意象」那一节的末尾）。
+   写在这里不行：它和 `.art-scene-host[data-shape-hint="mark"] > …`
+   特异性相同 (0,3,0)，而那条在后面，按层叠顺序它赢。
+   实测后果：每一行都吃到 96px 的「给角落画让位」，行高涨到 112–167px，
+   文字被压成 90px 一栏。 */
+
+/* 三档配色，对应三种语气。不是随机换颜色：绿=常态、玉=在办、珊瑚=要留意。 */
+.art-row[data-art-tone="jade"] {
+  background: linear-gradient(180deg, #f4f8f2 0%, #e9f0e6 100%);
+  border-color: rgba(94, 138, 106, .45);
+}
+.art-row[data-art-tone="coral"] {
+  background: linear-gradient(180deg, #fdf4ee 0%, #f9e8dc 100%);
+  border-color: rgba(198, 126, 88, .42);
+}
+
+@media (prefers-color-scheme: dark) {
+  .art-row {
+    background: linear-gradient(180deg, #1e1c19 0%, #191714 100%);
+    border-color: rgba(190, 158, 96, .32);
+  }
+  .art-row[data-art-tone="jade"] {
+    background: linear-gradient(180deg, #1a221c 0%, #161d18 100%);
+  }
+  .art-row[data-art-tone="coral"] {
+    background: linear-gradient(180deg, #241b16 0%, #1d1613 100%);
+  }
+  /* 图标是浅色纸面的画，深色下压暗；**不反色**，反色会把朱红变青。 */
+  .art-row > .art-scene { filter: brightness(.82) saturate(.95); }
+}
+
+/* --------------------------------------------------------------- 场景意象 */
+
+/* 一个卡片角落里的意象。**只在卡片右上/右下的留白处**，不覆盖文字区。
+   密度受控：一张卡最多一个，靠 `data-art-scene` 显式声明，不自动铺。 */
+.art-scene-host { position: relative; }
+
+.art-scene {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  opacity: var(--art-scene-opacity);
+  /* 竖排在右侧，横排在右上——由每个意象自己的比例决定，见下面的分组。 */
+}
+
+/* 竖长的意象（鹤、扇、玉兰）：贴右侧，占卡片高度的大部分。 */
+.art-scene[data-shape="tall"] {
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 78%;
+  width: auto;
+  max-width: 32%;
+}
+
+/* 横宽的意象（远山、锦鲤、卷轴）：贴右下角。
+   **34% 不是 42%。** 42% 配上 46% 的让位 padding，实测把「共 3 条 | 最近一次
+   2026-08-16 | 早晨量了血压:132/84」挤成了四行——一行数据折成四行，
+   比没有装饰糟得多。缩小画、少让位。 */
+/* 26%，而且**不占文字的行宽**：它压在最后一行的下方空白里。
+   34% + 92px 让位仍然把「共 3 条 | 最近一次 2026-08-16 | 早晨量了血压:132/84」
+   折成三行——一行数据折三行，比没有装饰糟。现在只让 76px。 */
+.art-scene[data-shape="wide"] {
+  right: 8px;
+  bottom: 4px;
+  width: 26%;
+  height: auto;
+  max-height: 42%;
+}
+
+/* 小圆章式的意象（莲、松、牡丹）：右上角。 */
+.art-scene[data-shape="mark"] {
+  right: 12px;
+  top: 12px;
+  width: 56px;
+  height: 56px;
+}
+
+/* 有意象的卡片，要给它让出位置，否则文字压在画上。
+   这是「艺术层不可遮挡数值和状态」在排版上的落法。
+
+   **三种形状都要让。** 第一版只给 `tall` 留了 `padding-right`，
+   `wide` 只留了 6px 的 `padding-bottom`、`mark` 什么都没留。实测截图里：
+   远山压住「早晨量了」、玉兰压住「（6 次）」、松压住那一行的箭头——
+   三行里有两行的数值被画吃掉。「艺术层不可遮挡数值」写在注释里不算数，
+   要写成 padding。 */
+.art-scene-host[data-shape-hint="tall"] > :not(.art-scene) { padding-right: 34%; }
+/* wide 贴的是右**下**角，只有最后一两行需要避开，整列缩进 46% 会把一行
+   数据折成四行。让 92px（够避开画的左缘）+ 一点下留白就行。 */
+.art-scene-host[data-shape-hint="wide"] > :not(.art-scene) {
+  padding-right: 76px;
+  padding-bottom: 10px;
+}
+/* `mark` 的让位加在**宿主自己**上，不是加在子元素上。
+   加在子元素上要求「内容是元素、而且是直接子元素」——而 `#dailyReport`
+   的内容由 `family.js` 生成，`#nextItem` 里是多层嵌套，两处都不满足。
+   实测：莲花圆章压住「和平常一样」，亭子压住「下一件」。
+   加在宿主上，内容长什么样都让得出来。 */
+.art-scene-host[data-shape-hint="mark"] { padding-right: 68px; }
+.art-scene-host[data-shape-hint="mark"] > :not(.art-scene) { padding-right: 0; }
+
+/* 行组件的图标在**左边**，不需要右侧让位——上面那条会把它右边挖空 68px。 */
+.art-row.art-scene-host[data-shape-hint="mark"] { padding-right: 16px; }
+
+/* 意象要避开行尾那个 `→`。`.trust-more-link` 的箭头是绝对定位在右侧的，
+   画贴到 `right: 8px` 正好盖住它——那个箭头是「这一行可以点进去」的唯一提示。 */
+.trust-more-link.art-scene-host > .art-scene { right: 34px; }
+.trust-more-link.art-scene-host[data-shape-hint="mark"] > :not(.art-scene) { padding-right: 96px; }
+.trust-more-link.art-scene-host[data-shape-hint="wide"] > :not(.art-scene) { padding-right: 124px; }
+
+/* ------------------------------------------------- 行组件不吃上面这些让位
+ *
+ * 上面所有 `padding-right` 都是给「画压在文字上」用的——画绝对定位在角落，
+ * 文字要缩进去避开它。三栏行组件里画和字**各占各的格**，不重叠，不用让。
+ *
+ * ## 必须写在这里，不能写在 `.art-row` 那一节
+ *
+ * 第一版写在前面，特异性同为 (0,3,0)，按层叠顺序输给
+ * `.art-scene-host[data-shape-hint="mark"] > :not(.art-scene)`。
+ * 实测：每一行都吃到 96px 让位，行高涨到 112–167px，文字压成 90px 一栏。
+ * `care.html` 五行全中——而我看了截图没发现，是并行的审计量出来的。
+ *
+ * 这里同时提高特异性（多一个 `.art-scene-host`），双保险：
+ * 以后有人在这行后面再加规则也不会又把它顶掉。
+ */
+.art-row.art-scene-host[data-shape-hint] > :not(.art-scene),
+.trust-more-link.art-row.art-scene-host[data-shape-hint] > :not(.art-scene) {
+  padding-right: 0;
+  padding-bottom: 0;
+}
+
+/* 图标位只认 `mark`（近方形）。`tall`/`wide` 的角落几何会赢过
+   `.art-row > .art-scene`——实测 `scroll-desk`（tall）在 44px 的圆里
+   渲染成 15×63 的一条。这里把三种形状都拉回图标位，
+   免得下一个人挑了张竖图然后看到一条缝。 */
+.art-row > .art-scene[data-shape="tall"],
+.art-row > .art-scene[data-shape="wide"],
+.art-row > .art-scene[data-shape="mark"] {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  transform: none;
+  width: 56px;
+  height: 56px;
+  max-width: none;
+  max-height: none;
+}
+
+/* --------------------------------------------------------------- 票据语言 */
+
+/* 可信中心：凭证不是健康卡，是**票据**。边框、骑缝、印章都要说这件事。 */
+.art-receipt {
+  position: relative;
+  isolation: isolate;
+  border: 16px solid transparent;
+  border-image-source: url("/static/art/ui/receipt-frame.svg");
+  /* `fill` 会把 SVG 的中间区域也画进内容区——实测那道角饰的卷须伸进了正文，
+     压在「他说的原话不在链上」那一段上。只要边框，不要中间。 */
+  border-image-slice: 28;
+  border-image-width: 16px;
+  border-image-repeat: stretch;
+  /* 中间靠这里给纸色，而不是靠 SVG 的 fill。 */
+  background: rgba(250, 247, 240, .55);
+}
+
+.art-receipt > * { position: relative; z-index: 1; }
+
+/* 印章。盖在右下角，**只在真的成立时才出现**——`data-art-seal` 由 JS 按
+   业务状态加，不是写死在 HTML 里。一张盖着「已核验」的未核验凭证
+   比没有印章糟得多。 */
+.art-seal {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+  opacity: .88;
+  transform: rotate(-8deg);
+}
+
+/* 云纹分隔：段落之间，替代一条灰线。 */
+.art-divider {
+  display: block;
+  width: 100%;
+  height: 18px;
+  margin: 18px 0;
+  background: url("/static/art/ui/cloud-divider.svg") center / contain no-repeat;
+  opacity: .5;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ 深色 */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 只降不透明度、压暗。**不做 display:none**——
+       R6 那次深色下整层艺术消失，用户看到的是两套完全不同的产品。 */
+    --art-scene-opacity: .5;
+    --art-frame-opacity: .8;
+  }
+
+  /* **不反色。** 第一版这里是 `invert(.9) hue-rotate(180deg)`，
+     实测把那幅青绿山水变成了一张底片：山成惨白、纸成暗褐、红日成灰粉。
+     反色对线条描边有效，对**一幅画**永远是错的。
+     压暗 + 略降饱和，让它退到文字后面去，颜色关系保持不变。 */
+  .art-card > .art-shell,
+  .art-scene { filter: brightness(.55) saturate(.8) contrast(1.05); }
+
+  /* 文字衬底必须跟着翻。
+     衬底写死成纸色（`rgba(250,247,240,.82)`）而文字在深色下变成浅色，
+     结果是**浅字压在浅底上**——实测截图里「他今天和平常差不多」几乎读不出来。
+     这是一整类错误：给亮色模式挑的颜色写死在变量里，深色只改了别的东西。 */
+  .art-card[data-art-shell] > * { --art-scrim: 16, 15, 14; }
+
+  /* 描边框是线条，反色是对的；内容再反回来。
+     这一招在 trust 上实测成立（票据框变成暗底金线，正文可读）。 */
+  .art-framed,
+  .art-receipt { filter: invert(.88) hue-rotate(180deg); }
+  .art-framed > *,
+  .art-receipt > * { filter: invert(1) hue-rotate(180deg); }
+
+  /* 印章不跟着反：它是朱红的，反色变成青蓝，就不是印章了。 */
+  .art-seal { filter: invert(1) hue-rotate(180deg) brightness(1.1); }
+
+  /* 描边框**里面**的意象要抵消宿主那层反色，再压暗。
+     `filter` 一个元素上只生效一条，上面 `.art-scene` 和 `.art-framed > *`
+     同特异性，胜负全靠源码顺序——实测结果恰好是对的，但那是巧合。
+     写明白：反回来 + 压暗，一条规则说完。 */
+  .art-framed > .art-scene,
+  .art-receipt > .art-scene {
+    filter: invert(1) hue-rotate(180deg) brightness(.62) saturate(.85);
+  }
+}
+
+/* ---------------------------------------------------------------- 无障碍 */
+
+@media (prefers-reduced-motion: reduce) {
+  .art-card > .art-shell,
+  .art-scene { transition: none; animation: none; }
+}
+
+/* 高对比偏好下把装饰压到最弱，保证文字对比度。不隐藏——
+   隐藏会让版面塌一块，看起来像加载失败。 */
+@media (prefers-contrast: more) {
+  :root { --art-scene-opacity: .25; }
+}
+
+/* 窄屏：意象让位给内容。390px 宽下 34% 的右留白会把一行数字挤成两行。 */
+@media (max-width: 400px) {
+  .art-scene[data-shape="tall"] { max-width: 26%; opacity: .7; }
+  .art-scene-host[data-shape-hint="tall"] > :not(.art-scene) { padding-right: 28%; }
+  .art-scene[data-shape="mark"] { width: 44px; height: 44px; }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V2 · 2026-08
+   只改视觉与动效：不改业务 JS / id / data-section / data-panel / aria-live。
+   设计依据：8dp/4dp 视觉节奏、材料层级、短时过渡、形状表达与 reduced-motion。
+   ============================================================================ */
+
+:root {
+  --v2-paper: #f7f2e8;
+  --v2-paper-strong: #fffaf0;
+  --v2-ink: #26352f;
+  --v2-ink-soft: #53635c;
+  --v2-jade: #315f54;
+  --v2-jade-2: #477d6b;
+  --v2-gold: #bd8e45;
+  --v2-gold-soft: #ddbd7a;
+  --v2-coral: #c86f59;
+  --v2-line: rgba(108, 88, 54, .16);
+  --v2-glass: rgba(255, 250, 240, .82);
+  --v2-glass-strong: rgba(255, 251, 243, .94);
+  --v2-shadow-1: 0 8px 22px rgba(48, 57, 48, .07), 0 1px 2px rgba(74, 57, 34, .07);
+  --v2-shadow-2: 0 18px 48px rgba(41, 62, 52, .13), 0 2px 8px rgba(80, 57, 28, .08);
+  --v2-shadow-float: 0 24px 70px rgba(30, 47, 40, .18), 0 4px 14px rgba(93, 64, 29, .11);
+  --v2-r-sm: 14px;
+  --v2-r-md: 20px;
+  --v2-r-lg: 28px;
+  --v2-r-xl: 34px;
+  --v2-ease: cubic-bezier(.22, .8, .28, 1);
+  --v2-spring: cubic-bezier(.16, 1.18, .32, 1);
+}
+
+body[data-surface="consumer"] {
+  color: var(--v2-ink);
+  background:
+    radial-gradient(circle at 7% 8%, rgba(222, 190, 126, .18), transparent 30%),
+    radial-gradient(circle at 94% 32%, rgba(68, 123, 104, .12), transparent 28%),
+    linear-gradient(180deg, #efe8dc 0%, #f8f4ed 32%, #f3eee5 100%);
+}
+
+body[data-surface="consumer"]::before,
+body[data-surface="consumer"]::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: no-repeat;
+  opacity: .16;
+}
+body[data-surface="consumer"]::before {
+  width: min(920px, 82vw);
+  height: 390px;
+  top: -72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-image: url("/static/art/v2/hero-pine-crane.webp");
+  background-size: contain;
+  background-position: center top;
+  filter: saturate(.82) contrast(.96);
+  mask-image: linear-gradient(to bottom, #000 0 46%, transparent 96%);
+}
+body[data-surface="consumer"]::after {
+  width: 260px;
+  height: 650px;
+  right: max(calc(50% - 360px), -52px);
+  bottom: -140px;
+  background-image: url("/static/art/v2/scene-bamboo-screen.webp");
+  background-size: contain;
+  background-position: center bottom;
+  opacity: .11;
+  filter: saturate(.72);
+  animation: v2-bamboo-breathe 9s ease-in-out infinite alternate;
+}
+
+body[data-surface="consumer"] > .shell {
+  position: relative;
+  z-index: 1;
+}
+
+.shell {
+  width: min(100%, 500px);
+  padding-inline: clamp(14px, 4.2vw, 22px);
+  padding-top: max(14px, env(safe-area-inset-top));
+  padding-bottom: calc(108px + env(safe-area-inset-bottom));
+}
+
+/* ---------- Header: content-first hero, art becomes material not sticker ---------- */
+.family-app .fam-head,
+body[data-surface="consumer"] .shell > .fam-head {
+  min-height: 176px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 24px 22px 22px;
+  margin: 4px 0 22px;
+  border-radius: var(--v2-r-xl);
+  border: 1px solid rgba(162, 126, 66, .22);
+  border-image: none;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(100deg, rgba(255,251,242,.97) 0 51%, rgba(255,251,242,.86) 66%, rgba(245,236,219,.68) 100%),
+    url("/static/art/v2/hero-pine-crane.webp") 74% 50% / auto 100% no-repeat;
+  box-shadow: var(--v2-shadow-2);
+  filter: none;
+  animation: v2-hero-in .72s var(--v2-ease) both;
+}
+.family-app .fam-head::before,
+body[data-surface="consumer"] .shell > .fam-head::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: -1;
+  border: 1px solid rgba(190, 147, 78, .18);
+  border-radius: calc(var(--v2-r-xl) - 8px);
+  pointer-events: none;
+}
+.family-app .fam-head::after,
+body[data-surface="consumer"] .shell > .fam-head::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  bottom: -42px;
+  width: 146px;
+  height: 122px;
+  z-index: -1;
+  background: url("/static/art/v2/ornament-auspicious-cloud.webp") center / contain no-repeat;
+  opacity: .25;
+  transform: rotate(-7deg);
+  animation: v2-cloud-drift 6.5s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.fam-head-text { min-width: 0; position: relative; z-index: 2; }
+.fam-verdict,
+.fam-head h1 {
+  max-width: 12em;
+  margin: 2px 0 8px;
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  font-size: clamp(28px, 7.4vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  color: #223b32;
+  text-wrap: balance;
+}
+.fam-verdict::first-letter,
+.fam-head h1::first-letter { color: var(--v2-jade); }
+.fam-head .lead { max-width: 24em; margin: 0 0 8px; color: #53645c; line-height: 1.6; }
+.fam-updated { color: #718078; font-size: 13px; letter-spacing: .02em; }
+.fam-refresh,
+.back-link {
+  position: relative;
+  z-index: 3;
+  border-radius: 999px;
+  background: rgba(255, 252, 246, .76);
+  border: 1px solid rgba(120, 101, 70, .16);
+  box-shadow: 0 6px 18px rgba(53,72,61,.08);
+  backdrop-filter: blur(14px) saturate(1.15);
+  transition: transform .22s var(--v2-spring), box-shadow .22s ease, background .22s ease;
+}
+.fam-refresh:hover,
+.back-link:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(53,72,61,.13); }
+.fam-refresh:active,
+.back-link:active { transform: scale(.96); }
+
+/* Existing art-cards injection remains but hero art should not duplicate the material. */
+.family-app .fam-head > .art-scene { opacity: .34; filter: saturate(.85); }
+
+/* ---------- Section hierarchy ---------- */
+.page-section:not([hidden]) {
+  display: block;
+  animation: v2-panel-in .52s var(--v2-ease) both;
+}
+.page-section:not([hidden]) > * {
+  animation: v2-child-in .58s var(--v2-ease) both;
+}
+.page-section:not([hidden]) > :nth-child(1) { animation-delay: .02s; }
+.page-section:not([hidden]) > :nth-child(2) { animation-delay: .07s; }
+.page-section:not([hidden]) > :nth-child(3) { animation-delay: .12s; }
+.page-section:not([hidden]) > :nth-child(4) { animation-delay: .17s; }
+.page-section:not([hidden]) > :nth-child(n+5) { animation-delay: .21s; }
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 2px 12px;
+  color: #2d463c;
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-size: 19px;
+  letter-spacing: .02em;
+}
+.section-head::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50% 50% 50% 14%;
+  background: linear-gradient(145deg, #739b87, #315f54);
+  box-shadow: 0 0 0 5px rgba(58,104,89,.08);
+  transform: rotate(-22deg);
+}
+.section-head::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  min-width: 30px;
+  background: linear-gradient(90deg, rgba(185,139,67,.38), transparent);
+}
+.section-note {
+  margin: -3px 4px 14px;
+  color: #7a817c;
+  line-height: 1.65;
+  font-size: 13px;
+}
+
+/* ---------- Shared rounded rectangles: internal rendering ---------- */
+#tasks > .task,
+#otherTasks > .task,
+#notices > .task,
+.calendar-day,
+.report-section,
+.report-more,
+.metric,
+#reminderForm,
+.audit-row,
+.fam-links,
+.notice,
+.digest,
+.care-block,
+.care-item,
+.care-empty,
+.care-period,
+.trust-more-link,
+.report-verdict,
+#dailyReport {
+  position: relative;
+  isolation: isolate;
+}
+
+.task,
+.calendar-day,
+.report-section,
+.report-more,
+#reminderForm,
+.audit-row,
+.digest,
+.care-block,
+.care-item,
+.care-empty,
+.care-period,
+.trust-more-link,
+.report-verdict,
+#dailyReport {
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  background: var(--v2-glass);
+  box-shadow: var(--v2-shadow-1);
+  backdrop-filter: blur(14px) saturate(1.08);
+}
+
+/* Fine inner gold hairline — gives cards a designed edge without another wrapper. */
+.task::after,
+.calendar-day::after,
+.report-section::after,
+#reminderForm::after,
+.digest::after,
+.care-block::after,
+.care-item::after,
+.report-verdict::after,
+#dailyReport::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  z-index: -1;
+  border-radius: calc(var(--v2-r-md) - 5px);
+  border: 1px solid rgba(187,143,72,.08);
+  pointer-events: none;
+}
+
+/* A soft material sheen that traverses cards on first appearance. */
+.task::before,
+.calendar-day::before,
+.report-section::before,
+.metric::before,
+.digest::before,
+.care-item::before,
+.trust-more-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(112deg, transparent 18%, rgba(255,255,255,.58) 42%, transparent 64%);
+  transform: translateX(-120%);
+  animation: v2-card-sheen 1.25s .22s var(--v2-ease) both;
+  pointer-events: none;
+}
+
+/* ---------- Family / today ---------- */
+#tasks { display: grid; gap: 10px; }
+#tasks > .task,
+#otherTasks > .task,
+#notices > .task {
+  padding: 17px 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,252,246,.96), rgba(255,249,238,.90)),
+    url("/static/art/v2/ornament-cloud-stream.webp") 105% 120% / 104px auto no-repeat;
+  transition: transform .26s var(--v2-spring), box-shadow .26s ease, border-color .26s ease;
+  animation: v2-rect-pop .48s var(--v2-spring) both;
+}
+#tasks > .task:nth-child(2), #otherTasks > .task:nth-child(2), #notices > .task:nth-child(2) { animation-delay: .06s; }
+#tasks > .task:nth-child(3), #otherTasks > .task:nth-child(3), #notices > .task:nth-child(3) { animation-delay: .11s; }
+#tasks > .task:hover,
+#otherTasks > .task:hover,
+#notices > .task:hover { transform: translateY(-3px); box-shadow: var(--v2-shadow-2); border-color: rgba(174,130,65,.27); }
+.task > strong { color: #2b4037; font-size: 16px; }
+.task button { margin-top: 12px; }
+
+#dailyReport {
+  min-height: 160px;
+  padding: 18px 18px 20px;
+  overflow: hidden;
+  padding-right: 18px;
+  background:
+    linear-gradient(92deg, rgba(255,252,246,.97) 0 66%, rgba(255,250,240,.73) 100%),
+    url("/static/art/v2/medallion-lotus.webp") 101% 18px / 116px 116px no-repeat;
+  box-shadow: var(--v2-shadow-2);
+}
+#dailyReport > .art-scene { opacity: .16; }
+#dailyReport .report-section {
+  margin-top: 12px;
+  padding: 14px 15px;
+  border-radius: var(--v2-r-sm);
+  background: rgba(255,252,246,.74);
+  box-shadow: none;
+}
+#dailyReport .report-section:nth-of-type(1) {
+  background:
+    linear-gradient(90deg, rgba(255,252,246,.90), rgba(255,252,246,.80)),
+    url("/static/art/v2/ornament-lotus-flourish.webp") 102% 120% / 88px auto no-repeat;
+}
+.report-more { overflow: hidden; }
+.report-more > summary {
+  position: relative;
+  padding: 14px 44px 14px 16px;
+  cursor: pointer;
+  transition: background .22s ease, padding-left .22s var(--v2-ease);
+}
+.report-more > summary:hover { background: rgba(65,111,94,.055); padding-left: 20px; }
+.report-more[open] { animation: v2-expand .4s var(--v2-ease); }
+.report-more[open] > summary { color: var(--v2-jade); }
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+.metric {
+  min-height: 102px;
+  padding: 15px 12px;
+  overflow: hidden;
+  border: 1px solid rgba(165,128,71,.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(160deg, rgba(255,252,245,.96), rgba(242,236,222,.84));
+  box-shadow: 0 10px 26px rgba(52,68,58,.07);
+  animation: v2-metric-pop .56s var(--v2-spring) both;
+}
+.metric:nth-child(1) { animation-delay: .04s; }
+.metric:nth-child(2) { animation-delay: .10s; }
+.metric:nth-child(3) { animation-delay: .16s; }
+.metric::after {
+  content: "";
+  position: absolute;
+  right: -16px;
+  bottom: -22px;
+  width: 76px;
+  height: 76px;
+  opacity: .16;
+  background: url("/static/art/v2/medallion-golden-lotus.webp") center / contain no-repeat;
+  pointer-events: none;
+  animation: v2-medallion-float 6s ease-in-out infinite alternate;
+}
+.metric:nth-child(2)::after { background-image: url("/static/art/v2/medallion-pavilion.webp"); animation-delay: -2s; }
+.metric:nth-child(3)::after { background-image: url("/static/art/v2/medallion-crane.webp"); animation-delay: -4s; }
+.metric strong { font-size: clamp(24px, 7vw, 32px); color: #294b3f; }
+.metric-label { color: #68766f; font-size: 12px; }
+.metric.alert { border-color: rgba(190,119,74,.28); background: linear-gradient(160deg,#fff9ef,#fbebe3); }
+
+/* ---------- Todo: calendar + form ---------- */
+#calendar { display: grid; gap: 12px; }
+.calendar-day {
+  padding: 16px;
+  overflow: hidden;
+  background:
+    linear-gradient(100deg, rgba(255,252,246,.96), rgba(248,241,227,.88)),
+    url("/static/art/v2/info-bamboo.webp") 112% 50% / 190px auto no-repeat;
+  animation: v2-rect-slide .55s var(--v2-ease) both;
+}
+.calendar-day.today {
+  border-color: rgba(62,113,95,.28);
+  box-shadow: 0 14px 36px rgba(45,82,69,.11);
+}
+.calendar-day h3 { color: #31594d; margin-bottom: 8px; }
+.calendar-entry {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(113,95,65,.10);
+}
+.calendar-entry time { font-variant-numeric: tabular-nums; color: #4a6258; font-weight: 700; }
+
+#reminderForm {
+  padding: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(104deg, rgba(255,252,246,.97) 0 72%, rgba(255,248,234,.82) 100%),
+    url("/static/art/v2/scene-study-square.webp") 112% 108% / 162px auto no-repeat;
+}
+#reminderForm::before {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: -12px;
+  width: 78px;
+  height: 92px;
+  background: url("/static/art/v2/ornament-plum-hanging.webp") top right / contain no-repeat;
+  opacity: .20;
+  pointer-events: none;
+}
+#reminderForm label {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+  color: #53655d;
+  font-size: 13px;
+  transition: color .2s ease, transform .2s var(--v2-ease);
+}
+#reminderForm label:focus-within { color: var(--v2-jade); transform: translateX(2px); }
+input, textarea, select {
+  border-radius: 14px;
+  border: 1px solid rgba(104,94,74,.20);
+  background: rgba(255,255,255,.76);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+  transition: border-color .22s ease, box-shadow .22s ease, background .22s ease, transform .22s var(--v2-ease);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: rgba(55,105,88,.48);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 0 0 4px rgba(58,112,93,.10), 0 8px 22px rgba(57,83,71,.08);
+  transform: translateY(-1px);
+}
+
+/* ---------- Buttons: tactile but quiet ---------- */
+button,
+.button,
+a.tab,
+.fam-link,
+.trust-more-link {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(.seg),
+#reminderForm button {
+  position: relative;
+  overflow: hidden;
+  border-radius: 15px;
+  transition: transform .20s var(--v2-spring), box-shadow .20s ease, filter .20s ease;
+}
+button:not(.seg)::after,
+#reminderForm button::after {
+  content: "";
+  position: absolute;
+  top: -90%;
+  left: -35%;
+  width: 32%;
+  height: 280%;
+  transform: rotate(22deg);
+  background: linear-gradient(90deg,transparent,rgba(255,255,255,.38),transparent);
+  transition: left .48s var(--v2-ease);
+  pointer-events: none;
+}
+button:not(.seg):hover::after,
+#reminderForm button:hover::after { left: 118%; }
+button:not(.seg):active,
+#reminderForm button:active { transform: scale(.975); }
+
+/* ---------- Mine / audit ---------- */
+.audit-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 15px;
+  margin: 8px 0;
+  background: rgba(255,252,246,.76);
+  box-shadow: 0 5px 16px rgba(48,65,56,.05);
+  animation: v2-rect-pop .48s var(--v2-ease) both;
+}
+.audit-row::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--v2-gold);
+  box-shadow: 0 0 0 5px rgba(190,143,70,.09);
+}
+.audit-row { grid-template-columns: 8px 1fr auto; }
+.audit-row .audit-what { grid-column: 2; }
+.audit-row time { grid-column: 3; color: #7e857f; font-size: 12px; }
+.fam-links {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,252,246,.96), rgba(255,250,238,.86)),
+    url("/static/art/v2/scene-mountain-tall.webp") 108% 42% / 130px auto no-repeat;
+}
+.fam-link {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  padding: 0 17px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(104,94,74,.10);
+  color: #34574a;
+  transition: transform .22s var(--v2-spring), background .22s ease, box-shadow .22s ease;
+}
+.fam-link:hover { transform: translateX(4px); background: rgba(255,255,255,.88); box-shadow: 0 8px 20px rgba(55,77,66,.07); }
+
+/* ---------- Care module nav: scrollable material rail ---------- */
+.segmented {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 20;
+  display: flex;
+  gap: 7px;
+  margin: 0 0 20px;
+  padding: 7px;
+  overflow-x: auto;
+  border: 1px solid rgba(122,103,73,.14);
+  border-radius: 20px;
+  background: rgba(248,244,235,.82);
+  box-shadow: 0 10px 30px rgba(48,65,56,.08);
+  backdrop-filter: blur(18px) saturate(1.18);
+  scrollbar-width: none;
+}
+.segmented::-webkit-scrollbar { display: none; }
+.segmented::before {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: -4px;
+  width: 66px;
+  height: 38px;
+  background: url("/static/art/v2/ornament-cloud-stream.webp") right bottom / contain no-repeat;
+  opacity: .12;
+  pointer-events: none;
+}
+.seg {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 64px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  color: #65736d;
+  background: transparent;
+  transition: color .22s ease, background .22s ease, box-shadow .22s ease, transform .22s var(--v2-spring);
+}
+.seg:hover { color: var(--v2-jade); background: rgba(255,255,255,.52); }
+.seg.is-current,
+.seg[aria-current="true"] {
+  color: #23483b;
+  background: rgba(255,253,248,.96);
+  box-shadow: 0 6px 18px rgba(47,77,64,.11), inset 0 0 0 1px rgba(180,139,72,.16);
+  transform: translateY(-1px);
+}
+.seg.is-current::after,
+.seg[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 18px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,var(--v2-gold),var(--v2-jade));
+  transform: translateX(-50%);
+  animation: v2-indicator-in .36s var(--v2-spring) both;
+}
+
+/* ---------- Care overview: richer art density without fake fields ---------- */
+#overviewBody { display: grid; gap: 10px; }
+#ovVerdict {
+  min-height: 122px;
+  padding: 18px 108px 18px 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,252,246,.97) 0 64%, rgba(252,245,230,.74) 100%),
+    url("/static/art/v2/medallion-crane.webp") calc(100% - 14px) 50% / 86px 86px no-repeat;
+  box-shadow: var(--v2-shadow-2);
+}
+#ovVerdict > .art-scene { opacity: .10; }
+.trust-more-link {
+  min-height: 76px;
+  padding: 13px 48px 13px 74px;
+  overflow: hidden;
+  background: rgba(255,252,246,.88);
+  box-shadow: 0 7px 22px rgba(49,68,58,.06);
+  transition: transform .24s var(--v2-spring), box-shadow .24s ease, border-color .24s ease;
+  animation: v2-row-in .46s var(--v2-ease) both;
+}
+.trust-more-link:nth-of-type(2) { animation-delay: .04s; }
+.trust-more-link:nth-of-type(3) { animation-delay: .08s; }
+.trust-more-link:nth-of-type(4) { animation-delay: .12s; }
+.trust-more-link:nth-of-type(5) { animation-delay: .16s; }
+.trust-more-link:hover { transform: translateX(4px) translateY(-1px); box-shadow: var(--v2-shadow-2); border-color: rgba(174,130,65,.25); }
+.trust-more-link > .art-scene { filter: saturate(.86); transition: transform .35s var(--v2-spring), opacity .3s ease; }
+.trust-more-link:hover > .art-scene { transform: scale(1.08) rotate(-2deg); opacity: .96; }
+#ovToday { background-image: linear-gradient(90deg,rgba(255,252,246,.92),rgba(255,248,232,.84)), url("/static/art/v2/info-crane.webp"); background-size: auto, 172px auto; background-position: 0 0, 112% 50%; background-repeat: no-repeat; }
+#ovMed { background-image: linear-gradient(90deg,rgba(255,252,246,.93),rgba(241,247,240,.82)), url("/static/art/v2/scene-lotus-square.webp"); background-size: auto, 108px auto; background-position: 0 0, 108% 52%; background-repeat: no-repeat; }
+#ovBody { background-image: linear-gradient(90deg,rgba(255,252,246,.93),rgba(240,246,242,.82)), url("/static/art/v2/info-bamboo.webp"); background-size: auto, 174px auto; background-position: 0 0, 113% 50%; background-repeat: no-repeat; }
+#ovMood { background-image: linear-gradient(90deg,rgba(255,252,246,.93),rgba(255,242,235,.78)), url("/static/art/v2/info-plum.webp"); background-size: auto, 176px auto; background-position: 0 0, 113% 50%; background-repeat: no-repeat; }
+#ovSafety { background-image: linear-gradient(90deg,rgba(255,252,246,.93),rgba(239,246,241,.82)), url("/static/art/v2/hero-pine-crane.webp"); background-size: auto, 195px auto; background-position: 0 0, 116% 50%; background-repeat: no-repeat; }
+
+/* Care detail cards get alternating semantic art. */
+#todayBody .care-block:nth-of-type(1),
+#medBody .care-item:nth-of-type(1),
+#bodyBody .care-item:nth-of-type(1),
+#moodBody .digest,
+#safetyBody .digest,
+#weekly .digest {
+  background-image: linear-gradient(95deg,rgba(255,252,246,.96),rgba(255,249,238,.85)), url("/static/art/v2/ornament-lotus-flourish.webp");
+  background-repeat: no-repeat;
+  background-size: auto, 92px auto;
+  background-position: 0 0, 108% 112%;
+}
+.care-block,
+.care-item,
+.digest,
+.care-empty,
+.care-period {
+  padding: 16px;
+  margin: 10px 0;
+  overflow: hidden;
+  animation: v2-rect-pop .48s var(--v2-ease) both;
+}
+.care-block-head,
+.care-item-head { color: #315448; }
+.care-lines li::marker { color: var(--v2-gold); }
+.digest-row {
+  padding: 11px 2px;
+  border-bottom: 1px solid rgba(105,92,68,.10);
+  animation: v2-digest-in .42s var(--v2-ease) both;
+}
+.digest-row:last-child { border-bottom: 0; }
+.digest-row:nth-child(2) { animation-delay: .05s; }
+.digest-row:nth-child(3) { animation-delay: .10s; }
+.digest-row:nth-child(4) { animation-delay: .15s; }
+
+/* ---------- Tabbar: floating, clear location, lightweight material ---------- */
+.tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 60;
+  width: min(calc(100% - 24px), 462px);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(95,84,66,.17);
+  border-radius: 24px;
+  background: rgba(250,247,239,.88);
+  box-shadow: var(--v2-shadow-float);
+  backdrop-filter: blur(22px) saturate(1.2);
+  animation: v2-tabbar-in .68s .12s var(--v2-ease) both;
+}
+.tabbar::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(190,143,70,.08);
+  border-radius: 20px;
+  pointer-events: none;
+}
+.tab {
+  position: relative;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border-radius: 18px;
+  color: #6d7671;
+  transition: color .24s ease, background .24s ease, transform .24s var(--v2-spring), box-shadow .24s ease;
+}
+.tab:hover { color: #37584c; background: rgba(255,255,255,.48); }
+.tab:active { transform: scale(.94); }
+.tab.is-current,
+.tab[aria-current="page"] {
+  color: #244c3e;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 7px 20px rgba(48,76,64,.11), inset 0 0 0 1px rgba(188,145,73,.13);
+  transform: translateY(-2px);
+}
+.tab.is-current::before,
+.tab[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 18px;
+  height: 3px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,#d2a354,#497765);
+  transform: translateX(-50%);
+  animation: v2-indicator-in .42s var(--v2-spring) both;
+}
+.tab-icon { transition: transform .28s var(--v2-spring); }
+.tab.is-current .tab-icon,
+.tab[aria-current="page"] .tab-icon { transform: translateY(-1px) scale(1.06); }
+.tab span { font-size: 12px; }
+
+/* ---------- Status, pills, notices ---------- */
+.notice {
+  padding: 14px 16px;
+  overflow: hidden;
+  box-shadow: 0 7px 20px rgba(50,70,60,.06);
+}
+.notice.good { background: linear-gradient(95deg,rgba(240,248,241,.95),rgba(250,248,237,.92)); }
+.notice.warning, .notice.warn { background: linear-gradient(95deg,rgba(255,246,225,.96),rgba(255,250,240,.92)); }
+.notice.bad { background: linear-gradient(95deg,rgba(255,239,234,.96),rgba(255,248,241,.92)); }
+.pill, .status-chip, .report-badge {
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(84,70,49,.08);
+}
+
+/* ---------- Keyboard accessibility ---------- */
+:where(a, button, input, summary):focus-visible {
+  outline: 3px solid rgba(55,105,88,.28);
+  outline-offset: 3px;
+}
+
+/* ---------- Motion library ---------- */
+@keyframes v2-hero-in {
+  0% { opacity: 0; transform: translateY(16px) scale(.985); filter: blur(5px); }
+  60% { opacity: 1; filter: blur(0); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes v2-panel-in {
+  from { opacity: 0; transform: translateX(10px) translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-child-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes v2-rect-pop {
+  0% { opacity: 0; transform: translateY(14px) scale(.97); clip-path: inset(10% 4% 10% 4% round 26px); }
+  62% { opacity: 1; transform: translateY(-2px) scale(1.006); }
+  100% { opacity: 1; transform: none; clip-path: inset(0 round 20px); }
+}
+@keyframes v2-rect-slide {
+  from { opacity: 0; transform: translateX(-16px); clip-path: inset(0 14% 0 0 round 20px); }
+  to { opacity: 1; transform: translateX(0); clip-path: inset(0 round 20px); }
+}
+@keyframes v2-row-in {
+  from { opacity: 0; transform: translateX(14px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-metric-pop {
+  0% { opacity: 0; transform: translateY(12px) scale(.90); }
+  72% { opacity: 1; transform: translateY(-2px) scale(1.018); }
+  100% { transform: none; }
+}
+@keyframes v2-card-sheen {
+  0%, 28% { transform: translateX(-125%); opacity: 0; }
+  48% { opacity: .7; }
+  100% { transform: translateX(125%); opacity: 0; }
+}
+@keyframes v2-expand {
+  from { opacity: .74; transform: scaleY(.97); transform-origin: top; }
+  to { opacity: 1; transform: scaleY(1); }
+}
+@keyframes v2-indicator-in {
+  from { opacity: 0; transform: translateX(-50%) scaleX(.2); }
+  to { opacity: 1; transform: translateX(-50%) scaleX(1); }
+}
+@keyframes v2-tabbar-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px) scale(.96); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes v2-digest-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes v2-cloud-drift {
+  from { transform: translate3d(-4px,3px,0) rotate(-8deg); opacity: .18; }
+  to { transform: translate3d(6px,-4px,0) rotate(-3deg); opacity: .29; }
+}
+@keyframes v2-bamboo-breathe {
+  from { transform: translateY(4px) scale(.99); opacity: .08; }
+  to { transform: translateY(-4px) scale(1.015); opacity: .13; }
+}
+@keyframes v2-medallion-float {
+  from { transform: translateY(4px) rotate(-2deg); }
+  to { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* ---------- Desktop/demo shell ---------- */
+@media (min-width: 900px) {
+  body[data-surface="consumer"] { padding: 34px 0 58px; min-height: 100vh; }
+  body[data-surface="consumer"] > .shell {
+    min-height: min(880px, calc(100vh - 68px));
+    border: 8px solid #1e211f;
+    border-radius: 48px;
+    background: rgba(248,245,238,.96);
+    box-shadow: 0 36px 90px rgba(30,38,34,.25), 0 0 0 1px rgba(255,255,255,.35) inset;
+    overflow: clip;
+  }
+  body[data-surface="consumer"] > .shell::before {
+    content: "";
+    position: sticky;
+    display: block;
+    top: 7px;
+    width: 112px;
+    height: 28px;
+    margin: 0 auto -17px;
+    z-index: 80;
+    border-radius: 20px;
+    background: #171917;
+    box-shadow: 0 2px 5px rgba(0,0,0,.24);
+  }
+  .tabbar { width: 430px; bottom: 48px; }
+}
+
+/* ---------- Small phone tuning ---------- */
+@media (max-width: 390px) {
+  .shell { padding-inline: 12px; }
+  .family-app .fam-head,
+  body[data-surface="consumer"] .shell > .fam-head { min-height: 164px; padding: 20px 17px; border-radius: 28px; }
+  .fam-verdict, .fam-head h1 { font-size: 27px; }
+  .metric-row { gap: 7px; }
+  .metric { min-height: 94px; padding: 13px 9px; border-radius: 18px; }
+  .calendar-entry { grid-template-columns: 52px 1fr; }
+  .calendar-entry .status-chip { grid-column: 2; justify-self: start; }
+  #ovVerdict { padding-right: 92px; background-size: auto, 74px 74px; }
+  .trust-more-link { padding-left: 67px; }
+  .tabbar { width: calc(100% - 18px); }
+}
+
+/* ---------- Dark mode: keep ink-art chroma, avoid photographic negative ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --v2-paper: #161a17;
+    --v2-paper-strong: #1d211e;
+    --v2-ink: #e5e8e2;
+    --v2-ink-soft: #aeb7b1;
+    --v2-glass: rgba(28,32,29,.88);
+    --v2-glass-strong: rgba(31,36,32,.96);
+    --v2-line: rgba(222,193,139,.13);
+  }
+  body[data-surface="consumer"] {
+    color: var(--v2-ink);
+    background: radial-gradient(circle at 12% 5%,rgba(107,91,62,.22),transparent 28%), linear-gradient(#111512,#161a17);
+  }
+  .family-app .fam-head,
+  body[data-surface="consumer"] .shell > .fam-head {
+    background: linear-gradient(100deg,rgba(25,31,27,.97) 0 56%,rgba(26,32,28,.86) 72%,rgba(28,34,29,.70)), url("/static/art/v2/hero-pine-crane.webp") 74% 50% / auto 100% no-repeat;
+    filter: none;
+  }
+  .fam-verdict, .fam-head h1, .section-head, .task > strong, .care-block-head, .care-item-head { color: #e2e8e2; }
+  .fam-updated, .section-note, .metric-label { color: #a6b0aa; }
+  .task, .calendar-day, .report-section, .report-more, #reminderForm, .audit-row, .digest, .care-block, .care-item, .care-empty, .care-period, .trust-more-link, .report-verdict, #dailyReport, .metric, .fam-links {
+    background-color: rgba(27,32,28,.90);
+  }
+  .segmented, .tabbar { background: rgba(24,29,26,.90); }
+  .seg.is-current, .seg[aria-current="true"], .tab.is-current, .tab[aria-current="page"] { background: rgba(49,58,52,.88); color: #e5e9e5; }
+  .fam-link { background: rgba(45,52,47,.70); color: #dce5df; }
+}
+
+/* ---------- Accessibility: motion can be rich by default, never mandatory ---------- */
+@media (prefers-reduced-motion: reduce) {
+  body[data-surface="consumer"]::after,
+  .family-app .fam-head,
+  body[data-surface="consumer"] .shell > .fam-head,
+  .family-app .fam-head::after,
+  body[data-surface="consumer"] .shell > .fam-head::after,
+  .page-section:not([hidden]),
+  .page-section:not([hidden]) > *,
+  .task, .calendar-day, .report-section, .metric, .care-block, .care-item,
+  .trust-more-link, .digest-row, .tabbar,
+  .task::before, .calendar-day::before, .report-section::before, .metric::before,
+  .digest::before, .care-item::before, .trust-more-link::before,
+  .metric::after {
+    animation: none;
+    transition-duration: .01ms;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V3 · 2026-08
+   修正：贴图位置偏移、重影感、卡内装饰与文字抢阅读的问题。
+   约束：不改 HTML / JS / id / data-* / aria-live，只做 art-cards.css 末尾覆盖。
+   ========================================================================== */
+
+/* 1) 今日结论卡：不要双重莲章；圆章收进卡内，文字区更稳定。 */
+#dailyReport {
+  min-height: 168px;
+  padding: 22px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  font-size: clamp(18px, 4.8vw, 22px);
+  font-weight: 700;
+  line-height: 1.52;
+  color: #2b4037;
+  background:
+    linear-gradient(94deg, rgba(255,252,246,.985) 0 68%, rgba(250,243,229,.82) 100%),
+    radial-gradient(circle at 86% 22%, rgba(221,189,122,.11), transparent 18%),
+    url("/static/art/v2/medallion-lotus.webp") calc(100% - 16px) 18px / 96px 96px no-repeat;
+}
+#dailyReport > .art-scene { display: none; }
+#dailyReport::after { inset: 7px; border-color: rgba(187,143,72,.11); }
+#dailyReport .report-section {
+  margin-top: 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(184,146,80,.12);
+  background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,251,242,.56));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
+}
+#dailyReport .report-section:nth-of-type(1) {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,250,240,.58)),
+    url("/static/art/v2/ornament-lotus-flourish.webp") calc(100% - 8px) calc(100% + 10px) / 84px auto no-repeat;
+}
+
+/* 2) 三个指标矩形：圆章回到卡内右下，不再像贴歪和被裁。 */
+.metric-row { gap: 14px; margin: 14px 0 10px; }
+.metric {
+  min-height: 118px;
+  padding: 17px 16px 14px;
+  border-radius: 22px;
+  background: linear-gradient(162deg, rgba(255,252,245,.98), rgba(242,236,222,.88));
+  box-shadow: 0 12px 28px rgba(52,68,58,.07);
+}
+.metric::before { opacity: .24; }
+.metric::after {
+  right: 10px;
+  bottom: 10px;
+  width: 64px;
+  height: 64px;
+  opacity: .22;
+}
+.metric-label {
+  display: block;
+  max-width: 4.8em;
+  line-height: 1.28;
+  color: #62736b;
+}
+.metric strong {
+  display: block;
+  margin-top: 18px;
+  font-size: clamp(36px, 7vw, 42px);
+  line-height: 1;
+  letter-spacing: -.03em;
+  color: #24483d;
+}
+
+/* 3) 新增待办表单：右侧意象收边，云纹与挂饰更轻，不压字段。 */
+#reminderForm {
+  padding: 22px 18px 20px;
+  background:
+    linear-gradient(104deg, rgba(255,252,246,.985) 0 71%, rgba(255,248,236,.92) 100%),
+    url("/static/art/v2/ornament-cloud-stream.webp") calc(100% - 16px) 106px / 74px auto no-repeat,
+    url("/static/art/v2/scene-study-square.webp") calc(100% - 10px) calc(100% - 8px) / 118px auto no-repeat;
+}
+#reminderForm::before {
+  right: 14px;
+  top: 8px;
+  width: 42px;
+  height: 62px;
+  opacity: .12;
+}
+#reminderForm label { margin-bottom: 18px; }
+#reminderForm input,
+#reminderForm select,
+#reminderForm textarea {
+  min-height: 58px;
+  font-size: 16px;
+}
+#reminderForm button {
+  min-height: 54px;
+  padding-inline: 24px;
+  border-radius: 18px;
+  box-shadow: 0 14px 28px rgba(48,105,176,.22), inset 0 1px 0 rgba(255,255,255,.34);
+}
+
+/* 4) 照护总览行：消掉“左图标 + 右大图”带来的重影感，改为更干净的右侧题签图。 */
+#ovVerdict {
+  padding: 19px 98px 19px 18px;
+  background:
+    linear-gradient(90deg, rgba(255,252,246,.98) 0 66%, rgba(252,245,230,.78) 100%),
+    radial-gradient(circle at 86% 50%, rgba(221,189,122,.10), transparent 22%),
+    url("/static/art/v2/medallion-crane.webp") calc(100% - 16px) 50% / 74px 74px no-repeat;
+}
+#ovVerdict > .art-scene { display: none; }
+.trust-more-link {
+  min-height: 82px;
+  padding: 14px 54px 14px 16px;
+  border-radius: 22px;
+  box-shadow: 0 8px 22px rgba(49,68,58,.055);
+}
+.trust-more-link::before {
+  background: linear-gradient(112deg, transparent 20%, rgba(255,255,255,.42) 42%, transparent 60%);
+  opacity: .18;
+}
+.trust-more-link > .art-scene {
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(190, 158, 96, .40);
+  box-shadow: 0 2px 8px rgba(93, 74, 45, .08);
+}
+.trust-more-link > span {
+  display: block;
+  padding-right: 102px;
+}
+.trust-more-link > span > span:first-child {
+  font-size: clamp(18px, 5.6vw, 21px);
+  line-height: 1.15;
+}
+.trust-more-link .meta {
+  display: inline-block;
+  margin-top: 6px;
+  color: #696f6b;
+  line-height: 1.45;
+}
+#ovToday,
+#ovMed,
+#ovBody,
+#ovMood,
+#ovSafety {
+  background-repeat: no-repeat;
+  background-position: 0 0, calc(100% - 8px) 50%;
+}
+#ovToday { background-image: linear-gradient(90deg, rgba(255,252,246,.95), rgba(255,248,232,.85)), url("/static/art/v2/info-crane.webp"); background-size: auto, 126px auto; }
+#ovMed { background-image: linear-gradient(90deg, rgba(255,252,246,.95), rgba(241,247,240,.84)), url("/static/art/v2/scene-lotus-square.webp"); background-size: auto, 100px auto; }
+#ovBody { background-image: linear-gradient(90deg, rgba(255,252,246,.95), rgba(240,246,242,.84)), url("/static/art/v2/info-bamboo.webp"); background-size: auto, 128px auto; }
+#ovMood { background-image: linear-gradient(90deg, rgba(255,252,246,.95), rgba(255,242,235,.82)), url("/static/art/v2/info-plum.webp"); background-size: auto, 126px auto; }
+#ovSafety { background-image: linear-gradient(90deg, rgba(255,252,246,.95), rgba(239,246,241,.84)), url("/static/art/v2/hero-pine-crane.webp"); background-size: auto, 136px auto; }
+
+/* 5) 减少“重影”来源：总览行 hover 只轻抬，不再放大图标。 */
+.trust-more-link:hover > .art-scene { transform: none; opacity: .92; }
+
+/* 6) 小屏收口：保证右侧装饰不再压阅读。 */
+@media (max-width: 420px) {
+  #dailyReport {
+    padding: 20px 18px 18px;
+    background-size: auto, auto, 86px 86px;
+    background-position: 0 0, 0 0, calc(100% - 12px) 16px;
+  }
+  .metric-row { gap: 10px; }
+  .metric { padding: 16px 12px 13px; }
+  .metric::after {
+    right: 8px;
+    bottom: 8px;
+    width: 58px;
+    height: 58px;
+    opacity: .20;
+  }
+  #reminderForm {
+    background-size: auto, 66px auto, 104px auto;
+    background-position: 0 0, calc(100% - 14px) 104px, calc(100% - 8px) calc(100% - 6px);
+  }
+  .trust-more-link {
+    min-height: 78px;
+    padding-right: 48px;
+  }
+  .trust-more-link > span { padding-right: 86px; }
+  #ovToday { background-size: auto, 112px auto; }
+  #ovMed { background-size: auto, 90px auto; }
+  #ovBody { background-size: auto, 114px auto; }
+  #ovMood { background-size: auto, 112px auto; }
+  #ovSafety { background-size: auto, 118px auto; }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V4 · Native bottom tabbar refinement
+   目标：底栏固定在手机框最底部，像原生手机 Tab Bar，而不是悬浮胶囊。
+   ========================================================================== */
+
+.tabbar {
+  left: 50%;
+  bottom: 0;
+  width: min(100%, 500px);
+  min-height: calc(84px + env(safe-area-inset-bottom));
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  border: 1px solid rgba(95,84,66,.12);
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgba(250,247,239,.96) 0%, rgba(247,243,233,.98) 100%);
+  box-shadow: 0 -10px 28px rgba(48,76,64,.08), 0 -2px 8px rgba(81,62,34,.05);
+  backdrop-filter: blur(20px) saturate(1.12);
+  transform: translateX(-50%);
+}
+.tabbar::before {
+  inset: 4px 4px 0 4px;
+  border-radius: 24px 24px 0 0;
+  border-color: rgba(190,143,70,.08);
+}
+.tabbar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 110px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(202,166,98,.8), transparent);
+  pointer-events: none;
+}
+.tab {
+  min-height: 60px;
+  border-radius: 18px;
+  align-content: center;
+}
+.tab.is-current,
+.tab[aria-current="page"] {
+  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(247,244,237,.94));
+  box-shadow: 0 6px 16px rgba(48,76,64,.08), inset 0 0 0 1px rgba(188,145,73,.12);
+  transform: translateY(-1px);
+}
+.tab.is-current::before,
+.tab[aria-current="page"]::before {
+  top: 6px;
+  width: 14px;
+  height: 4px;
+}
+.tabbar .tab-icon {
+  width: 24px;
+  height: 24px;
+}
+.shell {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .tabbar {
+    width: 500px;
+  }
+}
+
+@media (max-width: 420px) {
+  .tabbar {
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding-inline: 8px;
+  }
+  .tab {
+    min-height: 58px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V5 · Tabbar anchored inside device frame
+   目标：桌面演示模式下，底栏固定在手机框内部底边，而不是网页视口底边。
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  body[data-surface="consumer"] > .shell {
+    position: relative;
+    padding-bottom: 118px;
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    min-height: 94px;
+    padding: 10px 12px 12px;
+    border-radius: 30px 30px 38px 38px;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    background: linear-gradient(180deg, rgba(250,247,239,.97) 0%, rgba(246,242,233,.985) 100%);
+    box-shadow: 0 -12px 28px rgba(48,76,64,.08), 0 -2px 8px rgba(81,62,34,.05);
+    transform: none;
+    animation: none;
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar::before {
+    inset: 6px 6px 0 6px;
+    border-radius: 24px 24px 32px 32px;
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar::after {
+    top: 0;
+    left: 50%;
+    width: 120px;
+    transform: translateX(-50%);
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar .tab {
+    min-height: 64px;
+    border-radius: 18px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V6 · Phone-internal scroll + scale refinement
+   目标：桌面演示模式下，手机框内部可上下滚动，并且内部组件更贴近真实手机比例。
+   约束：不改 HTML / JS / id / data-* / aria-live，只做 art-cards.css 末尾覆盖。
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  body[data-surface="consumer"] > .shell {
+    width: min(100%, 468px);
+    min-height: min(860px, calc(100vh - 76px));
+    max-height: min(860px, calc(100vh - 76px));
+    padding: 8px 16px 112px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(114, 136, 124, .58) rgba(0,0,0,0);
+    scroll-behavior: smooth;
+  }
+
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar {
+    width: 8px;
+  }
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 22px 0 118px;
+  }
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: linear-gradient(180deg, rgba(116,144,128,.86), rgba(86,112,100,.86));
+    border: 2px solid rgba(247,243,233,.96);
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar {
+    position: sticky;
+    left: auto;
+    right: auto;
+    bottom: 0;
+    width: auto;
+    margin: 18px -16px -8px;
+    min-height: 88px;
+    padding: 8px 10px 10px;
+    z-index: 70;
+  }
+
+  body[data-surface="consumer"] > .shell > .tabbar .tab {
+    min-height: 58px;
+    gap: 2px;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab-icon {
+    width: 22px;
+    height: 22px;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab span {
+    font-size: 11px;
+  }
+
+  /* 让整个手机内部更像真机比例，而不是放大网页。 */
+  .shell {
+    padding-top: 6px;
+    padding-inline: 16px;
+  }
+  .family-app .fam-head,
+  body[data-surface="consumer"] .shell > .fam-head {
+    min-height: 158px;
+    padding: 20px 18px 18px;
+    margin: 2px 0 18px;
+    border-radius: 28px;
+  }
+  .fam-verdict,
+  .fam-head h1 {
+    font-size: clamp(26px, 2.2vw, 31px);
+  }
+  .fam-head .lead {
+    font-size: 14px;
+  }
+  .section-head {
+    margin: 22px 2px 10px;
+    font-size: 17px;
+  }
+  .section-note {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  #dailyReport {
+    min-height: 154px;
+    padding: 18px 18px 16px;
+    font-size: 19px;
+  }
+  .metric-row {
+    gap: 10px;
+    margin: 12px 0 8px;
+  }
+  .metric {
+    min-height: 102px;
+    padding: 15px 13px 12px;
+    border-radius: 20px;
+  }
+  .metric strong {
+    font-size: 34px;
+    margin-top: 14px;
+  }
+  .metric::after {
+    width: 56px;
+    height: 56px;
+    right: 8px;
+    bottom: 8px;
+  }
+  .task,
+  .calendar-day,
+  .report-section,
+  .report-more,
+  #reminderForm,
+  .audit-row,
+  .digest,
+  .care-block,
+  .care-item,
+  .care-empty,
+  .care-period,
+  .trust-more-link,
+  .report-verdict {
+    border-radius: 18px;
+  }
+  #tasks > .task,
+  #otherTasks > .task,
+  #notices > .task {
+    padding: 15px 16px;
+  }
+  .report-more > summary {
+    padding: 12px 42px 12px 15px;
+  }
+  #reminderForm {
+    padding: 18px 16px 18px;
+    background-size: auto, 68px auto, 112px auto;
+  }
+  #reminderForm input,
+  #reminderForm select,
+  #reminderForm textarea {
+    min-height: 54px;
+    font-size: 15px;
+  }
+  #reminderForm button {
+    min-height: 50px;
+    font-size: 15px;
+  }
+  .segmented {
+    margin-bottom: 16px;
+    padding: 6px;
+    border-radius: 18px;
+  }
+  .seg {
+    min-height: 38px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+  #ovVerdict {
+    min-height: 110px;
+    padding: 16px 90px 16px 16px;
+  }
+  .trust-more-link {
+    min-height: 74px;
+    padding: 12px 46px 12px 15px;
+  }
+  .trust-more-link > .art-scene {
+    width: 48px;
+    height: 48px;
+  }
+  .trust-more-link > span {
+    padding-right: 88px;
+  }
+  .trust-more-link > span > span:first-child {
+    font-size: 18px;
+  }
+  .trust-more-link .meta {
+    font-size: 13px;
+  }
+  .care-block,
+  .care-item,
+  .digest,
+  .care-empty,
+  .care-period {
+    padding: 14px;
+    margin: 8px 0;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V7 · Phone ratio + bottom tabbar correction
+   目标：修正桌面演示下的手机比例，并让底栏始终固定在手机框内部最底部。
+   ========================================================================== */
+
+@media (min-width: 900px) {
+  /* 取消 pages.css 里把 tabbar 提到前面的 flex/order 方案。 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+    display: block;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .fam-head,
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+    order: initial;
+  }
+
+  /* 更接近真机：窄一点、长一点，像真正的手机比例。 */
+  body[data-surface="consumer"] {
+    padding: 24px 0 36px;
+  }
+  body[data-surface="consumer"] > .shell {
+    width: min(100%, 420px);
+    min-height: min(900px, calc(100vh - 48px));
+    max-height: min(900px, calc(100vh - 48px));
+    padding: 8px 14px 110px;
+    border-width: 10px;
+    border-radius: 44px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(116,138,126,.52) transparent;
+  }
+  body[data-surface="consumer"] > .shell::before {
+    top: 8px;
+    width: 108px;
+    height: 28px;
+    margin-bottom: -18px;
+  }
+
+  /* 手机框内部滚动条，轻一些。 */
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar {
+    width: 7px;
+  }
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 22px 0 112px;
+  }
+  body[data-surface="consumer"] > .shell::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: linear-gradient(180deg, rgba(116,144,128,.72), rgba(86,112,100,.72));
+    border: 2px solid rgba(247,243,233,.96);
+  }
+
+  /* 底栏永远贴在手机框内部底部，而不是跑到内容区上方。 */
+  body[data-surface="consumer"] > .shell > .tabbar {
+    position: sticky;
+    bottom: 0;
+    left: auto;
+    right: auto;
+    width: auto;
+    margin: 18px -14px -8px;
+    padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+    min-height: 84px;
+    border: 0;
+    border-top: 1px solid rgba(95,84,66,.10);
+    border-radius: 24px 24px 34px 34px;
+    background: linear-gradient(180deg, rgba(251,248,240,.96) 0%, rgba(246,242,233,.985) 100%);
+    box-shadow: 0 -10px 24px rgba(48,76,64,.06), 0 -1px 0 rgba(255,255,255,.42) inset;
+    backdrop-filter: blur(18px) saturate(1.08);
+    transform: none;
+    z-index: 80;
+    animation: none;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar::before {
+    inset: 4px 4px 0 4px;
+    border-radius: 20px 20px 28px 28px;
+    border-color: rgba(190,143,70,.06);
+  }
+  body[data-surface="consumer"] > .shell > .tabbar::after {
+    top: 0;
+    width: 96px;
+    background: linear-gradient(90deg, transparent, rgba(202,166,98,.6), transparent);
+  }
+
+  /* 更像手机系统 tabbar：整体更克制，不要过大的悬浮块。 */
+  body[data-surface="consumer"] > .shell > .tabbar .tab {
+    min-height: 56px;
+    gap: 2px;
+    border-radius: 16px;
+    color: #6a746f;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab:hover {
+    background: rgba(255,255,255,.36);
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab.is-current,
+  body[data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"] {
+    background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(247,244,237,.90));
+    box-shadow: 0 4px 12px rgba(48,76,64,.06), inset 0 0 0 1px rgba(188,145,73,.08);
+    transform: none;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab.is-current::before,
+  body[data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"]::before {
+    top: 7px;
+    width: 12px;
+    height: 3px;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab-icon {
+    width: 21px;
+    height: 21px;
+  }
+  body[data-surface="consumer"] > .shell > .tabbar .tab span {
+    font-size: 11px;
+  }
+
+  /* 手机内部内容整体再收一档，贴合真机比例。 */
+  .shell {
+    padding-inline: 14px;
+    padding-top: 6px;
+  }
+  .family-app .fam-head,
+  body[data-surface="consumer"] .shell > .fam-head {
+    min-height: 150px;
+    padding: 18px 16px 16px;
+    margin: 2px 0 16px;
+    border-radius: 26px;
+  }
+  .fam-verdict,
+  .fam-head h1 {
+    font-size: clamp(24px, 2vw, 28px);
+  }
+  .fam-head .lead,
+  .fam-updated {
+    font-size: 13px;
+  }
+  .section-head {
+    margin: 20px 2px 10px;
+    font-size: 16px;
+  }
+  .section-note {
+    font-size: 12px;
+    margin: -2px 4px 12px;
+  }
+  #dailyReport {
+    min-height: 146px;
+    padding: 16px 16px 14px;
+    font-size: 18px;
+    background-size: auto, auto, 84px 84px;
+  }
+  #dailyReport .report-section {
+    padding: 12px 13px;
+  }
+  .metric-row {
+    gap: 9px;
+    margin: 10px 0 8px;
+  }
+  .metric {
+    min-height: 96px;
+    padding: 13px 11px 11px;
+    border-radius: 18px;
+  }
+  .metric strong {
+    font-size: 31px;
+    margin-top: 12px;
+  }
+  .metric::after {
+    width: 52px;
+    height: 52px;
+    right: 8px;
+    bottom: 8px;
+  }
+  #tasks > .task,
+  #otherTasks > .task,
+  #notices > .task,
+  .care-block,
+  .care-item,
+  .digest,
+  .care-empty,
+  .care-period,
+  .audit-row {
+    padding: 13px 14px;
+  }
+  #reminderForm {
+    padding: 16px 14px 16px;
+    background-size: auto, 64px auto, 102px auto;
+  }
+  #reminderForm label {
+    gap: 6px;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+  #reminderForm input,
+  #reminderForm select,
+  #reminderForm textarea {
+    min-height: 50px;
+    font-size: 14px;
+  }
+  #reminderForm button {
+    min-height: 48px;
+    font-size: 14px;
+    border-radius: 16px;
+  }
+  .segmented {
+    margin-bottom: 14px;
+    padding: 6px;
+    border-radius: 16px;
+  }
+  .seg {
+    min-height: 36px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+  #ovVerdict {
+    min-height: 104px;
+    padding: 14px 82px 14px 14px;
+    background-size: auto, auto, 68px 68px;
+  }
+  .trust-more-link {
+    min-height: 68px;
+    padding: 11px 42px 11px 14px;
+    border-radius: 18px;
+  }
+  .trust-more-link > .art-scene {
+    width: 44px;
+    height: 44px;
+  }
+  .trust-more-link > span {
+    padding-right: 78px;
+  }
+  .trust-more-link > span > span:first-child {
+    font-size: 16px;
+  }
+  .trust-more-link .meta {
+    margin-top: 4px;
+    font-size: 12px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V8 · Real phone demo shell
+   目标：像真实手机演示图——内容在手机内部滚动，Tab Bar 固定在手机框内部底部。
+   ========================================================================== */
+
+.phone-scroll {
+  min-height: 0;
+}
+
+@media (min-width: 900px) {
+  /* 用真实手机壳逻辑：壳子固定，里面分成“可滚动内容区 + 底部系统 tabbar”。 */
+  body[data-surface="consumer"] {
+    padding: 18px 0 28px;
+    background:
+      radial-gradient(circle at 14% 16%, rgba(243,238,224,.94), rgba(238,235,228,.82) 38%, rgba(233,230,223,.76) 100%),
+      linear-gradient(180deg, #eeebe4 0%, #e7e3dc 100%);
+  }
+
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 408px);
+    height: min(884px, calc(100vh - 36px));
+    min-height: min(884px, calc(100vh - 36px));
+    max-height: min(884px, calc(100vh - 36px));
+    padding: 10px 12px 0;
+    border: 10px solid #202322;
+    border-radius: 46px;
+    background:
+      linear-gradient(180deg, rgba(249,246,239,.995) 0%, rgba(244,240,232,.992) 100%);
+    box-shadow:
+      0 42px 88px rgba(32,36,34,.24),
+      0 14px 26px rgba(32,36,34,.12),
+      inset 0 1px 0 rgba(255,255,255,.36),
+      inset 0 0 0 1px rgba(255,255,255,.12);
+    overflow: hidden;
+    position: relative;
+  }
+
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 110px;
+    height: 30px;
+    transform: translateX(-50%);
+    z-index: 110;
+    border-radius: 0 0 22px 22px;
+    background: linear-gradient(180deg, #111413 0%, #171a19 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,.26);
+    pointer-events: none;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell::after {
+    content: "";
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    width: 118px;
+    height: 5px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(45,51,48,.76);
+    opacity: .42;
+    pointer-events: none;
+    z-index: 110;
+  }
+
+  /* phone-scroll 才是手机内部真正的内容区域 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(118,141,128,.46) transparent;
+    padding: 18px 2px 12px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0 10px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(118,141,128,.66), rgba(89,110,99,.66));
+    border: 2px solid rgba(247,243,233,.96);
+  }
+
+  /* 取消旧版把 tabbar 顶到上面的布局方式。 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .fam-head,
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+    order: initial;
+  }
+
+  /* 真正固定在手机框内部底部。 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+    flex: 0 0 auto;
+    position: relative;
+    width: calc(100% + 24px);
+    margin: 0 -12px;
+    padding: 8px 12px 18px;
+    min-height: 86px;
+    border: 0;
+    border-top: 1px solid rgba(112,99,73,.10);
+    border-radius: 28px 28px 0 0;
+    background:
+      linear-gradient(180deg, rgba(250,247,239,.95) 0%, rgba(245,241,232,.985) 100%);
+    box-shadow:
+      0 -8px 18px rgba(47,69,60,.05),
+      inset 0 1px 0 rgba(255,255,255,.42);
+    backdrop-filter: blur(20px) saturate(1.1);
+    z-index: 90;
+    transform: none;
+    animation: none;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar::before {
+    inset: 4px 4px 0 4px;
+    border-radius: 24px 24px 0 0;
+    border-color: rgba(187,143,72,.05);
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 88px;
+    height: 1px;
+    transform: translateX(-50%);
+    background: linear-gradient(90deg, transparent, rgba(202,166,98,.56), transparent);
+    pointer-events: none;
+  }
+
+  /* 更像系统 tabbar，不是网页按钮排排站。 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab {
+    min-height: 52px;
+    gap: 3px;
+    border-radius: 15px;
+    color: #717a75;
+    transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab:hover {
+    background: rgba(255,255,255,.34);
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab.is-current,
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"] {
+    background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(247,244,237,.88));
+    box-shadow: 0 4px 10px rgba(48,76,64,.05), inset 0 0 0 1px rgba(188,145,73,.07);
+    color: #31594d;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab.is-current::before,
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"]::before {
+    top: 6px;
+    width: 12px;
+    height: 3px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab-icon {
+    width: 21px;
+    height: 21px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab span {
+    font-size: 11px;
+    letter-spacing: .01em;
+  }
+
+  /* 真机演示比例：内部整体再收一点，更像手机而不是桌面网页。 */
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll > .fam-head,
+  body[data-surface="consumer"] .shell > .phone-scroll > .fam-head {
+    min-height: 146px;
+    padding: 17px 15px 15px;
+    margin: 0 0 14px;
+    border-radius: 24px;
+  }
+  .phone-scroll .fam-verdict,
+  .phone-scroll .fam-head h1 {
+    font-size: clamp(23px, 1.75vw, 27px);
+  }
+  .phone-scroll .fam-head .lead,
+  .phone-scroll .fam-updated {
+    font-size: 13px;
+  }
+  .phone-scroll .section-head {
+    margin: 18px 2px 9px;
+    font-size: 16px;
+  }
+  .phone-scroll .section-note {
+    margin: -1px 4px 10px;
+    font-size: 12px;
+  }
+  .phone-scroll #dailyReport {
+    min-height: 140px;
+    padding: 15px 15px 13px;
+    font-size: 17px;
+    background-size: auto, auto, 80px 80px;
+  }
+  .phone-scroll #dailyReport .report-section {
+    padding: 11px 12px;
+  }
+  .phone-scroll .metric-row {
+    gap: 8px;
+    margin: 9px 0 8px;
+  }
+  .phone-scroll .metric {
+    min-height: 92px;
+    padding: 12px 10px 10px;
+    border-radius: 18px;
+  }
+  .phone-scroll .metric strong {
+    font-size: 29px;
+    margin-top: 11px;
+  }
+  .phone-scroll .metric::after {
+    width: 50px;
+    height: 50px;
+    right: 7px;
+    bottom: 7px;
+  }
+  .phone-scroll .task,
+  .phone-scroll .calendar-day,
+  .phone-scroll .report-section,
+  .phone-scroll .report-more,
+  .phone-scroll #reminderForm,
+  .phone-scroll .audit-row,
+  .phone-scroll .digest,
+  .phone-scroll .care-block,
+  .phone-scroll .care-item,
+  .phone-scroll .care-empty,
+  .phone-scroll .care-period,
+  .phone-scroll .trust-more-link,
+  .phone-scroll .report-verdict {
+    border-radius: 17px;
+  }
+  .phone-scroll #tasks > .task,
+  .phone-scroll #otherTasks > .task,
+  .phone-scroll #notices > .task,
+  .phone-scroll .care-block,
+  .phone-scroll .care-item,
+  .phone-scroll .digest,
+  .phone-scroll .care-empty,
+  .phone-scroll .care-period,
+  .phone-scroll .audit-row {
+    padding: 12px 13px;
+  }
+  .phone-scroll #reminderForm {
+    padding: 15px 13px 15px;
+    background-size: auto, 60px auto, 96px auto;
+  }
+  .phone-scroll #reminderForm label {
+    gap: 6px;
+    margin-bottom: 13px;
+    font-size: 12px;
+  }
+  .phone-scroll #reminderForm input,
+  .phone-scroll #reminderForm select,
+  .phone-scroll #reminderForm textarea {
+    min-height: 48px;
+    font-size: 14px;
+  }
+  .phone-scroll #reminderForm button {
+    min-height: 46px;
+    font-size: 14px;
+    border-radius: 15px;
+  }
+  .phone-scroll .segmented {
+    margin-bottom: 13px;
+    padding: 6px;
+    border-radius: 15px;
+  }
+  .phone-scroll .seg {
+    min-height: 35px;
+    border-radius: 11px;
+    font-size: 13px;
+  }
+  .phone-scroll #ovVerdict {
+    min-height: 98px;
+    padding: 13px 78px 13px 13px;
+    background-size: auto, auto, 64px 64px;
+  }
+  .phone-scroll .trust-more-link {
+    min-height: 64px;
+    padding: 10px 40px 10px 13px;
+    border-radius: 17px;
+  }
+  .phone-scroll .trust-more-link > .art-scene {
+    width: 42px;
+    height: 42px;
+  }
+  .phone-scroll .trust-more-link > span {
+    padding-right: 74px;
+  }
+  .phone-scroll .trust-more-link > span > span:first-child {
+    font-size: 15px;
+  }
+  .phone-scroll .trust-more-link .meta {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V9 · Care clean-up + hidden scrollbars
+   目标：照护模式重新分层；所有滚动容器保留滚动能力，但不显示滚动条。
+   ========================================================================== */
+
+/* ---- 所有页面：可滚动，但不显示滚动轮/滚动条 ---- */
+html,
+body,
+.shell,
+.phone-scroll,
+.segmented,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.shell::-webkit-scrollbar,
+.phone-scroll::-webkit-scrollbar,
+.segmented::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+  background: transparent;
+}
+
+/* ---- 底栏：所有页面更像原生系统 Tab Bar，选中态不再是一大块浮卡 ---- */
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab.is-current,
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"] {
+  background: transparent;
+  box-shadow: none;
+  color: #31594d;
+  transform: none;
+}
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab.is-current::before,
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"]::before {
+  top: 3px;
+  width: 18px;
+  height: 3px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,#c89a4f,#3f7865);
+}
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab.is-current .tab-icon,
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar .tab[aria-current="page"] .tab-icon {
+  transform: none;
+  stroke-width: 2;
+}
+
+/* ========================================================================
+   照护模式：只在 care-app 生效
+   ====================================================================== */
+.care-app .phone-scroll {
+  padding-inline: 4px;
+}
+
+/* 1. 顶部不再是一张大“家庭首页卡”，改成更克制的照护档案页头。 */
+.care-app .fam-head {
+  min-height: 112px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 16px 15px;
+  margin: 0 0 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(76,91,83,.10);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  animation: none;
+}
+.care-app .fam-head::before,
+.care-app .fam-head::after,
+.care-app .fam-head > .art-scene { display: none; }
+.care-app .fam-head h1 {
+  max-width: none;
+  margin: 0 0 4px;
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+  font-size: 25px;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  color: #253c34;
+}
+.care-app .fam-head h1::first-letter { color: inherit; }
+.care-app #careUpdated {
+  margin: 0;
+  font-size: 12px;
+  color: #7a827d;
+}
+.care-app .back-link {
+  min-height: 36px;
+  padding: 0 11px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.56);
+  border: 1px solid rgba(90,98,91,.10);
+  box-shadow: none;
+}
+
+/* 2. 会话状态降权：成功/读取状态只是一条轻提示，不再是一张大卡。 */
+.care-app .care-status {
+  min-height: 0;
+  margin: 4px 3px 10px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(54,103,86,.055);
+  box-shadow: none;
+  color: #607169;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.care-app .care-status::before,
+.care-app .care-status::after { display: none; }
+
+/* 3. 七分区导航：固定为清楚的 4+3 网格，不横向乱滚，不堆材质。 */
+.care-app .segmented {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 5px;
+  margin: 0 0 15px;
+  padding: 6px;
+  overflow: visible;
+  border: 1px solid rgba(79,94,85,.10);
+  border-radius: 18px;
+  background: rgba(248,246,240,.94);
+  box-shadow: 0 7px 22px rgba(47,65,56,.055);
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+.care-app .segmented::before { display: none; }
+.care-app .seg {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 4px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6e7772;
+  background: transparent;
+  box-shadow: none;
+}
+.care-app .seg.is-current,
+.care-app .seg[aria-current="true"] {
+  color: #2e5b4c;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 3px 10px rgba(50,76,65,.075), inset 0 0 0 1px rgba(186,145,78,.09);
+  transform: none;
+}
+.care-app .seg.is-current::after,
+.care-app .seg[aria-current="true"]::after {
+  bottom: 3px;
+  width: 14px;
+  height: 2px;
+}
+
+/* 4. 分区标题统一；照护页不再每块都带长金线。 */
+.care-app .section-head {
+  margin: 18px 3px 6px;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.01em;
+  color: #293c34;
+}
+.care-app .section-head::before {
+  width: 5px;
+  height: 18px;
+  flex-basis: 5px;
+  border-radius: 99px;
+  background: linear-gradient(180deg,#cda45d,#487865);
+  box-shadow: none;
+  transform: none;
+}
+.care-app .section-head::after { display: none; }
+.care-app .section-note {
+  margin: 0 3px 12px;
+  color: #858b87;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 5. 概览结论：只保留一处主视觉，不叠 crane + bamboo + 背景圆章。 */
+.care-app #overviewBody {
+  display: grid;
+  gap: 8px;
+}
+.care-app #ovVerdict {
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  padding: 15px 92px 15px 15px;
+  border: 1px solid rgba(168,132,74,.13);
+  border-image: none;
+  border-radius: 20px;
+  background:
+    linear-gradient(95deg, rgba(255,253,248,.98) 0 70%, rgba(246,241,229,.85) 100%),
+    url("/static/art/v2/medallion-crane.webp") calc(100% - 13px) 50% / 66px 66px no-repeat;
+  box-shadow: 0 10px 26px rgba(51,67,59,.065);
+}
+.care-app #ovVerdict::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(190,145,74,.06);
+  border-radius: 16px;
+  pointer-events: none;
+}
+.care-app #ovVerdict::before,
+.care-app #ovVerdict > .art-scene { display: none; }
+.care-app #ovVerdict .report-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  box-shadow: none;
+}
+.care-app #ovVerdict strong {
+  font-size: 17px;
+  line-height: 1.4;
+  color: #2e4239;
+}
+
+/* 6. 五个入口全部改成一致的“文字 + 单一右侧题签图”，去掉左圆图和重复图层。 */
+.care-app .trust-more-link {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  padding: 11px 102px 11px 15px;
+  border: 1px solid rgba(83,97,89,.105);
+  border-radius: 18px;
+  background-color: rgba(255,253,248,.92);
+  box-shadow: 0 5px 16px rgba(50,67,58,.045);
+  animation: v2-row-in .4s var(--v2-ease) both;
+  transform: none;
+}
+.care-app .trust-more-link::before { display: none; }
+.care-app .trust-more-link::after {
+  content: "→";
+  right: 12px;
+  color: #477d6b;
+  font-size: 16px;
+  font-weight: 500;
+}
+.care-app .trust-more-link > .art-scene { display: none; }
+.care-app .trust-more-link > span {
+  display: block;
+  min-width: 0;
+  padding: 0;
+}
+.care-app .trust-more-link > span > span:first-child {
+  color: #2d4d41;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+.care-app .trust-more-link .meta {
+  display: block;
+  margin-top: 5px;
+  color: #747b77;
+  font-size: 12px;
+  line-height: 1.35;
+  /* 这里原本是 max-width:16em + white-space:nowrap + text-overflow:ellipsis。
+     占位文案放得下，真数据放不下——设计稿上看不出来，接上后端就在句子中间
+     切掉 5–11 个汉字（量到 59/59/117/137px）。手机上省略号后面的字没有任何
+     办法看到（没有 hover），而这四行是家属进来第一眼的摘要，被切掉的往往
+     正是「晚上还有一次」这种要采取行动的半句。中文折行没有代价。 */
+}
+.care-app #ovToday,
+.care-app #ovMed,
+.care-app #ovBody,
+.care-app #ovMood,
+.care-app #ovSafety {
+  background-repeat: no-repeat;
+  background-position: 0 0, calc(100% - 26px) 50%;
+  background-size: auto, 72px auto;
+}
+.care-app #ovToday {
+  background-image: linear-gradient(90deg,rgba(255,253,248,.98),rgba(255,248,234,.88)), url("/static/art/v2/info-crane.webp");
+}
+.care-app #ovMed {
+  background-image: linear-gradient(90deg,rgba(255,253,248,.98),rgba(240,247,241,.88)), url("/static/art/v2/scene-lotus-square.webp");
+}
+.care-app #ovBody {
+  background-image: linear-gradient(90deg,rgba(255,253,248,.98),rgba(239,246,242,.88)), url("/static/art/v2/info-bamboo.webp");
+}
+.care-app #ovMood {
+  background-image: linear-gradient(90deg,rgba(255,253,248,.98),rgba(255,243,237,.88)), url("/static/art/v2/info-plum.webp");
+}
+.care-app #ovSafety {
+  background-image: linear-gradient(90deg,rgba(255,253,248,.98),rgba(240,246,241,.88)), url("/static/art/v2/hero-pine-crane.webp");
+}
+.care-app .trust-more-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(50,67,58,.07);
+}
+
+/* 7. 细节页统一成干净档案卡，取消随机装饰背景。 */
+.care-app .care-block,
+.care-app .care-item,
+.care-app .digest,
+.care-app .care-empty,
+.care-app .care-period,
+.care-app #todayBody .care-block:nth-of-type(1),
+.care-app #medBody .care-item:nth-of-type(1),
+.care-app #bodyBody .care-item:nth-of-type(1),
+.care-app #moodBody .digest,
+.care-app #safetyBody .digest,
+.care-app #weekly .digest {
+  margin: 7px 0;
+  padding: 13px 14px;
+  border: 1px solid rgba(79,94,85,.095);
+  border-radius: 16px;
+  background: rgba(255,253,249,.88);
+  background-image: none;
+  box-shadow: 0 4px 14px rgba(49,65,57,.038);
+}
+.care-app .care-block::before,
+.care-app .care-block::after,
+.care-app .care-item::before,
+.care-app .care-item::after,
+.care-app .digest::before,
+.care-app .digest::after { opacity: .18; }
+.care-app .care-block-head,
+.care-app .care-item-head {
+  color: #2f4f43;
+  font-size: 15px;
+}
+.care-app .digest-row {
+  padding: 9px 0;
+  border-bottom-color: rgba(79,94,85,.08);
+}
+
+@media (min-width: 900px) {
+  .care-app .phone-scroll {
+    padding-top: 18px;
+  }
+  .care-app .fam-head {
+    min-height: 104px;
+    padding-top: 20px;
+  }
+  .care-app .segmented {
+    top: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .care-app .segmented {
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    gap: 4px;
+  }
+  .care-app .seg { font-size: 11px; }
+  .care-app .trust-more-link {
+    padding-right: 88px;
+  }
+  .care-app #ovToday,
+  .care-app #ovMed,
+  .care-app #ovBody,
+  .care-app #ovMood,
+  .care-app #ovSafety {
+    background-size: auto, 62px auto;
+    background-position: 0 0, calc(100% - 24px) 50%;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V10 · Care structural repair
+   修复 care.html 缺失 phone-scroll 开始标签导致的底栏消失 / 无法滚动。
+   ========================================================================== */
+
+/* 全尺寸都使用同一种手机内部结构：shell 固定，内容滚，tabbar 不滚。 */
+body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 底栏永远是 shell 的第二层固定家具，不参与内容滚动。 */
+body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+  flex: 0 0 auto;
+  position: relative;
+  inset: auto;
+  z-index: 100;
+  transform: none;
+  animation: none;
+}
+
+/* 真手机宽度：shell 占满可视高度，内容自己滚。 */
+@media (max-width: 899px) {
+  body[data-nav="tabbar"][data-surface="consumer"] {
+    min-height: 100svh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+    width: 100%;
+    height: 100svh;
+    height: 100dvh;
+    min-height: 0;
+    max-height: none;
+    padding-bottom: 0;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll {
+    padding-bottom: 12px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+    width: 100%;
+    margin: 0;
+    bottom: auto;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+}
+
+/* 桌面真机演示：维持窄长手机比例，底栏稳在壳底。 */
+@media (min-width: 900px) {
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+    width: min(100%, 402px);
+    height: min(870px, calc(100vh - 36px));
+    min-height: min(870px, calc(100vh - 36px));
+    max-height: min(870px, calc(100vh - 36px));
+    padding: 10px 12px 0;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll {
+    padding: 18px 2px 12px;
+  }
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .tabbar {
+    width: calc(100% + 24px);
+    margin: 0 -12px;
+    min-height: 82px;
+    padding: 7px 11px 18px;
+    border-radius: 26px 26px 0 0;
+  }
+}
+
+/* ========================================================================
+   照护中心 V10：再砍一轮视觉噪声，只留清楚的信息路径。
+   ====================================================================== */
+.care-app .phone-scroll {
+  padding-inline: 6px;
+}
+
+/* 页头更像档案标题，不与概览正文抢权重。 */
+.care-app .fam-head {
+  min-height: 80px;
+  align-items: end;
+  padding: 17px 8px 11px;
+  margin: 0;
+  border-bottom: 0;
+}
+.care-app .fam-head h1 {
+  font-size: 22px;
+  margin-bottom: 3px;
+}
+.care-app #careUpdated { font-size: 11px; }
+.care-app .back-link { display: none; }
+.care-app .care-status {
+  margin: 0 1px 8px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+/* 七分区保持 4+3，但进一步减弱“七个按钮”的后台感。 */
+.care-app .segmented {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 4px;
+  border-radius: 15px;
+  background: rgba(248,246,241,.96);
+  box-shadow: 0 5px 16px rgba(47,65,56,.045);
+}
+.care-app .seg {
+  min-height: 31px;
+  padding: 0 3px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.care-app .seg.is-current,
+.care-app .seg[aria-current="true"] {
+  background: rgba(255,255,255,.92);
+  box-shadow: inset 0 0 0 1px rgba(102,120,110,.09);
+}
+.care-app .seg.is-current::after,
+.care-app .seg[aria-current="true"]::after {
+  display: none;
+}
+
+/* 概览只保留“一个结论 + 五条目录”，取消五条目录的大幅美术背景。 */
+.care-app .section-head {
+  margin: 14px 2px 5px;
+  font-size: 17px;
+}
+.care-app .section-note {
+  margin: 0 2px 9px;
+  font-size: 11px;
+}
+.care-app #overviewBody { gap: 6px; }
+.care-app #ovVerdict {
+  min-height: 88px;
+  padding: 13px 70px 13px 13px;
+  border-radius: 17px;
+  background:
+    linear-gradient(95deg, rgba(255,253,248,.99) 0 74%, rgba(247,243,234,.88) 100%),
+    url("/static/art/v2/medallion-crane.webp") calc(100% - 12px) 50% / 48px 48px no-repeat;
+  box-shadow: 0 6px 18px rgba(51,67,59,.045);
+}
+.care-app #ovVerdict strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.care-app #ovVerdict .report-badge { font-size: 10px; }
+
+.care-app .trust-more-link,
+.care-app #ovToday,
+.care-app #ovMed,
+.care-app #ovBody,
+.care-app #ovMood,
+.care-app #ovSafety {
+  min-height: 58px;
+  padding: 9px 34px 9px 13px;
+  border-radius: 15px;
+  background: rgba(255,253,249,.91);
+  background-image: none;
+  box-shadow: 0 3px 10px rgba(50,67,58,.032);
+}
+.care-app .trust-more-link::before,
+.care-app .trust-more-link > .art-scene { display: none; }
+.care-app .trust-more-link::after {
+  right: 13px;
+  font-size: 15px;
+  color: #668076;
+}
+.care-app .trust-more-link > span { padding: 0; }
+.care-app .trust-more-link > span > span:first-child {
+  font-size: 14px;
+  color: #30493f;
+}
+.care-app .trust-more-link .meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #838984;
+}
+
+/* 细节区也只用一种档案卡，不再随机叠画。 */
+.care-app .care-block,
+.care-app .care-item,
+.care-app .digest,
+.care-app .care-empty,
+.care-app .care-period {
+  margin: 6px 0;
+  padding: 12px 13px;
+  border-radius: 14px;
+  background: rgba(255,253,249,.92);
+  background-image: none;
+  box-shadow: 0 3px 10px rgba(49,65,57,.028);
+}
+.care-app .care-block::before,
+.care-app .care-block::after,
+.care-app .care-item::before,
+.care-app .care-item::after,
+.care-app .digest::before,
+.care-app .digest::after {
+  display: none;
+}
+
+/* 底栏在照护页必须明确可见。 */
+body[data-nav="tabbar"] > .care-app > .tabbar {
+  display: grid;
+  visibility: visible;
+  opacity: 1;
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V11 · Care Art Recomposition
+   目标：照护中心重新引入完整美术体系，但每个区域只保留一个主意象，清晰优先。
+   只改 CSS，不改业务 JS / id / data-section / data-panel / aria-live。
+   ========================================================================== */
+
+/* 全界面：能滚动，但永远不显示滚动条。 */
+html, body, .shell, .phone-scroll, .segmented,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.shell::-webkit-scrollbar,
+.phone-scroll::-webkit-scrollbar,
+.segmented::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   CARE PAGE — PAPER + LANDSCAPE ATMOSPHERE
+   -------------------------------------------------------------------------- */
+.care-app .phone-scroll {
+  position: relative;
+  isolation: isolate;
+  padding-inline: 10px;
+  background:
+    radial-gradient(circle at 85% 4%, rgba(221,190,132,.10), transparent 25%),
+    linear-gradient(180deg, rgba(252,249,242,.98), rgba(247,243,234,.98));
+}
+.care-app .phone-scroll::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 260px;
+  right: -42px;
+  width: 152px;
+  height: 430px;
+  background: url("/static/art/v2/scene-bamboo-screen.webp") center / contain no-repeat;
+  opacity: .065;
+  filter: saturate(.78);
+}
+.care-app .phone-scroll::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  left: -40px;
+  bottom: 180px;
+  width: 170px;
+  height: 340px;
+  background: url("/static/art/v2/scene-lotus-koi-tall.webp") center / contain no-repeat;
+  opacity: .045;
+  filter: saturate(.78);
+}
+
+/* --------------------------------------------------------------------------
+   CARE HEADER — one mature hero, not a plain text box
+   -------------------------------------------------------------------------- */
+.care-app .fam-head {
+  position: relative;
+  min-height: 154px;
+  padding: 23px 104px 20px 20px;
+  margin: 2px 0 10px;
+  overflow: hidden;
+  border: 1px solid rgba(171,133,71,.20);
+  border-radius: 28px;
+  background:
+    linear-gradient(100deg, rgba(255,252,245,.985) 0 54%, rgba(249,244,231,.86) 73%, rgba(241,234,217,.70) 100%),
+    url("/static/art/v2/panel-jade-mountain.webp") 108% 48% / 205px auto no-repeat;
+  box-shadow: 0 14px 34px rgba(48,68,58,.09), inset 0 1px 0 rgba(255,255,255,.62);
+}
+.care-app .fam-head::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: 0;
+  border: 1px solid rgba(194,151,78,.10);
+  border-radius: 21px;
+  pointer-events: none;
+}
+.care-app .fam-head::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  right: 18px;
+  top: 19px;
+  width: 72px;
+  height: 72px;
+  background: url("/static/art/v2/medallion-crane.webp") center / contain no-repeat;
+  opacity: .82;
+  filter: drop-shadow(0 5px 9px rgba(75,64,43,.08));
+  pointer-events: none;
+  animation: care-v11-float 7s ease-in-out infinite alternate;
+}
+.care-app .fam-head-text {
+  position: relative;
+  z-index: 2;
+}
+.care-app .fam-head h1 {
+  margin: 2px 0 9px;
+  font-size: clamp(25px, 7vw, 30px);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  color: #24453a;
+}
+.care-app .fam-head h1::after {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 3px;
+  margin-top: 10px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,#bc914a,#4a7868);
+}
+.care-app #careUpdated {
+  max-width: 19em;
+  margin: 0;
+  color: #68756f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.care-app .back-link { display: none; }
+
+/* --------------------------------------------------------------------------
+   STATUS — small jade strip, not a competing card
+   -------------------------------------------------------------------------- */
+.care-app .care-status {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 3px 12px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, rgba(232,241,234,.88), rgba(250,247,237,.70)),
+    url("/static/art/v2/bar-jade-gold.webp") 100% 50% / 118px 40px no-repeat;
+  box-shadow: none;
+  color: #527164;
+  font-size: 11px;
+}
+.care-app .care-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #5b8977;
+  box-shadow: 0 0 0 4px rgba(76,126,107,.08);
+}
+.care-app .care-status::after { display: none; }
+
+/* --------------------------------------------------------------------------
+   MODULE NAV — compact 4+3 grid; art only in selected module
+   -------------------------------------------------------------------------- */
+.care-app .segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 6px;
+  margin: 0 0 17px;
+  padding: 7px;
+  overflow: visible;
+  border: 1px solid rgba(126,105,72,.11);
+  border-radius: 19px;
+  background:
+    linear-gradient(180deg, rgba(250,247,240,.94), rgba(244,239,230,.88));
+  box-shadow: 0 8px 22px rgba(49,66,58,.055), inset 0 1px 0 rgba(255,255,255,.56);
+  backdrop-filter: blur(14px) saturate(1.04);
+}
+.care-app .segmented::before {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: -8px;
+  width: 52px;
+  height: 30px;
+  background: url("/static/art/v2/ornament-cloud-stream.webp") right bottom / contain no-repeat;
+  opacity: .10;
+  pointer-events: none;
+}
+.care-app .seg {
+  min-width: 0;
+  min-height: 39px;
+  padding: 0 5px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #6a756f;
+  background: transparent;
+  box-shadow: none;
+}
+.care-app .seg.is-current,
+.care-app .seg[aria-current="true"] {
+  color: #2d5a4a;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.95), rgba(246,242,232,.92)),
+    url("/static/art/v2/ornament-auspicious-cloud.webp") 105% 115% / 38px auto no-repeat;
+  box-shadow: 0 5px 13px rgba(51,75,64,.08), inset 0 0 0 1px rgba(188,145,73,.10);
+}
+.care-app .seg.is-current::after,
+.care-app .seg[aria-current="true"]::after {
+  width: 14px;
+  height: 2px;
+  bottom: 4px;
+  background: linear-gradient(90deg,#bf934b,#477a68);
+}
+
+/* --------------------------------------------------------------------------
+   PANEL TITLE — title is the anchor, not a decorative divider
+   -------------------------------------------------------------------------- */
+.care-app .page-section:not([hidden]) {
+  animation: care-v11-panel .42s cubic-bezier(.22,.8,.28,1) both;
+}
+.care-app .section-head {
+  margin: 17px 2px 5px;
+  gap: 8px;
+  font-size: 18px;
+  color: #294b40;
+}
+.care-app .section-head::before {
+  width: 8px;
+  height: 8px;
+  flex-basis: 8px;
+  background: linear-gradient(145deg,#cb9e53,#4f7e6d);
+  box-shadow: 0 0 0 4px rgba(77,126,107,.065);
+}
+.care-app .section-head::after {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg,rgba(191,148,76,.22),transparent);
+}
+.care-app .section-note {
+  margin: 0 3px 12px 18px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #818780;
+}
+
+/* --------------------------------------------------------------------------
+   OVERVIEW HERO — one large painting, one verdict
+   -------------------------------------------------------------------------- */
+.care-app #overviewBody {
+  display: grid;
+  gap: 9px;
+}
+.care-app #ovVerdict {
+  position: relative;
+  min-height: 126px;
+  padding: 20px 130px 18px 18px;
+  overflow: hidden;
+  border: 1px solid rgba(176,134,68,.18);
+  border-radius: 22px;
+  background:
+    linear-gradient(92deg, rgba(255,252,245,.98) 0 52%, rgba(255,250,240,.88) 66%, rgba(247,238,219,.50) 100%),
+    url("/static/art/v2/hero-pine-crane.webp") calc(100% + 28px) 50% / 185px auto no-repeat;
+  box-shadow: 0 12px 28px rgba(47,65,57,.08), inset 0 1px 0 rgba(255,255,255,.62);
+}
+.care-app #ovVerdict::before {
+  content: "";
+  position: absolute;
+  right: 90px;
+  bottom: 5px;
+  width: 54px;
+  height: 38px;
+  background: url("/static/art/v2/ornament-auspicious-cloud.webp") center / contain no-repeat;
+  opacity: .14;
+  pointer-events: none;
+}
+.care-app #ovVerdict::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(190,145,73,.09);
+  border-radius: 17px;
+  pointer-events: none;
+}
+.care-app #ovVerdict > .art-scene { display: none; }
+.care-app #ovVerdict .report-badge {
+  display: inline-flex;
+  margin: 0 0 10px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(232,241,234,.82);
+  color: #547365;
+  font-size: 10px;
+  box-shadow: inset 0 0 0 1px rgba(79,123,106,.08);
+}
+.care-app #ovVerdict strong {
+  display: block;
+  max-width: 13em;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 18px;
+  line-height: 1.48;
+  color: #29453b;
+}
+
+/* --------------------------------------------------------------------------
+   FIVE OVERVIEW ENTRIES — real art cards, but exactly one art composition each
+   -------------------------------------------------------------------------- */
+.care-app .trust-more-link,
+.care-app #ovToday,
+.care-app #ovMed,
+.care-app #ovBody,
+.care-app #ovMood,
+.care-app #ovSafety {
+  position: relative;
+  min-height: 82px;
+  display: block;
+  padding: 15px 112px 14px 17px;
+  overflow: hidden;
+  border: 1px solid rgba(137,116,82,.12);
+  border-radius: 19px;
+  background-color: rgba(255,252,246,.92);
+  box-shadow: 0 7px 19px rgba(47,65,56,.052), inset 0 1px 0 rgba(255,255,255,.48);
+  transition: transform .22s cubic-bezier(.16,1,.32,1), box-shadow .22s ease, border-color .22s ease;
+}
+.care-app .trust-more-link > .art-scene { display: none; }
+.care-app .trust-more-link::before {
+  content: "";
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 3px;
+  height: 38px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(180deg,#ca9c50,#517e6d);
+  opacity: .72;
+}
+.care-app .trust-more-link::after {
+  content: "→";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255,252,245,.80);
+  box-shadow: 0 3px 10px rgba(61,76,67,.07), inset 0 0 0 1px rgba(174,137,75,.11);
+  color: #507969;
+  font-size: 15px;
+}
+.care-app .trust-more-link > span {
+  position: relative;
+  z-index: 2;
+  display: block;
+  padding: 0;
+}
+.care-app .trust-more-link > span > span:first-child {
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 750;
+  color: #31564a;
+}
+.care-app .trust-more-link .meta {
+  display: block;
+  margin-top: 7px;
+  /* 同选择器在本文件第 2810 行还有一条，那条我已经去掉了截断——但**这一条在后面**，
+     源序相同特异度下它赢，所以改上面那条时四处裁切的像素数一点没变（59/59/117/137）。
+     两条都要改。 */
+  font-size: 11px;
+  line-height: 1.35;
+  color: #747a75;
+}
+.care-app #ovToday {
+  background:
+    linear-gradient(90deg,rgba(255,252,246,.975) 0 65%,rgba(255,249,237,.72) 100%),
+    url("/static/art/v2/info-crane.webp") calc(100% + 14px) 50% / 132px auto no-repeat;
+}
+.care-app #ovMed {
+  background:
+    linear-gradient(90deg,rgba(255,252,246,.975) 0 66%,rgba(239,247,240,.71) 100%),
+    url("/static/art/v2/info-floral.webp") calc(100% + 12px) 50% / 130px auto no-repeat;
+}
+.care-app #ovBody {
+  background:
+    linear-gradient(90deg,rgba(255,252,246,.975) 0 66%,rgba(238,246,242,.72) 100%),
+    url("/static/art/v2/info-bamboo.webp") calc(100% + 12px) 50% / 132px auto no-repeat;
+}
+.care-app #ovMood {
+  background:
+    linear-gradient(90deg,rgba(255,252,246,.975) 0 66%,rgba(255,242,235,.70) 100%),
+    url("/static/art/v2/info-plum.webp") calc(100% + 12px) 50% / 132px auto no-repeat;
+}
+.care-app #ovSafety {
+  background:
+    linear-gradient(90deg,rgba(255,252,246,.975) 0 66%,rgba(239,246,241,.70) 100%),
+    url("/static/art/v2/panel-jade-mountain.webp") calc(100% + 34px) 50% / 150px auto no-repeat;
+}
+.care-app .trust-more-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 25px rgba(47,65,56,.075);
+  border-color: rgba(174,135,72,.18);
+}
+
+/* --------------------------------------------------------------------------
+   DETAIL PANELS — one visual language per domain
+   -------------------------------------------------------------------------- */
+.care-app [data-panel="today"],
+.care-app [data-panel="med"],
+.care-app [data-panel="body"],
+.care-app [data-panel="mood"],
+.care-app [data-panel="safety"],
+.care-app [data-panel="trend"] {
+  position: relative;
+  isolation: isolate;
+}
+.care-app [data-panel="today"]::before,
+.care-app [data-panel="med"]::before,
+.care-app [data-panel="body"]::before,
+.care-app [data-panel="mood"]::before,
+.care-app [data-panel="safety"]::before,
+.care-app [data-panel="trend"]::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 4px;
+  right: -4px;
+  width: 84px;
+  height: 126px;
+  background-position: right top;
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: .085;
+}
+.care-app [data-panel="today"]::before { background-image: url("/static/art/v2/scene-pine-crane-tall.webp"); }
+.care-app [data-panel="med"]::before { background-image: url("/static/art/v2/scene-lotus-koi-tall.webp"); }
+.care-app [data-panel="body"]::before { background-image: url("/static/art/v2/scene-bamboo-screen.webp"); }
+.care-app [data-panel="mood"]::before { background-image: url("/static/art/v2/scene-autumn-lake-tall.webp"); }
+.care-app [data-panel="safety"]::before { background-image: url("/static/art/v2/scene-mountain-tall.webp"); }
+.care-app [data-panel="trend"]::before { background-image: url("/static/art/v2/scene-lotus-koi-tall.webp"); }
+
+.care-app .care-block,
+.care-app .care-item,
+.care-app .digest,
+.care-app .care-empty,
+.care-app .care-period {
+  position: relative;
+  overflow: hidden;
+  margin: 8px 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(132,112,79,.12);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg,rgba(255,253,248,.95),rgba(249,246,238,.91));
+  box-shadow: 0 7px 18px rgba(47,65,56,.045), inset 0 1px 0 rgba(255,255,255,.48);
+}
+.care-app .care-block::before,
+.care-app .care-item::before,
+.care-app .digest::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  right: -12px;
+  bottom: -12px;
+  width: 74px;
+  height: 74px;
+  background: url("/static/art/v2/ornament-lotus-flourish.webp") center / contain no-repeat;
+  opacity: .055;
+}
+.care-app .care-block::after,
+.care-app .care-item::after,
+.care-app .digest::after { display: none; }
+.care-app .care-block > *,
+.care-app .care-item > *,
+.care-app .digest > * { position: relative; z-index: 1; }
+.care-app .care-block-head,
+.care-app .care-item-head {
+  color: #34584c;
+  font-size: 14px;
+  font-weight: 750;
+}
+.care-app .digest-row {
+  padding: 10px 2px;
+  border-bottom: 1px solid rgba(105,92,68,.08);
+}
+
+/* Bottom tabbar stays fixed by the V10 structure. Make care selected state restrained. */
+body[data-nav="tabbar"] > .care-app > .tabbar {
+  flex: 0 0 auto;
+  z-index: 100;
+}
+.care-app > .tabbar .tab.is-current,
+.care-app > .tabbar .tab[aria-current="page"] {
+  color: #315d4e;
+  background: rgba(255,255,255,.64);
+  box-shadow: inset 0 0 0 1px rgba(184,142,72,.075);
+}
+
+@keyframes care-v11-panel {
+  from { opacity: 0; transform: translateY(8px) scale(.992); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes care-v11-float {
+  from { transform: translateY(0) rotate(-1deg); }
+  to { transform: translateY(-4px) rotate(1deg); }
+}
+
+@media (max-width: 420px) {
+  .care-app .phone-scroll { padding-inline: 8px; }
+  .care-app .fam-head {
+    min-height: 146px;
+    padding: 20px 92px 18px 17px;
+    border-radius: 25px;
+  }
+  .care-app .fam-head::after { width: 64px; height: 64px; right: 15px; }
+  .care-app .segmented { gap: 5px; padding: 6px; }
+  .care-app .seg { min-height: 37px; font-size: 11px; }
+  .care-app #ovVerdict { min-height: 118px; padding-right: 112px; background-size: auto, 168px auto; }
+  .care-app .trust-more-link,
+  .care-app #ovToday,
+  .care-app #ovMed,
+  .care-app #ovBody,
+  .care-app #ovMood,
+  .care-app #ovSafety {
+    min-height: 78px;
+    padding: 13px 94px 13px 15px;
+  }
+  .care-app #ovToday,
+  .care-app #ovMed,
+  .care-app #ovBody,
+  .care-app #ovMood { background-size: auto, 116px auto; }
+  .care-app #ovSafety { background-size: auto, 132px auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .care-app .fam-head::after,
+  .care-app .page-section:not([hidden]) { animation: none; }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V12 · Care overview redesign
+   目标：摆脱五张重复长白卡。概览采用「结论主卡 + 今日主卡 + 2×2 照护矩阵」。
+   只改变视觉布局；业务 id / data-section / data-panel / aria-live 不变。
+   ========================================================================== */
+
+/* 照护页整体：更紧凑、少边框、层级更像移动端 dashboard。 */
+.care-app .phone-scroll {
+  padding-inline: 9px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(206,185,142,.095), transparent 25%),
+    linear-gradient(180deg, #faf7f0 0%, #f4f0e8 100%);
+}
+.care-app .phone-scroll::before,
+.care-app .phone-scroll::after { display: none; }
+
+/* 页头只保留一个横向山水构图，不再同时叠圆章。 */
+.care-app .fam-head {
+  min-height: 126px;
+  padding: 19px 142px 17px 18px;
+  margin: 1px 0 9px;
+  border: 0;
+  border-radius: 25px;
+  background:
+    linear-gradient(96deg, rgba(255,253,248,.99) 0 50%, rgba(252,248,238,.91) 67%, rgba(240,235,220,.62) 100%),
+    url("/static/art/v2/panel-jade-mountain.webp") calc(100% + 16px) 50% / 205px auto no-repeat;
+  box-shadow: 0 10px 27px rgba(47,64,56,.075), inset 0 0 0 1px rgba(177,142,83,.10);
+}
+.care-app .fam-head::before {
+  inset: 6px;
+  border-radius: 19px;
+  border-color: rgba(188,148,79,.07);
+}
+.care-app .fam-head::after { display: none; }
+.care-app .fam-head h1 {
+  font-size: 26px;
+  margin: 1px 0 7px;
+  color: #21473a;
+}
+.care-app .fam-head h1::after {
+  width: 35px;
+  height: 2px;
+  margin-top: 8px;
+  opacity: .75;
+}
+.care-app #careUpdated { font-size: 11px; line-height: 1.5; color: #75807a; }
+
+/* 状态只做一条安静提示。 */
+.care-app .care-status {
+  min-height: 28px;
+  margin: 0 2px 10px;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: rgba(235,242,236,.72);
+  color: #60776d;
+  font-size: 10px;
+}
+
+/* 七分区：像模块切换器，不像一块后台按钮面板。 */
+.care-app .segmented {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0 0 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.care-app .segmented::before { display: none; }
+.care-app .seg {
+  min-height: 36px;
+  padding: 0 5px;
+  border: 1px solid rgba(105,102,88,.075);
+  border-radius: 12px;
+  background: rgba(255,253,249,.70);
+  color: #6c7670;
+  font-size: 11px;
+  font-weight: 650;
+  box-shadow: 0 3px 9px rgba(49,66,58,.025);
+}
+.care-app .seg.is-current,
+.care-app .seg[aria-current="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, #386957 0%, #4e7a69 100%);
+  border-color: transparent;
+  box-shadow: 0 6px 14px rgba(45,90,73,.18);
+}
+.care-app .seg.is-current::after,
+.care-app .seg[aria-current="true"]::after { display: none; }
+
+.care-app .section-head {
+  margin: 16px 2px 5px;
+  font-size: 18px;
+  color: #284d40;
+}
+.care-app .section-head::after { opacity: .55; }
+.care-app .section-note {
+  margin: 0 3px 11px 17px;
+  color: #848b85;
+  font-size: 10.5px;
+}
+
+/* --------------------------------------------------------------------------
+   概览：结论 + 今日主卡 + 四宫格
+   -------------------------------------------------------------------------- */
+.care-app #overviewBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.care-app #ovVerdict {
+  grid-column: 1 / -1;
+  min-height: 112px;
+  padding: 17px 132px 16px 17px;
+  border: 0;
+  border-radius: 22px;
+  background:
+    linear-gradient(94deg, rgba(255,253,248,.99) 0 55%, rgba(255,250,240,.88) 70%, rgba(244,235,216,.44) 100%),
+    url("/static/art/v2/hero-pine-crane.webp") calc(100% + 38px) 52% / 190px auto no-repeat;
+  box-shadow: 0 11px 26px rgba(47,65,56,.07), inset 0 0 0 1px rgba(182,142,76,.09);
+}
+.care-app #ovVerdict::before {
+  right: 98px;
+  bottom: 3px;
+  width: 42px;
+  height: 28px;
+  opacity: .09;
+}
+.care-app #ovVerdict::after { display: none; }
+.care-app #ovVerdict .report-badge {
+  margin-bottom: 7px;
+  padding: 3px 8px;
+  font-size: 9px;
+  background: rgba(229,239,231,.83);
+}
+.care-app #ovVerdict strong {
+  max-width: 12em;
+  font-size: 17px;
+  line-height: 1.42;
+}
+
+/* 默认：四张小模块卡。 */
+.care-app #overviewBody > .trust-more-link {
+  min-width: 0;
+  min-height: 136px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 14px 13px 12px;
+  border: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(47,65,56,.052), inset 0 0 0 1px rgba(133,114,80,.075);
+  transform: none;
+}
+.care-app #overviewBody > .trust-more-link::before {
+  left: 13px;
+  top: auto;
+  bottom: 12px;
+  width: 24px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,#c79a50,#4b7867);
+  opacity: .58;
+}
+.care-app #overviewBody > .trust-more-link::after {
+  right: 11px;
+  top: 11px;
+  transform: none;
+  width: 25px;
+  height: 25px;
+  background: rgba(255,253,248,.68);
+  box-shadow: inset 0 0 0 1px rgba(111,102,82,.08);
+  color: #456f60;
+  font-size: 13px;
+}
+.care-app #overviewBody > .trust-more-link > span {
+  z-index: 2;
+  max-width: 100%;
+  padding: 0;
+}
+.care-app #overviewBody > .trust-more-link > span > span:first-child {
+  display: block;
+  max-width: calc(100% - 28px);
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 16px;
+  line-height: 1.18;
+  font-weight: 750;
+  color: #285246;
+}
+/* 这一条才是承重的（ID 选择器，特异度最高）。同一个 .meta 在本文件里有三条规则，
+   前两条我都改过而四个裁切数字一动不动——不是改得不够，是改的地方不承重。
+
+   原本是 `-webkit-line-clamp: 2` + `overflow: hidden`，把高度钉死在 39px，
+   而真数据要 78–215px。被夹掉的是这种句子：
+       「共 3 条｜最近一次 2026-08-17｜早晨量了血压:132/85」
+       「12 小时没动静就找人｜还没有登记亲友」
+   第二句被夹掉的正是「还没有登记亲友」——这一页唯一一处告诉家属
+   *安全兜底还没配好* 的地方，夹掉之后那一行读起来像是已经配好了。
+
+   占位文案（「正在读安全设置……」）两行放得下，所以设计稿上看不出来。 */
+.care-app #overviewBody > .trust-more-link .meta {
+  display: block;
+  margin-top: 7px;
+  max-width: 92%;
+  white-space: normal;
+  font-size: 11px;
+  line-height: 1.38;
+  color: #747c77;
+}
+
+/* 今天作为主卡，占两列，强调“当前”而不是五张同权。 */
+.care-app #ovToday {
+  grid-column: 1 / -1;
+  min-height: 112px;
+  padding: 17px 150px 15px 17px;
+  justify-content: center;
+  background:
+    linear-gradient(94deg, rgba(255,253,248,.985) 0 59%, rgba(250,246,235,.83) 76%, rgba(238,235,222,.50) 100%),
+    url("/static/art/v2/info-crane.webp") calc(100% + 12px) 52% / 154px auto no-repeat;
+}
+.care-app #ovToday::before { bottom: 14px; }
+.care-app #ovToday > span > span:first-child { font-size: 19px; }
+.care-app #ovToday .meta { max-width: 15em; font-size: 11px; }
+
+/* 四张模块各有自己的“材质区”，不是右边一张小截图。 */
+.care-app #ovMed {
+  background:
+    linear-gradient(150deg, rgba(246,251,246,.98) 0 58%, rgba(231,243,234,.78) 100%),
+    url("/static/art/v2/scene-lotus-square.webp") 112% 108% / 104px auto no-repeat;
+}
+.care-app #ovBody {
+  background:
+    linear-gradient(150deg, rgba(247,251,248,.98) 0 58%, rgba(229,241,234,.80) 100%),
+    url("/static/art/v2/info-bamboo.webp") 118% 107% / 118px auto no-repeat;
+}
+.care-app #ovMood {
+  background:
+    linear-gradient(150deg, rgba(255,249,245,.98) 0 58%, rgba(248,232,222,.76) 100%),
+    url("/static/art/v2/info-plum.webp") 117% 108% / 116px auto no-repeat;
+}
+.care-app #ovSafety {
+  background:
+    linear-gradient(150deg, rgba(248,250,245,.98) 0 58%, rgba(232,239,227,.78) 100%),
+    url("/static/art/v2/panel-jade-mountain.webp") 123% 112% / 128px auto no-repeat;
+}
+
+.care-app #overviewBody > .trust-more-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px rgba(47,65,56,.075), inset 0 0 0 1px rgba(137,113,70,.10);
+}
+
+/* 详情页：降低装饰噪音，只在标题后留一个淡景。 */
+.care-app [data-panel="today"]::before,
+.care-app [data-panel="med"]::before,
+.care-app [data-panel="body"]::before,
+.care-app [data-panel="mood"]::before,
+.care-app [data-panel="safety"]::before,
+.care-app [data-panel="trend"]::before {
+  width: 68px;
+  height: 100px;
+  top: 4px;
+  right: 0;
+  opacity: .055;
+}
+.care-app .care-block,
+.care-app .care-item,
+.care-app .digest,
+.care-app .care-empty,
+.care-app .care-period {
+  margin: 7px 0;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255,253,249,.88);
+  box-shadow: 0 5px 15px rgba(48,64,57,.038), inset 0 0 0 1px rgba(116,101,75,.07);
+}
+.care-app .care-block::before,
+.care-app .care-item::before,
+.care-app .digest::before { opacity: .032; }
+
+/* 小屏保证 2×2 卡片仍有呼吸感。 */
+@media (max-width: 420px) {
+  .care-app .phone-scroll { padding-inline: 7px; }
+  .care-app .fam-head {
+    min-height: 120px;
+    padding: 17px 126px 15px 16px;
+    background-size: auto, 180px auto;
+  }
+  .care-app .fam-head h1 { font-size: 24px; }
+  .care-app #overviewBody { gap: 8px; }
+  .care-app #ovVerdict {
+    min-height: 106px;
+    padding: 15px 116px 14px 15px;
+    background-size: auto, 170px auto;
+  }
+  .care-app #ovToday {
+    min-height: 104px;
+    padding: 15px 126px 13px 15px;
+    background-size: auto, 138px auto;
+  }
+  .care-app #overviewBody > .trust-more-link {
+    min-height: 130px;
+    padding: 13px 11px 11px;
+  }
+  .care-app #overviewBody > .trust-more-link > span > span:first-child { font-size: 15px; }
+  .care-app #overviewBody > .trust-more-link .meta { font-size: 10px; }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V13 · User-supplied frame replacement
+   目标：把所有圆角矩形统一替换为用户提供的装饰框，并按组件类别保持同类同框。
+   类别映射：
+   - 松景类（大卡/主卡/底栏）：frame-pine-main / frame-pine-alt
+   - 竹景类（列表卡/详情卡/入口卡）：frame-bamboo-main / frame-bamboo-alt
+   - 梅景类（表单/输入区/折叠区）：frame-plum-main / frame-plum-alt
+   - 荷景类（指标卡/分段切换/小按钮）：frame-lotus-main
+   ========================================================================== */
+
+:root {
+  --v13-frame-bamboo-main: url("/static/art/user-frames/frame-bamboo-main.png");
+  --v13-frame-bamboo-alt: url("/static/art/user-frames/frame-bamboo-alt.png");
+  --v13-frame-plum-main: url("/static/art/user-frames/frame-plum-main.png");
+  --v13-frame-plum-alt: url("/static/art/user-frames/frame-plum-alt.png");
+  --v13-frame-lotus-main: url("/static/art/user-frames/frame-lotus-main.png");
+  --v13-frame-pine-main: url("/static/art/user-frames/frame-pine-main.png");
+  --v13-frame-pine-alt: url("/static/art/user-frames/frame-pine-alt.png");
+  --v13-fill-hero: linear-gradient(180deg, rgba(251,248,242,.97) 0%, rgba(247,243,236,.96) 100%);
+  --v13-fill-card: linear-gradient(180deg, rgba(252,249,243,.965) 0%, rgba(248,245,239,.955) 100%);
+  --v13-fill-soft: linear-gradient(180deg, rgba(253,250,245,.97) 0%, rgba(248,246,241,.955) 100%);
+  --v13-fill-quiet: linear-gradient(180deg, rgba(255,253,249,.975) 0%, rgba(250,247,242,.96) 100%);
+  --v13-shadow-lg: 0 12px 28px rgba(74, 67, 52, .10), 0 3px 9px rgba(90, 76, 55, .06);
+  --v13-shadow-md: 0 9px 18px rgba(74, 67, 52, .08), 0 2px 6px rgba(90, 76, 55, .05);
+  --v13-shadow-sm: 0 6px 14px rgba(74, 67, 52, .06), 0 2px 5px rgba(90, 76, 55, .04);
+}
+
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict,
+body[data-surface="consumer"] .shell .tabbar {
+  background-image: var(--v13-frame-pine-main), var(--v13-fill-hero);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+  border-color: transparent;
+  box-shadow: var(--v13-shadow-lg);
+}
+
+body[data-surface="consumer"] .shell .tabbar {
+  background-image: var(--v13-frame-pine-alt), var(--v13-fill-hero);
+  padding-top: 10px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  border-top: 0;
+  box-shadow: 0 -8px 22px rgba(74, 67, 52, .10), 0 -2px 6px rgba(90, 76, 55, .05);
+}
+
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period {
+  background-image: var(--v13-frame-bamboo-main), var(--v13-fill-card);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+  border-color: transparent;
+  box-shadow: var(--v13-shadow-md);
+}
+
+body[data-surface="consumer"] .shell .trust-more-link {
+  background-image: var(--v13-frame-bamboo-alt), var(--v13-fill-card);
+  min-height: 126px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .art-receipt {
+  background-image: var(--v13-frame-plum-main), var(--v13-fill-soft);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+  border-color: transparent;
+  box-shadow: var(--v13-shadow-md);
+}
+
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab):not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  background-image: var(--v13-frame-plum-alt), var(--v13-fill-quiet);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+  border-color: transparent;
+  box-shadow: var(--v13-shadow-sm);
+}
+
+body[data-surface="consumer"] .shell .metric,
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell .report-badge {
+  background-image: var(--v13-frame-lotus-main), var(--v13-fill-quiet);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 100% 100%, 100% 100%;
+  border-color: transparent;
+  box-shadow: var(--v13-shadow-sm);
+}
+
+/* 同类组件尺寸/留白微调，避免角部意象压文字。 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict,
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period,
+body[data-surface="consumer"] .shell .metric,
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab):not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .fam-links {
+  border-width: 0;
+  overflow: hidden;
+}
+
+body[data-surface="consumer"] .shell .fam-head {
+  padding-top: 26px;
+  padding-bottom: 22px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+body[data-surface="consumer"] .shell .report-more > summary,
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab):not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-surface="consumer"] .shell #reminderForm {
+  padding-top: 22px;
+  padding-right: 20px;
+  padding-bottom: 22px;
+  padding-left: 20px;
+}
+
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea {
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+body[data-surface="consumer"] .shell .segmented {
+  padding: 8px;
+}
+
+body[data-surface="consumer"] .shell .seg {
+  min-height: 42px;
+}
+
+body[data-surface="consumer"] .shell .metric {
+  min-height: 104px;
+  padding: 18px 14px 14px;
+}
+
+body[data-surface="consumer"] .shell .tab {
+  min-height: 58px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+body[data-surface="consumer"] .shell .report-badge {
+  padding: 6px 12px;
+}
+
+/* 减弱旧的高光线条，避免和新框叠脏。 */
+body[data-surface="consumer"] .shell .task::before,
+body[data-surface="consumer"] .shell .calendar-day::before,
+body[data-surface="consumer"] .shell .report-section::before,
+body[data-surface="consumer"] .shell .metric::before,
+body[data-surface="consumer"] .shell .digest::before,
+body[data-surface="consumer"] .shell .care-item::before,
+body[data-surface="consumer"] .shell .trust-more-link::before,
+body[data-surface="consumer"] .shell .fam-head::before,
+body[data-surface="consumer"] .shell .fam-head::after,
+body[data-surface="consumer"] .shell .tabbar::before,
+body[data-surface="consumer"] .shell .tabbar::after {
+  opacity: .18;
+}
+
+/* 桌面与手机宽度下都保持同类框型一致。 */
+@media (max-width: 899px) {
+  body[data-surface="consumer"] .shell .trust-more-link { min-height: 112px; }
+  body[data-surface="consumer"] .shell .tabbar { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V14 · Frame refinement
+   目标：在 V13 的同类同框基础上，进一步解决装饰压内容、比例不服帖、层级不完整的问题。
+   仅精修适配，不改业务逻辑。
+   ========================================================================== */
+
+:root {
+  --v14-frame-size-hero: 98.2% 97.6%;
+  --v14-frame-size-list: 98.1% 96.8%;
+  --v14-frame-size-form: 98.2% 97.2%;
+  --v14-frame-size-chip: 98.8% 98.4%;
+  --v14-pad-hero-x: 24px;
+  --v14-pad-hero-y: 22px;
+  --v14-pad-card-x: 18px;
+  --v14-pad-card-y: 18px;
+  --v14-pad-form-x: 20px;
+  --v14-pad-form-y: 20px;
+}
+
+/* 统一：让所有框型留出一点空气，避免图片紧贴盒子边缘。 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict,
+body[data-surface="consumer"] .shell .tabbar {
+  background-size: var(--v14-frame-size-hero), 100% 100%;
+  background-origin: padding-box;
+}
+
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period {
+  background-size: var(--v14-frame-size-list), 100% 100%;
+  background-origin: padding-box;
+}
+
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .art-receipt,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab):not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  background-size: var(--v14-frame-size-form), 100% 100%;
+  background-origin: padding-box;
+}
+
+body[data-surface="consumer"] .shell .metric,
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell .report-badge {
+  background-size: var(--v14-frame-size-chip), 100% 100%;
+  background-origin: padding-box;
+}
+
+/* 主卡：进一步提升内容可读性，避免角部山石与正文争抢。 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict {
+  padding-top: var(--v14-pad-hero-y);
+  padding-bottom: var(--v14-pad-hero-y);
+  padding-left: var(--v14-pad-hero-x);
+  padding-right: var(--v14-pad-hero-x);
+}
+
+body[data-surface="consumer"] .shell .fam-head .lead,
+body[data-surface="consumer"] .shell .fam-updated,
+body[data-surface="consumer"] .shell .report-verdict strong,
+body[data-surface="consumer"] .shell #ovVerdict strong {
+  max-width: 92%;
+}
+
+/* 列表卡：压掉过重的“满幅贴图感”，让它更像组件而不是插画板。 */
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period {
+  padding-top: var(--v14-pad-card-y);
+  padding-bottom: var(--v14-pad-card-y);
+  padding-left: var(--v14-pad-card-x);
+  padding-right: var(--v14-pad-card-x);
+}
+
+/* 入口卡：保留装饰，但给右边 art-scene 和箭头明确预留区。 */
+body[data-surface="consumer"] .shell .trust-more-link {
+  min-height: 118px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  padding-left: 18px;
+  padding-right: 118px;
+  display: flex;
+  align-items: center;
+}
+body[data-surface="consumer"] .shell .trust-more-link > span {
+  padding-right: 0;
+  max-width: 100%;
+}
+body[data-surface="consumer"] .shell .trust-more-link > .art-scene {
+  right: 22px;
+  width: 68px;
+  height: 68px;
+  opacity: .88;
+}
+body[data-surface="consumer"] .shell .trust-more-link::after {
+  right: 18px;
+}
+body[data-surface="consumer"] .shell .trust-more-link .meta {
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+/* 表单区：框型更适合大块区域，但内部输入再留出呼吸感。 */
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice {
+  padding-top: var(--v14-pad-form-y);
+  padding-bottom: var(--v14-pad-form-y);
+  padding-left: var(--v14-pad-form-x);
+  padding-right: var(--v14-pad-form-x);
+}
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea {
+  min-height: 52px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab):not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  min-height: 46px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+/* 小卡类：荷景框更轻，但不应太花。让内容更居中。 */
+body[data-surface="consumer"] .shell .metric {
+  min-height: 108px;
+  padding: 18px 14px 14px;
+}
+body[data-surface="consumer"] .shell .metric::after {
+  right: 8px;
+  bottom: 8px;
+  opacity: .70;
+}
+body[data-surface="consumer"] .shell .segmented {
+  padding: 9px;
+}
+body[data-surface="consumer"] .shell .seg {
+  min-height: 40px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+body[data-surface="consumer"] .shell .tab {
+  min-height: 56px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* 照护页四宫格/列表在不同尺寸下更稳定。 */
+body[data-surface="consumer"] .shell #overviewBody {
+  gap: 12px;
+}
+body[data-surface="consumer"] .shell #todayBody,
+body[data-surface="consumer"] .shell #medBody,
+body[data-surface="consumer"] .shell #bodyBody,
+body[data-surface="consumer"] .shell #moodBody,
+body[data-surface="consumer"] .shell #safetyBody,
+body[data-surface="consumer"] .shell #weekly {
+  gap: 12px;
+}
+
+/* 减少旧视觉残留：把旧的微高光再压低一些。 */
+body[data-surface="consumer"] .shell .task::before,
+body[data-surface="consumer"] .shell .calendar-day::before,
+body[data-surface="consumer"] .shell .report-section::before,
+body[data-surface="consumer"] .shell .metric::before,
+body[data-surface="consumer"] .shell .digest::before,
+body[data-surface="consumer"] .shell .care-item::before,
+body[data-surface="consumer"] .shell .trust-more-link::before,
+body[data-surface="consumer"] .shell .fam-head::before,
+body[data-surface="consumer"] .shell .fam-head::after,
+body[data-surface="consumer"] .shell .tabbar::before,
+body[data-surface="consumer"] .shell .tabbar::after {
+  opacity: .10;
+}
+
+/* 小屏微调：减少边角图压字。 */
+@media (max-width: 899px) {
+  :root {
+    --v14-pad-hero-x: 21px;
+    --v14-pad-hero-y: 20px;
+    --v14-pad-card-x: 16px;
+    --v14-pad-card-y: 16px;
+    --v14-pad-form-x: 18px;
+    --v14-pad-form-y: 18px;
+  }
+
+  body[data-surface="consumer"] .shell .trust-more-link {
+    min-height: 106px;
+    padding-right: 104px;
+  }
+  body[data-surface="consumer"] .shell .trust-more-link > .art-scene {
+    width: 60px;
+    height: 60px;
+    right: 18px;
+  }
+  body[data-surface="consumer"] .shell .metric {
+    min-height: 96px;
+  }
+}
+
+/* 桌面真机演示下，进一步让框型服帖。 */
+@media (min-width: 900px) {
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell {
+    background: linear-gradient(180deg, rgba(249,246,239,.995) 0%, rgba(244,240,232,.992) 100%);
+  }
+  body[data-surface="consumer"] .shell .tabbar {
+    background-size: 98.6% 97.8%, 100% 100%;
+  }
+  body[data-surface="consumer"] .shell .fam-head {
+    min-height: 158px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V15 · Selective frame cleanup
+   目标：符合尺寸的框保留，不符合尺寸的不用；减少混乱感。
+   策略：
+   - 保留装饰框：主卡 / 顶部卡 / 大容器 / 底栏
+   - 取消装饰框：小卡 / 列表项 / tab / seg / 指标卡 / 输入控件 / 小按钮
+   ========================================================================== */
+
+:root {
+  --v15-plain-surface: linear-gradient(180deg, rgba(252,249,243,.98) 0%, rgba(247,243,236,.97) 100%);
+  --v15-plain-surface-soft: linear-gradient(180deg, rgba(255,252,248,.985) 0%, rgba(249,246,241,.975) 100%);
+  --v15-plain-border: rgba(181, 166, 135, .34);
+  --v15-plain-shadow: 0 8px 18px rgba(74,67,52,.06), 0 2px 5px rgba(90,76,55,.04);
+  --v15-plain-shadow-sm: 0 5px 12px rgba(74,67,52,.045), 0 1px 3px rgba(90,76,55,.03);
+}
+
+/* 一、保留真正适合大尺寸的框型 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict {
+  background-image: var(--v13-frame-pine-main), var(--v13-fill-hero);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 98.2% 97.6%, 100% 100%;
+  border: 0;
+  box-shadow: var(--v13-shadow-lg);
+}
+
+body[data-surface="consumer"] .shell .tabbar {
+  background-image: var(--v13-frame-pine-alt), var(--v13-fill-hero);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 98.5% 97.8%, 100% 100%;
+  border: 0;
+  box-shadow: 0 -8px 22px rgba(74, 67, 52, .09), 0 -2px 6px rgba(90, 76, 55, .04);
+}
+
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .art-receipt {
+  background-image: var(--v13-frame-plum-main), var(--v13-fill-soft);
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  background-size: 98.2% 97.2%, 100% 100%;
+  border: 0;
+  box-shadow: var(--v13-shadow-md);
+}
+
+/* 二、取消不适合小尺寸/重复列表的框型，改成统一轻量卡片 */
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period,
+body[data-surface="consumer"] .shell .metric,
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell .report-badge,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.fam-refresh):not(.back-link),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  background-image: none;
+  background: var(--v15-plain-surface);
+  border: 1px solid var(--v15-plain-border);
+  box-shadow: var(--v15-plain-shadow);
+}
+
+/* 三、不同类别保留清晰层次，但不再乱用装饰框 */
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period,
+body[data-surface="consumer"] .shell .trust-more-link {
+  border-radius: 22px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+body[data-surface="consumer"] .shell .metric {
+  border-radius: 20px;
+  min-height: 102px;
+  padding: 16px 14px 14px;
+}
+
+body[data-surface="consumer"] .shell .segmented {
+  border-radius: 18px;
+  padding: 6px;
+  background: rgba(245, 241, 234, .88);
+  border: 1px solid rgba(185,171,141,.32);
+  box-shadow: var(--v15-plain-shadow-sm);
+}
+
+body[data-surface="consumer"] .shell .seg,
+body[data-surface="consumer"] .shell .tab,
+body[data-surface="consumer"] .shell .report-badge {
+  border-radius: 14px;
+  min-height: 40px;
+  box-shadow: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+body[data-surface="consumer"] .shell .tab.is-current,
+body[data-surface="consumer"] .shell .tab[aria-current="page"],
+body[data-surface="consumer"] .shell .seg[aria-pressed="true"],
+body[data-surface="consumer"] .shell .seg.is-current {
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(246,241,232,.92));
+  border: 1px solid rgba(179,164,131,.34);
+  box-shadow: var(--v15-plain-shadow-sm);
+}
+
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea {
+  min-height: 52px;
+  padding-left: 18px;
+  padding-right: 18px;
+  border-radius: 18px;
+  background: var(--v15-plain-surface-soft);
+}
+
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  min-height: 46px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,242,234,.93));
+}
+
+/* 四、照护页重点收拾：入口卡不再花，统一清晰 */
+body[data-surface="consumer"] .shell .trust-more-link {
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  padding-right: 88px;
+}
+body[data-surface="consumer"] .shell .trust-more-link > .art-scene {
+  right: 18px;
+  width: 54px;
+  height: 54px;
+  opacity: .78;
+}
+body[data-surface="consumer"] .shell .trust-more-link > span {
+  padding-right: 0;
+}
+body[data-surface="consumer"] .shell .trust-more-link::after {
+  right: 18px;
+}
+
+/* 五、压低旧残留装饰，避免混乱 */
+body[data-surface="consumer"] .shell .task::before,
+body[data-surface="consumer"] .shell .calendar-day::before,
+body[data-surface="consumer"] .shell .report-section::before,
+body[data-surface="consumer"] .shell .metric::before,
+body[data-surface="consumer"] .shell .digest::before,
+body[data-surface="consumer"] .shell .care-item::before,
+body[data-surface="consumer"] .shell .trust-more-link::before,
+body[data-surface="consumer"] .shell .fam-head::before,
+body[data-surface="consumer"] .shell .fam-head::after,
+body[data-surface="consumer"] .shell .tabbar::before,
+body[data-surface="consumer"] .shell .tabbar::after {
+  opacity: .06;
+}
+
+/* 六、整体节奏：统一卡片间距，界面更安静 */
+body[data-surface="consumer"] .shell #overviewBody,
+body[data-surface="consumer"] .shell #todayBody,
+body[data-surface="consumer"] .shell #medBody,
+body[data-surface="consumer"] .shell #bodyBody,
+body[data-surface="consumer"] .shell #moodBody,
+body[data-surface="consumer"] .shell #safetyBody,
+body[data-surface="consumer"] .shell #weekly,
+body[data-surface="consumer"] .shell .metric-row {
+  gap: 12px;
+}
+
+body[data-surface="consumer"] .shell .section-head {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 899px) {
+  body[data-surface="consumer"] .shell .trust-more-link {
+    min-height: 102px;
+    padding-right: 78px;
+  }
+  body[data-surface="consumer"] .shell .trust-more-link > .art-scene {
+    width: 48px;
+    height: 48px;
+    right: 16px;
+  }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V16 · Declutter + Typography reset
+   目标：去掉不合适的装饰框，改成一体化圆角矩形；统一字体、字号、行高与排版节奏。
+   ========================================================================== */
+
+:root {
+  --v16-font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --v16-ink-1: #2e3a35;
+  --v16-ink-2: #55655e;
+  --v16-ink-3: #7b877f;
+  --v16-accent: #31594d;
+  --v16-accent-soft: rgba(49, 89, 77, .08);
+  --v16-line: rgba(186, 175, 151, .48);
+  --v16-line-soft: rgba(186, 175, 151, .28);
+  --v16-bg-card: linear-gradient(180deg, rgba(255,253,249,.98) 0%, rgba(249,246,240,.98) 100%);
+  --v16-bg-soft: linear-gradient(180deg, rgba(252,249,244,.95) 0%, rgba(246,242,236,.95) 100%);
+  --v16-bg-quiet: rgba(255,255,255,.72);
+  --v16-shadow-1: 0 10px 24px rgba(65, 60, 47, .07), 0 2px 5px rgba(65,60,47,.04);
+  --v16-shadow-2: 0 6px 16px rgba(65, 60, 47, .05), 0 1px 3px rgba(65,60,47,.03);
+  --v16-radius-xl: 28px;
+  --v16-radius-lg: 22px;
+  --v16-radius-md: 18px;
+  --v16-radius-sm: 14px;
+}
+
+body[data-surface="consumer"],
+body[data-surface="consumer"] button,
+body[data-surface="consumer"] input,
+body[data-surface="consumer"] select,
+body[data-surface="consumer"] textarea {
+  font-family: var(--v16-font-sans);
+  letter-spacing: 0;
+}
+
+body[data-surface="consumer"] .shell {
+  color: var(--v16-ink-1);
+}
+
+/* 一、彻底移除那些不合适的边框装饰，改成完整卡片本体。 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict,
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period,
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .art-receipt,
+body[data-surface="consumer"] .shell .metric,
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell .tabbar,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link {
+  background-image: none;
+  border: 1px solid var(--v16-line-soft);
+  background: var(--v16-bg-card);
+  box-shadow: var(--v16-shadow-2);
+}
+
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict,
+body[data-surface="consumer"] .shell .report-more,
+body[data-surface="consumer"] .shell #reminderForm,
+body[data-surface="consumer"] .shell .fam-links,
+body[data-surface="consumer"] .shell .notice,
+body[data-surface="consumer"] .shell .art-receipt {
+  border-radius: var(--v16-radius-xl);
+  box-shadow: var(--v16-shadow-1);
+}
+
+body[data-surface="consumer"] .shell .task,
+body[data-surface="consumer"] .shell .calendar-day,
+body[data-surface="consumer"] .shell .care-block,
+body[data-surface="consumer"] .shell .care-item,
+body[data-surface="consumer"] .shell .digest,
+body[data-surface="consumer"] .shell .audit-row,
+body[data-surface="consumer"] .shell .report-section,
+body[data-surface="consumer"] .shell .trust-more-link,
+body[data-surface="consumer"] .shell .care-empty,
+body[data-surface="consumer"] .shell .care-period,
+body[data-surface="consumer"] .shell .metric {
+  border-radius: var(--v16-radius-lg);
+}
+
+body[data-surface="consumer"] .shell .segmented,
+body[data-surface="consumer"] .shell input,
+body[data-surface="consumer"] .shell select,
+body[data-surface="consumer"] .shell textarea,
+body[data-surface="consumer"] .shell button:not(.seg):not(.tab),
+body[data-surface="consumer"] .shell .fam-refresh,
+body[data-surface="consumer"] .shell .back-link,
+body[data-surface="consumer"] .shell .tabbar {
+  border-radius: var(--v16-radius-md);
+}
+
+/* 二、压掉旧装饰残留，让卡片真正完整。 */
+body[data-surface="consumer"] .shell .fam-head::before,
+body[data-surface="consumer"] .shell .fam-head::after,
+body[data-surface="consumer"] .shell .task::before,
+body[data-surface="consumer"] .shell .calendar-day::before,
+body[data-surface="consumer"] .shell .report-section::before,
+body[data-surface="consumer"] .shell .metric::before,
+body[data-surface="consumer"] .shell .digest::before,
+body[data-surface="consumer"] .shell .care-item::before,
+body[data-surface="consumer"] .shell .trust-more-link::before,
+body[data-surface="consumer"] .shell .report-verdict::after,
+body[data-surface="consumer"] .shell #reminderForm::before,
+body[data-surface="consumer"] .shell #reminderForm::after,
+body[data-surface="consumer"] .shell .tabbar::before,
+body[data-surface="consumer"] .shell .tabbar::after,
+body[data-surface="consumer"] .shell button:not(.seg)::after,
+body[data-surface="consumer"] .shell #reminderForm button::after {
+  display: none;
+}
+
+/* 三、主卡与结论卡：重新做一套可读性更强的排版。 */
+body[data-surface="consumer"] .shell .fam-head,
+body[data-surface="consumer"] .shell #dailyReport,
+body[data-surface="consumer"] .shell .report-verdict,
+body[data-surface="consumer"] .shell #ovVerdict {
+  padding: 22px 22px 20px;
+}
+
+.fam-head h1,
+.fam-verdict,
+#dailyReport,
+#ovVerdict,
+.report-verdict {
+  font-size: clamp(24px, 6.4vw, 30px);
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--v16-ink-1);
+}
+
+.fam-head .lead,
+.fam-updated,
+.report-verdict .meta,
+#ovVerdict .meta,
+.section-note,
+.trust-more-link .meta,
+.notice,
+.digest-row,
+.audit-row,
+.care-period,
+.care-empty {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--v16-ink-2);
+}
+
+.fam-head .lead {
+  max-width: 32em;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+/* 四、所有标题体系统一。 */
+.section-head,
+.task > strong,
+.care-block-head,
+.care-item-head,
+.trust-more-link > span > span:first-child,
+.report-more > summary,
+.fam-links strong,
+.notice strong {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--v16-ink-1);
+}
+
+.section-head {
+  margin: 24px 4px 12px;
+  padding: 0;
+}
+
+.section-note {
+  margin: -2px 4px 12px;
+}
+
+.task,
+.calendar-day,
+.care-block,
+.care-item,
+.digest,
+.audit-row,
+.report-section,
+.care-empty,
+.care-period {
+  padding: 18px;
+}
+
+.task p,
+.calendar-day p,
+.care-block p,
+.care-item p,
+.report-section p,
+.digest p,
+.audit-row p,
+.care-empty p,
+.care-period p,
+.task li,
+.calendar-day li,
+.care-block li,
+.care-item li,
+.report-section li,
+.digest li,
+.audit-row li,
+#dailyReport li,
+#ovVerdict li,
+.report-verdict li {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--v16-ink-2);
+}
+
+/* 五、数字卡与小卡片：改得更轻更整齐。 */
+.metric {
+  min-height: 98px;
+  padding: 16px 14px 14px;
+  background: var(--v16-bg-soft);
+}
+
+.metric-label {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--v16-ink-2);
+  font-weight: 600;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(24px, 6.2vw, 30px);
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--v16-accent);
+}
+
+.metric-row {
+  gap: 10px;
+}
+
+/* 六、照护入口卡：去掉“装饰品感”，让它更像真正的导航卡。 */
+.trust-more-link {
+  min-height: 108px;
+  padding: 18px 78px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--v16-bg-card);
+}
+
+.trust-more-link > span {
+  display: block;
+  padding-right: 0;
+}
+
+.trust-more-link > .art-scene {
+  right: 16px;
+  width: 46px;
+  height: 46px;
+  opacity: .46;
+  filter: saturate(.7);
+}
+
+.trust-more-link::after {
+  right: 18px;
+  color: var(--v16-accent);
+}
+
+.trust-more-link:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--v16-shadow-1);
+  border-color: rgba(147, 132, 99, .32);
+}
+
+/* 七、表单与按钮：统一字体大小和控件尺寸。 */
+#reminderForm {
+  padding: 20px;
+}
+
+#reminderForm label {
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--v16-ink-2);
+}
+
+#reminderForm input,
+#reminderForm select,
+#reminderForm textarea,
+input,
+select,
+textarea {
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--v16-ink-1);
+  background: rgba(255,255,255,.84);
+  border: 1px solid var(--v16-line);
+}
+
+textarea,
+#reminderForm textarea {
+  min-height: 92px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+button:not(.seg):not(.tab),
+#reminderForm button,
+.fam-refresh,
+.back-link {
+  min-height: 46px;
+  padding: 0 18px;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--v16-accent);
+}
+
+/* 八、分段器和底栏：弱化花样，强调清楚。 */
+.segmented {
+  padding: 6px;
+  background: rgba(247,243,236,.9);
+  border: 1px solid var(--v16-line-soft);
+  box-shadow: none;
+}
+
+.seg,
+.tab {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--v16-ink-2);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.seg.is-current,
+.seg[aria-current="true"],
+.tab.is-current,
+.tab[aria-current="page"] {
+  color: var(--v16-accent);
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(173, 159, 126, .32);
+  box-shadow: 0 2px 8px rgba(65,60,47,.05);
+}
+
+.tabbar {
+  background: rgba(250,247,241,.96);
+  border: 1px solid var(--v16-line-soft);
+  box-shadow: 0 -4px 12px rgba(65,60,47,.04);
+}
+
+.tabbar .tab {
+  min-height: 52px;
+}
+
+.tabbar .tab-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.tab span,
+.seg span {
+  font-size: 12px;
+}
+
+/* 九、特殊错误/空状态文字，避免过大过红。 */
+#dailyReport .empty,
+#dailyReport .error,
+.report-verdict .error,
+.care-empty,
+.notice.error,
+.notice.warn {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #8a3d43;
+}
+
+/* 十、手机内部统一节奏。 */
+.phone-scroll .section-head {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}
+.phone-scroll #overviewBody,
+.phone-scroll #todayBody,
+.phone-scroll #medBody,
+.phone-scroll #bodyBody,
+.phone-scroll #moodBody,
+.phone-scroll #safetyBody,
+.phone-scroll #weekly,
+.phone-scroll .metric-row {
+  gap: 10px;
+}
+
+/* 十一、桌面真机预览下再收一下比例。 */
+@media (min-width: 900px) {
+  body[data-nav="tabbar"][data-surface="consumer"] > .shell > .phone-scroll {
+    padding: 18px 2px 10px;
+  }
+  .phone-scroll .fam-head,
+  .phone-scroll #dailyReport,
+  .phone-scroll .report-verdict,
+  .phone-scroll #ovVerdict {
+    padding: 20px 20px 18px;
+  }
+  .phone-scroll .fam-head h1,
+  .phone-scroll .fam-verdict {
+    font-size: 28px;
+  }
+  .phone-scroll .section-head {
+    font-size: 17px;
+  }
+  .phone-scroll .metric strong {
+    font-size: 28px;
+  }
+  .phone-scroll .trust-more-link {
+    min-height: 102px;
+  }
+}
+
+@media (max-width: 899px) {
+  .fam-head h1,
+  .fam-verdict,
+  #dailyReport,
+  #ovVerdict,
+  .report-verdict { font-size: 25px; }
+  .section-head,
+  .task > strong,
+  .care-block-head,
+  .care-item-head,
+  .trust-more-link > span > span:first-child,
+  .report-more > summary { font-size: 17px; }
+  .task,
+  .calendar-day,
+  .care-block,
+  .care-item,
+  .digest,
+  .audit-row,
+  .report-section,
+  .care-empty,
+  .care-period,
+  #reminderForm,
+  .fam-head,
+  #dailyReport,
+  .report-verdict,
+  #ovVerdict { padding-left: 16px; padding-right: 16px; }
+  .trust-more-link { min-height: 100px; padding-right: 70px; }
+  .trust-more-link > .art-scene { width: 42px; height: 42px; right: 14px; }
+}
+
+
+/* ============================================================================
+   优活 Consumer Visual System V17 · Care overview frame replacement
+   目标：只替换照护总览五张入口卡的边框。
+   - 直接用横向框替代圆角矩形本体
+   - 不再保留浅色圆角矩形底卡
+   - 同步修正标题/副文案字体与排版
+   ========================================================================== */
+
+:root {
+  --v17-overview-frame: url("/static/art/user-frames-v17/care-overview-banner.png");
+  --v17-title-color: #8d5f17;
+  --v17-meta-color: #756250;
+  --v17-arrow-color: #8d6a2f;
+  --v17-scene-ring: rgba(184, 150, 88, .22);
+  --v17-shadow: drop-shadow(0 8px 16px rgba(92, 78, 50, .10));
+}
+
+/* 只处理总览区那 5 张入口卡。 */
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link {
+  position: relative;
+  min-height: 116px;
+  padding: 20px 34px 20px 108px;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  background-image: var(--v17-overview-frame) !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  filter: var(--v17-shadow);
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::before {
+  display: none !important;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::after {
+  right: 28px;
+  font-size: 20px;
+  color: var(--v17-arrow-color);
+  opacity: .95;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > .art-scene {
+  left: 18px;
+  right: auto;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  opacity: 1;
+  background-color: rgba(255, 249, 238, .72);
+  box-shadow: inset 0 0 0 1px var(--v17-scene-ring);
+  filter: none;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span {
+  padding: 0;
+  max-width: calc(100% - 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span > span:first-child {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 25px;
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--v17-title-color);
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link .meta {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: var(--v17-meta-color);
+  letter-spacing: 0;
+  max-width: 34em;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link:hover {
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+/* 移动端再压一点，避免标题挤。 */
+@media (max-width: 899px) {
+  /* 这一条是补的。本块余下每一句都是**单列宽行**的画法——美术在左
+     （`.art-scene { left:16px; width:54px }`）、左内边距 94px 给它让位、
+     箭头贴右 22px——唯独没有把栅格从两列改回一列。而两列是第 3801 行
+     在顶层无条件设的，这个断点里没人覆盖它。
+
+     后果：每格只有 182px，减去 94px 左内边距和 28px 右内边距，正文只剩
+     60px，而标题是 22px 字号——「在吃什么药」于是竖着一个字一行，
+     整行高 303px。手机上五个总览入口有四个是这样。
+
+     测试跑在 390px 宽也复现，但 `test_no_page_clips_its_own_content` 量的是
+     overflow:hidden 的竖向溢出，这一行没有 overflow:hidden，它只是**变高**，
+     所以 1835 条全绿。是截图看出来的。 */
+  body[data-surface="consumer"] .shell.care-app #overviewBody {
+    grid-template-columns: 1fr;
+  }
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link {
+    min-height: 104px;
+    /* 下面这三条是补的。第 3840 行（顶层）按**两列卡片**写了
+       `flex-direction: column; align-items: center`，本块只改了内边距没改它，
+       于是标题和摘要在 376px 宽的行里缩成 112px 一竖条居中摆——
+       「在吃什么药」折成两行、行高涨到 147px。
+
+       右内边距也从 28px 改到 58px：箭头是 `::after`，`right: 22px` 宽 25px，
+       28px 的右内边距下正文会压到箭头底下。
+
+       左边 94px 保留：这一行的美术是整幅背景图 care-overview-banner.png
+       （`.art-scene` 在这里是 display:none），左侧金框角饰大约占到 90px，
+       文字进去就压在山石上。 */
+    display: flex;
+    flex-direction: column;
+    /* stretch 而不是 flex-start：中间那层 `<span>` 是 `flex: 0 1 auto`，
+       flex-start 下它收缩到 fit-content——而 fit-content 取的是**两行里较宽的那行**，
+       也就是 13px 的摘要「降压药｜还够 60 天」= 112px。于是 22px 的标题被迫在
+       112px 里折成「在吃什 / 么药」，尽管这一行实际有 224px 可用。 */
+    align-items: stretch;
+    justify-content: center;
+    padding: 18px 58px 18px 94px;
+  }
+  /* HTML 是 `<span>在吃什么药</span><br /><span class="meta">…</span>`。
+     两个 span 在这里都已经是 display:block，`<br>` 于是不换行——它只产生一个
+     **空行盒**，高度按父级 22px 字号算，凭空插进 42px。
+     结果：标题 25px + 空行 42px + 摘要 20px = 87px，而金框
+     care-overview-banner.png 的内沿只有约 48px，标题正好骑在框的上边线上、
+     摘要骑在下边线上（裁图量的）。
+     不能删 HTML 里的 `<br>`（那是共用结构，宽屏两列版还靠它），改成不渲染。 */
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span > br {
+    display: none;
+  }
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > .art-scene {
+    left: 16px;
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+  }
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span > span:first-child {
+    font-size: 22px;
+  }
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link .meta {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::after {
+    right: 22px;
+    font-size: 18px;
+  }
+}

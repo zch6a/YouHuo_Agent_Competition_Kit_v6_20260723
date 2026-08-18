@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="/static/pages.css" />
   <!-- 美术卡片层。放在 pages.css **之后**：它要覆盖 `.panel` 那类通用白卡背景，
        靠层叠顺序而不是 `!important`（交接包那份 pages.css 里累了 311 个）。 -->
-  <link rel="stylesheet" href="/static/art-cards.css" />
+  <link rel="stylesheet" href="/static/art-cards-family.css" />
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -39,6 +39,7 @@
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
   <main id="main" class="shell family-app">
+    <div class="phone-scroll">
     <!-- 结论卡：整张卡的轮廓、纸张、山水就是 `art/shell/hero.svg` 本身，
          HTML 只在它的留白区放那句结论。这是「SVG 参与 UI 结构」的落点——
          不是白卡加圆角再往角上贴一朵花。
@@ -186,6 +187,8 @@
     <!-- 四格，永远四格。清单在 `youhuo/surfaces.py:FAMILY_NAV`，闸门拿它核对三份
          markup 一致；每一格的 href 由 `href_from()` 算，`test_tabbar.py` 的
          `test_every_nav_cell_lands_somewhere_real` 保证它落在真实分区上。 -->
+    </div>
+
     <nav class="tabbar" aria-label="主要分区">
       <!-- 页内那三格带 `seg` + `data-section`，**不是可选的**。
            `initSections`（common.js）只更新 `.seg` 的 `is-current` / `aria-current`。
