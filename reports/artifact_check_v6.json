@@ -1,6 +1,6 @@
 {
   "version": "6.0.0",
-  "passed": true,
+  "passed": false,
   "checks": {
     "required_files": true,
     "openapi_yaml": true,
@@ -21,9 +21,14 @@
     "http_smoke_passed": true,
     "heavy_reports_match_current_source": true,
     "project_version": true,
-    "no_runtime_database": true,
+    "no_runtime_database": false,
     "no_generated_audit_key": true,
     "no_env_file": true,
     "no_bundled_tts_model": true
-  }
+  },
+  "leaked_artifacts": [
+    "data\\youhuo.db",
+    "data\\youhuo.db-shm",
+    "data\\youhuo.db-wal"
+  ]
 }

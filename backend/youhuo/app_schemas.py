@@ -239,6 +239,55 @@ class AppRoutineChanged(StrictModel):
     scheduled: int = 0
 
 
+# ---- 同意记忆 ---------------------------------------------------------------
+#
+# 「同意记忆 + 可核验的代办」是这个产品的核心主张，而**老人端此前一个入口都没有**：
+# 他既看不到系统记住了什么，也撤不回。
+#
+# v3 那一侧（`/v3/memories/*`）是完整的，而且规则很明确：
+# 家属可以**提**，只有老人本人能**批准**和**撤销**（`api.py:678` / `:694`）。
+# 也就是说这条流程按设计必须在老人端完成——而老人端没有那个屏。
+#
+# 顺带量到：种子里同意记忆 **0 条**。招牌功能连演示数据都没有。
+
+class AppMemory(StrictModel):
+    id: str
+    #: 记住的是什么，例如「爱喝的茶」。
+    key: str
+    #: 记住的内容，念给人听的一句话。原始值是 JSON，这里拍平成中文。
+    detail: str
+    #: 为什么要记。`purpose` 是这套机制的核心——记一样东西必须说得出用途。
+    purpose: str
+    #: 偏好 / 个人信息 / 敏感信息。界面显示这个，不是 `preference` 那种枚举值。
+    sensitivity: str
+    #: 只有我 / 家人能看到概要 / 家人能看到全部。
+    scope: str
+    #: 什么时候记下的、什么时候过期。
+    since: str
+    expiresAt: str | None = None
+    #: 还有多少天到期。到期就自动忘掉，这是「记忆有期限」的落点。
+    daysLeft: int | None = None
+
+
+class AppMemoryList(StrictModel):
+    #: 已经生效的（老人点过头的）。
+    items: list[AppMemory]
+    #: 家人提了、还等老人点头的。
+    pending: list[AppMemory]
+    count: int
+    pendingCount: int
+    message: str
+
+
+class AppMemoryDecided(StrictModel):
+    ok: bool
+    id: str
+    key: str
+    #: 已记住 / 没有记 / 已忘掉。
+    status: str
+    message: str
+
+
 class AppPendingMedication(StrictModel):
     id: str
     name: str

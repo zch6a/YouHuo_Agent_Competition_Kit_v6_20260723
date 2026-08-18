@@ -713,7 +713,8 @@ def create_app(
     # demo_mode 决定「没带令牌」是退回演示老人还是 401。
     # 不传的话这一层在真实部署里也会把演示家庭的数据发给任何人。
     app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode,
-                                        voice=neural_voice, v6_store=v6_store))
+                                        voice=neural_voice, v6_store=v6_store,
+                                        memory_vault=memory_vault))
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
     app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))

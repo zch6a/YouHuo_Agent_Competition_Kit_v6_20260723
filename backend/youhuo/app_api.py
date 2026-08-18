@@ -53,6 +53,8 @@ from .app_schemas import (
     AppHealthSummary,
     AppMedicationDecided,
     AppMedicationToday,
+    AppMemoryDecided,
+    AppMemoryList,
     AppNotificationList,
     AppNotificationRead,
     AppPaymentMoved,
@@ -129,6 +131,8 @@ _EV_HEALTH_RECORDED = "app.health.recorded"
 _EV_REMINDER_MOVED = "app.reminder.moved"
 _EV_APPOINTMENT_CANCELLED = "app.appointment.cancelled"
 _EV_MEDICATION_DECIDED = "app.medication.decided"
+_EV_MEMORY_DECIDED = "app.memory.decided"
+_EV_MEMORY_FORGOTTEN = "app.memory.forgotten"
 _EV_ROUTINE_CREATED = "app.routine.created"
 _EV_ROUTINE_PAUSED = "app.routine.paused"
 _EV_ROUTINE_RESUMED = "app.routine.resumed"
@@ -190,7 +194,7 @@ def _parse_when(raw: str) -> datetime:
 
 
 def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice=None,
-                     v6_store=None) -> APIRouter:
+                     v6_store=None, memory_vault=None) -> APIRouter:
 
     class _IdempotentRoute(APIRoute):
         """带 `Idempotency-Key` 的写请求，重放同一个响应。
@@ -1123,6 +1127,12 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         "app.reminder.moved": ("改了提醒的时间", "健康", "record_confirm"),
         "app.appointment.cancelled": ("取消了一次就医安排", "健康", "record_confirm"),
         "app.medication.decided": ("确认了一份用药计划", "健康", "record_confirm"),
+        "app.memory.decided": ("决定了一条要不要记", "服务", "record_confirm"),
+        "app.memory.forgotten": ("让优活忘掉一条", "服务", "record_request"),
+        "MEMORY_PROPOSED": ("家人想让优活记一件事", "服务", "record_family"),
+        "MEMORY_APPROVED": ("同意记住一件事", "服务", "record_confirm"),
+        "MEMORY_REJECTED": ("没有同意记那一件", "服务", "record_confirm"),
+        "MEMORY_REVOKED": ("让优活忘掉一条", "服务", "record_request"),
         # 服药记录由 `v4_store.record_dose` 自己写（大写下划线那一批）。
         # 这一层不重复写一条：同一件事在记录页出现两行，看起来像吃了两次。
         "MEDICATION_DOSE_RECORDED": ("记了一次服药", "健康", "record_confirm"),
@@ -2263,6 +2273,149 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
     def resume_routine(routine_id: str, ctx: AuthContext = Depends(_actor)) -> AppRoutineChanged:
         """继续提醒。"""
         return _switch_routine(ctx, routine_id, True)
+
+    # ---- 同意记忆 -----------------------------------------------------------
+    #
+    # 「同意记忆 + 可核验的代办」是这个产品的核心主张，而老人端此前**一个入口都没有**：
+    # 他既看不到系统记住了什么，也撤不回。
+    #
+    # v3 那一侧是完整的，规则也明确：家属可以**提**，只有老人本人能**批准**和
+    # **撤销**（`api.py:678`「只有老人本人可以批准长期记忆」/ `:694`）。
+    # 这条流程按设计必须在老人端完成——而那个屏不存在。
+    #
+    # **走 `memory_vault`，不重写它的逻辑。** 过期自动转 `expired`、
+    # 批准时写 `consent_actor_id`、按角色过滤可见性，这些都在 vault 里。
+    # 这一层重写一遍就是第三次「同一件事两个实现」（前两次是字号语速和 SOS）。
+
+    _SENS_WORDS = {"preference": "偏好", "personal": "个人信息", "sensitive": "敏感信息"}
+    _SCOPE_WORDS = {"private": "只有我看得到",
+                    "family_summary": "家人能看到有这一条",
+                    "family_shared": "家人能看到内容"}
+
+    def _memory_detail(value: Any) -> str:
+        """把 JSON 值拍成一句能念的话。
+
+        `value` 是自由 JSON。直接 `str(dict)` 会给老人看到 `{'茶': '龙井'}`——
+        大括号和引号在这一屏上没有任何意义。
+        """
+        if isinstance(value, dict):
+            parts = [f"{k}：{v}" for k, v in value.items()
+                     if isinstance(v, (str, int, float)) and not isinstance(v, bool)]
+            return "；".join(parts) if parts else "（没有可以直接读出来的内容）"
+        if isinstance(value, list):
+            return "、".join(str(x) for x in value[:6]) or "（空）"
+        if isinstance(value, bool):
+            return "是" if value else "否"
+        return str(value)
+
+    def _memory_view(item) -> dict[str, Any]:
+        now = datetime.now(UTC)
+        exp = getattr(item, "expires_at", None)
+        if exp is not None and exp.tzinfo is None:
+            exp = exp.replace(tzinfo=UTC)
+        days = int((exp - now).total_seconds() // 86400) if exp else None
+        created = getattr(item, "created_at", None)
+        if created is not None and created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        return {
+            "id": item.id,
+            "key": item.key,
+            "detail": _memory_detail(item.value),
+            "purpose": item.purpose,
+            "sensitivity": _SENS_WORDS.get(
+                getattr(item.sensitivity, "value", str(item.sensitivity)), "偏好"),
+            "scope": _SCOPE_WORDS.get(
+                getattr(item.scope, "value", str(item.scope)), "只有我看得到"),
+            "since": created.isoformat() if created else "",
+            "expiresAt": exp.isoformat() if exp else None,
+            "daysLeft": max(0, days) if days is not None else None,
+        }
+
+    @router.get("/memories")
+    def list_memories(ctx: AuthContext = Depends(_actor)) -> AppMemoryList:
+        """系统记住了您什么，以及有没有等您点头的。
+
+        分两段：**已经生效的**和**家人提了在等您的**。
+        混在一起的话，「它已经记住了」和「它想记住」看起来是同一件事——
+        而后者还没有得到同意。
+        """
+        if memory_vault is None:
+            return {"items": [], "pending": [], "count": 0, "pendingCount": 0,
+                    "message": "这台机器上没有开启记忆功能。"}
+        elder = _elder_of(ctx)
+        # 生效的走 vault：它顺带把过期的转成 expired 并落库。
+        active = memory_vault.list_visible(ctx.family_id, elder, viewer_role="elder")
+        # 待确认的 vault 不返回（它只给 ACTIVE），直接查。
+        pending = [m for m in db.list_memories(ctx.family_id, elder)
+                   if m.status == MemoryStatus.PROPOSED]
+
+        items = [_memory_view(m) for m in active]
+        pend = [_memory_view(m) for m in pending]
+        if pend:
+            msg = f"有 {len(pend)} 件事想记下来，等您点头。"
+        elif items:
+            msg = f"优活替您记着 {len(items)} 件事。哪一条不想让它记了，随时可以忘掉。"
+        else:
+            msg = "优活现在什么都没替您记。"
+        return {"items": items, "pending": pend, "count": len(items),
+                "pendingCount": len(pend), "message": msg}
+
+    def _decide_memory(ctx: AuthContext, memory_id: str, approve: bool) -> dict[str, Any]:
+        if memory_vault is None:
+            raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
+        from .memory_vault import MemoryDecision
+
+        try:
+            item = memory_vault.decide(ctx.family_id, _elder_of(ctx),
+                                       MemoryDecision(memory_id=memory_id, approve=approve))
+        except PermissionError:
+            raise HTTPException(status_code=404, detail="没有找到这一条。")
+        except ValueError as exc:
+            # vault 对「已经处理过的」抛 ValueError。再点一次不算失败，
+            # 但也不能说成「刚刚记下了」。
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        db.append_audit(
+            family_id=ctx.family_id, actor_id=ctx.actor_id,
+            event_type=_EV_MEMORY_DECIDED, entity_id=memory_id,
+            payload={"approved": approve, "key": item.key},
+        )
+        return {
+            "ok": True, "id": memory_id, "key": item.key,
+            "status": "已记住" if approve else "没有记",
+            "message": (f"好，我记住「{item.key}」了。不想让我记的时候说一声就忘掉。"
+                        if approve else f"好，「{item.key}」我不记。"),
+        }
+
+    @router.post("/memories/{memory_id}/approve")
+    def approve_memory(memory_id: str, ctx: AuthContext = Depends(_actor)) -> AppMemoryDecided:
+        """同意让优活记住这一条。"""
+        return _decide_memory(ctx, memory_id, True)
+
+    @router.post("/memories/{memory_id}/decline")
+    def decline_memory(memory_id: str, ctx: AuthContext = Depends(_actor)) -> AppMemoryDecided:
+        """不让它记。"""
+        return _decide_memory(ctx, memory_id, False)
+
+    @router.post("/memories/{memory_id}/forget")
+    def forget_memory(memory_id: str, ctx: AuthContext = Depends(_actor)) -> AppMemoryDecided:
+        """撤回一条已经生效的记忆。
+
+        **这是这套机制的关键动作**——「可撤回」是「同意」成立的前提。
+        撤回之后 `list_visible` 不再返回它，读它的地方拿到的是空。
+        """
+        if memory_vault is None:
+            raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
+        try:
+            item = memory_vault.revoke(ctx.family_id, _elder_of(ctx), memory_id)
+        except PermissionError:
+            raise HTTPException(status_code=404, detail="没有找到这一条。")
+        db.append_audit(
+            family_id=ctx.family_id, actor_id=ctx.actor_id,
+            event_type=_EV_MEMORY_FORGOTTEN, entity_id=memory_id,
+            payload={"key": item.key},
+        )
+        return {"ok": True, "id": memory_id, "key": item.key, "status": "已忘掉",
+                "message": f"好，「{item.key}」我不再记着了。"}
 
     # ---- 家人加的药，等老人点头 -------------------------------------------
     #
