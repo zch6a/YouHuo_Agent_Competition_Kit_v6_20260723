@@ -5283,8 +5283,17 @@ body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link:h
   box-shadow: none;
 }
 
-/* 移动端再压一点，避免标题挤。 */
-@media (max-width: 899px) {
+/* 单列宽行版式——**不设断点**。
+   ..........................................................................
+   这一块原先是 `@media (max-width: 899px)`，那个条件是错的：这一页在桌面上
+   是**手机框演示**，`.shell` 量出来永远是 402px，和视口宽度没有关系。
+   1280px 视口下这一整块因此不生效，页面退回顶层那套两列版式——每格 166px，
+   于是「今天」骑在金框上边线、「3 项都和平常一样｜2 件事已经超时」的「超时」
+   两个字掉到框外面。手机上看不到，只有在电脑上打开才显形。
+
+   按视口宽度写断点的前提是「视口宽 = 内容宽」。这一页把内容锁进一个定宽的
+   手机框，那个前提就不成立了；能决定版式的是容器，不是窗口。 */
+@media all {
   /* 这一条是补的。本块余下每一句都是**单列宽行**的画法——美术在左
      （`.art-scene { left:16px; width:54px }`）、左内边距 94px 给它让位、
      箭头贴右 22px——唯独没有把栅格从两列改回一列。而两列是第 3801 行
@@ -5351,3 +5360,104 @@ body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link:h
     font-size: 18px;
   }
 }
+
+
+/* ==========================================================================
+   照护页概览：去掉外框，回到三列卡片
+   ..........................................................................
+   用户看到的样子：金框当了行背景，文字整个在框外，「在吃什么药」竖着一字一行。
+
+   金框（care-overview-banner.png，2048×682）是一张**定构图**，而
+   `background-size: 100% 100%` 把它拉到行盒上。行盒的高度由里面的文字决定：
+   文字多一行，框就被拉变形；文字少一行，框里就空一块。一个固定长宽比的画面
+   托不住一个高度可变的行——`.art-pill` 上已经栽过一次同样的账，当时的结论是
+   「换成三列栅格」，这里又走了回去。
+
+   所以回到 `.art-row`：56px 美术 / 1fr 文字 / auto 箭头。
+   美术不做外框，做**左边一枚方形意象**。五个意象一个都不删——
+   pavilion / lotus / crane / peony / chrysanth 语义各不相同，是有意挑的：
+       今天 → 亭   一日之居
+       用药 → 莲   清、药性
+       身体 → 鹤   起伏、长久
+       心情 → 牡丹 舒展
+       安全 → 菊   围护
+
+   写在文件末尾是为了源序：同一个选择器在这份 5000 行的样式表里出现过三次，
+   靠特异度去压它们会写出一串 `body[data-surface] .shell.care-app #x > .y`，
+   下一个人改的时候还得再叠一层。
+   ========================================================================== */
+
+body[data-surface="consumer"] .shell.care-app #overviewBody {
+  display: grid;
+  grid-template-columns: 1fr;      /* 永远单列：这一页的壳锁死在 402px（手机框），
+                                      按视口宽度分栏的前提不成立 */
+  gap: 10px;
+}
+
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link {
+  /* 三列：美术 / 文字 / 箭头。和 /elder、/trust 上那些行是同一套。 */
+  display: grid;
+  grid-template-columns: 56px 1fr 28px;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;                /* 触控目标；和全站同一个数 */
+  padding: 14px 16px;
+  /* 外框换成一张干净的卡。边线用最细的一条，重量交给美术和字。 */
+  background: var(--surface);
+  background-image: none;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: none;
+  text-align: left;
+}
+
+/* 美术回到左列，占满那 56px。原先它被 `display: none` 关掉了——
+   因为外框已经占了整行，两个一起出现会打架。 */
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > .art-scene {
+  display: block;
+  position: static;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+/* 文字列。`min-width: 0` 是必需的：栅格轨道默认 `min-width: auto`，
+   长标题会把 1fr 撑破而不是折行——这一条在这个项目里犯过两次。 */
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span {
+  display: block;
+  min-width: 0;
+  padding: 0;
+}
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span > span:first-child {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #2d4d41;
+}
+/* `<br>` 在两个 display:block 之间只产生一个空行盒，按父级字号算高度。 */
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link > span > br { display: none; }
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link .meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #6d746f;
+  /* 不截断：这一行常常是「12 小时没动静就找人｜还没有登记亲友」，
+     被夹掉的正好是「还没有登记亲友」——唯一一处说明兜底没配好的话。 */
+  overflow: visible;
+}
+
+/* 箭头回到第三列，不再绝对定位。绝对定位的箭头会压在文字上，
+   而文字长度是数据决定的，压不压得到取决于当天的内容。 */
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::after {
+  position: static;
+  width: auto;
+  height: auto;
+  background: none;
+  font-size: 17px;
+  color: #a8895a;
+  line-height: 1;
+}
+body[data-surface="consumer"] .shell.care-app #overviewBody > .trust-more-link::before { content: none; }
