@@ -96,6 +96,84 @@
    那条 `.card` 半透明顺手改掉。 */
 .global-nav { --nav-bg: rgba(255, 253, 248, .975); }
 
+/* ---------------------------------------------------------------- 手机框
+ *
+ * `.phone` 是 430×932——iPhone 14 Pro Max 的逻辑尺寸，比例 9:19.5。
+ * 原本在 ≥650px 只给了圆角和一点阴影，看起来像「一张窄网页」，
+ * 不像一台手机。
+ *
+ * 补齐三件让它成为一台设备的东西：
+ *   1. 一圈黑色边框（用 `box-shadow` 画，不占布局、不改 HTML）
+ *   2. 顶部的灵动岛（用背景图层画，同样不改 HTML）
+ *   3. 桌面背景 + 投影，让它「放在桌上」
+ *
+ * `.island` 那个类在 `app.css` 里定义了但 17 个页面一个都没用——
+ * 所以只能画在背景层上。
+ *
+ * 只在 ≥900px 生效：手机上它**本来就是**一台手机，再套个框是画蛇添足。
+ */
+@media (min-width: 900px) {
+  body[data-surface="consumer"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 36px 0;
+    box-sizing: border-box;
+    /* 桌面：一层暖灰，中间稍亮，手机落在光里 */
+    background:
+      radial-gradient(120% 90% at 50% 30%, #e8e3d9 0%, #cfc9bd 55%, #b8b1a4 100%);
+  }
+
+  .phone {
+    /* 固定比例。原来只有 `min-height`，内容多的页面会越长越高，
+       长到 1400px 就不是一台手机了。 */
+    height: 932px;
+    min-height: 932px;
+    max-height: 932px;
+    overflow-y: auto;
+    border-radius: 46px;
+    box-shadow:
+      0 0 0 11px #17151300,          /* 占位，下面那层才是边框 */
+      0 0 0 11px #1a1816,            /* 机身黑边 */
+      0 0 0 12.5px #4a453e,          /* 金属高光那一道 */
+      0 0 0 13.5px #221f1c,          /* 外缘暗线 */
+      0 26px 60px rgba(40, 30, 18, .38),
+      0 6px 18px rgba(40, 30, 18, .22);
+  }
+
+  /* 灵动岛画在背景层最上面。`.phone` 的背景在上面那一节已经定义，
+     这里**重复完整的三层再加一层**——`background-image` 是整体替换，
+     只写一层会把纸纹和天光冲掉。 */
+  .phone {
+    background-image:
+      url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='34'%3E%3Crect x='0' y='0' width='112' height='34' rx='17' fill='%23050505'/%3E%3Ccircle cx='90' cy='17' r='5.5' fill='%23151a22'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, rgba(203, 178, 132, .20) 0, rgba(203, 178, 132, 0) 300px),
+      url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--paper), var(--paper2));
+    background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+    background-position: center 11px, 0 0, 0 0, 0 0;
+    background-size: 112px 34px, 100% 300px, 140px 140px, 100% 100%;
+    background-attachment: local, local, local, local;
+  }
+
+  /* 灵动岛下面要留出位置，否则品牌栏顶到它上面。 */
+  .phone > .brandbar:first-child,
+  .phone > .header-grid:first-child { margin-top: 56px !important; }
+
+  /* 底栏原来 `position: fixed` 贴视口底——套了手机框之后它会贴在
+     **桌面**的底部，飘在手机外面。改成贴手机框内壁。 */
+  .global-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+    border-radius: 0 0 46px 46px;
+  }
+}
+
 /* ------------------------------------------------------------------ 深色 */
 
 @media (prefers-color-scheme: dark) {

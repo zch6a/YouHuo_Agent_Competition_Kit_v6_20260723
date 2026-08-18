@@ -45,7 +45,7 @@
 
          选 hero 卡壳给这里，是因为这一页第一屏只有一个结论要说；
          整页最重的视觉分量应当落在唯一那句话上，而不是平摊给三张一样的白卡。 -->
-    <header class="fam-head art-framed" data-art-frame="primary" data-art-scene="crane">
+    <header class="fam-head art-framed" data-art-inlay="pine-crane" data-art-frame="primary" data-art-scene="crane">
       <div class="fam-head-text">
         <!-- 第一句话就是结论。
              这里原先是「家里今天」加一行「最后更新 08:14」——一个栏目名和一个时间戳，
@@ -118,7 +118,15 @@
            对应工作单里「关系/家庭信息可使用花鸟或梅兰类局部元素」。
            贴右下角（koi 是 246×207 的横构图），不压住 aria-live 的正文。 -->
       <h2 class="section-head">今天怎么样</h2>
-      <div id="dailyReport" aria-live="polite" data-art-scene="koi">正在生成……</div>
+      <!-- **用圆徽章，不用整幅竖画。**
+           这里原来是 `koi`。换高清素材之后 koi 从 246×207（wide）变成
+           941×1672（tall），让位规则跟着从「右下角 76px」变成「右侧 34%」——
+           而这一段的内容是 `family.js` 生成的，结构对不上
+           `.art-scene-host > :not(.art-scene)` 那条让位选择器。
+           实测：一整幅竖画贴在右边，把「今天还没过完，现在下结论太早」
+           从「太」字切断。
+           圆徽章是 56px 的定尺，不吃让位也不会切字。 -->
+      <div id="dailyReport" aria-live="polite" data-art-scene="lotus">正在生成……</div>
       <div class="metric-row">
         <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
         <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>

@@ -172,6 +172,84 @@
   border-image-source: url("/static/art/ui/frame-primary.svg");
 }
 
+/* ---------------------------------------------------------------- 卡内景
+ *
+ * ## 这一层回答的是「圆角矩形里面怎么有美术」
+ *
+ * 前面那两种做法各自解决一半：
+ *   `art-scene`   在角落放一枚意象——卡的**大部分**还是白的
+ *   `art-shell`   整张卡就是一幅画——文字没地方放，而且画拉不得
+ *
+ * 这一层是第三种：**景从卡的一侧进来，在触到文字之前淡掉。**
+ * 卡内不再是白的，但文字区始终干净。三个手法：
+ *
+ *   1. `mask-image` 斜向渐隐 —— 景在右侧最实，往左 38% 处归零。
+ *      不是整层调低透明度：那样文字底下也蒙一层灰，对比度全掉。
+ *      遮罩让「有景的地方够看，没景的地方全白」。
+ *   2. `auto 130%` 让画超出卡高，只露中间一段 —— 一幅完整构图缩进
+ *      一张 100px 高的卡里会变成一团糊，露一段反而看得出是什么。
+ *   3. `overflow: hidden` + 继承卡的圆角 —— 景要被卡的轮廓裁住，
+ *      否则四角会露出直角。
+ *
+ * ## 怎么挑图
+ *
+ * 用 `wide`/`tall` 的整幅画，不要用圆徽章——徽章自带圆框，
+ * 渐隐之后会露出半个圆环，看起来像没加载完。
+ */
+.art-inlay {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.art-inlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--art-inlay-src);
+  background-position: right center;
+  background-size: auto 130%;
+  background-repeat: no-repeat;
+  opacity: .5;
+  -webkit-mask-image: linear-gradient(100deg,
+    transparent 0%, transparent 34%, rgba(0, 0, 0, .55) 58%, #000 100%);
+  mask-image: linear-gradient(100deg,
+    transparent 0%, transparent 34%, rgba(0, 0, 0, .55) 58%, #000 100%);
+}
+
+.art-inlay > * { position: relative; z-index: 1; }
+
+/* 内容不要顶到景最实的地方。留 22% ——比角落意象的 34% 少，
+   因为景是渐隐的，压上去一点也读得清。
+
+   **`position: absolute` 的子元素排除在外。** 它们自己定了位置，
+   本来就不在文档流里，给它们加 `padding-right` 只会压窄它们**内部**的内容区。
+   实测：`#homeFollowupDetail` 是 `absolute; width:127px` 的「查看详情 ›」按钮，
+   吃到 22% 之后可用宽度只剩 99px，四个字折成两行还被切掉半个。
+   一个装饰性的让位规则，把一个按钮弄成了读不出来的样子。 */
+.art-inlay > :not(.art-scene) { padding-right: 22%; }
+.art-inlay > [style*="absolute"],
+.art-inlay > .btn,
+.art-inlay > button { padding-right: revert; }
+
+/* 窄屏景收窄：390px 上 22% 只剩 300px 放文字。 */
+@media (max-width: 420px) {
+  .art-inlay::before { background-size: auto 118%; opacity: .42; }
+  .art-inlay > :not(.art-scene) { padding-right: 16%; }
+}
+
+@media (prefers-color-scheme: dark) {
+  /* 压暗而不是反色——反色会把一幅画变成底片，这个坑这一层栽过一次。 */
+  .art-inlay::before { opacity: .3; filter: brightness(.6) saturate(.85); }
+}
+
+@media (prefers-contrast: more) {
+  /* 高对比下把景压到最弱，**不隐藏**——隐藏会让版面塌一块。 */
+  .art-inlay::before { opacity: .16; }
+}
+
 /* ------------------------------------------------------------ 行组件（药丸）
  *
  * ## 第一版是错的，错在方法不在参数
@@ -349,7 +427,16 @@
   padding-right: 76px;
   padding-bottom: 10px;
 }
-.art-scene-host[data-shape-hint="mark"] > :not(.art-scene) { padding-right: 68px; }
+/* `mark` 的让位加在**宿主自己**上，不是加在子元素上。
+   加在子元素上要求「内容是元素、而且是直接子元素」——而 `#dailyReport`
+   的内容由 `family.js` 生成，`#nextItem` 里是多层嵌套，两处都不满足。
+   实测：莲花圆章压住「和平常一样」，亭子压住「下一件」。
+   加在宿主上，内容长什么样都让得出来。 */
+.art-scene-host[data-shape-hint="mark"] { padding-right: 68px; }
+.art-scene-host[data-shape-hint="mark"] > :not(.art-scene) { padding-right: 0; }
+
+/* 行组件的图标在**左边**，不需要右侧让位——上面那条会把它右边挖空 68px。 */
+.art-row.art-scene-host[data-shape-hint="mark"] { padding-right: 16px; }
 
 /* 意象要避开行尾那个 `→`。`.trust-more-link` 的箭头是绝对定位在右侧的，
    画贴到 `right: 8px` 正好盖住它——那个箭头是「这一行可以点进去」的唯一提示。 */

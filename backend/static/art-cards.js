@@ -131,6 +131,20 @@
     el.prepend(img);
   }
 
+  /* 卡内景：`data-art-inlay="pine-crane"` → 设 `--art-inlay-src`。
+     **不能写成内联 `style`**——这个仓库有严格 CSP，而且
+     `test_no_inline_script_or_style_survives` 钉住这条。我第一版就是内联的，
+     那道门当场红了两页。它是对的：内联样式一旦允许，CSP 的 `style-src 'self'`
+     就得放宽，而放宽是不可逆的。 */
+  function mountInlay(el) {
+    const key = el.dataset.artInlay;
+    const entry = SCENES[key];
+    if (!entry) { console.warn('[art-cards] 未知卡内景：', key, el); return; }
+    const png = 'icon/' + entry[0].replace(/^scene\//, '').replace(/\.svg$/, '.png');
+    el.classList.add('art-inlay');
+    el.style.setProperty('--art-inlay-src', `url(${ART}${png})`);
+  }
+
   function mountSeal(el) {
     if (el.querySelector(':scope > .art-seal')) return;
     el.append(layer('ui/status-seal.svg', 'art-seal'));
@@ -139,6 +153,7 @@
   const MOUNTS = [
     ['[data-art-shell]', mountShell],
     ['[data-art-scene]', mountScene],
+    ['[data-art-inlay]', mountInlay],
     ['[data-art-seal="true"]', mountSeal]
   ];
 
