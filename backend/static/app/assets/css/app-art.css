@@ -53,7 +53,7 @@
   height: 300px;
   z-index: 0;                 /* 在 .scene(1) 之下、背景之上 */
   pointer-events: none;
-  background: url("/static/art/decor/pine-band.svg") center bottom / cover no-repeat;
+  background: url("/static/art/icon/pine-band.png") center bottom / cover no-repeat;
   opacity: .34;
 }
 
@@ -68,7 +68,7 @@
   height: 250px;
   z-index: 0;
   pointer-events: none;
-  background: url("/static/art/decor/bamboo-top.svg") right top / contain no-repeat;
+  background: url("/static/art/icon/bamboo-top.png") right top / contain no-repeat;
   opacity: .26;
 }
 

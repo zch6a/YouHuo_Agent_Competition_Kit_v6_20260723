@@ -103,7 +103,25 @@
     const entry = SCENES[key];
     if (!entry) { console.warn('[art-cards] 未知意象：', key, el); return; }
     if (el.querySelector(':scope > .art-scene')) return;
-    const [src, shape] = entry;
+    let [src, shape] = entry;
+    // `mark` 形状渲成 44–56px 的小圆章，而源图是 1254×1254、单张 1–5.6 MB
+    // 的「真矢量高清」。一张 5.6 MB 的画去画 44px，是三个数量级的浪费。
+    //
+    // 实测：`/care` 拉 18.28 MB 只为画六个圆章，`profile.html` 10.4 MB 画四个，
+    // 而且图标会晚一拍才出现。
+    //
+    // 出了一份 128px 的 PNG（显示尺寸的 2.9 倍，视网膜够用），共 191 KB。
+    // 矢量原件留着——`tall`/`wide` 那些大尺寸用途仍然用它。
+    // 三种形状全部走小图。显示尺寸和源图尺寸差三个数量级：
+    //   mark  显示 44–56px，源图 1254² 单张 1–5.6 MB
+    //   wide  显示约 100px，源图 1900–2200px 宽
+    //   tall  显示约 130px，源图 941×1672
+    //
+    // 实测：`/care` 拉 **18.28 MB** 只为画六个 44px 的圆章，`/elder` 10.09 MB，
+    // 而且图标会晚一拍才出现。出小图之后 care 是 0.13 MB。
+    //
+    // 矢量原件留在 `art/scene/`——要改显示尺寸就重渲一遍，母版还在。
+    src = 'icon/' + src.replace(/^scene\//, '').replace(/\.svg$/, '.png');
     el.classList.add('art-scene-host');
     // 形状同时写到宿主上：CSS 靠它给内容让出位置（padding-right 之类）。
     // 只给图层写的话，文字会压在画上。
