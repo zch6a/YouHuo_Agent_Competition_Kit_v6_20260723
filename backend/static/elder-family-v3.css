@@ -85,7 +85,25 @@ main.shell.app-frame {
 
 /* 所有老人端分区严格单列，绝不再出现 desktop rail/sidebar。 */
 .elder-panel { width: 100%; min-width: 0; }
-.elder-panel:not([hidden]) { display: block; animation: ev3-panel-in .34s cubic-bezier(.22,.8,.2,1) both; }
+/* `backwards` 而不是 `both`——这一个词决定横屏下打字入口能不能用。
+   ..........................................................................
+   `ev3-panel-in` 的末帧写的是 `transform: none`，但这条动画**同时在动
+   transform**（`from: translateY(8px)`）。`fill-mode: both` 下浏览器保留的是
+   插值结果——**单位矩阵 `matrix(1,0,0,1,0,0)`，不是 `none`**。
+   而单位矩阵照样给 `position: fixed` 的后代创建包含块。
+
+   后果：`pages.css` 里那套专门为横屏写的方案失效了。那里把 `.mic-stage`
+   钉成 `fixed; bottom: calc(var(--tabbar-h) + safe-area)`，注释里连
+   「667×375 下被标签栏盖住」这个坑都记着——写得是对的，只是被这个单位矩阵
+   废掉了：`fixed` 退化成相对 `.elder-panel` 定位，offsetTop 落在 1187px，
+   打字入口跑到首屏外 915px。
+
+   改成 `backwards`：入场动画照常播（`from` 状态在开始前就应用），
+   播完之后元素回到自己的计算样式 `transform: none`，包含块消失。
+
+   这也解释了我早先那次「给 #typeInstead 加 position: fixed」为什么让情况
+   更糟（156 → 1105）：同一个包含块，锚到了 1500px 高的面板上。 */
+.elder-panel:not([hidden]) { display: block; animation: ev3-panel-in .34s cubic-bezier(.22,.8,.2,1) backwards; }
 .elder-panel[data-panel="home"] { min-height: auto; overflow: visible; }
 .elder-panel[data-panel="home"] > .mic-stage { min-height: auto; }
 
