@@ -114,6 +114,18 @@ def create_app(
         # 一笔完整的已完成缴费。只写 `status='completed'` 的话，Trust Receipt 和
         # Audit 都会拿到一条残缺的链，而那两页的全部价值就是链本身。
         db.seed_demo_scenario(demo_ids, "completed_bill_payment")
+        # 一笔**停在等家属点头**的缴费。
+        #
+        # 这个产品的核心主张是「重要的事两边都同意才办」，而在加这一条之前，
+        # 演示数据里从来没有过一件需要家属点头的事——唯一那笔缴费一入库就是
+        # completed。驱动测试的结果是 `/v2/tasks` 只有 1 条、`#mNeedYou` 是 "0"、
+        # 家人端「今天」面板 0 个控件，永远显示「今天不用您操心，没有要您点头的事」。
+        # 前端没错，它如实反映了后端；是这个产品最想讲的那件事在屏幕上一次都没出现过。
+        #
+        # 只在 `attention` 下播：`normal` 的定义是「一切如常」，一件悬着的缴费
+        # 不属于如常。两个状态的语义差别本来就该体现在这种地方，而不只是基线曲线。
+        if demo_state == "attention":
+            db.seed_demo_scenario(demo_ids, "awaiting_family_approval")
     # Optional offline neural voice; absent package or model simply means the
     # elder client keeps using the browser's own speech synthesis.
     neural_voice = NeuralVoice(Path(__file__).resolve().parents[2])
@@ -420,6 +432,15 @@ def create_app(
             baseline_store.seed_demo_for(suffix)
             db.seed_demo_reminders(ids)
             db.seed_demo_scenario(ids, "completed_bill_payment")
+            # 停在等家属点头的那一笔，也要播在**这条**路径上。
+            #
+            # 上面 create_app 里那次只种 `-demo` 那个固定家庭，而前端走的是
+            # `/v2/auth/visitor`——每个访客一个新家庭，播种在这里。
+            # 我第一版只改了 create_app，结果是：库里确实多了一行
+            # （`select count(*) where status='awaiting_family_approval'` 返回 1），
+            # 而浏览器里 `/v2/tasks` 还是只有 1 条。两个播种点，改一个等于没改。
+            if demo_state == "attention":
+                db.seed_demo_scenario(ids, "awaiting_family_approval")
             # 照护页的「身体」与「心情」两段实测是空的（0 条 / event_count=0）。
             # 它们和上面三样一样是**演示历史**，所以挂在同一个开关上：真实部署
             # 不受影响。`v4_store.seed_demo()` 那个是无条件调用的，因为它种的是

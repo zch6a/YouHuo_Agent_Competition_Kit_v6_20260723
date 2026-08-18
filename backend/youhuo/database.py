@@ -425,19 +425,64 @@ class Database:
          {"recipient_role": "elder", "event_type": "task_completed"}),
     )
 
+    #: 停在「等家属点头」的那一笔，取上面八拍的**前五拍**。
+    #:
+    #: 为什么必须有这个场景：家人端的核心主张是「重要的事两边都同意才办」，
+    #: 而演示数据里此前**从来没有过一件需要家属点头的事**——唯一那笔缴费
+    #: 一入库就是 completed。驱动测试的结果是 `/v2/tasks` 只有 1 条、
+    #: `#mNeedYou` 是 "0"、「今天」面板 0 个控件，永远显示
+    #: 「今天不用您操心，没有要您点头的事」。前端没错，它如实反映了后端。
+    #: 于是这个产品最想讲的那件事，在屏幕上一次都没出现过。
+    #:
+    #: 切在第五拍（NOTIFICATION_CREATED / approval_required）之后是准确的：
+    #: 那正好是「已经通知家属、正在等」的状态。再往后一拍
+    #: （FAMILY_APPROVED_AND_EXECUTED）就是已经办完了。
+    #:
+    #: 偏移整体 +1 天：和已完成那一笔错开，免得可信中心把两笔的事件按时间穿插起来。
+    _AWAITING_APPROVAL_SCENARIO = tuple(
+        (offset, event_type, who, payload)
+        for offset, event_type, who, payload in _BILL_SCENARIO[:5]
+    )
+
+    #: 场景表。任务 id、状态、结果、播哪几拍，一处定义。
+    #:
+    #: 原先这个方法硬编码只认 `completed_bill_payment`，其余一律 raise。
+    #: 加第二个场景时如果照抄那段 INSERT，两份就会分叉——而它们必须保持
+    #: 「载荷形状和真实引擎一样」这条性质（`attempts` 那一条注释解释了为什么）。
+    _SCENARIOS: dict[str, dict[str, Any]] = {
+        "completed_bill_payment": {
+            "task_suffix": "bill",
+            "status": "completed",
+            "beats": "_BILL_SCENARIO",
+            "result": {"paid": True, "authority": "北京自来水公司", "amount_yuan": "68.40"},
+            "day_offset": 0,
+        },
+        "awaiting_family_approval": {
+            "task_suffix": "await",
+            "status": "awaiting_family_approval",
+            "beats": "_AWAITING_APPROVAL_SCENARIO",
+            # 还没执行，所以结果是空的。写 `{"paid": False}` 都是错的——
+            # 那是在断言「试过、没成功」，而真实情况是「还没试」。
+            "result": {},
+            "day_offset": 0,
+        },
+    }
+
     def seed_demo_scenario(self, ids: DemoIdentities, scenario: str) -> int:
         """按**语义**播一个场景，不是撒十几条散落的 INSERT。
 
         `normal` 状态那笔「已完成缴费」如果只写一行 `tasks.status='completed'`，
         到了 Audit 页就会出现「UI 看起来完成了，但证据链残缺」——而那一页的全部价值
-        就是证据链。所以一次播完：任务记录 + 八拍审计事件，时间戳带真实间隔。
+        就是证据链。所以一次播完：任务记录 + 若干拍审计事件，时间戳带真实间隔。
 
         幂等：任务 id 是确定的，已存在就直接返回 0。
         """
-        if scenario != "completed_bill_payment":
-            raise ValueError(f"没有这个场景：{scenario}")
+        spec = self._SCENARIOS.get(scenario)
+        if spec is None:
+            raise ValueError(f"没有这个场景：{scenario}，只有 {sorted(self._SCENARIOS)}")
+        beats = getattr(self, spec["beats"])
 
-        task_id = f"task-seed-bill-{ids.suffix}"
+        task_id = f"task-seed-{spec['task_suffix']}-{ids.suffix}"
         with self.transaction() as conn:
             exists = conn.execute("SELECT 1 FROM tasks WHERE id=?", (task_id,)).fetchone()
         if exists:
@@ -446,30 +491,68 @@ class Database:
         now = utcnow()
         base = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
         slots = {"bill_type": "水费", "period": "2026-07", "amount_cents": 6840}
+        # 停在等家属点头的那一笔要能**真的执行下去**，所以 slots 必须带 `bill_id`。
+        #
+        # 没有它的后果不是「少个字段」：家属点「核对后确认接力」→ 摘要校验通过 →
+        # 任务进入 executing → 执行缴费时 KeyError('bill_id') → 400，
+        # 而任务**卡在 executing 回不去**。屏幕上是一句光秃秃的 'bill_id'。
+        #
+        # 已完成那一笔不加：它的 slots 早就落库，改了会动到它的 semantic_key 之外的
+        # 存量数据，而它本来就不会再走执行路径。
+        if spec["status"] == "awaiting_family_approval":
+            slots = {**slots, "bill_id": f"bill-water-2026-07-{ids.suffix}"}
+        # `updated_at` 取**这个场景最后一拍**的时间，不是固定的 12506。
+        # 停在等家属点头的那一笔如果也写 12506，任务的更新时间会晚于它
+        # 最后一条审计事件——而可信中心讲的就是「每一条都对得上」。
+        first_offset = beats[0][0]
+        last_offset = beats[-1][0]
+        # 语义键要区分两笔，否则第二笔会被去重逻辑当成同一件事。
+        semantic = "bill_payment:水费:2026-07"
+        # 摘要种子里**不能**加后缀给已有那一笔——它的 approval_digest 已经落库、
+        # 可能被闸门钉着。只给新场景加，老场景一个字节都不变。
+        digest_seed = f"seed|{ids.suffix}|68.40"
+        if scenario != "completed_bill_payment":
+            semantic = f"{semantic}:{spec['task_suffix']}"
+            digest_seed = f"seed|{ids.suffix}|{spec['task_suffix']}|68.40"
         with self.transaction() as conn:
             conn.execute(
                 """INSERT INTO tasks(id,family_id,elder_id,task_type,status,risk_level,
                        slots_json,semantic_key,version,approval_digest,created_at,updated_at,
                        deferred_topics_json,result_json)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (task_id, ids.family_id, ids.elder_id, "bill_payment", "completed", 3,
-                 canonical_json(slots), f"bill_payment:水费:2026-07", 1,
-                 self._event_hash(f"seed|{ids.suffix}|68.40")[:40],
-                 iso(base + timedelta(seconds=12364)),
-                 iso(base + timedelta(seconds=12506)),
+                (task_id, ids.family_id, ids.elder_id, "bill_payment", spec["status"], 3,
+                 canonical_json(slots), semantic, 1,
+                 self._event_hash(digest_seed)[:40],
+                 iso(base + timedelta(seconds=first_offset)),
+                 iso(base + timedelta(seconds=last_offset)),
                  canonical_json([]),
-                 canonical_json({"paid": True, "authority": "北京自来水公司",
-                                 "amount_yuan": "68.40"})),
+                 canonical_json(spec["result"])),
             )
 
+        # 停在等家属点头的那一笔，`approval_digest` 必须是**引擎会算出来的那个值**。
+        #
+        # 我第一版种的是 `self._event_hash(...)` 的任意哈希，结果是：按钮出现了、
+        # 点下去 403「审批摘要与当前任务不一致，任务内容可能已变化，请刷新后重试。」
+        # 那不是缺陷，是防篡改控制在正确工作——`approve_task` 拿请求里的摘要和
+        # `SafetyPolicy.approval_digest(task)` 现算的比对，对不上就拒绝执行。
+        # 错的是种子：它伪造了一个签名。
+        #
+        # 已完成那一笔不走这条路（它的摘要早就落库、可能被闸门钉着），所以只改新场景。
+        if spec["status"] == "awaiting_family_approval":
+            from .security import SafetyPolicy      # 局部导入：database 是底层，避免环
+            task = self.get_task(task_id)
+            if task is not None:
+                task.approval_digest = SafetyPolicy.approval_digest(task)
+                self.update_task(task, bump_version=False)
+
         actors = {"elder": ids.elder_id, "daughter": ids.daughter_id, "system": ids.system_id}
-        for offset, event_type, who, payload in self._BILL_SCENARIO:
+        for offset, event_type, who, payload in beats:
             self.append_audit(
                 ids.family_id, actors[who], event_type, task_id,
                 {**payload, "task_id": task_id},
                 created_at=base + timedelta(seconds=offset),
             )
-        return len(self._BILL_SCENARIO)
+        return len(beats)
 
     def seed_demo_reminders(self, ids: DemoIdentities) -> int:
         """给演示家庭放三条待办，由女儿建立。
