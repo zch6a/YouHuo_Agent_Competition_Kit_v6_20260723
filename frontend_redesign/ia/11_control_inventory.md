@@ -8,7 +8,7 @@
 | 有 id | 376 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
-| 追不到 handler（非 `<a>`） | 16 |
+| 追不到 handler（非 `<a>`） | 14 |
 
 ## 全部控件
 
@@ -152,7 +152,7 @@
 | `#` | app/pages/home | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | primary |
 | `#` | app/pages/home | — | button | — | app/assets/js/app.js:value | — | consumer | app | shell | secondary |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
-| `#directorToggle` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
+| `#directorToggle` | stage | — | button | toggle | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#playStory` | stage | — | button | — | stage.js:playStory | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
@@ -161,7 +161,7 @@
 | `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | — | —:— | — | presentation | stage | shell | presentation-only |
-| `#` | stage | — | summary | details-toggle | —:— | — | presentation | stage | shell | presentation-only |
+| `#` | stage | — | summary | details-toggle | stage.js:setClean | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | common.js:tryScroll | — | presentation | stage | shell | presentation-only |
@@ -200,11 +200,11 @@
 | `#` | stage | — | button | click | stage.js:tickClock | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | stage.js:tickClock | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | button | click | stage.js:tickClock | — | presentation | stage | shell | presentation-only |
-| `#stageReset` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#stageReset` | stage | — | button | click | stage.js:sync | — | presentation | stage | shell | presentation-only |
 | `#stageClean` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
-| `#stageFull` | stage | — | button | click | stage.js:setClean | — | presentation | stage | shell | presentation-only |
-| `#depthProduct` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
-| `#depthTechnical` | stage | — | button | — | stage.js:setClean | — | presentation | stage | shell | presentation-only |
+| `#stageFull` | stage | — | button | click | stage.js:sync | — | presentation | stage | shell | presentation-only |
+| `#depthProduct` | stage | — | button | — | stage.js:sync | — | presentation | stage | shell | presentation-only |
+| `#depthTechnical` | stage | — | button | — | stage.js:sync | — | presentation | stage | shell | presentation-only |
 | `#` | stage | — | a | navigate | —:— | — | presentation | stage | shell | presentation-only |
 | `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |
 | `#` | stage | beats | button | — | stage.js:playStory | — | presentation | stage | beats | presentation-only |

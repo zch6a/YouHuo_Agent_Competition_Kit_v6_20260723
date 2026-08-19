@@ -2510,9 +2510,9 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "",
-      "handler": "",
-      "interaction_type": "",
+      "handler_file": "stage.js",
+      "handler": "setClean",
+      "interaction_type": "toggle",
       "apis": []
     },
     {
@@ -2672,8 +2672,8 @@
       "shell": "stage",
       "module": "shell",
       "visibility": "presentation-only",
-      "handler_file": "",
-      "handler": "",
+      "handler_file": "stage.js",
+      "handler": "setClean",
       "interaction_type": "details-toggle",
       "apis": []
     },
@@ -3375,7 +3375,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "setClean",
+      "handler": "sync",
       "interaction_type": "click",
       "apis": []
     },
@@ -3411,7 +3411,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "setClean",
+      "handler": "sync",
       "interaction_type": "click",
       "apis": []
     },
@@ -3429,7 +3429,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "setClean",
+      "handler": "sync",
       "interaction_type": "",
       "apis": []
     },
@@ -3447,7 +3447,7 @@
       "module": "shell",
       "visibility": "presentation-only",
       "handler_file": "stage.js",
-      "handler": "setClean",
+      "handler": "sync",
       "interaction_type": "",
       "apis": []
     },

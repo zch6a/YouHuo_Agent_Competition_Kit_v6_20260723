@@ -277,6 +277,44 @@
     if (event.key === 'Escape' && clean) setClean(false);
   });
 
+  // --- 导演台开关 -----------------------------------------------------------
+  //
+  // `#directorToggle` 此前是一个**真正的死控件**：全仓库没有任何 `.js` 提到它，
+  // 三处 `.stage-pick` 的事件委托都限定在 `#stageRoles` / `#stageSizes` /
+  // `#stageLines` 上，而它在页头的 `.stage-depth` 里；严格 CSP 也排除了内联
+  // 处理器。按下去什么都不发生，`aria-expanded="false"` 永远是 false。
+  //
+  // 而这一页自己在下面第 282 行就写着「不要留一个按下去什么都不发生的按钮」。
+  //
+  // 它不是可有可无的装饰。`stage.html:48` 那段注释记着它为什么存在：这一页的
+  // 两个出口原先都锁在收起的 `<details id="directorDeck">` 里，`check_exits.py`
+  // 五个宽度全报死路（出口 2 · 一步可用 0 · 首屏 0），而 manifest 是
+  // `display: standalone`——装成应用之后没有后退键，iOS 上连边缘滑动都没有。
+  // 页头这个按钮就是那次修复的一半，只是没接上。
+  const directorDeck = document.getElementById('directorDeck');
+  const directorToggle = document.getElementById('directorToggle');
+  if (directorDeck && directorToggle) {
+    // 状态的**唯一事实源是 `<details>` 自己的 `open`**，按钮只是它的镜子。
+    // 反过来写（按钮记一个布尔、去驱动 details）会立刻分叉：`<summary>` 是原生
+    // 控件，用户点它、或者按空格、或者浏览器的页内查找命中里面的文字，
+    // 都会改 `open` 而不经过这个按钮。
+    const sync = () => {
+      directorToggle.setAttribute('aria-expanded', directorDeck.open ? 'true' : 'false');
+    };
+    directorDeck.addEventListener('toggle', sync);
+    sync();
+
+    directorToggle.addEventListener('click', () => {
+      directorDeck.open = !directorDeck.open;
+      if (!directorDeck.open) return;
+      // 展开之后要**带到眼前**。它在这一栏最底下，页头点一下却什么都没动，
+      // 和没接上没有区别——这正是它此前的表现。
+      directorDeck.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+      const summary = directorDeck.querySelector('summary');
+      if (summary) summary.focus({preventScroll: true});
+    });
+  }
+
   document.getElementById('stageFull').addEventListener('click', () => {
     // 全屏可能被浏览器策略拒（无用户手势、iframe 沙箱、系统设置）。拒了就说一句，
     // 不要留一个按下去什么都不发生的按钮。
