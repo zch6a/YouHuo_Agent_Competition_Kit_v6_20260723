@@ -188,18 +188,23 @@ def test_the_review_never_carries_chat_text_or_its_fingerprint(client, elder, sa
     「他和无忧伴聊过的话不会出现在这里」是写在界面上的承诺。原文不能出现，
     原文的 sha256 也不能——一个能拿去比对的指纹同样是原文的一部分。
     """
-    secret = "我昨天在菜市场跟老张吵了一架心里堵得慌"
+    # 变量名不叫 `secret`：`scan_secrets.py` 的第三条规则是
+    # `(?:api[_-]?key|secret)\s*[:=]\s*['"]…{12,}['"]`，这一行会被它当成
+    # 一个硬编码凭据报出来（实测报过），于是每次推送前的密钥扫描都红。
+    # 该改的是这个名字——扫描器一个字都不能为了让它过而放宽。
+    # `said` 也更准确：这是她跟无忧伴说过的一句话。
+    said = "我昨天在菜市场跟老张吵了一架心里堵得慌"
     posted = client.post(
         "/v4/emotions/analyze",
-        json={"elder_id": sandbox["elder_id"], "text": secret, "store_event": True},
+        json={"elder_id": sandbox["elder_id"], "text": said, "store_event": True},
         headers=elder,
     )
     assert posted.status_code == 200, posted.text
 
     body = client.get(f"{V1}/emotions/review", headers=elder).text
-    assert secret not in body, "聊天原文漏进了心情回顾"
+    assert said not in body, "聊天原文漏进了心情回顾"
     assert "老张" not in body and "菜市场" not in body, "原文的片段漏了出来"
-    assert hashlib.sha256(secret.encode("utf-8")).hexdigest() not in body, (
+    assert hashlib.sha256(said.encode("utf-8")).hexdigest() not in body, (
         "原文的指纹漏了出来——它同样能拿去比对"
     )
     assert "无忧伴" in body, "界面上应当写着那句承诺，而它不见了"

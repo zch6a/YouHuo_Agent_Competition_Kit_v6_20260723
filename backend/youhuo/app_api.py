@@ -79,6 +79,7 @@ from .app_schemas import (
     AppWaterBill,
 )
 from .security import SafetyPolicy
+from .services import BILL_COMPANY
 from .utils import local_now, local_today, local_zone, request_fingerprint, semantic_hash
 from .models import (
     ActorRole,
@@ -117,6 +118,23 @@ _WATER_BILL = {
     "account_tail": "1234",
     "month": "本月",
 }
+
+#: 这一端**借用记忆表存自己的东西**时用的键。
+#:
+#: 它们不是「优活替这位老人记下来的事」，是这一层的存储细节，所以
+#: 「记忆」那张列表不许列它们，同意/拒绝/忘掉三条路也不许作用在它们上。
+#:
+#: 实测（老人拖一下字号滑块之后读 `/api/v1/memories`）：
+#:
+#:     优活替您记着 1 件事。哪一条不想让它记了，随时可以忘掉。
+#:       key      elder_app_settings
+#:       detail   voiceSpeaker：0
+#:
+#: 两个英文内部标识印在老人屏幕上（界面上不许出现英文枚举值是硬约束），
+#: 而那句话下面就是「忘掉」——她按一下，`revoke` 把这一条置成 REVOKED，
+#: `_pref_item` 从此跳过它，**她自己的发音人和配色就没了**。
+#: 一个破坏性动作，挂在一张说的是别的事情的屏幕上。
+_INTERNAL_MEMORY_KEYS = frozenset({"elder_app_settings"})
 
 #: 审计事件类型。前端不认这些字符串，它们只在后端之间用。
 _EV_PREPARED = "app.payment.prepared"
@@ -585,15 +603,13 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             "paidAt": paid_at,
         }
 
-    #: 账单类型 → 收费单位。库里的 `bills` 表**没有单位这一列**（只有
-    #: id/family_id/bill_type/period/amount_cents/due_date/paid/paid_at），
-    #: 而屏幕上要写「向谁交的钱」。这张表是演示数据的一部分，不是从库里读的，
-    #: 所以只写这三种已知的；认不出来的回 null，界面上少一行也不编一个单位。
-    _BILL_COMPANY = {
-        "水费": "示例自来水公司",
-        "电费": "示例供电公司",
-        "燃气费": "示例燃气公司",
-    }
+    #: 账单类型 → 收费单位。**这一份不在这里定义**，从 `services.BILL_COMPANY` 取。
+    #:
+    #: 它原先是这个路由工厂里的一个局部字典，于是槽位那一侧（`billing.lookup`）
+    #: 没有它——语音建的支付凭证上「向谁交的钱」永远是空的，而按钮建的有值。
+    #: 同一张凭证、同一笔水费，两条路径两个结果。表挪到填槽的地方去了，
+    #: 这里只是引用；两份会分叉，一份不会。
+    _BILL_COMPANY = BILL_COMPANY
 
     def _bill_view(row: Any) -> dict[str, Any]:
         kind = row["bill_type"]
@@ -2342,6 +2358,10 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             "daysLeft": max(0, days) if days is not None else None,
         }
 
+    def _is_internal(item) -> bool:
+        """这一条是不是这一层借记忆表存的自己的东西（见 `_INTERNAL_MEMORY_KEYS`）。"""
+        return getattr(item, "key", None) in _INTERNAL_MEMORY_KEYS
+
     @router.get("/memories")
     def list_memories(ctx: AuthContext = Depends(_actor)) -> AppMemoryList:
         """系统记住了您什么，以及有没有等您点头的。
@@ -2355,10 +2375,12 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                     "message": "这台机器上没有开启记忆功能。"}
         elder = _elder_of(ctx)
         # 生效的走 vault：它顺带把过期的转成 expired 并落库。
-        active = memory_vault.list_visible(ctx.family_id, elder, viewer_role="elder")
+        # 借这张表存的设置要滤掉——它不是「优活替她记下来的事」。
+        active = [m for m in memory_vault.list_visible(
+            ctx.family_id, elder, viewer_role="elder") if not _is_internal(m)]
         # 待确认的 vault 不返回（它只给 ACTIVE），直接查。
         pending = [m for m in db.list_memories(ctx.family_id, elder)
-                   if m.status == MemoryStatus.PROPOSED]
+                   if m.status == MemoryStatus.PROPOSED and not _is_internal(m)]
 
         items = [_memory_view(m) for m in active]
         pend = [_memory_view(m) for m in pending]
@@ -2371,11 +2393,24 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         return {"items": items, "pending": pend, "count": len(items),
                 "pendingCount": len(pend), "message": msg}
 
+    def _refuse_internal(ctx: AuthContext, memory_id: str) -> None:
+        """借记忆表存的东西，不许走同意/拒绝/忘掉这三条路。
+
+        只把它从列表里滤掉是不够的：这三条路按 id 收参数，id 一旦泄漏
+        （审计里就有）照样能作用在设置上，而「忘掉」在这里是不可逆的。
+        对老人报的是「没有找到这一条」——从她的角度这是真的，
+        那张列表上从来没有过这一条。
+        """
+        item = db.get_memory(memory_id)
+        if item is not None and _is_internal(item):
+            raise HTTPException(status_code=404, detail="没有找到这一条。")
+
     def _decide_memory(ctx: AuthContext, memory_id: str, approve: bool) -> dict[str, Any]:
         if memory_vault is None:
             raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
         from .memory_vault import MemoryDecision
 
+        _refuse_internal(ctx, memory_id)
         try:
             item = memory_vault.decide(ctx.family_id, _elder_of(ctx),
                                        MemoryDecision(memory_id=memory_id, approve=approve))
@@ -2416,6 +2451,7 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         """
         if memory_vault is None:
             raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
+        _refuse_internal(ctx, memory_id)
         try:
             item = memory_vault.revoke(ctx.family_id, _elder_of(ctx), memory_id)
         except PermissionError:
@@ -2777,8 +2813,11 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         `role=家人` 取发给家人的那一批——按了紧急呼叫之后，老人那一屏要能回答
         「到底通知到人了没有」，而那条通知按设计是发给家人的（不是发给他自己：
         「王爷爷按下了紧急呼叫」这句话给他本人看没有意义）。
-        没有这个参数的话，这个端点在演示里永远是空的——因为这套演示数据里
-        唯一会产生通知的动作，产生的都是家人那一侧的。
+
+        这里原先还写着「没有这个参数的话，这个端点在演示里永远是空的」。
+        那句话曾经是真的，但成因是**种子的缺陷**而不是设计：种子只写了
+        「已创建通知」那一拍审计，从没真的建过通知行。补上之后，
+        演示家庭里老人这一侧有一条「账单已经由家人确认支付。」。
         """
         items = []
         try:

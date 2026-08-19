@@ -15,7 +15,7 @@
   },
   "failures": [],
   "interpretation": "固定种子的性质/边界/策略断言，不代表100万名真实老人或100万次真实第三方接口调用。",
-  "source_digest": "d81114f09d0bb03c801363a6788f818343114ec1521d4fa7792d5126e3b845b6"
+  "source_digest": "660e2d29f6926acefae9d8783215be5a468de916389f324c0b58da5463778f68"
 }
 {
   "version": "5.0.0",
@@ -28,7 +28,7 @@
   "failed": 0,
   "failures": [],
   "note": "SQLite沙箱中的故障注入与恢复测试，不代表真实医院/支付平台故障演练。",
-  "source_digest": "d81114f09d0bb03c801363a6788f818343114ec1521d4fa7792d5126e3b845b6"
+  "source_digest": "660e2d29f6926acefae9d8783215be5a468de916389f324c0b58da5463778f68"
 }
 {
   "version": "6.0.0",
@@ -37,14 +37,14 @@
   "concurrency": 100,
   "successful": 5000,
   "failed": 0,
-  "elapsed_seconds": 127.6197,
-  "throughput_rps": 39.18,
+  "elapsed_seconds": 212.4057,
+  "throughput_rps": 23.54,
   "latency_ms": {
-    "mean": 2502.53,
-    "p50": 1711.0,
-    "p95": 7463.104,
-    "p99": 11689.229,
-    "max": 25133.895
+    "mean": 4173.752,
+    "p50": 2880.548,
+    "p95": 12652.66,
+    "p99": 19594.57,
+    "max": 39270.118
   },
   "mix": {
     "liveness_reads": 3000,
@@ -54,7 +54,7 @@
   "keepalive_retries": 0,
   "transport_errors": {},
   "note": "真实Uvicorn回环网络负载；不等同于公网、多进程或真实HarmonyOS设备压测。keepalive_retries 表示连接被服务端回收后重试的次数，属于长连接竞态，不是请求失败。",
-  "source_digest": "d81114f09d0bb03c801363a6788f818343114ec1521d4fa7792d5126e3b845b6"
+  "source_digest": "660e2d29f6926acefae9d8783215be5a468de916389f324c0b58da5463778f68"
 }
 {
   "version": "6.0.0",
@@ -70,11 +70,11 @@
     "consented_user_study_registry": true,
     "competition_evidence_board": true
   },
-  "source_digest": "d81114f09d0bb03c801363a6788f818343114ec1521d4fa7792d5126e3b845b6"
+  "source_digest": "660e2d29f6926acefae9d8783215be5a468de916389f324c0b58da5463778f68"
 }
 {
   "version": "6.0.0",
-  "passed": true,
+  "passed": false,
   "checks": {
     "required_files": true,
     "openapi_yaml": true,
@@ -95,10 +95,15 @@
     "http_smoke_passed": true,
     "heavy_reports_match_current_source": true,
     "project_version": true,
-    "no_runtime_database": true,
-    "no_generated_audit_key": true,
+    "no_runtime_database": false,
+    "no_generated_audit_key": false,
     "no_env_file": true,
     "no_bundled_tts_model": true
-  }
+  },
+  "leaked_artifacts": [
+    "backend\\data\\youhuo.db",
+    "backend\\data\\youhuo.db-shm",
+    "backend\\data\\youhuo.db-wal",
+    "backend\\data\\youhuo.db.audit.key"
+  ]
 }
-ALL V6 HEAVY VERIFICATION STAGES PASSED

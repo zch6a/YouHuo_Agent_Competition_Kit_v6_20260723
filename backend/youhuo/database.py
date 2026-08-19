@@ -419,8 +419,14 @@ class Database:
         (12422, "FAMILY_APPROVAL_RECORDED", "system", {"required": True}),
         (12458, "NOTIFICATION_CREATED", "system",
          {"recipient_role": "family", "event_type": "approval_required"}),
+        # `authority` 必须和 `BILL_COMPANY["水费"]` 是同一个字符串。
+        #
+        # 它原先写「北京自来水公司」，而这个名字**代码库里没有任何东西会产出**：
+        # 账单页、凭证、家人审批页读的都是 `示例自来水公司`。两个名字同时在屏幕上：
+        # 可信中心印「对方是北京自来水公司」（`trust.js:197` 读这个 payload 键），
+        # 凭证页印「示例自来水公司」。一笔钱，两个收款方。
         (12491, "FAMILY_APPROVED_AND_EXECUTED", "daughter",
-         {"amount_yuan": "68.40", "authority": "北京自来水公司"}),
+         {"amount_yuan": "68.40", "authority": "示例自来水公司"}),
         (12506, "NOTIFICATION_CREATED", "system",
          {"recipient_role": "elder", "event_type": "task_completed"}),
     )
@@ -438,11 +444,40 @@ class Database:
     #: 那正好是「已经通知家属、正在等」的状态。再往后一拍
     #: （FAMILY_APPROVED_AND_EXECUTED）就是已经办完了。
     #:
-    #: 偏移整体 +1 天：和已完成那一笔错开，免得可信中心把两笔的事件按时间穿插起来。
+    #: 两笔要**错开一天**，见 `_SCENARIOS` 的 `day_offset`。
+    #:
+    #: 这里原先写的是「偏移整体 +1 天」，而**代码从来没有这么做过**：
+    #: `day_offset` 两处声明、零处读取，两笔的 `base` 完全相同。
+    #: 实测家人端通知区（430×932，把面板切过去读 textContent）：
+    #:
+    #:     需要您接力确认 老人请求办理：支付2026-07水费 68.40元。… 2026/8/19 19:27:38
+    #:     需要您接力确认 老人请求办理：支付2026-07水费 68.40元。… 2026/8/19 19:27:38
+    #:
+    #: 一字不差，连秒都一样——读起来就是一个重复推送的缺陷。
+    #: （在补上「已通知」那一拍的真通知行之前看不见：那时两边收件箱都是空的。）
+    #:
+    #: 方向和原注释相反：错开的是**已完成**那一笔（-1 天），不是悬着这一笔。
+    #: 给悬着这一笔 +1 天会把一件正在等人点头的事标成明天发生的。
     _AWAITING_APPROVAL_SCENARIO = tuple(
         (offset, event_type, who, payload)
         for offset, event_type, who, payload in _BILL_SCENARIO[:5]
     )
+
+    #: 「已通知」那一拍要落的真通知行：`event_type` → (收件人, 正文)。
+    #:
+    #: 措辞照抄真实路径，不另写一套：
+    #:   approval_required  `engine.py:906` 的 `f"老人请求办理：{_summary(task)}。请在家属端核对后确认。"`
+    #:                      而 `_summary`（`engine.py:1719`）对缴费给的是
+    #:                      `f"支付{period}{bill_type} {amount:.2f}元"`
+    #:   task_completed     `engine.py:1162` 送的是 `result.user_message`，
+    #:                      即 `BillingService.settle` 的「账单已经由家人确认支付。」
+    _SEED_NOTICES: dict[str, tuple[ActorRole, str]] = {
+        "approval_required": (
+            ActorRole.FAMILY,
+            "老人请求办理：支付2026-07水费 68.40元。请在家属端核对后确认。",
+        ),
+        "task_completed": (ActorRole.ELDER, "账单已经由家人确认支付。"),
+    }
 
     #: 场景表。任务 id、状态、结果、播哪几拍，一处定义。
     #:
@@ -454,8 +489,11 @@ class Database:
             "task_suffix": "bill",
             "status": "completed",
             "beats": "_BILL_SCENARIO",
-            "result": {"paid": True, "authority": "北京自来水公司", "amount_yuan": "68.40"},
-            "day_offset": 0,
+            # 同上：收款方只有一个名字。
+            "result": {"paid": True, "authority": "示例自来水公司", "amount_yuan": "68.40"},
+            # 昨天办完的。两笔演示缴费是同一张 2026-07 水费（一笔办完、一笔在等），
+            # 同一天同一秒的话，家人那边就是两条一字不差的「需要您接力确认」。
+            "day_offset": -1,
         },
         "awaiting_family_approval": {
             "task_suffix": "await",
@@ -488,9 +526,24 @@ class Database:
         if exists:
             return 0
 
+        # 局部导入：database 是底层，services 反过来依赖它，模块级导入会成环。
+        # 文件里 `SafetyPolicy` 已经是这个写法。
+        from .services import BILL_COMPANY
+
         now = utcnow()
-        base = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
-        slots = {"bill_type": "水费", "period": "2026-07", "amount_cents": 6840}
+        # `day_offset` 此前是**声明了从不读**的死字段（两处 0，零处引用），
+        # 而 `_AWAITING_APPROVAL_SCENARIO` 上的注释在描述它本该做到的错开。
+        # 一个不承重的配置项加一段描述它的注释，看起来和真的做了完全一样。
+        base = (datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+                + timedelta(days=int(spec["day_offset"])))
+        # `company` 不是可选的，和上面 `attempts` 那一条是同一类：**真实引擎写它**
+        # （`billing.lookup` 的 data 进 `task.slots`），种子漏了。
+        #
+        # 后果是凭证上「向谁交的钱」那一格是空的——而演示家庭里唯一那笔办完的钱
+        # 就是它。同一格在家人审批页上显示成「还没有取到」。
+        # 实测三条路径：种子 None、按钮 示例供电公司、语音 None。
+        slots = {"bill_type": "水费", "period": "2026-07", "amount_cents": 6840,
+                 "company": BILL_COMPANY["水费"]}
         # 停在等家属点头的那一笔要能**真的执行下去**，所以 slots 必须带 `bill_id`。
         #
         # 没有它的后果不是「少个字段」：家属点「核对后确认接力」→ 摘要校验通过 →
@@ -501,6 +554,20 @@ class Database:
         # 存量数据，而它本来就不会再走执行路径。
         if spec["status"] == "awaiting_family_approval":
             slots = {**slots, "bill_id": f"bill-water-2026-07-{ids.suffix}"}
+        # 已经办完的那一笔：家人点过头了，就要留下**引擎会留的那三个槽位**
+        # （`engine.py:1125-1127`）。
+        #
+        # 缺它们的后果不是少三个字段：凭证上「谁点的头」是空的。
+        # 那一格读 `payload["approved_by"]`（山水版那条批准路径写的），读不到就退回
+        # `slots["family_approver"]`（引擎那条写的）——种子两条都没写，于是这笔
+        # 链上明明有一条「女儿 · 批准并执行」的事务，凭证却说不出是谁批的。
+        #
+        # 这三个键都在 `SafetyPolicy.approval_digest` 的**排除名单**里
+        # （`security.py:382`），所以加它们不会改变审批摘要，防篡改控制不受影响。
+        if spec["status"] == "completed":
+            slots = {**slots, "family_approved": True,
+                     "family_approver": ids.daughter_id,
+                     "family_approval_count": 1}
         # `updated_at` 取**这个场景最后一拍**的时间，不是固定的 12506。
         # 停在等家属点头的那一笔如果也写 12506，任务的更新时间会晚于它
         # 最后一条审计事件——而可信中心讲的就是「每一条都对得上」。
@@ -547,10 +614,30 @@ class Database:
 
         actors = {"elder": ids.elder_id, "daughter": ids.daughter_id, "system": ids.system_id}
         for offset, event_type, who, payload in beats:
+            at = base + timedelta(seconds=offset)
+            payload = {**payload, "task_id": task_id}
+            # 「已通知」这一拍要**真的发一条通知**。
+            #
+            # 真实路径 `NotificationService.send`（`services.py:334`）做的是两件事：
+            # 先 `add_notification` 落一条通知行，再写审计并把 `notification_id`
+            # 带进载荷。种子原先只做了后一半，后果是：链上写着「已通知家属」
+            # 「已通知老人」，而老人端和家人端的消息列表**一条都没有**
+            # （实测 `/api/v1/notifications` count=0）。
+            #
+            # 屏幕上这是一个自相矛盾：凭证说通知发过了，收件箱里没有。
+            # 而它躲过了每一道闸门——两边都没报错，两边看起来都很正常。
+            if event_type == "NOTIFICATION_CREATED":
+                notice = self._SEED_NOTICES.get(payload.get("event_type", ""))
+                if notice is not None:
+                    role, message = notice
+                    record = self.add_notification(
+                        ids.family_id, role, str(payload["event_type"]),
+                        message, task_id, created_at=at,
+                    )
+                    payload = {**payload, "notification_id": record.id}
             self.append_audit(
-                ids.family_id, actors[who], event_type, task_id,
-                {**payload, "task_id": task_id},
-                created_at=base + timedelta(seconds=offset),
+                ids.family_id, actors[who], event_type, task_id, payload,
+                created_at=at,
             )
         return len(beats)
 
@@ -1317,9 +1404,13 @@ class Database:
         )
 
     def add_notification(
-        self, family_id: str, recipient_role: ActorRole, event_type: str, message: str, entity_id: str | None = None
+        self, family_id: str, recipient_role: ActorRole, event_type: str, message: str,
+        entity_id: str | None = None, created_at: datetime | None = None
     ) -> NotificationRecord:
-        created_at = utcnow()
+        # `created_at` 可传：演示种子要按**那一拍的时刻**落，不是播种的时刻。
+        # `append_audit` 早就为同一个理由带了这个参数——通知和审计是同一件事的
+        # 两半，时刻对不上的话，可信中心把它们排在一起就会自相矛盾。
+        created_at = created_at or utcnow()
         with self.transaction() as conn:
             cursor = conn.execute(
                 """INSERT INTO notifications(family_id,recipient_role,event_type,entity_id,message,created_at,read_at)

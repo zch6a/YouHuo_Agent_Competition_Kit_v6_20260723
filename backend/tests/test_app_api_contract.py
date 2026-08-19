@@ -43,6 +43,22 @@ def client(tmp_path):
         yield c
 
 
+def _sos_notices(client: TestClient) -> int:
+    """家人那一侧的**紧急呼叫**通知有几条。
+
+    下面两条测试原先数的是家人收件箱的**总数**，判 `== 1`。那不是它们
+    声称的性质，只是当时演示数据的一个巧合：种子从没真的建过通知行
+    （只写了「已创建通知」那一拍审计），所以两侧收件箱恒为空，
+    `== 1` 就等价于「这一次呼叫发了一条」。
+
+    补上种子之后，家人那边本来就有一条「请核对后确认」，`== 1` 于是红了——
+    而重复推送一次都没发生。按类型数才是这两条真正要钉的东西，
+    而且比原来更严：多发一条别的通知不会让它们误绿。
+    """
+    body = client.get(f"{V1}/notifications", params={"role": "家人"}).json()
+    return sum(1 for n in body["items"] if n["eventType"] == "emergency_call")
+
+
 def _pay_to(client: TestClient, step: str, bill_id: str | None = None) -> str:
     """把一笔缴费推到指定阶段，返回事务号。"""
     body = {"billId": bill_id} if bill_id else {}
@@ -686,8 +702,19 @@ def test_the_emergency_call_reaches_the_primary_contact(client: TestClient) -> N
 
 
 def test_family_notifications_do_not_leak_into_the_elders_own_list(client: TestClient) -> None:
+    """紧急呼叫那条是发给家人的，不许出现在老人自己那一屏。
+
+    判据原先是「老人这边 count == 0」。那**不是**这条测试声称的性质，
+    只是当时演示数据的一个巧合：种子从没真的建过通知行，所以老人那一侧
+    恒为空，`== 0` 于是对任何实现都成立。补上种子之后老人有了一条
+    「账单已经由家人确认支付。」，这条判据就红了——红得没有道理，
+    因为泄漏一次都没发生过。
+    改成按**类型**判：老人那一屏不许出现 `emergency_call`。
+    """
     client.post(f"{V1}/emergency/call", json={})
-    assert client.get(f"{V1}/notifications").json()["count"] == 0
+    mine = client.get(f"{V1}/notifications").json()["items"]
+    leaked = [n for n in mine if n["eventType"] == "emergency_call"]
+    assert not leaked, f"「他自己按了紧急呼叫」这句话出现在了他自己那一屏：{leaked}"
 
 
 def test_a_notification_can_be_read_only_once(client: TestClient) -> None:
@@ -757,7 +784,7 @@ def test_the_first_emergency_call_always_notifies(client: TestClient) -> None:
     """
     r = client.post(f"{V1}/emergency/call", json={}).json()
     assert r["notified"], "第一次呼叫就没有通知任何人"
-    assert client.get(f"{V1}/notifications", params={"role": "家人"}).json()["count"] == 1
+    assert _sos_notices(client) == 1, "第一次呼叫没有在家人那一侧留下通知"
 
 
 def test_double_tapping_sos_does_not_spam_the_family(client: TestClient) -> None:
@@ -768,7 +795,7 @@ def test_double_tapping_sos_does_not_spam_the_family(client: TestClient) -> None
     """
     client.post(f"{V1}/emergency/call", json={})
     second = client.post(f"{V1}/emergency/call", json={}).json()
-    assert client.get(f"{V1}/notifications", params={"role": "家人"}).json()["count"] == 1
+    assert _sos_notices(client) == 1, "按了两次，家人那边收到了不止一条"
     assert "120" in second["message"], "第二次要告诉他更急的话该打 120"
     calls = [i for i in client.get(f"{V1}/records").json()["items"] if i["title"] == "紧急呼叫"]
     assert len(calls) == 2, f"按了两次，链上只记了 {len(calls)} 次"

@@ -166,6 +166,23 @@ class HospitalService:
         )
 
 
+#: 账单类型 → 收费单位。`bills` 表**没有单位这一列**（只有
+#: id/family_id/bill_type/period/amount_cents/due_date/paid/paid_at），
+#: 而屏幕上要写「向谁交的钱」。这是演示数据的一部分，接真营业厅之后从查询里取。
+#:
+#: 放在这里而不是门面层，是因为**槽位是在这里填的**。原先这张表只存在于
+#: `app_api.py` 的路由工厂里，后果是：`/api/v1/payments/prepare` 建的那一笔
+#: 凭证上有收款方，而**语音建的那一笔没有**——`lookup()` 的 data 里没有这一项，
+#: 而 `engine.py:725` 的 `task.slots.update(lookup.data)` 就是引擎填槽的全部来源。
+#: 语音是这个产品的主路径，凭证上「向谁交的钱」那一格恰恰最不能空。
+#: 实测（三条路径各办一笔）：种子 None、按钮 示例供电公司、语音 None。
+BILL_COMPANY = {
+    "水费": "示例自来水公司",
+    "电费": "示例供电公司",
+    "燃气费": "示例燃气公司",
+}
+
+
 class BillingService:
     def lookup(self, db: Database, family_id: str, bill_type: str) -> ToolResult:
         row = db.unpaid_bill(family_id, bill_type)
@@ -192,6 +209,11 @@ class BillingService:
                 "period": row["period"],
                 "amount_cents": row["amount_cents"],
                 "due_date": row["due_date"],
+                # 认不出来的类型就不写这一项：界面上宁可少一行，也不编一个单位。
+                # 写 `""` 是错的——那会让「取到了，是空的」和「没取到」变成同一件事，
+                # 而家人审批页对后者显示的是「还没有取到」。
+                **({"company": BILL_COMPANY[row["bill_type"]]}
+                   if row["bill_type"] in BILL_COMPANY else {}),
             },
             user_message=(
                 f"查到{_period_words(row['period'])}的{row['bill_type']}是{amount:.2f}元，"
