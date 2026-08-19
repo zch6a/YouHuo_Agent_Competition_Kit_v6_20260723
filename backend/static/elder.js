@@ -434,6 +434,193 @@ async function saveProfile() {
   speak(status.textContent, profile.speech_rate);
 }
 
+/* ==========================================================================
+   我的数据：心情回顾、今天怎么样、优活记了什么、删掉
+   ..........................................................................
+   这三块能力后端早就有（`/api/v1/emotions/review`、`/daily-report`、
+   `/privacy/data` + `/privacy/erase`），但在这之前**没有任何页面在调**。
+   做完了没有入口，等于没做。
+
+   四条共同约定：
+
+   ① **后端的 `message` 原样显示。** 这一层的每个端点都返回一句写好的中文，
+      而且语气是它定的——「今天该吃的都记过了」是 409 不是成功。前端再写一遍
+      文案就是第二个事实源，两边迟早分叉。
+
+   ② **不碰 `records`。** `/privacy/data` 的 `records` 里是原始记录：
+      `label: "calm"`、`source: "companion"`、`valence`、`text_digest`。
+      那是导出文件该有的内容，**不是界面该显示的**——界面上不许出现英文枚举值。
+      屏幕上只放 `buckets` 那个中文摘要。
+
+   ③ **不用 `innerHTML`。** 严格 CSP 之外，这些字符串里有后端拼进来的数量和
+      名称；用 DOM API 建，注入这条路从一开始就不存在。
+
+   ④ **删除两步走，第二个按钮一开始不存在。** 见 `renderErasePreview`。
+   ========================================================================== */
+
+/** 把一块结果显示出来。空文本 = 收起来，而不是留一块空白。 */
+function showOut(host, text) {
+  host.textContent = text || '';
+  host.hidden = !text;
+}
+
+/** 「名称 数量」一行一条。只接受后端给的中文名。 */
+function renderCounts(host, rows, lead) {
+  host.replaceChildren();
+  if (lead) {
+    const p = document.createElement('p');
+    p.className = 'meta';
+    p.textContent = lead;
+    host.appendChild(p);
+  }
+  const list = document.createElement('ul');
+  list.className = 'care-lines';
+  // 数量为 0 的不印。「就医单据 0 条」对老人没有信息量，
+  // 只是让这张单子长一倍——而她要回答的问题是「优活都记了我什么」。
+  rows.filter(r => Number(r.count) > 0).forEach((r) => {
+    const li = document.createElement('li');
+    li.textContent = `${r.name}　${r.count} 条`;
+    list.appendChild(li);
+  });
+  host.appendChild(list);
+  host.hidden = false;
+}
+
+async function loadMoodReview() {
+  const host = document.querySelector('#moodReviewBody');
+  try {
+    const data = await api('/api/v1/emotions/review?days=14');
+    host.replaceChildren();
+    const line = document.createElement('p');
+    line.textContent = data.message || '';
+    host.appendChild(line);
+    // 建议是后端按真实记录给的，不是这里编的。没有就不印这一段。
+    (data.suggestions || []).forEach((s) => {
+      const p = document.createElement('p');
+      p.className = 'meta';
+      p.textContent = s;
+      host.appendChild(p);
+    });
+    // 这句承诺必须跟着显示：这一页别处写着「和无忧伴聊天的内容不会记在这里」，
+    // 而这一块正是最容易让人怀疑那句话的地方。
+    if (data.privacyNote) {
+      const note = document.createElement('p');
+      note.className = 'meta';
+      note.textContent = data.privacyNote;
+      host.appendChild(note);
+    }
+    host.hidden = false;
+    speak(data.message);
+  } catch (e) {
+    showOut(host, window.YouHuo.errorWords(e, '心情记录').text);
+  }
+}
+
+async function loadDayReport() {
+  const host = document.querySelector('#dayReportBody');
+  try {
+    const data = await api('/api/v1/daily-report');
+    host.replaceChildren();
+    const line = document.createElement('p');
+    line.textContent = data.message || '';
+    host.appendChild(line);
+    // 五个通道逐条说，但**只说有结论的**。`word` 是「现在还说不准」的那几条
+    // 照样印——那不是缺数据，是一个诚实的回答（比如晚上还没到，就寝当然说不准）。
+    const list = document.createElement('ul');
+    list.className = 'care-lines';
+    (data.channels || []).forEach((c) => {
+      const li = document.createElement('li');
+      li.textContent = c.today
+        ? `${c.name}　${c.today}（平常 ${c.usual || '还没算出来'}）　${c.word}`
+        : `${c.name}　${c.word}`;
+      list.appendChild(li);
+    });
+    host.appendChild(list);
+    host.hidden = false;
+    speak(data.message);
+  } catch (e) {
+    showOut(host, window.YouHuo.errorWords(e, '今天的情况').text);
+  }
+}
+
+async function loadMyData() {
+  const host = document.querySelector('#myDataBody');
+  try {
+    const data = await api('/api/v1/privacy/data');
+    renderCounts(host, data.buckets || [], data.message
+      || `一共 ${data.total} 条。`);
+  } catch (e) {
+    host.replaceChildren();
+    showOut(host, window.YouHuo.errorWords(e, '您的数据').text);
+  }
+}
+
+/** 删除第一步：告诉她要删什么，然后**才**给出第二个按钮。
+ *
+ * 第二步的按钮**一开始不存在于 DOM 里**，不是 disabled 也不是 hidden。
+ * 一个看得见的「确认删除」按钮会让人以为「点两下就没了」；而它在看到清单之前
+ * 根本不该存在。
+ *
+ * `confirmToken` 由后端绑定条数算出，确认时它会重新数一遍再比对。这保证的不是
+ * 防伪造（只有本人进得来、算法就在源码里），而是**她确认的对象和她看到的
+ * 那一份是同一份**——回执写「删掉 7 条」实际删了 9 条，两边都不报错。
+ */
+async function startErase() {
+  const host = document.querySelector('#eraseBody');
+  try {
+    const preview = await api('/api/v1/privacy/erase/preview', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+    });
+    renderCounts(host, preview.willDelete || [], preview.message);
+
+    const keep = document.createElement('p');
+    keep.className = 'meta';
+    keep.textContent = '这些会留下来：' + (preview.preserved || []).join('、');
+    host.appendChild(keep);
+
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'danger block';
+    confirm.textContent = `确认删掉这 ${preview.total} 条`;
+    confirm.addEventListener('click', () => window.YouHuo.once(confirm, async () => {
+      try {
+        const done = await api('/api/v1/privacy/erase', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          // `confirmToken` 是驼峰，和 preview 返回的字段名一致。
+          // 我第一版写了下划线，后端读不到就走 400
+          // 「删除要先看一眼、再确认」——**它是对的**：从服务端看，
+          // 一个没带令牌的删除请求和一个跳过预览直接来的请求没有区别。
+          body: JSON.stringify({confirmToken: preview.confirmToken})
+        });
+        host.replaceChildren();
+        showOut(host, done.message || '删好了。');
+        speak(done.message);
+      } catch (e) {
+        // 令牌过期（条数在这中间变了）走 409，后端那句话说得比这里清楚。
+        const p = document.createElement('p');
+        p.className = 'notice warning';
+        p.textContent = window.YouHuo.errorWords(e, '删除').text;
+        host.appendChild(p);
+      }
+    }));
+    host.appendChild(confirm);
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'secondary block';
+    cancel.textContent = '先不删';
+    cancel.addEventListener('click', () => {
+      host.replaceChildren();
+      host.hidden = true;
+    });
+    host.appendChild(cancel);
+    speak(preview.message);
+  } catch (e) {
+    host.replaceChildren();
+    showOut(host, window.YouHuo.errorWords(e, '删除').text);
+  }
+}
+
 // 建会话要记忆化，否则首次使用时的两次点击会建出两个会话。
 //
 // 原先是"跨 await 检查再赋值一个普通变量"：全新浏览器里快速点「挂号」再点「交水费」，
@@ -889,7 +1076,7 @@ async function loadReminders() {
   } catch (e) {
     // 原先是 `待办加载失败：${e.message}`——`e.message` 可能是
     // `Failed to fetch`，而这一行会被念给老人听。见 common.js 的 errorWords。
-    remindersEl.textContent = window.YouHuo.errorWords(e, '待办').text;
+    remindersEl.textContent = window.YouHuo.window.YouHuo.errorWords(e, '待办').text;
   }
 }
 
@@ -938,7 +1125,7 @@ async function loadActivity() {
       );
     }
   } catch (e) {
-    activityLogEl.textContent = window.YouHuo.errorWords(e, '记录').text;
+    activityLogEl.textContent = window.YouHuo.window.YouHuo.errorWords(e, '记录').text;
   }
 }
 
@@ -1007,7 +1194,7 @@ async function openTaskDetail(aboutId) {
     renderTaskDetail(detailBody, taskDetailViewModel(task));
   } catch (e) {
     detailBody.replaceChildren();
-    detailBody.textContent = window.YouHuo.errorWords(e, '这件事的经过').text;
+    detailBody.textContent = window.YouHuo.window.YouHuo.errorWords(e, '这件事的经过').text;
   }
 }
 
@@ -1092,6 +1279,18 @@ document.querySelector('#stepBack').addEventListener('click', () => {
 
 document.querySelector('#saveProfile').addEventListener('click', () => {
   saveProfile().catch(e => { setStatus(e.message); });
+});
+
+// 「我的数据」那四个。全部包在 `once()` 里：这几个都要往返一次后端，
+// 而慢网络下连点两次「删掉」是不可接受的——第二次会拿一个已经用过的令牌
+// 去删一份已经不存在的数据，后端会正确地拒绝，但屏幕上会闪一句错误，
+// 让人以为第一次没成功。
+[['#moodReview', loadMoodReview],
+ ['#dayReport', loadDayReport],
+ ['#myData', loadMyData],
+ ['#eraseStart', startErase]].forEach(([sel, run]) => {
+  const btn = document.querySelector(sel);
+  if (btn) btn.addEventListener('click', () => window.YouHuo.once(btn, run));
 });
 fontScaleEl.addEventListener('change', () => applyProfile({...interactionProfile, font_scale: Number(fontScaleEl.value)}));
 speechRateEl.addEventListener('change', () => { interactionProfile.speech_rate = Number(speechRateEl.value); });

@@ -796,3 +796,48 @@ body.detail-open .dock{opacity:.35}
   opacity:1;visibility:visible;translate:0 0;
   transition:opacity .22s ease,translate .22s ease,visibility 0s;
 }
+
+
+/* ==========================================================================
+   我的数据（设计二）
+   ..........................................................................
+   `elder.js` 的 loadMoodReview / loadDayReport / loadMyData / startErase
+   会往这几个容器里写，并且**在运行时建出** `.care-lines` 和 `.danger`。
+   闸门 `test_every_class_the_logic_builds_has_a_rule` 守的就是这一条：
+   共享逻辑会建的每一个类，这一页都得有规则——没有不会报错，
+   只会是那一段用浏览器默认样式渲染，在这套配色里格外扎眼。
+   ========================================================================== */
+.data-tools{display:grid;gap:10px}
+
+/* 结果就地展开，不用弹窗：弹窗要求她先理解「这层盖住了下面」。 */
+.data-out{
+  margin:0;padding:14px 16px;
+  border:1px solid rgba(164,113,40,.22);border-radius:16px;
+  background:rgba(255,252,245,.92);
+  font-size:15px;line-height:1.6;color:#3d4a44;
+}
+.data-out p{margin:0 0 6px}
+.data-out p:last-child{margin-bottom:0}
+
+/* `renderCounts` 建的清单。不用项目符号——「心情记录 7 条」本身已经
+   是一行一件事，圆点只是噪音。 */
+.data-out .care-lines{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.data-out .care-lines li{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:8px 0;border-top:1px solid rgba(164,113,40,.14);
+  font-variant-numeric:tabular-nums;
+}
+
+/* 删除确认。红是**这一页唯一一处**用红的地方——它配的是唯一一个
+   不可撤销的动作。别处再用就贬值了。 */
+.data-out button{
+  width:100%;min-height:56px;margin-top:10px;
+  border-radius:16px;font-size:16px;font-weight:700;cursor:pointer;
+}
+.data-out button.danger{
+  border:1px solid #a8392c;background:#a8392c;color:#fff;
+}
+.data-out button.secondary{
+  border:1px solid rgba(164,113,40,.30);background:#fffaf0;color:#5a4322;
+}
+.service-entry.is-danger b{color:#a8392c}

@@ -305,6 +305,40 @@
             </div>
           </section>
 
+          <!-- 我的数据。
+               ..............................................................
+               这三块能力后端早就有（`/api/v1/emotions/review`、`/daily-report`、
+               `/privacy/data` + `/privacy/erase`），但**没有任何页面在调**——
+               做完了没有入口，等于没做。
+
+               为什么放在「我的」而不是首页：它们都是「关于我自己的」，
+               不是「今天要办的事」。首页那一屏只回答「下一件是什么」。
+
+               每一块都是「一个大按钮 + 一块结果」，不用弹窗：
+               弹窗要求她先理解「这层东西盖住了下面」，而结果就地展开不需要。 -->
+          <h2 class="tab-head">我的数据</h2>
+          <section class="panel rail-card">
+            <div class="data-tools" aria-label="我的数据">
+              <button id="moodReview" class="secondary block">看看这两周的心情</button>
+              <p id="moodReviewBody" class="meta data-out" hidden></p>
+
+              <button id="dayReport" class="secondary block">我今天怎么样</button>
+              <p id="dayReportBody" class="meta data-out" hidden></p>
+
+              <button id="myData" class="secondary block">优活替我记了些什么</button>
+              <div id="myDataBody" class="data-out" hidden></div>
+            </div>
+
+            <!-- 删除是**两步**，而且第二步的按钮一开始不存在。
+                 后端 `/privacy/erase/preview` 会给出「要删几条、留下什么」和一个
+                 绑定条数的令牌，确认时重新数一遍再比对——它保证的不是防伪造
+                 （只有本人进得来），而是**她确认的对象和她看到的那一份是同一份**。
+                 回执写「删掉 7 条」实际删了 9 条，两边都不报错，那才是要防的。 -->
+            <p class="meta">下面这个删掉之后找不回来。会先告诉您要删什么，再问一次。</p>
+            <button id="eraseStart" class="secondary block">删掉优活记下的这些</button>
+            <div id="eraseBody" class="data-out" hidden></div>
+          </section>
+
           <!-- 离开这一侧的出口。
                从首页顶栏的「‹ 返回」搬到这里——真实 App 的"退出 / 换账号"就在设置里，
                不在首页顶栏。文案不说「返回」（返回哪里？），说这个动作对她意味着什么。

@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 376 |
+| 总数 | 384 |
 |---|---|
-| 有 id | 376 |
+| 有 id | 384 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 14 |
@@ -41,6 +41,10 @@
 | `#fontScale` | elder | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
 | `#saveProfile` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#companionEntry` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#moodReview` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#dayReport` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#myData` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#eraseStart` | elder | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#leaveApp` | elder | me | a | navigate | —:— | — | consumer | elder | me | hidden-until-state |
 | `#` | elder | — | button | — | sheet.js:(顶层) | — | consumer | elder | shell | primary |
 | `#` | elder | — | button | click | elder.js:task | — | consumer | elder | shell | secondary |
@@ -69,6 +73,10 @@
 | `#saveProfile` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#companionEntry` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#leaveApp` | elder-v6 | me | a | navigate | —:— | — | consumer | elder | me | hidden-until-state |
+| `#moodReview` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#dayReport` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#myData` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#eraseStart` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
 | `#focusBack` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
 | `#focusMic` | elder-v6 | — | button | click | elder-v6-a.js:paintClock | — | consumer | elder | shell | primary |
 | `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |

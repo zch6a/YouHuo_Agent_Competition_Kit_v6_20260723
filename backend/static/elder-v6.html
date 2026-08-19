@@ -275,6 +275,44 @@
           </a>
         </div>
 
+        <!-- 我的数据。
+             ..........................................................
+             和设计一同一批容器、同一份逻辑（`elder.js` 的 `loadMoodReview` /
+             `loadDayReport` / `loadMyData` / `startErase`）。
+
+             这四个 id 不是可选的：`test_elder_design2` 要求这一页带齐
+             `elder.js` 读的每一个 id。少一个不会报错，只会是那一块永远空着
+             ——「一份逻辑两张皮」这条约定，代价就在这里付。 -->
+        <div class="section-head"><h2>我的数据</h2><span>都是关于您自己的</span></div>
+        <div class="data-tools">
+          <button type="button" id="moodReview" class="service-entry">
+            <b>看看这两周的心情</b>
+            <span>只有类别和变化，聊过的话不在里面。</span>
+          </button>
+          <p id="moodReviewBody" class="data-out" hidden></p>
+
+          <button type="button" id="dayReport" class="service-entry">
+            <b>我今天怎么样</b>
+            <span>和您自己平常比，不和别人比。</span>
+          </button>
+          <p id="dayReportBody" class="data-out" hidden></p>
+
+          <button type="button" id="myData" class="service-entry">
+            <b>优活替我记了些什么</b>
+            <span>这份是您自己的，可以存下来。</span>
+          </button>
+          <div id="myDataBody" class="data-out" hidden></div>
+
+          <!-- 删除两步走：先看清单，第二个按钮那时才出现。
+               后端给的令牌绑着条数，确认时重新数一遍再比——保证的是
+               「您确认的那一份和您看到的那一份是同一份」。 -->
+          <button type="button" id="eraseStart" class="service-entry is-danger">
+            <b>删掉优活记下的这些</b>
+            <span>会先告诉您要删什么，再问一次。删掉找不回来。</span>
+          </button>
+          <div id="eraseBody" class="data-out" hidden></div>
+        </div>
+
         <div class="trust-strip">
           <strong>优活怎么保护您</strong>
           <div class="trust-line">

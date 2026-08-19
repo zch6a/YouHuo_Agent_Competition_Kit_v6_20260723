@@ -948,3 +948,41 @@ body[data-activity="offline"] .mic-big img { filter:grayscale(.16) saturate(.78)
 
    真要做，下一轮用 `mask-image: linear-gradient(...)` 让它从底部渐隐，
    并且贴在 `.elder-layout::before` 这种能单独控 opacity 的伪元素上。 */
+
+
+/* ==========================================================================
+   我的数据（设计一）
+   ..........................................................................
+   和设计二同一批容器、同一份逻辑，只是版式跟这一边走。
+   ========================================================================== */
+.data-tools { display: grid; gap: 10px; }
+.data-out {
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--ev3-line);
+  border-radius: var(--ev3-radius-md);
+  background: var(--ev3-card-2);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ev3-ink-2);
+}
+.data-out p { margin: 0 0 6px; }
+.data-out p:last-child { margin-bottom: 0; }
+.data-out .care-lines {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.data-out .care-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--ev3-line);
+  font-variant-numeric: tabular-nums;
+}
+.data-out button { width: 100%; min-height: 56px; margin-top: 10px; }
+/* 红只给这一个不可撤销的动作。别处再用就贬值了。 */
+.data-out button.danger { border: 1px solid #a8392c; background: #a8392c; color: #fff; }

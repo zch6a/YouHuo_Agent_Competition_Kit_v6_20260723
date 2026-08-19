@@ -49,7 +49,11 @@
 //: 清单一条没变，所以「漏文件」那种检查看不出区别——但 stale-while-revalidate
 //: 会先把 v15 缓存里的旧 HTML/CSS 返回去，用户看到的还是 37px 那一版。
 //: 「改文件」和「让浏览器拿到」是两件事，这个文件上面第 37 行已经为同一件事写过一次。
-const VERSION = 'youhuo-shell-v16';
+//: v16 → v17：`isApi()` 漏掉了整个 `/api/v1` 层（50 个端点）。
+//: 已安装的 worker 缓存里躺着一批 `/api/v1` 的旧响应，`activate` 只删 key 不等于
+//: VERSION 的缓存——不升这个字符串，改了 `isApi()` 也救不回已经装好的那批，
+//: 而它们会继续把「上一次的答案」交给老人。详见下面 `isApi()` 上面那段。
+const VERSION = 'youhuo-shell-v17';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -163,9 +167,33 @@ self.addEventListener('activate', event => {
  * top of this file says must never happen: a family member could have been
  * shown yesterday's 日报 and told nothing was unusual. Matching /v\d+/ means a
  * future version cannot reintroduce the bug by being forgotten here.
+ *
+ * ⚠ 而它**还是又发生了一次**，就在这段注释底下。
+ *
+ * `/api/v1` 那一层（老人端门面，50 个端点）是后来加的，它以 `/api/` 开头，
+ * `^\/(v\d+|…)` 一个都不匹配——于是整层被当成外壳缓存，走
+ * stale-while-revalidate（`hit || fetching`：先把上一次的响应交出去）。
+ *
+ * 实测（同一个访客、四次调用，真实状态 59 → 59 → 0）：
+ *
+ *     GET /api/v1/privacy/data      →  0     ← 上一次的
+ *     POST /privacy/erase/preview   →  59    ← POST 不走缓存，是真的
+ *     POST /privacy/erase           →  删掉 59 条，库里核实过：真删了
+ *     GET /api/v1/privacy/data      →  59    ← 又是上一次的
+ *
+ * 屏幕上的效果是：老人删完自己的数据，页面告诉他**一条都没删**。
+ * 这正是本文件开头那句「serving a stale copy … would be the one failure this
+ * product is built to avoid」，而且发生在最需要信任的那条路径上。
+ *
+ * 写操作没受影响（下面 `request.method !== 'GET'` 早退），受影响的全是读。
+ * 但「读到旧的」在这个产品里不是小问题：日报、用药、亲友、隐私清单都是读。
+ *
+ * 加 `api`。同时**必须升 VERSION**——已安装的 worker 缓存里躺着一批
+ * `/api/v1` 的旧响应，`activate` 只删 key 不等于 VERSION 的缓存，
+ * 不升的话改了这个函数也救不回已经装好的那批。这一条上面第 14 行说过一次。
  */
 function isApi(url) {
-  return /^\/(v\d+|health|ping|docs|redoc|openapi)(\/|$|\.)/.test(url.pathname);
+  return /^\/(v\d+|api|health|ping|docs|redoc|openapi)(\/|$|\.)/.test(url.pathname);
 }
 
 self.addEventListener('fetch', event => {
