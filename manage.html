@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 字符编码与视口设置：确保中文字符正常显示，并适配移动端与PC端 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>子女管理平台 · 无忧伴</title>
+    <!-- 引入Inter字体，提升现代感与可读性 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <!-- 引入 ECharts 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js">
+    </script>
+    <style>
+        /* ===== 全局重置与基础变量 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* 定义CSS变量 - 黑金蓝配色主题 */
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111927;
+            --bg-card: rgba(20, 30, 50, 0.55);
+            --border-glow-start: #0a0e17;
+            --border-glow-mid: #1a2a4a;
+            --border-glow-end: #4a8ad9;
+            --text-primary: #e8edf5;
+            --text-secondary: #8899bb;
+            --text-muted: #556688;
+            --gold-glow: rgba(200, 180, 120, 0.15);
+            --blue-glow: rgba(74, 138, 217, 0.25);
+            --radius-card: 20px;
+            --shadow-card: 0 8px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100vh;
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* ===== 主容器 ===== */
+        .dashboard {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 20px 24px 40px;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* ============================================================
+           背景层 - 深邃黑渐变 + 发光粒子效果
+           ============================================================ */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(30, 60, 120, 0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(20, 40, 80, 0.20) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(10, 20, 40, 0.30) 0%, transparent 70%),
+                var(--bg-primary);
+            overflow: hidden;
+        }
+
+        /* 背景装饰光晕 - 动态呼吸 */
+        .bg-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            animation: breatheGlow 8s infinite alternate ease-in-out;
+        }
+        .bg-glow-1 {
+            width: 600px;
+            height: 600px;
+            top: -200px;
+            right: -100px;
+            background: radial-gradient(circle, rgba(74, 138, 217, 0.30), transparent);
+            animation-delay: 0s;
+        }
+        .bg-glow-2 {
+            width: 500px;
+            height: 500px;
+            bottom: -150px;
+            left: -100px;
+            background: radial-gradient(circle, rgba(200, 180, 120, 0.15), transparent);
+            animation-delay: -3s;
+        }
+        .bg-glow-3 {
+            width: 400px;
+            height: 400px;
+            top: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: radial-gradient(circle, rgba(30, 80, 160, 0.12), transparent);
+            animation-delay: -5s;
+        }
+
+        @keyframes breatheGlow {
+            0% {
+                opacity: 0.08;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0.22;
+                transform: scale(1.15);
+            }
+        }
+
+        /* ============================================================
+           顶部导航栏
+           ============================================================ */
+        .navbar {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0 20px;
+            border-bottom: 1px solid rgba(74, 138, 217, 0.10);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 1px;
+        }
+        .navbar-brand .icon {
+            font-size: 28px;
+        }
+        .navbar-brand .sub {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .navbar-right .time {
+            background: rgba(74, 138, 217, 0.08);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(74, 138, 217, 0.12);
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        .navbar-right .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 16px rgba(74, 222, 128, 0.30);
+            margin-right: 6px;
+            animation: pulseDot 2s infinite;
+        }
+        @keyframes pulseDot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(0.85);
+            }
+        }
+
+        /* ============================================================
+           网格布局 - 各功能分区
+           所有卡片边框：外到内 黑色→蓝黑色→蓝色 渐变发光
+           ============================================================ */
+        .grid-container {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        /* 卡片通用样式 - 发光边框渐变 */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: var(--radius-card);
+            padding: 20px 22px 24px;
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            transition: transform 0.25s ease, box-shadow 0.3s ease;
+            /* 发光边框 - 使用伪元素实现外到内渐变 */
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: calc(var(--radius-card) + 2px);
+            padding: 2px;
+            background: linear-gradient(135deg,
+                    rgba(10, 14, 23, 0.90) 0%,
+                    rgba(20, 30, 50, 0.70) 30%,
+                    rgba(30, 60, 100, 0.50) 60%,
+                    rgba(74, 138, 217, 0.40) 80%,
+                    rgba(74, 138, 217, 0.60) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: 0;
+            animation: borderGlow 4s infinite alternate ease-in-out;
+        }
+
+        /* 发光边框动画 */
+        @keyframes borderGlow {
+            0% {
+                opacity: 0.6;
+                background: linear-gradient(135deg,
+                        rgba(10, 14, 23, 0.90) 0%,
+                        rgba(20, 30, 50, 0.70) 30%,
+                        rgba(30, 60, 100, 0.50) 60%,
+                        rgba(74, 138, 217, 0.30) 80%,
+                        rgba(74, 138, 217, 0.50) 100%);
+            }
+            100% {
+                opacity: 1;
+                background: linear-gradient(135deg,
+                        rgba(10, 14, 23, 0.95) 0%,
+                        rgba(20, 30, 50, 0.80) 25%,
+                        rgba(40, 80, 140, 0.60) 55%,
+                        rgba(74, 138, 217, 0.60) 80%,
+                        rgba(100, 180, 255, 0.50) 100%);
+            }
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
+        }
+
+        .card>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title .badge {
+            font-size: 10px;
+            background: rgba(74, 138, 217, 0.20);
+            padding: 2px 10px;
+            border-radius: 20px;
+            color: var(--border-glow-end);
+            text-transform: none;
+        }
+
+        /* ============================================================
+           1. 老人信息卡片 (占2列)
+           ============================================================ */
+        .card-profile {
+            grid-column: span 2;
+        }
+
+        .profile-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .profile-avatar {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2a4a7a, #4a8ad9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 0 40px rgba(74, 138, 217, 0.20);
+        }
+        .profile-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 28px;
+            flex: 1;
+        }
+        .profile-info .name-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        .profile-info .name {
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .profile-info .tag {
+            font-size: 13px;
+            color: var(--text-secondary);
+            background: rgba(74, 138, 217, 0.08);
+            padding: 2px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(74, 138, 217, 0.10);
+        }
+        .profile-info .detail {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .profile-info .detail strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* ===== 环境-人体感知原始数据 ===== */
+        .sensor-data {
+            width: 100%;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(74, 138, 217, 0.10);
+            display: grid;
+            grid-template-columns: auto 1fr 1fr 1fr 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+        .sensor-data .section-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            padding-right: 8px;
+            border-right: 1px solid rgba(74, 138, 217, 0.08);
+        }
+        .sensor-data .realtime-badge {
+            font-size: 10px;
+            color: #4ade80;
+            background: rgba(74, 222, 128, 0.10);
+            padding: 1px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(74, 222, 128, 0.15);
+            display: inline-block;
+            margin-top: 2px;
+            letter-spacing: 0.5px;
+            animation: pulseDot 2s infinite;
+        }
+        .sensor-data .label-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .sensor-item {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            padding: 10px 14px;
+            text-align: center;
+            border: 1px solid rgba(74, 138, 217, 0.06);
+            transition: background 0.2s;
+        }
+        .sensor-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .sensor-item .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sensor-item .value {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 2px 0;
+        }
+        .sensor-item .value .unit {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+        .sensor-item .desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            letter-spacing: 0.3px;
+        }
+        .sensor-item .desc .highlight {
+            color: var(--border-glow-end);
+            font-weight: 500;
+        }
+        .sensor-item .status-badge {
+            display: inline-block;
+            padding: 2px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        .status-badge.active {
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+        }
+        .status-badge.still {
+            background: rgba(245, 166, 35, 0.12);
+            color: #f5a623;
+        }
+        .status-badge.sleeping {
+            background: rgba(74, 138, 217, 0.12);
+            color: #4a8ad9;
+        }
+
+        /* ============================================================
+           2. 状态统计卡片
+           ============================================================ */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 8px 4px;
+        }
+        .stat-item .number {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #4a8ad9, #6aaae8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-item .number.warning {
+            background: linear-gradient(135deg, #f5a623, #f7c948);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-item .number.danger {
+            background: linear-gradient(135deg, #e74c3c, #f05a4a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-item .label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            letter-spacing: 0.3px;
+        }
+        .stat-item .sub-label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ============================================================
+           3. ECharts 图表 - 每日生活数据
+           ============================================================ */
+        .card-chart {
+            grid-column: span 2;
+            min-height: 280px;
+        }
+        .card-chart .chart-container {
+            width: 100%;
+            height: 240px;
+        }
+
+        /* ============================================================
+           4. 安心日报区
+           ============================================================ */
+        .card-daily {
+            grid-column: span 1;
+        }
+        .daily-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .daily-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border-left: 3px solid rgba(74, 138, 217, 0.30);
+            transition: background 0.2s;
+        }
+        .daily-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .daily-item .time {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 48px;
+        }
+        .daily-item .content {
+            font-size: 14px;
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .daily-item .status {
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+        }
+        .daily-item .status.warning {
+            background: rgba(245, 166, 35, 0.12);
+            color: #f5a623;
+        }
+        .daily-item .status.danger {
+            background: rgba(231, 76, 60, 0.12);
+            color: #e74c3c;
+        }
+
+        /* ============================================================
+           5. 异常告警提示区
+           ============================================================ */
+        .card-alert {
+            grid-column: span 1;
+        }
+        .alert-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .alert-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .alert-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+        .alert-list::-webkit-scrollbar-thumb {
+            background: rgba(74, 138, 217, 0.30);
+            border-radius: 4px;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 14px;
+            background: rgba(231, 76, 60, 0.06);
+            border-radius: 12px;
+            border-left: 3px solid #e74c3c;
+        }
+        .alert-item .icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .alert-item .msg {
+            font-size: 13px;
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .alert-item .msg .time {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .alert-item .tag {
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 20px;
+            background: rgba(231, 76, 60, 0.15);
+            color: #e74c3c;
+            flex-shrink: 0;
+        }
+        .alert-item.resolved {
+            border-left-color: #4ade80;
+            background: rgba(74, 222, 128, 0.04);
+        }
+        .alert-item.resolved .tag {
+            background: rgba(74, 222, 128, 0.12);
+            color: #4ade80;
+        }
+
+        /* ============================================================
+           6. 添加日程区
+           ============================================================ */
+        .card-schedule {
+            grid-column: span 1;
+        }
+        .schedule-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .schedule-form .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .schedule-form input,
+        .schedule-form select {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(74, 138, 217, 0.15);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .schedule-form input:focus,
+        .schedule-form select:focus {
+            border-color: rgba(74, 138, 217, 0.40);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .schedule-form input::placeholder {
+            color: var(--text-muted);
+        }
+        .schedule-form .btn-add {
+            padding: 10px 28px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #2a5a8a, #4a8ad9);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 20px rgba(74, 138, 217, 0.20);
+        }
+        .schedule-form .btn-add:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 28px rgba(74, 138, 217, 0.35);
+        }
+
+        .schedule-list {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .schedule-list .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .schedule-list .item .time {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .schedule-list .item .del {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+        .schedule-list .item .del:hover {
+            color: #e74c3c;
+        }
+
+        /* ============================================================
+           7. 远程协助区 - 添加按钮点击选中变蓝样式
+           ============================================================ */
+        .card-remote {
+            grid-column: span 1;
+        }
+        .remote-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .remote-btns .btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(74, 138, 217, 0.15);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .remote-btns .btn:hover {
+            background: rgba(74, 138, 217, 0.10);
+            border-color: rgba(74, 138, 217, 0.30);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(74, 138, 217, 0.10);
+        }
+        /* 默认激活状态 - 蓝色（对应"一键呼叫"） */
+        .remote-btns .btn.primary {
+            background: linear-gradient(135deg, #2a5a8a, #4a8ad9);
+            border-color: transparent;
+            box-shadow: 0 4px 20px rgba(74, 138, 217, 0.15);
+        }
+        .remote-btns .btn.primary:hover {
+            box-shadow: 0 6px 28px rgba(74, 138, 217, 0.30);
+        }
+        /* 点击选中变蓝 - 用于所有按钮 */
+        .remote-btns .btn.active-blue {
+            background: linear-gradient(135deg, #2a5a8a, #4a8ad9) !important;
+            border-color: transparent !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 20px rgba(74, 138, 217, 0.25) !important;
+        }
+        .remote-btns .btn.active-blue:hover {
+            box-shadow: 0 6px 28px rgba(74, 138, 217, 0.35) !important;
+        }
+        /* 移除默认的primary样式与其他按钮的冲突，通过JS动态控制 */
+        
+         /* 保留作为初始状态，但JS会覆盖 */
+        
+
+        .remote-status {
+            margin-top: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(74, 138, 217, 0.06);
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .remote-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.20);
+            animation: pulseDot 2s infinite;
+        }
+
+        /* ============================================================
+           8. 硬件接口数据 - 金属光泽浮动气泡
+           ============================================================ */
+        .hardware-bubbles {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 20px;
+            padding: 4px 0;
+        }
+
+        .bubble-metric {
+            flex: 1;
+            min-width: 120px;
+            max-width: 200px;
+            padding: 16px 20px;
+            border-radius: 60px 40px 50px 30px / 40px 50px 30px 60px;
+            background: rgba(10, 14, 23, 0.85);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            position: relative;
+            box-shadow:
+                0 4px 30px rgba(0, 0, 0, 0.30),
+                0 0 60px rgba(180, 150, 80, 0.04);
+            text-align: center;
+            animation: floatBubble 3s infinite alternate ease-in-out;
+            transform-origin: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: default;
+            border: none;
+        }
+
+        .bubble-metric::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: calc(60px + 3px) calc(40px + 3px) calc(50px + 3px) calc(45px + 3px) / calc(40px + 3px) calc(50px + 3px) calc(30px + 3px) calc(60px + 3px);
+            padding: 3px;
+            background: radial-gradient(ellipse at 50% 50%,
+                    rgba(200, 180, 120, 0.00) 60%,
+                    rgba(180, 160, 100, 0.08) 70%,
+                    rgba(200, 180, 120, 0.20) 80%,
+                    rgba(220, 200, 140, 0.35) 88%,
+                    rgba(200, 180, 120, 0.50) 94%,
+                    rgba(180, 160, 100, 0.35) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: 0;
+            animation: goldGlowPulse 4s infinite alternate ease-in-out;
+        }
+
+        @keyframes goldGlowPulse {
+            0% {
+                opacity: 0.6;
+                background: radial-gradient(ellipse at 50% 50%,
+                        rgba(200, 180, 120, 0.00) 55%,
+                        rgba(180, 160, 100, 0.06) 70%,
+                        rgba(200, 180, 120, 0.18) 82%,
+                        rgba(220, 200, 140, 0.30) 90%,
+                        rgba(200, 180, 120, 0.45) 95%,
+                        rgba(160, 140, 90, 0.30) 100%);
+            }
+            100% {
+                opacity: 1;
+                background: radial-gradient(ellipse at 50% 50%,
+                        rgba(200, 180, 120, 0.00) 50%,
+                        rgba(180, 160, 100, 0.10) 68%,
+                        rgba(200, 180, 120, 0.25) 80%,
+                        rgba(230, 210, 150, 0.40) 88%,
+                        rgba(210, 190, 130, 0.55) 94%,
+                        rgba(180, 160, 100, 0.40) 100%);
+            }
+        }
+
+        .bubble-metric>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        .bubble-metric:hover {
+            transform: scale(1.04) translateY(-4px);
+            box-shadow:
+                0 8px 40px rgba(0, 0, 0, 0.40),
+                0 0 80px rgba(180, 150, 80, 0.08);
+        }
+
+        .bubble-metric:nth-child(1) { animation-delay: 0s; }
+        .bubble-metric:nth-child(2) { animation-delay: 0.6s; }
+        .bubble-metric:nth-child(3) { animation-delay: 1.2s; }
+        .bubble-metric:nth-child(4) { animation-delay: 0.3s; }
+        .bubble-metric:nth-child(5) { animation-delay: 0.9s; }
+        .bubble-metric:nth-child(6) { animation-delay: 1.5s; }
+
+        @keyframes floatBubble {
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-6px); }
+        }
+
+        .bubble-metric .value {
+            font-size: 26px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #e8edf5, #aabbdd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: block;
+            line-height: 1.2;
+        }
+        .bubble-metric .value .unit {
+            font-size: 14px;
+            font-weight: 400;
+            -webkit-text-fill-color: #8899bb;
+            color: #8899bb;
+        }
+        .bubble-metric .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+            display: block;
+        }
+        .bubble-metric .trend {
+            font-size: 11px;
+            margin-top: 2px;
+            display: block;
+        }
+        .bubble-metric .trend.up { color: #4ade80; }
+        .bubble-metric .trend.down { color: #e74c3c; }
+        .bubble-metric .trend.stable { color: #f5a623; }
+
+        .bubble-metric .hw-tag {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            font-size: 8px;
+            background: rgba(180, 150, 80, 0.15);
+            padding: 2px 8px;
+            border-radius: 20px;
+            color: #b89a6a;
+            border: 1px solid rgba(180, 150, 80, 0.10);
+            letter-spacing: 0.3px;
+            backdrop-filter: blur(4px);
+            z-index: 2;
+        }
+
+        /* ============================================================
+           响应式适配
+           ============================================================ */
+        @media (max-width: 1024px) {
+            .grid-container {
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
+            .card-profile { grid-column: span 2; }
+            .card-chart { grid-column: span 2; }
+            .card-daily { grid-column: span 1; }
+            .card-alert { grid-column: span 1; }
+            .card-schedule { grid-column: span 1; }
+            .card-remote { grid-column: span 1; }
+            .stat-grid { grid-template-columns: 1fr 1fr 1fr; }
+            .bubble-metric { min-width: 100px; max-width: 160px; padding: 14px 16px; }
+            .bubble-metric .value { font-size: 22px; }
+            .sensor-data { grid-template-columns: auto 1fr 1fr 1fr 1fr; gap: 8px; }
+            .sensor-item .value { font-size: 18px; }
+            .sensor-data .section-label { font-size: 12px; }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard { padding: 12px 14px 30px; }
+            .grid-container { grid-template-columns: 1fr; gap: 14px; }
+            .card-profile { grid-column: span 1; }
+            .card-chart { grid-column: span 1; min-height: 220px; }
+            .card-chart .chart-container { height: 180px; }
+            .card-daily { grid-column: span 1; }
+            .card-alert { grid-column: span 1; }
+            .card-schedule { grid-column: span 1; }
+            .card-remote { grid-column: span 1; }
+            .stat-grid { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+            .stat-item .number { font-size: 24px; }
+            .profile-content { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .profile-info .name { font-size: 18px; }
+            .navbar-brand { font-size: 18px; }
+            .navbar-right .time { font-size: 11px; padding: 4px 12px; }
+            .hardware-bubbles { justify-content: center; }
+            .bubble-metric { min-width: 80px; max-width: 140px; padding: 12px 14px; flex: 0 0 auto; }
+            .bubble-metric .value { font-size: 18px; }
+            .bubble-metric .label { font-size: 10px; }
+            .remote-btns .btn { min-width: 60px; padding: 10px 12px; font-size: 12px; }
+            .sensor-data { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .sensor-data .section-label {
+                grid-column: 1 / -1;
+                border-right: none;
+                padding-right: 0;
+                text-align: center;
+                padding-bottom: 4px;
+                border-bottom: 1px solid rgba(74, 138, 217, 0.08);
+            }
+            .sensor-data .label-group { align-items: center; }
+            .sensor-item .value { font-size: 18px; }
+        }
+
+        @media (max-width: 480px) {
+            .stat-grid { grid-template-columns: 1fr 1fr; }
+            .stat-item .number { font-size: 20px; }
+            .bubble-metric { min-width: 70px; max-width: 110px; padding: 10px 10px; }
+            .bubble-metric .value { font-size: 16px; }
+            .bubble-metric .label { font-size: 9px; }
+            .card { padding: 14px 14px 18px; }
+            .schedule-form .row { flex-direction: column; }
+            .schedule-form input,
+            .schedule-form select { min-width: unset; }
+            .sensor-data { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .sensor-item { padding: 8px 10px; }
+            .sensor-item .value { font-size: 16px; }
+        }
+
+        .text-glow { text-shadow: 0 0 40px rgba(74, 138, 217, 0.10); }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        .gap-8 { gap: 8px; }
+        .mt-12 { margin-top: 12px; }
+        .w-full { width: 100%; }
+    </style>
+</head>
+<body>
+
+    <!-- ===== 背景层 ===== -->
+    <div style="position:absolute;top:12px;left:16px;z-index:9999;">
+        <a href="yyyyhhhh.html" 
+        style="color:#ffffff;text-decoration:none;font-size:16px;">← 返回首页</a >
+    </div>
+    <div class="bg-layer" aria-hidden="true">
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+        <div class="bg-glow bg-glow-3"></div>
+    </div>
+
+    <!-- ===== 主仪表盘 ===== -->
+    <div class="dashboard">
+
+        <!-- ===== 顶部导航 ===== -->
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <span class="icon">🏠</span>
+                <span>子女管理平台</span>
+                <span class="sub">| 关爱每一刻</span>
+            </div>
+            <div class="navbar-right">
+                <span class="time" id="headerTime">--:--</span>
+                <span><span class="status-dot"></span> 设备在线</span>
+            </div>
+        </nav>
+
+        <!-- ===== 网格布局 - 功能分区 ===== -->
+
+        <!-- ===== 1. 老人信息卡片 ===== -->
+        <div class="grid-container">
+            <div class="card card-profile">
+                <div class="card-title">👤 老人信息 <span class="badge">已关联设备</span></div>
+                <div class="profile-content">
+                    <div class="profile-avatar">👴</div>
+                    <div class="profile-info">
+                        <div class="name-row">
+                            <span class="name">张爷爷</span>
+                            <span class="tag">❤️ 健康关注</span>
+                        </div>
+                        <span class="detail">📅 年龄 <strong>78岁</strong></span>
+                        <span class="detail">📍 住所 <strong>阳光花园 3-202</strong></span>
+                        <span class="detail">📱 设备 <strong>边缘感知智能终端</strong></span>
+                        <span class="detail">🕐 最近活跃 <strong>12分钟前</strong></span>
+
+                        <!-- ===== 环境-人体感知原始数据 ===== -->
+                        <div class="sensor-data">
+                            <div class="label-group">
+                                <span class="section-label">🌿 环境—人体感知原始数据</span>
+                                <span class="realtime-badge">● 实时</span>
+                            </div>
+                            <div class="sensor-item">
+                                <div class="label">🌡️ 温度</div>
+                                <div class="value">24.6 <span class="unit">°C</span></div>
+                                <div class="desc">🌤️ <span class="highlight">舒适</span></div>
+                            </div>
+                            <div class="sensor-item">
+                                <div class="label">💧 湿度</div>
+                                <div class="value">62 <span class="unit">%</span></div>
+                                <div class="desc">💨 <span class="highlight">较湿润</span></div>
+                            </div>
+                            <div class="sensor-item">
+                                <div class="label">☀️ 光照</div>
+                                <div class="value">380 <span class="unit">lux</span></div>
+                                <div class="desc">💡 <span class="highlight">中等</span></div>
+                            </div>
+                            <div class="sensor-item">
+                                <div class="label">🧍 人体状态</div>
+                                <div class="value">
+                                    <span class="status-badge active">🚶 运动中</span>
+                                </div>
+                                <div class="desc">&nbsp;</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 2. 今日概览 ===== -->
+            <div class="card">
+                <div class="card-title">📊 今日概览</div>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="number">87</div>
+                        <div class="label">活动的频繁程度</div>
+                        <div class="sub-label">较昨日 ↑ 5%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number">2.5</div>
+                        <div class="label">移动时长</div>
+                        <div class="sub-label">较昨日 ↑ 0.3h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number warning">中</div>
+                        <div class="label">运动强度</div>
+                        <div class="sub-label">较昨日 ↑ 1级</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number">6.8</div>
+                        <div class="label">睡眠时长</div>
+                        <div class="sub-label">较昨日 ↑ 0.2h</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number danger">1</div>
+                        <div class="label">未读告警</div>
+                        <div class="sub-label">需关注</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number">98%</div>
+                        <div class="label">设备在线率</div>
+                        <div class="sub-label">良好</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 3. 每日生活数据 ===== -->
+            <div class="card card-chart">
+                <div class="card-title">📈 每日生活数据 <span class="badge">近7天</span></div>
+                <div class="chart-container" id="dailyChart"></div>
+            </div>
+
+            <!-- ===== 4. 安心日报 ===== -->
+            <div class="card card-daily">
+                <div class="card-title">📋 安心日报 <span class="badge">今日</span></div>
+                <div class="daily-list">
+                    <div class="daily-item">
+                        <span class="time">06:30</span>
+                        <span class="content">起床 · 睡眠质量 良好</span>
+                        <span class="status">✅</span>
+                    </div>
+                    <div class="daily-item">
+                        <span class="time">07:15</span>
+                        <span class="content">早餐 · 食欲正常</span>
+                        <span class="status">✅</span>
+                    </div>
+                    <div class="daily-item">
+                        <span class="time">08:40</span>
+                        <span class="content">散步 · 约 28 分钟</span>
+                        <span class="status">✅</span>
+                    </div>
+                    <div class="daily-item">
+                        <span class="time">14:30</span>
+                        <span class="content">午休 · 约 45 分钟</span>
+                        <span class="status warning">⏳ 偏长</span>
+                    </div>
+                    <div class="daily-item">
+                        <span class="time">18:00</span>
+                        <span class="content">晚餐 · 食欲正常</span>
+                        <span class="status">✅</span>
+                    </div>
+                    <div class="daily-item">
+                        <span class="time">20:30</span>
+                        <span class="content">晚间活动 · 看电视</span>
+                        <span class="status">✅</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 5. 异常告警 ===== -->
+            <div class="card card-alert">
+                <div class="card-title">⚠️ 异常告警 <span class="badge">1 条未处理</span></div>
+                <div class="alert-list">
+                    <div class="alert-item">
+                        <span class="icon">🔴</span>
+                        <span class="msg">
+                            心率异常偏高 (95bpm)
+                            <span class="time">2026-08-19 15:32</span>
+                        </span>
+                        <span class="tag">未处理</span>
+                    </div>
+                    <div class="alert-item">
+                        <span class="icon">🟡</span>
+                        <span class="msg">
+                            缴费临期（电费）·还剩6h
+                            <span class="time">2026-08-19 14:00</span>
+                        </span>
+                        <span class="tag">待处理</span>
+                    </div>
+                    <div class="alert-item resolved">
+                        <span class="icon">🟢</span>
+                        <span class="msg">
+                            设备离线 · 已恢复
+                            <span class="time">2026-08-19 09:05</span>
+                        </span>
+                        <span class="tag">已处理</span>
+                    </div>
+                    <div class="alert-item">
+                        <span class="icon">🟡</span>
+                        <span class="msg">
+                            睡眠时长不足 (5.2h)
+                            <span class="time">2026-08-19 06:30</span>
+                        </span>
+                        <span class="tag">观察中</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 6. 添加日程区 ===== -->
+            <div class="card card-schedule">
+                <div class="card-title">📅 添加日程 <span class="badge">提醒</span></div>
+                <div class="schedule-form">
+                    <div class="row">
+                        <input type="text" id="scheduleInput" placeholder="输入日程事项..." />
+                        <input type="time" id="scheduleTime" value="09:00" />
+                    </div>
+                    <div class="row">
+                        <select id="schedulePriority">
+                            <option value="普通">普通</option>
+                            <option value="重要">重要</option>
+                            <option value="紧急">紧急</option>
+                        </select>
+                        <button class="btn-add" id="addScheduleBtn">+ 添加</button>
+                    </div>
+                </div>
+                <div class="schedule-list" id="scheduleList">
+                    <div class="item">
+                        <span>💊 提醒吃药</span>
+                        <span class="time">08:00</span>
+                        <span class="del" data-idx="0">✕</span>
+                    </div>
+                    <div class="item">
+                        <span>🚶 散步提醒</span>
+                        <span class="time">16:30</span>
+                        <span class="del" data-idx="1">✕</span>
+                    </div>
+                    <div class="item">
+                        <span>📞 视频通话</span>
+                        <span class="time">19:00</span>
+                        <span class="del" data-idx="2">✕</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 7. 远程协助区 - 添加点击选中变蓝交互 ===== -->
+            <div class="card card-remote">
+                <div class="card-title">🖥️ 远程协助 <span class="badge">实时</span></div>
+                <div class="remote-btns" id="remoteBtnGroup">
+                    <button class="btn primary" data-btn="call">📞 一键呼叫</button>
+                    <button class="btn" data-btn="video">📹 视频查看</button>
+                    <button class="btn" data-btn="voice">🔊 语音留言</button>
+                    <button class="btn" data-btn="diagnose">📡 设备诊断</button>
+                </div>
+                <div class="remote-status">
+                    <span class="dot"></span>
+                    设备连接正常 · 最后同步: 12:34
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 8. 硬件接口数据 - 金属光泽浮动气泡 ===== -->
+        <div class="hardware-bubbles">
+            <div class="bubble-metric" data-hw="temperature">
+                <span class="hw-tag">⚡ HW-01</span>
+                <span class="value">24.6 <span class="unit">°C</span></span>
+                <span class="label">温度</span>
+                <span class="trend stable">— 舒适</span>
+            </div>
+            <div class="bubble-metric" data-hw="humidity">
+                <span class="hw-tag">⚡ HW-02</span>
+                <span class="value">62 <span class="unit">%</span></span>
+                <span class="label">湿度</span>
+                <span class="trend stable">— 较湿润</span>
+            </div>
+            <div class="bubble-metric" data-hw="light">
+                <span class="hw-tag">⚡ HW-03</span>
+                <span class="value">380 <span class="unit">lux</span></span>
+                <span class="label">光照</span>
+                <span class="trend stable">— 中等</span>
+            </div>
+            <div class="bubble-metric" data-hw="activity">
+                <span class="hw-tag">⚡ HW-04</span>
+                <span class="value">87 <span class="unit">分</span></span>
+                <span class="label">活动的频繁程度</span>
+                <span class="trend up">↑ 较昨日 +5%</span>
+            </div>
+            <div class="bubble-metric" data-hw="duration">
+                <span class="hw-tag">⚡ HW-05</span>
+                <span class="value">2.5 <span class="unit">h</span></span>
+                <span class="label">移动时长</span>
+                <span class="trend up">↑ 较昨日 +0.3h</span>
+            </div>
+            <div class="bubble-metric" data-hw="sleep">
+                <span class="hw-tag">⚡ HW-06</span>
+                <span class="value">6.8 <span class="unit">h</span></span>
+                <span class="label">睡眠时长</span>
+                <span class="trend up">↑ 较昨日 +0.2h</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ================================================================
+        // JavaScript：时间更新 + ECharts 图表 + 日程管理 + 硬件接口模拟
+        //      + 远程协助按钮点击选中变蓝
+        // ================================================================
+
+        // ----- 1. 顶部时间更新 -----
+        function updateHeaderTime() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('headerTime').textContent = h + ':' + m;
+        }
+        updateHeaderTime();
+        setInterval(updateHeaderTime, 10000);
+
+        // ----- 2. ECharts 图表 - 每日生活数据 -----
+        (function initChart() {
+            const chartDom = document.getElementById('dailyChart');
+            if (!chartDom) return;
+            const myChart = echarts.init(chartDom, 'dark');
+
+            const days = ['08-13', '08-14', '08-15', '08-16', '08-17', '08-18', '08-19'];
+            const activityData = [72, 68, 78, 65, 82, 75, 87];
+            const durationData = [1.8, 1.5, 2.1, 1.6, 2.4, 2.0, 2.5];
+            const intensityData = [2, 2, 3, 1, 3, 2, 3];
+            const sleepData = [7.2, 6.8, 7.5, 6.5, 7.8, 7.0, 6.8];
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(10,14,23,0.85)',
+                    borderColor: 'rgba(74,138,217,0.20)',
+                    textStyle: { color: '#e8edf5' },
+                    formatter: function(params) {
+                        let html = `<strong>${params[0].axisValue}</strong><br/>`;
+                        params.forEach(p => {
+                            if (p.seriesName === '活动的频繁程度') {
+                                html += `${p.marker} ${p.seriesName}：${p.value} 分<br/>`;
+                            } else if (p.seriesName === '移动时长') {
+                                html += `${p.marker} ${p.seriesName}：${p.value} 小时<br/>`;
+                            } else if (p.seriesName === '运动强度') {
+                                const levelMap = {1: '低', 2: '中低', 3: '中', 4: '中高', 5: '高'};
+                                html += `${p.marker} ${p.seriesName}：${levelMap[p.value] || p.value} 级<br/>`;
+                            } else if (p.seriesName === '睡眠时长') {
+                                html += `${p.marker} ${p.seriesName}：${p.value} 小时<br/>`;
+                            }
+                        });
+                        return html;
+                    }
+                },
+                legend: {
+                    data: ['活动的频繁程度', '移动时长', '运动强度', '睡眠时长'],
+                    textStyle: { color: '#8899bb' },
+                    itemWidth: 12,
+                    itemHeight: 8,
+                    top: 0,
+                    right: 0
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '8%',
+                    top: '18%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: days,
+                    axisLine: { lineStyle: { color: 'rgba(74,138,217,0.15)' } },
+                    axisLabel: { color: '#556688', fontSize: 11 },
+                    axisTick: { show: false }
+                },
+                yAxis: [{
+                    type: 'value',
+                    name: '活动评分 / 时长',
+                    nameTextStyle: { color: '#556688', fontSize: 10 },
+                    splitLine: { lineStyle: { color: 'rgba(255,255,255,0.03)' } },
+                    axisLabel: { color: '#556688', fontSize: 10 },
+                    min: 0,
+                    max: 100
+                }, {
+                    type: 'value',
+                    name: '运动强度等级',
+                    nameTextStyle: { color: '#556688', fontSize: 10 },
+                    splitLine: { show: false },
+                    axisLabel: {
+                        color: '#556688',
+                        fontSize: 10,
+                        formatter: function(val) {
+                            const map = {1: '低', 2: '中低', 3: '中', 4: '中高', 5: '高'};
+                            return map[val] || val;
+                        }
+                    },
+                    min: 0,
+                    max: 6,
+                    interval: 1
+                }],
+                series: [{
+                    name: '活动的频繁程度',
+                    type: 'bar',
+                    data: activityData,
+                    itemStyle: {
+                        borderRadius: [4, 4, 0, 0],
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#4a8ad9' },
+                            { offset: 1, color: 'rgba(74,138,217,0.20)' }
+                        ])
+                    },
+                    barWidth: '25%'
+                }, {
+                    name: '移动时长',
+                    type: 'line',
+                    yAxisIndex: 0,
+                    data: durationData,
+                    smooth: true,
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    lineStyle: { color: '#f5a623', width: 2 },
+                    itemStyle: { color: '#f5a623' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(245,166,35,0.20)' },
+                            { offset: 1, color: 'rgba(245,166,35,0.01)' }
+                        ])
+                    }
+                }, {
+                    name: '运动强度',
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: intensityData,
+                    smooth: true,
+                    symbol: 'diamond',
+                    symbolSize: 8,
+                    lineStyle: { color: '#4ade80', width: 2 },
+                    itemStyle: { color: '#4ade80' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(74,222,128,0.15)' },
+                            { offset: 1, color: 'rgba(74,222,128,0.01)' }
+                        ])
+                    }
+                }, {
+                    name: '睡眠时长',
+                    type: 'line',
+                    yAxisIndex: 0,
+                    data: sleepData,
+                    smooth: true,
+                    symbol: 'triangle',
+                    symbolSize: 8,
+                    lineStyle: { color: '#a78bfa', width: 2, type: 'dashed' },
+                    itemStyle: { color: '#a78bfa' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(167,139,250,0.15)' },
+                            { offset: 1, color: 'rgba(167,139,250,0.01)' }
+                        ])
+                    }
+                }]
+            };
+
+            myChart.setOption(option);
+
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+
+            window.__dailyChart = myChart;
+        })();
+
+        // ----- 3. 日程管理 -----
+        (function initSchedule() {
+            const input = document.getElementById('scheduleInput');
+            const timeInput = document.getElementById('scheduleTime');
+            const prioritySelect = document.getElementById('schedulePriority');
+            const addBtn = document.getElementById('addScheduleBtn');
+            const list = document.getElementById('scheduleList');
+
+            let schedules = [
+                { text: '💊 提醒吃药', time: '08:00', priority: '重要' },
+                { text: '🚶 散步提醒', time: '16:30', priority: '普通' },
+                { text: '📞 视频通话', time: '19:00', priority: '重要' }
+            ];
+
+            function renderSchedules() {
+                list.innerHTML = '';
+                schedules.forEach((item, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    div.innerHTML = `
+                        <span>${item.text}</span>
+                        <span class="time">${item.time}</span>
+                        <span class="del" data-idx="${idx}">✕</span>
+                    `;
+                    list.appendChild(div);
+                });
+
+                list.querySelectorAll('.del').forEach(el => {
+                    el.addEventListener('click', function() {
+                        const idx = parseInt(this.dataset.idx);
+                        schedules.splice(idx, 1);
+                        renderSchedules();
+                    });
+                });
+            }
+
+            addBtn.addEventListener('click', function() {
+                const text = input.value.trim();
+                const time = timeInput.value;
+                const priority = prioritySelect.value;
+                if (!text) {
+                    alert('请输入日程事项');
+                    return;
+                }
+                schedules.push({ text: text, time: time, priority: priority });
+                input.value = '';
+                renderSchedules();
+            });
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') addBtn.click();
+            });
+
+            renderSchedules();
+        })();
+
+        // ----- 4. 远程协助按钮 - 点击选中变蓝 -----
+        (function initRemoteButtons() {
+            const btnGroup = document.getElementById('remoteBtnGroup');
+            if (!btnGroup) return;
+
+            const buttons = btnGroup.querySelectorAll('.btn');
+
+            // 默认"一键呼叫"是选中状态（已有primary类）
+            // 移除其他按钮的primary类，确保初始状态正确
+            buttons.forEach(btn => {
+                if (!btn.classList.contains('primary')) {
+                    btn.classList.remove('active-blue');
+                } else {
+                    // 为"一键呼叫"添加active-blue类，统一管理
+                    btn.classList.add('active-blue');
+                }
+            });
+
+            buttons.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // 移除所有按钮的选中状态
+                    buttons.forEach(b => {
+                        b.classList.remove('primary');
+                        b.classList.remove('active-blue');
+                    });
+                    // 为当前点击的按钮添加选中状态（蓝色）
+                    this.classList.add('primary');
+                    this.classList.add('active-blue');
+                    console.log(`🖥️ 远程协助 - 已选中: ${this.textContent.trim()}`);
+                });
+            });
+        })();
+
+        // ----- 5. 硬件接口数据模拟更新 (气泡数据与上半部分保持一致) -----
+        (function simulateHardwareData() {
+            const bubbles = document.querySelectorAll('.bubble-metric');
+
+            let currentData = {
+                temperature: 24.6,
+                humidity: 62,
+                light: 380,
+                activity: 87,
+                duration: 2.5,
+                sleep: 6.8
+            };
+
+            function updateBubbleData() {
+                const tempValueEl = document.querySelector('.sensor-item .value');
+                if (tempValueEl) {
+                    const tempMatch = tempValueEl.textContent.match(/([\d.]+)/);
+                    if (tempMatch) {
+                        currentData.temperature = parseFloat(tempMatch[1]);
+                    }
+                }
+
+                const sensorItems = document.querySelectorAll('.sensor-item');
+                if (sensorItems.length >= 2) {
+                    const humValueEl = sensorItems[1].querySelector('.value');
+                    if (humValueEl) {
+                        const humMatch = humValueEl.textContent.match(/([\d.]+)/);
+                        if (humMatch) {
+                            currentData.humidity = parseFloat(humMatch[1]);
+                        }
+                    }
+                }
+
+                if (sensorItems.length >= 3) {
+                    const lightValueEl = sensorItems[2].querySelector('.value');
+                    if (lightValueEl) {
+                        const lightMatch = lightValueEl.textContent.match(/([\d.]+)/);
+                        if (lightMatch) {
+                            currentData.light = parseFloat(lightMatch[1]);
+                        }
+                    }
+                }
+
+                const statItems = document.querySelectorAll('.stat-item');
+                if (statItems.length >= 1) {
+                    const activityNumEl = statItems[0].querySelector('.number');
+                    if (activityNumEl) {
+                        const actMatch = activityNumEl.textContent.match(/([\d.]+)/);
+                        if (actMatch) {
+                            currentData.activity = parseFloat(actMatch[1]);
+                        }
+                    }
+                }
+
+                if (statItems.length >= 2) {
+                    const durationNumEl = statItems[1].querySelector('.number');
+                    if (durationNumEl) {
+                        const durMatch = durationNumEl.textContent.match(/([\d.]+)/);
+                        if (durMatch) {
+                            currentData.duration = parseFloat(durMatch[1]);
+                        }
+                    }
+                }
+
+                if (statItems.length >= 4) {
+                    const sleepNumEl = statItems[3].querySelector('.number');
+                    if (sleepNumEl) {
+                        const sleepMatch = sleepNumEl.textContent.match(/([\d.]+)/);
+                        if (sleepMatch) {
+                            currentData.sleep = parseFloat(sleepMatch[1]);
+                        }
+                    }
+                }
+
+                bubbles.forEach(bubble => {
+                    const hwType = bubble.dataset.hw;
+                    const valueEl = bubble.querySelector('.value');
+                    const trendEl = bubble.querySelector('.trend');
+                    if (!valueEl) return;
+
+                    let value = '';
+                    let unit = '';
+                    let trendText = '';
+
+                    switch (hwType) {
+                        case 'temperature':
+                            value = currentData.temperature;
+                            unit = '°C';
+                            trendText = '— 舒适';
+                            break;
+                        case 'humidity':
+                            value = currentData.humidity;
+                            unit = '%';
+                            trendText = '— 较湿润';
+                            break;
+                        case 'light':
+                            value = currentData.light;
+                            unit = 'lux';
+                            trendText = '— 中等';
+                            break;
+                        case 'activity':
+                            value = currentData.activity;
+                            unit = '分';
+                            trendText = '↑ 较昨日 +5%';
+                            break;
+                        case 'duration':
+                            value = currentData.duration;
+                            unit = 'h';
+                            trendText = '↑ 较昨日 +0.3h';
+                            break;
+                        case 'sleep':
+                            value = currentData.sleep;
+                            unit = 'h';
+                            trendText = '↑ 较昨日 +0.2h';
+                            break;
+                        default: return;
+                    }
+
+                    valueEl.innerHTML = `${value} <span class="unit">${unit}</span>`;
+                    if (trendEl) {
+                        trendEl.textContent = trendText;
+                    }
+                });
+            }
+
+            updateBubbleData();
+            setInterval(updateBubbleData, 8000);
+        })();
+
+        // ----- 6. 环境-人体感知数据模拟更新 -----
+        (function simulateSensorData() {
+            const sensorItems = document.querySelectorAll('.sensor-item');
+
+            function updateSensorData() {
+                const temp = (22 + Math.random() * 6);
+                const tempVal = Math.round(temp * 10) / 10;
+                const tempDesc = tempVal < 20 ? '偏凉' : (tempVal < 24 ? '凉爽' : (tempVal < 27 ? '舒适' : '偏热'));
+
+                const hum = (40 + Math.random() * 40);
+                const humVal = Math.round(hum);
+                let humDesc = '';
+                if (humVal < 45) humDesc = '干燥';
+                else if (humVal < 55) humDesc = '较干燥';
+                else if (humVal < 65) humDesc = '较湿润';
+                else if (humVal < 75) humDesc = '潮湿';
+                else humDesc = '非常潮湿';
+
+                const now = new Date();
+                const hour = now.getHours();
+                let lightBase = 0;
+                if (hour >= 6 && hour < 8) lightBase = 150 + Math.random() * 200;
+                else if (hour >= 8 && hour < 17) lightBase = 300 + Math.random() * 500;
+                else if (hour >= 17 && hour < 19) lightBase = 100 + Math.random() * 200;
+                else lightBase = 10 + Math.random() * 40;
+                const lightVal = Math.round(lightBase);
+                let lightDesc = '';
+                if (lightVal < 50) lightDesc = '弱';
+                else if (lightVal < 150) lightDesc = '较弱';
+                else if (lightVal < 350) lightDesc = '中等';
+                else if (lightVal < 600) lightDesc = '较强';
+                else lightDesc = '强';
+
+                const states = ['运动中', '静止', '休息中'];
+                const statusEmojis = ['🚶', '🧘', '😴'];
+                const statusClasses = ['active', 'still', 'sleeping'];
+                const randIdx = Math.floor(Math.random() * 3);
+
+                if (sensorItems.length >= 4) {
+                    const tempValue = sensorItems[0].querySelector('.value');
+                    const tempDescEl = sensorItems[0].querySelector('.desc');
+                    if (tempValue) tempValue.innerHTML = `${tempVal} <span class="unit">°C</span>`;
+                    if (tempDescEl) tempDescEl.innerHTML = `🌤️ <span class="highlight">${tempDesc}</span>`;
+
+                    const humValue = sensorItems[1].querySelector('.value');
+                    const humDescEl = sensorItems[1].querySelector('.desc');
+                    if (humValue) humValue.innerHTML = `${humVal} <span class="unit">%</span>`;
+                    if (humDescEl) humDescEl.innerHTML = `💨 <span class="highlight">${humDesc}</span>`;
+
+                    const lightValue = sensorItems[2].querySelector('.value');
+                    const lightDescEl = sensorItems[2].querySelector('.desc');
+                    if (lightValue) lightValue.innerHTML = `${lightVal} <span class="unit">lux</span>`;
+                    if (lightDescEl) lightDescEl.innerHTML = `💡 <span class="highlight">${lightDesc}</span>`;
+
+                    const statusValue = sensorItems[3].querySelector('.value');
+                    if (statusValue) {
+                        statusValue.innerHTML =
+                            `<span class="status-badge ${statusClasses[randIdx]}">${statusEmojis[randIdx]} ${states[randIdx]}</span>`;
+                    }
+                }
+            }
+
+            updateSensorData();
+            setInterval(updateSensorData, 5000);
+        })();
+
+        console.log('🏠 子女管理平台已启动');
+        console.log('🖥️ 远程协助按钮已添加点击选中变蓝交互');
+        console.log('🟡 底部气泡：外围发光金属黄渐变至背景色，内部与背景色完美融合');
+    </script>
+
+</body>
+</html>

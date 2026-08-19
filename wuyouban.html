@@ -1,0 +1,2395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 字符编码与视口设置：确保中文字符正常显示，并适配移动端与PC端 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>无忧伴 · 老人端</title>
+    <!-- 引入Inter与系统字体，提升现代感与可读性 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <style>
+        /* ----- 全局重置与基础变量：让body完全占满视口 ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* 定义CSS变量，当前为“无忧伴”橙黄色暖色系主题 */
+        :root {
+            --primary-warm: #e8963a;
+            --primary-warm-light: #f5c842;
+            --primary-warm-pale: #fdf6e8;
+            --primary-warm-deep: #c47a2a;
+            --cream: #fdf6e8;
+            --text-dark: #3a2a1a;
+            --text-soft: #7a6a5a;
+            --shadow-soft: 0 12px 40px rgba(200, 150, 80, 0.15);
+            --radius-card: 32px;
+            --radius-btn: 48px;
+            /* 新增蓝色变量用于优活模式 */
+            --blue-primary: #4a90d9;
+            --blue-light: #6ba3e0;
+            --blue-deep: #2c6aa0;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            min-height: 100vh;
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+            background: var(--cream);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* ----- 主卡片：完全占满整个屏幕，暖色基底 ----- */
+        .hero-card {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100%;
+            max-height: 100%;
+            background: var(--cream);
+            border-radius: 0;
+            overflow: hidden;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            padding: 28px 36px 32px;
+            transition: all 0.3s ease;
+        }
+
+        /* ============================================================
+           风吹麦浪背景层：暖色渐变 + 流动光晕
+           ============================================================ */
+        .wave-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            border-radius: 0;
+            overflow: hidden;
+            background: linear-gradient(145deg, 
+                #fdf6e8 0%, 
+                #f8edd4 20%, 
+                #f5e4c0 40%, 
+                #f0d8a8 60%, 
+                #ebc890 80%, 
+                #e0b878 100%
+            );
+        }
+
+        .wave-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: wheatFlow 16s infinite alternate ease-in-out;
+            will-change: transform, opacity;
+        }
+
+        .wave-glow-1 {
+            width: 500px;
+            height: 500px;
+            top: -120px;
+            right: -100px;
+            background: radial-gradient(circle at 30% 40%, #f5d080, #e8b860);
+            animation-duration: 18s;
+            opacity: 0.25;
+        }
+        .wave-glow-2 {
+            width: 600px;
+            height: 600px;
+            bottom: -180px;
+            left: -140px;
+            background: radial-gradient(circle at 60% 50%, #f0c870, #dba050);
+            animation-duration: 22s;
+            animation-delay: -5s;
+            opacity: 0.2;
+        }
+        .wave-glow-3 {
+            width: 350px;
+            height: 350px;
+            top: 25%;
+            left: 8%;
+            background: radial-gradient(circle at 40% 60%, #f5d888, #e8b860);
+            animation-duration: 14s;
+            animation-delay: -8s;
+            opacity: 0.2;
+        }
+        .wave-glow-4 {
+            width: 400px;
+            height: 400px;
+            bottom: 10%;
+            right: -60px;
+            background: radial-gradient(circle at 20% 30%, #f8e098, #e8b860);
+            animation-duration: 20s;
+            animation-delay: -3s;
+            opacity: 0.18;
+        }
+
+        @keyframes wheatFlow {
+            0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.2; }
+            25%  { transform: translate(30px, -25px) scale(1.08) rotate(3deg); opacity: 0.3; }
+            50%  { transform: translate(-20px, 35px) scale(0.92) rotate(-2deg); opacity: 0.18; }
+            75%  { transform: translate(40px, 20px) scale(1.10) rotate(4deg); opacity: 0.28; }
+            100% { transform: translate(-25px, -15px) scale(0.95) rotate(-3deg); opacity: 0.2; }
+        }
+
+        /* ============================================================
+           背景上飘动的红色扁菱形风筝（远景，模糊）
+           增加数量：6只，大小不一，牵引线为黑色丝线，连接在风筝右边的角上
+           ============================================================ */
+        .distant-kites {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        /* 风筝基础样式 - 扁菱形，红色，带模糊效果 */
+        .distant-kite {
+            position: absolute;
+            background: rgba(200, 40, 30, 0.55);
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            filter: blur(3px) drop-shadow(0 2px 12px rgba(180, 30, 20, 0.15));
+            opacity: 0.6;
+            animation: kiteDrift 18s infinite alternate ease-in-out;
+            transform-origin: center bottom;
+        }
+
+        /* 风筝的牵引线 - 黑色丝线，连接在风筝右边角（即clip-path的第二个顶点100% 50%处） */
+        .distant-kite::before {
+            content: '';
+            position: absolute;
+            bottom: -28px;          /* 从风筝右下角向下延伸 */
+            right: -8px;            /* 从右边角位置出发，略微偏移让线从角上自然垂下 */
+            width: 2px;             /* 黑色丝线粗细 */
+            height: 48px;           /* 线长 */
+            background: rgba(30, 30, 30, 0.65);  /* 黑色丝线，半透明显自然 */
+            border-radius: 1px;
+            filter: blur(1px);      /* 轻微模糊，符合远景 */
+            transform: rotate(6deg); /* 略微倾斜，自然垂落 */
+        }
+
+        /* 不同大小的风筝变体 */
+        .distant-kite-sm {
+            width: 28px;
+            height: 18px;
+            filter: blur(3.5px) drop-shadow(0 2px 10px rgba(180, 30, 20, 0.10));
+            opacity: 0.45;
+            animation-duration: 20s;
+        }
+        .distant-kite-sm::before {
+            height: 32px;
+            bottom: -20px;
+            right: -6px;
+            width: 1.5px;
+            background: rgba(30, 30, 30, 0.50);
+            filter: blur(1.5px);
+            transform: rotate(8deg);
+        }
+
+        .distant-kite-md {
+            width: 36px;
+            height: 22px;
+            filter: blur(2.8px) drop-shadow(0 2px 14px rgba(180, 30, 20, 0.13));
+            opacity: 0.55;
+            animation-duration: 16s;
+        }
+        .distant-kite-md::before {
+            height: 40px;
+            bottom: -24px;
+            right: -7px;
+            width: 2px;
+            background: rgba(30, 30, 30, 0.58);
+            filter: blur(1.2px);
+            transform: rotate(5deg);
+        }
+
+        .distant-kite-lg {
+            width: 44px;
+            height: 26px;
+            filter: blur(2.5px) drop-shadow(0 2px 18px rgba(180, 30, 20, 0.18));
+            opacity: 0.65;
+            animation-duration: 14s;
+        }
+        .distant-kite-lg::before {
+            height: 50px;
+            bottom: -28px;
+            right: -9px;
+            width: 2.5px;
+            background: rgba(30, 30, 30, 0.65);
+            filter: blur(1px);
+            transform: rotate(4deg);
+        }
+
+        /* 更小的风筝 - 更远 */
+        .distant-kite-xs {
+            width: 20px;
+            height: 12px;
+            filter: blur(4px) drop-shadow(0 2px 8px rgba(180, 30, 20, 0.08));
+            opacity: 0.35;
+            animation-duration: 24s;
+        }
+        .distant-kite-xs::before {
+            height: 24px;
+            bottom: -16px;
+            right: -4px;
+            width: 1.2px;
+            background: rgba(30, 30, 30, 0.40);
+            filter: blur(2px);
+            transform: rotate(10deg);
+        }
+
+        /* 各个风筝的位置 - 分布在背景不同区域，疏密有致 */
+        .distant-kite.pos-1 {
+            top: 8%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        .distant-kite.pos-2 {
+            top: 5%;
+            right: 18%;
+            animation-delay: -2.5s;
+        }
+        .distant-kite.pos-3 {
+            top: 22%;
+            left: 48%;
+            animation-delay: -5s;
+        }
+        .distant-kite.pos-4 {
+            top: 15%;
+            left: 28%;
+            animation-delay: -7.5s;
+        }
+        .distant-kite.pos-5 {
+            top: 3%;
+            left: 68%;
+            animation-delay: -10s;
+        }
+        .distant-kite.pos-6 {
+            top: 28%;
+            right: 8%;
+            animation-delay: -12.5s;
+        }
+
+        /* 风筝飘动动画 - 更缓和的摇摆，模拟高空风力 */
+        @keyframes kiteDrift {
+            0% {
+                transform: translate(0, 0) rotate(-4deg) scale(1);
+            }
+            25% {
+                transform: translate(14px, -10px) rotate(3deg) scale(1.03);
+            }
+            50% {
+                transform: translate(-10px, 12px) rotate(-5deg) scale(0.97);
+            }
+            75% {
+                transform: translate(20px, -6px) rotate(5deg) scale(1.02);
+            }
+            100% {
+                transform: translate(-14px, 16px) rotate(-3deg) scale(0.98);
+            }
+        }
+
+        /* ============================================================
+           右栏泡泡群 - 3个泡泡，介于稻草人和语音气泡轮廓之间，分散分布
+           ============================================================ */
+        .bubble-swarm {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        /* 泡泡样式 */
+        .bubble-swarm .bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 25%, 
+                rgba(220, 240, 255, 0.40), 
+                rgba(180, 215, 240, 0.15)
+            );
+            border: 2px solid rgba(210, 230, 250, 0.25);
+            box-shadow: 
+                inset 0 -4px 20px rgba(200, 225, 245, 0.08),
+                0 6px 30px rgba(200, 225, 245, 0.06),
+                0 0 60px rgba(200, 225, 245, 0.03);
+            animation: bubbleDrift 10s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes bubbleDrift {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                opacity: 0.5;
+            }
+            25% {
+                transform: translate(12px, -18px) scale(1.05) rotate(5deg);
+                opacity: 0.85;
+            }
+            50% {
+                transform: translate(-8px, 12px) scale(0.94) rotate(-3deg);
+                opacity: 0.6;
+            }
+            75% {
+                transform: translate(16px, -10px) scale(1.04) rotate(7deg);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translate(-5px, 6px) scale(0.96) rotate(-2deg);
+                opacity: 0.5;
+            }
+        }
+
+        /* 3个泡泡 - 重新定位：介于稻草人（左下）和语音气泡轮廓（右中）之间，分散且不进入语音气泡内部 */
+        .bubble-swarm .bubble-1 {
+            width: 70px;
+            height: 70px;
+            bottom: 18%;        /* 靠近底部，但高于稻草人 */
+            left: 22%;          /* 左移，介于稻草人和语音气泡之间 */
+            animation-duration: 9s;
+            animation-delay: 0s;
+        }
+        .bubble-swarm .bubble-2 {
+            width: 55px;
+            height: 55px;
+            bottom: 42%;        /* 中部偏下 */
+            left: 10%;          /* 更靠左，分散开 */
+            animation-duration: 7.5s;
+            animation-delay: 1.2s;
+        }
+        .bubble-swarm .bubble-3 {
+            width: 60px;
+            height: 60px;
+            bottom: 68%;        /* 中上部 */
+            left: 28%;          /* 右移一点，但仍避开语音气泡区域 */
+            animation-duration: 8.5s;
+            animation-delay: 0.6s;
+        }
+
+        /* ============================================================
+           左下角彩铅素描插画 - 稻草人（保持不变）
+           ============================================================ */
+        .sketch-art {
+            position: absolute;
+            bottom: 20px;
+            left: 24px;
+            z-index: 6;
+            width: 200px;
+            height: 170px;
+            pointer-events: none;
+            opacity: 0.85;
+            filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.06));
+            transition: opacity 0.5s ease;
+        }
+
+        .field-path {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 28%;
+            background: linear-gradient(180deg, 
+                rgba(180, 160, 120, 0.35),
+                rgba(200, 180, 140, 0.25)
+            );
+            border-radius: 0 0 0 0;
+            clip-path: polygon(0% 40%, 20% 20%, 40% 45%, 60% 25%, 80% 50%, 100% 30%, 100% 100%, 0% 100%);
+        }
+
+        .field-stroke {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 33%;
+            background: repeating-linear-gradient(
+                10deg,
+                transparent 0px,
+                rgba(160, 140, 100, 0.15) 2px,
+                transparent 4px,
+                rgba(180, 160, 120, 0.10) 6px,
+                transparent 8px
+            );
+            clip-path: polygon(0% 40%, 20% 20%, 40% 45%, 60% 25%, 80% 50%, 100% 30%, 100% 100%, 0% 100%);
+        }
+
+        .scarecrow-leg {
+            position: absolute;
+            bottom: 6%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 7px;
+            height: 18px;
+            background: rgba(200, 180, 150, 0.20);
+            border-radius: 3px 3px 6px 6px;
+            border: 2px solid rgba(180, 160, 140, 0.12);
+        }
+        .scarecrow-leg::after {
+            content: '';
+            position: absolute;
+            inset: 1px;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(180, 160, 140, 0.06) 2px,
+                transparent 4px
+            );
+            border-radius: inherit;
+        }
+
+        .scarecrow-body {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 34px;
+            height: 40px;
+            background: rgba(200, 180, 150, 0.35);
+            border-radius: 30% 30% 20% 20%;
+            border: 2.5px solid rgba(180, 160, 130, 0.30);
+            box-shadow: inset -2px 0 8px rgba(160, 130, 100, 0.08);
+        }
+        .scarecrow-body::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(180, 160, 130, 0.08) 2px,
+                transparent 4px,
+                rgba(200, 180, 160, 0.06) 6px,
+                transparent 8px
+            );
+            border-radius: inherit;
+        }
+
+        .scarecrow-head {
+            position: absolute;
+            bottom: 52%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 34px;
+            background: radial-gradient(circle at 40% 30%, rgba(220, 200, 180, 0.40), rgba(190, 170, 150, 0.20));
+            border-radius: 50% 50% 45% 45%;
+            border: 2.5px solid rgba(180, 160, 140, 0.25);
+        }
+
+        .scarecrow-hat {
+            position: absolute;
+            bottom: 70%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 46px;
+            height: 14px;
+            background: radial-gradient(ellipse at 50% 30%, rgba(200, 180, 150, 0.30), rgba(180, 160, 140, 0.12));
+            border-radius: 50% 50% 20% 20%;
+            border: 2.5px solid rgba(180, 160, 140, 0.18);
+            box-shadow: inset 0 -4px 8px rgba(160, 140, 120, 0.06);
+        }
+        .scarecrow-hat::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 10%;
+            width: 80%;
+            height: 3px;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                rgba(160, 140, 120, 0.10) 3px,
+                transparent 6px
+            );
+            border-radius: 2px;
+        }
+
+        .scarecrow-hat-top {
+            position: absolute;
+            bottom: 80%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 8px;
+            background: radial-gradient(ellipse at 50% 30%, rgba(200, 180, 150, 0.25), rgba(180, 160, 140, 0.10));
+            border-radius: 50% 50% 0 0;
+            border: 2px solid rgba(180, 160, 140, 0.12);
+        }
+
+        .scarecrow-eye {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: rgba(80, 60, 40, 0.30);
+            border-radius: 50%;
+            border: 1.5px solid rgba(80, 60, 40, 0.10);
+        }
+        .scarecrow-eye-left {
+            bottom: 66%;
+            left: 43%;
+        }
+        .scarecrow-eye-right {
+            bottom: 66%;
+            left: 51%;
+        }
+
+        .scarecrow-smile {
+            position: absolute;
+            bottom: 60%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 6px;
+            border-bottom: 2.5px solid rgba(120, 90, 70, 0.20);
+            border-radius: 0 0 20px 20px;
+        }
+
+        .scarecrow-arm {
+            position: absolute;
+            bottom: 32%;
+            width: 20px;
+            height: 6px;
+            background: rgba(200, 180, 150, 0.25);
+            border-radius: 8px;
+            border: 2px solid rgba(180, 160, 140, 0.15);
+        }
+        .scarecrow-arm-left {
+            left: 20%;
+            transform: rotate(-15deg);
+            transform-origin: right center;
+        }
+        .scarecrow-arm-right {
+            left: 56%;
+            transform: rotate(15deg);
+            transform-origin: left center;
+        }
+        .scarecrow-arm::after {
+            content: '';
+            position: absolute;
+            inset: 1px;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                rgba(180, 160, 140, 0.08) 2px,
+                transparent 4px
+            );
+            border-radius: inherit;
+        }
+
+        .scarecrow-bow {
+            position: absolute;
+            bottom: 46%;
+            left: 50%;
+            transform: translateX(-50%) rotate(4deg);
+            width: 9px;
+            height: 7px;
+            background: rgba(200, 100, 80, 0.20);
+            border-radius: 2px;
+            border: 1.5px solid rgba(200, 100, 80, 0.10);
+        }
+        .scarecrow-bow::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 0;
+            width: 9px;
+            height: 7px;
+            background: rgba(200, 100, 80, 0.15);
+            border-radius: 2px;
+            border: 1.5px solid rgba(200, 100, 80, 0.08);
+            transform: rotate(-8deg);
+        }
+
+        .grass-stroke {
+            position: absolute;
+            bottom: 4%;
+            width: 2.5px;
+            height: 10px;
+            background: rgba(140, 180, 120, 0.22);
+            border-radius: 2px;
+            transform: rotate(15deg);
+        }
+        .grass-stroke-1 { left: 5%; height: 12px; }
+        .grass-stroke-2 { left: 12%; height: 8px; transform: rotate(-10deg); }
+        .grass-stroke-3 { left: 25%; height: 10px; transform: rotate(20deg); }
+        .grass-stroke-4 { left: 55%; height: 7px; transform: rotate(-15deg); }
+        .grass-stroke-5 { left: 70%; height: 9px; transform: rotate(10deg); }
+        .grass-stroke-6 { left: 85%; height: 8px; transform: rotate(-8deg); }
+
+        /* ============================================================
+           右下角风车
+           ============================================================ */
+        .windmill {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 3;
+            width: 220px;
+            height: 260px;
+            pointer-events: none;
+            opacity: 0.65;
+            animation: windmillPulse 6s infinite alternate ease-in-out;
+            filter: drop-shadow(0 0 30px rgba(200, 150, 80, 0.12)) drop-shadow(0 4px 20px rgba(0,0,0,0.03));
+        }
+
+        .windmill-tower {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 80px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 245, 0.7));
+            border-radius: 4px 4px 6px 6px;
+            border: 1.5px solid rgba(220, 220, 230, 0.4);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.08), inset 0 2px 4px rgba(255,255,255,0.3);
+        }
+        .windmill-tower::before {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 20%;
+            width: 60%;
+            height: 70%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(200, 200, 210, 0.08) 2px,
+                transparent 4px
+            );
+            border-radius: 2px;
+        }
+
+        .windmill-base {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 48px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 4px;
+            border: 1.5px solid rgba(220, 220, 230, 0.3);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+        }
+
+        .windmill-body {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 110px;
+            height: 110px;
+        }
+
+        .windmill-hub {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle at 40% 35%, #e88050, #c05030);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 40px rgba(200, 80, 40, 0.3), 
+                0 0 80px rgba(200, 80, 40, 0.10),
+                inset 0 -2px 6px rgba(0,0,0,0.1);
+            z-index: 2;
+            border: 2px solid rgba(200, 80, 40, 0.15);
+        }
+
+        .windmill-blades {
+            position: absolute;
+            inset: 0;
+            animation: spinBlades 4.5s linear infinite;
+        }
+
+        .blade {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: 0% 50%;
+            width: 52px;
+            height: 10px;
+            background: linear-gradient(90deg, 
+                rgba(255, 255, 255, 0.75), 
+                rgba(240, 240, 245, 0.35),
+                rgba(230, 230, 240, 0.15)
+            );
+            border-radius: 14px 4px 4px 14px;
+            box-shadow: 
+                0 0 24px rgba(255, 255, 255, 0.10),
+                inset 0 1px 0 rgba(255,255,255,0.3);
+            border: 1.5px solid rgba(220, 220, 230, 0.2);
+        }
+        .blade::after {
+            content: '';
+            position: absolute;
+            top: 30%;
+            left: 10%;
+            width: 80%;
+            height: 40%;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                rgba(200, 200, 210, 0.06) 3px,
+                transparent 6px
+            );
+            border-radius: 2px;
+        }
+
+        .blade-1 { transform: rotate(0deg) translateX(-50%); }
+        .blade-2 { transform: rotate(90deg) translateX(-50%); }
+        .blade-3 { transform: rotate(180deg) translateX(-50%); }
+        .blade-4 { transform: rotate(270deg) translateX(-50%); }
+
+        @keyframes spinBlades {
+            0% { transform: rotate(0deg) scale(1); }
+            20% { transform: rotate(72deg) scale(1.02); }
+            40% { transform: rotate(144deg) scale(1); }
+            60% { transform: rotate(216deg) scale(0.98); }
+            80% { transform: rotate(288deg) scale(1.01); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        @keyframes windmillPulse {
+            0% { opacity: 0.50; transform: scale(0.95) rotate(-1deg); }
+            100% { opacity: 0.75; transform: scale(1.05) rotate(1deg); }
+        }
+
+        .wave-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--primary-warm-light), var(--primary-warm), var(--primary-warm-light), transparent);
+            opacity: 0.3;
+            z-index: 1;
+        }
+
+        /* ============================================================
+           布局容器 - 左栏功能(1/3)，右栏语音(2/3)
+           ============================================================ */
+        .layout-grid {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 24px;
+            flex: 1;
+            align-items: stretch;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* ----- 左栏：功能分区（占1/3） ----- */
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            justify-content: center;
+        }
+
+        /* ----- 右栏：语音核心区（占2/3宽度） ----- */
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            height: 100%;
+            width: 100%;
+            padding-top: 0;
+        }
+
+        /* ============================================================
+           语音模块 - 纯气泡轮廓，变化速度20秒
+           ============================================================ */
+        .voice-module {
+            width: 100%;
+            height: auto;
+            flex: 1;
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: none;
+            outline: none;
+            box-shadow: 
+                0 12px 40px rgba(200, 150, 80, 0.10),
+                inset 0 0 50px rgba(255, 255, 255, 0.04);
+            padding: 28px 32px 32px;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px;
+            transition: transform 0.25s ease, border-radius 6s ease;
+            margin-top: 0;
+            margin-bottom: 0;
+            border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+            animation: bubbleMorph 20s infinite alternate ease-in-out;
+            position: relative;
+        }
+
+        @keyframes bubbleMorph {
+            0% {
+                border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%;
+                transform: scale(1) rotate(0deg);
+            }
+            10% {
+                border-radius: 45% 55% 40% 60% / 55% 40% 60% 45%;
+                transform: scale(1.012) rotate(0.6deg);
+            }
+            20% {
+                border-radius: 55% 45% 60% 40% / 40% 60% 45% 55%;
+                transform: scale(0.992) rotate(-0.3deg);
+            }
+            30% {
+                border-radius: 40% 60% 45% 55% / 60% 45% 55% 40%;
+                transform: scale(1.008) rotate(0.9deg);
+            }
+            40% {
+                border-radius: 58% 42% 50% 50% / 42% 52% 48% 58%;
+                transform: scale(0.994) rotate(-0.6deg);
+            }
+            50% {
+                border-radius: 42% 58% 48% 52% / 58% 42% 52% 48%;
+                transform: scale(1.006) rotate(0.3deg);
+            }
+            60% {
+                border-radius: 50% 50% 60% 40% / 45% 55% 45% 55%;
+                transform: scale(0.997) rotate(-0.4deg);
+            }
+            70% {
+                border-radius: 52% 48% 42% 58% / 48% 52% 58% 42%;
+                transform: scale(1.004) rotate(0.7deg);
+            }
+            80% {
+                border-radius: 48% 52% 58% 42% / 42% 58% 48% 52%;
+                transform: scale(0.996) rotate(-0.5deg);
+            }
+            90% {
+                border-radius: 56% 44% 48% 52% / 46% 54% 42% 58%;
+                transform: scale(1.002) rotate(0.2deg);
+            }
+            100% {
+                border-radius: 55% 45% 45% 55% / 50% 50% 50% 50%;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        .voice-module::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: radial-gradient(
+                ellipse at 30% 25%,
+                rgba(255, 255, 255, 0.18) 0%,
+                rgba(255, 255, 255, 0.04) 40%,
+                transparent 70%
+            );
+            pointer-events: none;
+            z-index: 0;
+            animation: bubbleShine 7s infinite alternate ease-in-out;
+        }
+
+        @keyframes bubbleShine {
+            0% { opacity: 0.2; transform: translate(0, 0) scale(1); }
+            50% { opacity: 0.5; transform: translate(3%, 2%) scale(1.02); }
+            100% { opacity: 0.2; transform: translate(-2%, 1%) scale(0.98); }
+        }
+
+        .voice-module::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: inherit;
+            background: transparent;
+            box-shadow: 
+                0 0 40px rgba(232, 150, 58, 0.05),
+                inset 0 0 40px rgba(232, 150, 58, 0.025);
+            pointer-events: none;
+            z-index: 0;
+            animation: bubbleGlow 8s infinite alternate ease-in-out;
+        }
+
+        @keyframes bubbleGlow {
+            0% { opacity: 0.15; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.15; }
+        }
+
+        .voice-module:hover {
+            transform: translateY(-3px) scale(1.005);
+        }
+
+        .voice-module > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .voice-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .voice-header .label {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-soft);
+            opacity: 0.7;
+            letter-spacing: 0.3px;
+        }
+
+        .voice-status {
+            font-size: 14px;
+            color: var(--primary-warm);
+            font-weight: 400;
+            opacity: 0.7;
+        }
+
+        .voice-status.recording {
+            color: #e74c3c;
+            opacity: 1;
+            animation: pulseText 1s infinite;
+        }
+
+        @keyframes pulseText {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .voice-display {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.20);
+            border-radius: 30px;
+            padding: 20px 24px;
+            min-height: 70px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: var(--text-dark);
+            font-weight: 450;
+            line-height: 1.5;
+            transition: all 0.3s ease;
+            text-align: center;
+            word-break: break-word;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            max-width: 100%;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+            overflow: hidden;
+        }
+
+        .voice-display .placeholder {
+            color: var(--text-soft);
+            opacity: 0.4;
+            font-weight: 300;
+            font-size: 20px;
+        }
+
+        .voice-display .transcript {
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .voice-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: auto;
+            min-width: 55%;
+            max-width: 85%;
+            padding: 16px 28px;
+            border-radius: 60px;
+            border: none;
+            background: linear-gradient(135deg, var(--primary-warm-light), var(--primary-warm));
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 24px rgba(232, 150, 58, 0.20);
+            letter-spacing: 0.5px;
+            margin-top: 16px;
+            align-self: center;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .voice-button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 32px rgba(232, 150, 58, 0.30);
+        }
+
+        .voice-button:active {
+            transform: scale(0.97);
+        }
+
+        .voice-button.recording {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 6px 24px rgba(231, 76, 60, 0.20);
+        }
+
+        /* ----- 顶部栏：问候 + 时间（切换键移到下方） ----- */
+        .top-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-bottom: 2px;
+        }
+
+        .greeting-area {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .greeting {
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--text-dark);
+            letter-spacing: 0.3px;
+        }
+
+        .greeting .highlight {
+            color: var(--primary-warm-deep);
+            font-weight: 600;
+        }
+
+        .time-display {
+            font-size: 14px;
+            color: var(--text-soft);
+            opacity: 0.7;
+            font-weight: 400;
+        }
+
+        /* ============================================================
+           切换键 (role-switch) - 优活悬停变蓝，无忧伴保持橙黄
+           ============================================================ */
+        .role-switch {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: 40px;
+            padding: 4px;
+            border: 1px solid rgba(232, 150, 58, 0.2);
+            box-shadow: 0 4px 16px rgba(200, 150, 80, 0.08);
+            flex-shrink: 0;
+            width: fit-content;
+        }
+
+        .switch-btn {
+            padding: 8px 18px;
+            border-radius: 32px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: transparent;
+            color: var(--text-soft);
+            letter-spacing: 0.3px;
+        }
+
+        /* 无忧伴激活状态 - 橙黄色 */
+        .switch-btn.active-wuyouban {
+            background: var(--primary-warm);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(232, 150, 58, 0.3);
+        }
+
+        /* 优活悬停状态 - 蓝色（仅当鼠标悬停时） */
+        .switch-btn#btnYouhuo:hover:not(.active-wuyouban) {
+            background: var(--blue-primary);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(74, 144, 217, 0.35);
+        }
+
+        /* 优活激活状态 - 蓝色（当被点击激活时） */
+        .switch-btn#btnYouhuo.active-wuyouban {
+            background: var(--blue-primary);
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(74, 144, 217, 0.35);
+        }
+
+        /* 无忧伴悬停 - 保持橙黄色调（稍微加深一点以作反馈） */
+        .switch-btn#btnWuyouban:hover:not(.active-wuyouban) {
+            background: rgba(232, 150, 58, 0.15);
+            color: var(--primary-warm-deep);
+        }
+
+        .switch-btn:first-child {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .switch-btn:last-child {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        /* ============================================================
+           “今日陪伴” 风筝形模块 - 飘动幅度更小、速度更慢
+           ============================================================ */
+        .main-card {
+            /* 使用clip-path绘制扁平风筝形：上窄下宽，两侧翼尖 */
+            clip-path: polygon(
+                0% 20%,  /* 左下翼尖 */
+                15% 0%,  /* 左翼上 */
+                50% 10%, /* 顶部中心 */
+                85% 0%,  /* 右翼上 */
+                100% 20%, /* 右下翼尖 */
+                80% 100%, /* 右下尾 */
+                50% 85%,  /* 底部中心 */
+                20% 100%  /* 左下尾 */
+            );
+            background: linear-gradient(135deg, 
+                #d94f14 0%,      /* 橘红色外围 */
+                #e8692a 15%,
+                #f08a3a 30%,
+                #f5a84a 50%,
+                #f8c060 70%,
+                #fad680 85%,
+                #fde8a0 100%     /* 渐变至暖黄，与背景融合 */
+            );
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: 0;      /* clip-path已定义形状，无需圆角 */
+            padding: 18px 20px 20px;
+            border: 2px solid rgba(200, 80, 30, 0.25); /* 半透明橘红边框增强轮廓 */
+            box-shadow: 
+                0 8px 32px rgba(180, 80, 20, 0.15),
+                inset 0 0 40px rgba(255, 200, 120, 0.20);
+            transition: transform 0.25s ease, box-shadow 0.3s ease;
+            cursor: default;
+            /* 风筝飘动动画：幅度更小、速度更慢 */
+            animation: kiteFloat 10s infinite alternate ease-in-out; /* 从6s改为10s，更慢 */
+            transform-origin: center bottom;
+            /* 让内容居中并保持可读性 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: #3a2a1a;
+            position: relative;
+            z-index: 5;
+            /* 增加内部发光，让渐变更柔和 */
+        }
+
+        /* 风筝飘动关键帧：幅度缩小（位移从±12px降至±4px，旋转从±3deg降至±1.5deg） */
+        @keyframes kiteFloat {
+            0% {
+                transform: translate(0, 0) rotate(-1deg) scale(1.00);
+            }
+            25% {
+                transform: translate(3px, -2px) rotate(0.8deg) scale(1.01);
+            }
+            50% {
+                transform: translate(-2px, 2px) rotate(-1.2deg) scale(0.995);
+            }
+            75% {
+                transform: translate(4px, -1px) rotate(1deg) scale(1.005);
+            }
+            100% {
+                transform: translate(-2px, 3px) rotate(-0.8deg) scale(0.995);
+            }
+        }
+
+        /* ===== 风筝线 - 保持原有样式 ===== */
+        .main-card::before {
+            content: '';
+            position: absolute;
+            bottom: -42px;           /* 向下延伸，让线更显眼 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 5px;              /* 线宽从3px增加至5px，更加粗壮明显 */
+            height: 52px;            /* 线长略微增加 */
+            background: linear-gradient(180deg, 
+                rgba(200, 120, 70, 0.85),  /* 颜色进一步加深，提高对比度 */
+                rgba(160, 100, 60, 0.50)
+            );
+            border-radius: 3px;
+            z-index: -1;
+            animation: stringWave 4s infinite alternate ease-in-out; /* 线也同步放慢 */
+            /* 增强发光效果，让线在背景上更突出 */
+            filter: drop-shadow(0 2px 10px rgba(180, 100, 50, 0.35)) drop-shadow(0 0 6px rgba(200, 120, 70, 0.20));
+        }
+
+        /* 增加第二条线，形成双线效果，更显眼，同时也加粗 */
+        .main-card::after {
+            content: '';
+            position: absolute;
+            bottom: -34px;
+            left: 48%;
+            transform: translateX(-50%) rotate(4deg);
+            width: 4px;              /* 副线也从2.5px加粗至4px */
+            height: 36px;
+            background: linear-gradient(180deg, 
+                rgba(200, 120, 70, 0.65),
+                rgba(160, 100, 60, 0.30)
+            );
+            border-radius: 2px;
+            z-index: -1;
+            animation: stringWave2 4.5s infinite alternate ease-in-out;
+            filter: drop-shadow(0 2px 8px rgba(180, 100, 50, 0.25));
+        }
+
+        @keyframes stringWave {
+            0% { transform: translateX(-50%) rotate(2deg); opacity: 0.7; }
+            100% { transform: translateX(-50%) rotate(-2deg); opacity: 1; }
+        }
+
+        @keyframes stringWave2 {
+            0% { transform: translateX(-50%) rotate(5deg) scaleY(0.9); opacity: 0.5; }
+            100% { transform: translateX(-50%) rotate(-1deg) scaleY(1.1); opacity: 0.8; }
+        }
+
+        .main-card .card-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #5a3a1a;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            opacity: 0.7;
+            margin-bottom: 6px;
+            text-shadow: 0 1px 4px rgba(255, 255, 255, 0.15);
+        }
+
+        .main-card .chat-prompt {
+            font-size: 20px;
+            font-weight: 500;
+            color: #3a2a1a;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-shadow: 0 1px 6px rgba(255, 255, 255, 0.10);
+            flex-wrap: wrap;
+        }
+
+        .main-card .chat-prompt .icon {
+            font-size: 26px;
+        }
+
+        .main-card .chat-prompt .sub {
+            font-size: 13px;
+            font-weight: 400;
+            color: #5a4a3a;
+            opacity: 0.7;
+            margin-top: 2px;
+            display: block;
+            text-shadow: 0 1px 4px rgba(255, 255, 255, 0.08);
+        }
+
+        .main-card:hover {
+            transform: scale(1.02) rotate(1deg);
+            box-shadow: 0 12px 48px rgba(180, 80, 20, 0.25);
+        }
+
+        /* ----- 建议模块 (advice-section) - 动态数据接口 ----- */
+        .advice-section {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: var(--radius-card);
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.25s ease;
+            border-color: rgba(232, 150, 58, 0.08);
+            min-height: 52px; /* 保持高度一致 */
+        }
+
+        .advice-section:hover {
+            transform: translateY(-2px);
+        }
+
+        .advice-icon {
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .advice-text {
+            font-size: 14px;
+            color: var(--text-dark);
+            font-weight: 450;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .advice-text .highlight {
+            color: var(--primary-warm-deep);
+            font-weight: 500;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .quick-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border-radius: 18px;
+            padding: 10px 4px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: var(--shadow-soft);
+            transition: all 0.25s ease;
+            cursor: default;
+            color: var(--text-dark);
+            border-color: rgba(232, 150, 58, 0.06);
+        }
+
+        .quick-item:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 32px rgba(200, 150, 80, 0.08);
+            background: rgba(255, 255, 255, 0.7);
+        }
+
+        .quick-item .icon {
+            font-size: 26px;
+            line-height: 1;
+        }
+
+        .quick-item .label {
+            font-size: 12px;
+            font-weight: 450;
+            color: var(--text-soft);
+            letter-spacing: 0.2px;
+        }
+
+        .contact-footer {
+            margin-top: 2px;
+        }
+
+        .contact-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px 0;
+            border-radius: var(--radius-btn);
+            border: none;
+            background: linear-gradient(135deg, var(--primary-warm), var(--primary-warm-deep));
+            color: #ffffff;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 28px rgba(200, 150, 80, 0.25);
+            letter-spacing: 0.5px;
+        }
+
+        .contact-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 12px 36px rgba(200, 150, 80, 0.35);
+        }
+
+        .contact-btn:active {
+            transform: scale(0.97);
+        }
+
+        .brand-watermark {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-soft);
+            opacity: 0.3;
+            letter-spacing: 1px;
+            margin-top: 6px;
+            font-weight: 300;
+            grid-column: 1 / -1;
+        }
+
+        /* ============================================================
+           鼠标划过特效 - 白纸折纸飞机 + 短横线虚线轨迹
+           使用 JavaScript 动态创建
+           ============================================================ */
+        .mouse-trail {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transition: opacity 1.5s ease;
+        }
+
+        /* 白纸折纸飞机样式 - 使用CSS绘制 */
+        .paper-plane-css {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            width: 36px;
+            height: 36px;
+        }
+
+        .paper-plane-css.show {
+            opacity: 1;
+        }
+
+        /* 纸飞机SVG - 白纸折纸风格 */
+        .paper-plane-css svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08));
+            transform-origin: center center;
+        }
+
+        /* 短横线轨迹点 - 使用短横线（—）字符 */
+        .trail-dash {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9998;
+            color: rgba(200, 180, 160, 0.45);
+            font-size: 14px;
+            font-weight: 300;
+            letter-spacing: 0;
+            line-height: 1;
+            transition: opacity 1.2s ease;
+            opacity: 0;
+            font-family: 'Inter', 'PingFang SC', sans-serif;
+            transform: rotate(0deg);
+        }
+
+        .trail-dash.show {
+            opacity: 1;
+        }
+
+        /* ===== 响应式适配 ===== */
+        @media (max-width: 768px) {
+            .hero-card {
+                padding: 16px 14px 20px;
+                border-radius: 0;
+                min-height: 100vh;
+                height: 100%;
+            }
+            .layout-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .left-col { order: 1; }
+            .right-col { order: 2; }
+            .voice-module {
+                width: 100%;
+                height: auto;
+                flex: 1;
+                min-height: 160px;
+                padding: 18px 16px 20px;
+                border-radius: 50% 45% 55% 40% / 40% 55% 45% 50%;
+                animation: bubbleMorphMobile 20s infinite alternate ease-in-out;
+            }
+            @keyframes bubbleMorphMobile {
+                0% { border-radius: 50% 45% 55% 40% / 40% 55% 45% 50%; }
+                20% { border-radius: 40% 55% 45% 55% / 55% 40% 50% 45%; }
+                40% { border-radius: 55% 40% 50% 45% / 45% 50% 55% 40%; }
+                60% { border-radius: 45% 50% 40% 60% / 50% 45% 55% 48%; }
+                80% { border-radius: 48% 52% 40% 60% / 52% 45% 55% 48%; }
+                100% { border-radius: 50% 45% 55% 40% / 40% 55% 45% 50%; }
+            }
+            .voice-display {
+                font-size: 18px;
+                min-height: 50px;
+                padding: 12px 14px;
+            }
+            .voice-display .placeholder {
+                font-size: 16px;
+            }
+            .voice-button {
+                font-size: 16px;
+                padding: 12px 20px;
+                margin-top: 12px;
+                min-width: 50%;
+            }
+            .greeting { font-size: 18px; }
+            .switch-btn { font-size: 12px; padding: 5px 12px; }
+            .chat-prompt { font-size: 18px; }
+            .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .quick-item .icon { font-size: 24px; }
+            .quick-item .label { font-size: 11px; }
+            .contact-btn { font-size: 16px; padding: 12px 0; }
+            .advice-text { font-size: 13px; }
+            .main-card { padding: 14px 14px 16px; }
+            .main-card .chat-prompt { font-size: 17px; }
+            /* 移动端风筝线调整 */
+            .main-card::before { height: 40px; bottom: -34px; width: 4px; }
+            .main-card::after { height: 28px; bottom: -26px; width: 3px; }
+            .role-switch { width: fit-content; }
+            .brand-watermark { font-size: 10px; }
+            /* 移动端调整远景风筝大小和位置 */
+            .distant-kite { filter: blur(2.5px); }
+            .distant-kite-sm { width: 20px; height: 12px; filter: blur(3px); }
+            .distant-kite-sm::before { height: 22px; bottom: -14px; right: -4px; width: 1.2px; }
+            .distant-kite-md { width: 26px; height: 16px; filter: blur(2.5px); }
+            .distant-kite-md::before { height: 28px; bottom: -18px; right: -5px; width: 1.5px; }
+            .distant-kite-lg { width: 32px; height: 20px; filter: blur(2px); }
+            .distant-kite-lg::before { height: 34px; bottom: -20px; right: -6px; width: 2px; }
+            .distant-kite-xs { width: 14px; height: 8px; filter: blur(3.5px); }
+            .distant-kite-xs::before { height: 16px; bottom: -10px; right: -3px; width: 1px; }
+            .distant-kite.pos-1 { top: 6%; left: 8%; }
+            .distant-kite.pos-2 { top: 4%; right: 12%; }
+            .distant-kite.pos-3 { top: 18%; left: 40%; }
+            .distant-kite.pos-4 { top: 12%; left: 22%; }
+            .distant-kite.pos-5 { top: 2%; left: 58%; }
+            .distant-kite.pos-6 { top: 24%; right: 5%; }
+            .bubble-swarm .bubble-1 { width: 50px; height: 50px; bottom: 16%; left: 18%; }
+            .bubble-swarm .bubble-2 { width: 38px; height: 38px; bottom: 40%; left: 8%; }
+            .bubble-swarm .bubble-3 { width: 44px; height: 44px; bottom: 62%; left: 24%; }
+            .sketch-art {
+                width: 120px;
+                height: 105px;
+                bottom: 10px;
+                left: 12px;
+                z-index: 6;
+                opacity: 0.70;
+            }
+            .scarecrow-leg { width: 5px; height: 14px; bottom: 4%; }
+            .scarecrow-body { width: 22px; height: 28px; bottom: 18%; }
+            .scarecrow-head { width: 26px; height: 22px; bottom: 48%; }
+            .scarecrow-hat { width: 30px; height: 10px; bottom: 65%; }
+            .scarecrow-hat-top { width: 12px; height: 6px; bottom: 74%; }
+            .scarecrow-eye { width: 4px; height: 4px; }
+            .scarecrow-eye-left { bottom: 62%; left: 42%; }
+            .scarecrow-eye-right { bottom: 62%; left: 52%; }
+            .scarecrow-smile { width: 10px; height: 4px; bottom: 56%; }
+            .scarecrow-arm { width: 14px; height: 4px; bottom: 28%; }
+            .scarecrow-arm-left { left: 18%; }
+            .scarecrow-arm-right { left: 56%; }
+            .scarecrow-bow { width: 6px; height: 5px; bottom: 42%; }
+            .scarecrow-bow::before { width: 6px; height: 5px; }
+            .field-path { height: 25%; }
+            .field-stroke { height: 30%; }
+            .grass-stroke { height: 6px; }
+            .windmill {
+                width: 140px;
+                height: 165px;
+                bottom: 16px;
+                right: 14px;
+                opacity: 0.50;
+                z-index: 3;
+            }
+            .windmill-tower {
+                width: 10px;
+                height: 50px;
+                background: rgba(255, 255, 255, 0.85);
+            }
+            .windmill-base {
+                width: 32px;
+                height: 8px;
+                background: rgba(255, 255, 255, 0.75);
+            }
+            .windmill-body {
+                bottom: 44px;
+                width: 70px;
+                height: 70px;
+            }
+            .windmill-hub {
+                width: 14px;
+                height: 14px;
+            }
+            .blade {
+                width: 34px;
+                height: 8px;
+                background: linear-gradient(90deg, rgba(255, 255, 255, 0.7), rgba(240, 240, 245, 0.3));
+            }
+            @keyframes windmillPulse {
+                0% { opacity: 0.40; transform: scale(0.95); }
+                100% { opacity: 0.60; transform: scale(1.05); }
+            }
+            @keyframes spinBlades {
+                0% { transform: rotate(0deg) scale(1); }
+                100% { transform: rotate(360deg) scale(1); }
+            }
+            /* 移动端纸飞机缩小 */
+            .paper-plane-css { width: 28px; height: 28px; }
+            .trail-dash { font-size: 11px; }
+        }
+
+        @media (max-width: 380px) {
+            .hero-card { padding: 10px 8px 14px; }
+            .greeting { font-size: 16px; }
+            .switch-btn { font-size: 10px; padding: 4px 8px; }
+            .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+            .voice-display { font-size: 16px; min-height: 40px; padding: 10px 12px; }
+            .voice-display .placeholder { font-size: 14px; }
+            .voice-module { padding: 14px 12px 16px; min-height: 140px; }
+            .voice-button { font-size: 14px; padding: 10px 16px; min-width: 45%; }
+            .chat-prompt { font-size: 16px; }
+            .main-card .chat-prompt { font-size: 15px; }
+            .main-card { padding: 10px 10px 12px; }
+            .main-card::before { height: 30px; bottom: -24px; width: 3.5px; }
+            .main-card::after { height: 20px; bottom: -18px; width: 2.5px; }
+            .advice-text { font-size: 12px; }
+            .distant-kite-sm { width: 16px; height: 10px; }
+            .distant-kite-sm::before { height: 16px; bottom: -10px; right: -3px; }
+            .distant-kite-md { width: 20px; height: 12px; }
+            .distant-kite-md::before { height: 20px; bottom: -14px; right: -4px; }
+            .distant-kite-lg { width: 24px; height: 16px; }
+            .distant-kite-lg::before { height: 26px; bottom: -16px; right: -5px; }
+            .distant-kite-xs { width: 10px; height: 6px; }
+            .distant-kite-xs::before { height: 12px; bottom: -8px; right: -2px; }
+            .bubble-swarm .bubble-1 { width: 36px; height: 36px; bottom: 14%; left: 15%; }
+            .bubble-swarm .bubble-2 { width: 28px; height: 28px; bottom: 36%; left: 6%; }
+            .bubble-swarm .bubble-3 { width: 32px; height: 32px; bottom: 58%; left: 20%; }
+            .sketch-art {
+                width: 90px;
+                height: 78px;
+                bottom: 6px;
+                left: 8px;
+                z-index: 6;
+                opacity: 0.60;
+            }
+            .scarecrow-leg { width: 4px; height: 10px; }
+            .scarecrow-body { width: 16px; height: 20px; }
+            .scarecrow-head { width: 20px; height: 17px; }
+            .scarecrow-hat { width: 22px; height: 8px; }
+            .scarecrow-hat-top { width: 10px; height: 4px; }
+            .scarecrow-eye { width: 3px; height: 3px; }
+            .scarecrow-eye-left { bottom: 60%; left: 41%; }
+            .scarecrow-eye-right { bottom: 60%; left: 53%; }
+            .scarecrow-smile { width: 8px; height: 3px; bottom: 54%; }
+            .scarecrow-arm { width: 10px; height: 3px; }
+            .scarecrow-arm-left { left: 16%; }
+            .scarecrow-arm-right { left: 58%; }
+            .scarecrow-bow { width: 5px; height: 4px; }
+            .scarecrow-bow::before { width: 5px; height: 4px; }
+            .field-path { height: 20%; }
+            .field-stroke { height: 25%; }
+            .windmill {
+                width: 100px;
+                height: 120px;
+                bottom: 10px;
+                right: 8px;
+                opacity: 0.45;
+                z-index: 3;
+            }
+            .windmill-tower { height: 36px; width: 8px; }
+            .windmill-base { width: 24px; height: 6px; }
+            .windmill-body { bottom: 32px; width: 50px; height: 50px; }
+            .windmill-hub { width: 10px; height: 10px; }
+            .blade { width: 26px; height: 6px; }
+            .paper-plane-css { width: 22px; height: 22px; }
+            .trail-dash { font-size: 9px; }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .hero-card { padding: 24px 28px 28px; }
+            .layout-grid { gap: 20px; }
+            .greeting { font-size: 20px; }
+            .voice-display { font-size: 22px; min-height: 60px; padding: 16px 18px; }
+            .voice-module { min-height: 180px; }
+            .main-card .chat-prompt { font-size: 18px; }
+            .main-card { padding: 16px 18px 18px; }
+            .main-card::before { height: 44px; bottom: -36px; width: 4.5px; }
+            .main-card::after { height: 32px; bottom: -28px; width: 3.5px; }
+            .distant-kite-sm { width: 24px; height: 14px; }
+            .distant-kite-sm::before { height: 26px; bottom: -16px; right: -5px; }
+            .distant-kite-md { width: 30px; height: 18px; }
+            .distant-kite-md::before { height: 32px; bottom: -20px; right: -6px; }
+            .distant-kite-lg { width: 38px; height: 22px; }
+            .distant-kite-lg::before { height: 40px; bottom: -24px; right: -7px; }
+            .distant-kite-xs { width: 16px; height: 10px; }
+            .distant-kite-xs::before { height: 18px; bottom: -12px; right: -3px; }
+            .bubble-swarm .bubble-1 { width: 55px; height: 55px; bottom: 18%; left: 20%; }
+            .bubble-swarm .bubble-2 { width: 42px; height: 42px; bottom: 40%; left: 9%; }
+            .bubble-swarm .bubble-3 { width: 48px; height: 48px; bottom: 64%; left: 26%; }
+            .sketch-art {
+                width: 150px;
+                height: 130px;
+                z-index: 6;
+                opacity: 0.75;
+            }
+            .scarecrow-body { width: 26px; height: 34px; }
+            .scarecrow-head { width: 32px; height: 28px; }
+            .scarecrow-hat { width: 38px; height: 12px; }
+            .scarecrow-eye-left { left: 42%; }
+            .scarecrow-eye-right { left: 52%; }
+            .windmill {
+                width: 170px;
+                height: 200px;
+                z-index: 3;
+            }
+            .windmill-tower { height: 60px; width: 12px; }
+            .windmill-base { width: 38px; height: 9px; }
+            .windmill-body { bottom: 54px; width: 85px; height: 85px; }
+            .blade { width: 42px; height: 9px; }
+        }
+
+        @media (min-width: 1025px) {
+            .hero-card { padding: 32px 44px 36px; }
+            .layout-grid { gap: 24px; }
+            .greeting { font-size: 26px; }
+            .switch-btn { font-size: 16px; padding: 10px 22px; }
+            .chat-prompt { font-size: 22px; }
+            .main-card .chat-prompt { font-size: 22px; }
+            .voice-display { font-size: 28px; min-height: 80px; padding: 20px 24px; }
+            .voice-module { min-height: 220px; }
+            .voice-button { font-size: 22px; padding: 18px 28px; min-width: 40%; }
+            .contact-btn { font-size: 20px; padding: 16px 0; }
+            .quick-item .icon { font-size: 30px; }
+            .main-card { padding: 20px 24px 22px; }
+            .main-card::before { height: 52px; bottom: -42px; width: 5px; }
+            .main-card::after { height: 36px; bottom: -34px; width: 4px; }
+            .distant-kite-sm { width: 28px; height: 18px; }
+            .distant-kite-sm::before { height: 32px; bottom: -20px; right: -6px; }
+            .distant-kite-md { width: 36px; height: 22px; }
+            .distant-kite-md::before { height: 40px; bottom: -24px; right: -7px; }
+            .distant-kite-lg { width: 44px; height: 26px; }
+            .distant-kite-lg::before { height: 50px; bottom: -28px; right: -9px; }
+            .distant-kite-xs { width: 20px; height: 12px; }
+            .distant-kite-xs::before { height: 24px; bottom: -16px; right: -4px; }
+            .bubble-swarm .bubble-1 { width: 75px; height: 75px; bottom: 20%; left: 22%; }
+            .bubble-swarm .bubble-2 { width: 55px; height: 55px; bottom: 44%; left: 10%; }
+            .bubble-swarm .bubble-3 { width: 65px; height: 65px; bottom: 68%; left: 30%; }
+            .sketch-art {
+                width: 210px;
+                height: 180px;
+                bottom: 22px;
+                left: 28px;
+                z-index: 6;
+                opacity: 0.88;
+            }
+            .scarecrow-leg { width: 8px; height: 20px; }
+            .scarecrow-body { width: 36px; height: 44px; }
+            .scarecrow-head { width: 42px; height: 36px; }
+            .scarecrow-hat { width: 48px; height: 15px; }
+            .scarecrow-hat-top { width: 18px; height: 9px; }
+            .scarecrow-eye { width: 7px; height: 7px; }
+            .scarecrow-eye-left { left: 42%; }
+            .scarecrow-eye-right { left: 52%; }
+            .scarecrow-smile { width: 16px; height: 7px; }
+            .scarecrow-arm { width: 22px; height: 7px; }
+            .scarecrow-bow { width: 10px; height: 8px; }
+            .scarecrow-bow::before { width: 10px; height: 8px; }
+            .windmill {
+                width: 250px;
+                height: 290px;
+                bottom: 36px;
+                right: 40px;
+                opacity: 0.70;
+                z-index: 3;
+            }
+            .windmill-tower { height: 88px; width: 16px; background: rgba(255, 255, 255, 0.92); }
+            .windmill-base { width: 52px; height: 11px; background: rgba(255, 255, 255, 0.85); }
+            .windmill-body { bottom: 78px; width: 120px; height: 120px; }
+            .windmill-hub { width: 22px; height: 22px; }
+            .blade { width: 56px; height: 11px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(240, 240, 245, 0.3)); }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-card">
+        <!-- ===== 风吹麦浪背景层 ===== -->
+        <div style="position:absolute;top:12px;left:16px;z-index:9999;">
+            <a href="yyyyhhhh.html" 
+            style="color:#000000;text-decoration:none;font-size:16px;">← 返回首页</a >
+        </div>
+        <div class="wave-bg">
+            <div class="wave-glow wave-glow-1"></div>
+            <div class="wave-glow wave-glow-2"></div>
+            <div class="wave-glow wave-glow-3"></div>
+            <div class="wave-glow wave-glow-4"></div>
+            <div class="wave-line"></div>
+        </div>
+
+        <!-- ===== 背景上飘动的红色扁菱形风筝（远景，模糊）6只，大小不一，牵引线为黑色丝线 ===== -->
+        <div class="distant-kites" aria-hidden="true">
+            <!-- 风筝1 - 左上 中等大小 -->
+            <div class="distant-kite distant-kite-md pos-1"></div>
+            <!-- 风筝2 - 右上 较大 -->
+            <div class="distant-kite distant-kite-lg pos-2"></div>
+            <!-- 风筝3 - 中上偏左 较小 -->
+            <div class="distant-kite distant-kite-sm pos-3"></div>
+            <!-- 风筝4 - 左中 最小 -->
+            <div class="distant-kite distant-kite-xs pos-4"></div>
+            <!-- 风筝5 - 中上偏右 中等 -->
+            <div class="distant-kite distant-kite-md pos-5"></div>
+            <!-- 风筝6 - 右上靠边 较大 -->
+            <div class="distant-kite distant-kite-lg pos-6"></div>
+        </div>
+
+        <!-- ===== 右栏泡泡群 - 3个泡泡，介于稻草人和语音气泡轮廓之间，分散分布 ===== -->
+        <div class="bubble-swarm" aria-hidden="true">
+            <div class="bubble bubble-1"></div>
+            <div class="bubble bubble-2"></div>
+            <div class="bubble bubble-3"></div>
+        </div>
+
+        <!-- ===== 左下角彩铅素描插画 - 稻草人 ===== -->
+        <div class="sketch-art" aria-hidden="true">
+            <div class="field-path"></div>
+            <div class="field-stroke"></div>
+            <div class="grass-stroke grass-stroke-1"></div>
+            <div class="grass-stroke grass-stroke-2"></div>
+            <div class="grass-stroke grass-stroke-3"></div>
+            <div class="grass-stroke grass-stroke-4"></div>
+            <div class="grass-stroke grass-stroke-5"></div>
+            <div class="grass-stroke grass-stroke-6"></div>
+            <div class="scarecrow-leg"></div>
+            <div class="scarecrow-body"></div>
+            <div class="scarecrow-head"></div>
+            <div class="scarecrow-hat"></div>
+            <div class="scarecrow-hat-top"></div>
+            <div class="scarecrow-eye scarecrow-eye-left"></div>
+            <div class="scarecrow-eye scarecrow-eye-right"></div>
+            <div class="scarecrow-smile"></div>
+            <div class="scarecrow-arm scarecrow-arm-left"></div>
+            <div class="scarecrow-arm scarecrow-arm-right"></div>
+            <div class="scarecrow-bow"></div>
+        </div>
+
+        <!-- ===== 右下角风车 ===== -->
+        <div class="windmill" aria-hidden="true">
+            <div class="windmill-base"></div>
+            <div class="windmill-tower"></div>
+            <div class="windmill-body">
+                <div class="windmill-hub"></div>
+                <div class="windmill-blades">
+                    <div class="blade blade-1"></div>
+                    <div class="blade blade-2"></div>
+                    <div class="blade blade-3"></div>
+                    <div class="blade blade-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 左右布局网格 ===== -->
+        <div class="layout-grid">
+            <!-- 左栏 -->
+            <div class="left-col">
+                <div class="top-bar">
+                    <div class="greeting-area">
+                        <!-- ===== 问候语 - 由JavaScript动态更新 ===== -->
+                        <div class="greeting" id="greetingText">
+                            ☀️ 上午好，<span class="highlight">张爷爷</span>
+                        </div>
+                        <div class="time-display" id="timeDisplay">2026年8月18日 周二 09:42</div>
+                    </div>
+                    <!-- ===== 切换键 - 优活悬停变蓝，无忧伴保持橙黄 ===== -->
+                    <div class="role-switch">
+                        <button class="switch-btn" id="btnYouhuo" aria-label="切换到优活模式">优活</button>
+                        <button class="switch-btn active-wuyouban" id="btnWuyouban" aria-label="切换到无忧伴模式">无忧伴</button>
+    
+                    </div>
+                </div>
+
+                <!-- ===== 建议模块 (advice-section) - 动态数据接口 ===== -->
+                <div class="advice-section" id="adviceSection">
+                    <span class="advice-icon" id="adviceIcon">🌻</span>
+                    <span class="advice-text" id="adviceText">
+                        今天天气不错，您平常喜欢散步，要不要出去走走？
+                    </span>
+                </div>
+
+                <!-- ===== “今日陪伴” 风筝形模块 ===== -->
+                <div class="main-card">
+                    <div class="card-label">💬 今日陪伴</div>
+                    <div class="chat-prompt">
+                        <span class="icon">🌾</span>
+                        <span>
+                            今天想聊点什么？
+                            <span class="sub">我一直在听，随时都在</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <div class="quick-item">
+                        <span class="icon">🎵</span>
+                        <span class="label">音乐</span>
+                    </div>
+                    <div class="quick-item">
+                        <span class="icon">📻</span>
+                        <span class="label">电台</span>
+                    </div>
+                    <div class="quick-item">
+                        <span class="icon">📋</span>
+                        <span class="label">其他</span>
+                    </div>
+                </div>
+
+                <div class="contact-footer">
+                    <button class="contact-btn">📞 一键联系子女</button>
+                </div>
+            </div>
+
+            <!-- 右栏 -->
+            <div class="right-col">
+                <div class="voice-module" data-module="voice">
+                    <div class="voice-header">
+                        <span class="label">🎤 语音助手</span>
+                        <span class="voice-status" id="voiceStatus">点击说话</span>
+                    </div>
+                    <div class="voice-display" id="voiceDisplay">
+                        <span class="placeholder" id="placeholderText">说出您的需求，例如“我想听歌”</span>
+                        <span class="transcript" id="transcriptText"></span>
+                    </div>
+                    <button class="voice-button" id="voiceBtn">
+                        🎤 点击说话
+                    </button>
+                </div>
+            </div>
+
+            <div class="brand-watermark">无忧伴 · 为独居，安放安心</div>
+        </div>
+        <!-- end layout-grid -->
+    </div>
+    <!-- end hero-card -->
+
+    <script>
+        // ===== JavaScript：时间更新 + 问候语根据时间变化 + 语音识别 + 切换键占位 =====
+        //      + 建议模块动态数据接口（模拟数据分析生成个性化建议）
+        //      + 鼠标划过特效：白纸折纸飞机 + 短横线虚线轨迹
+
+        // ----- 1. 实时更新时间 & 问候语动态变化 -----
+        function updateTimeAndGreeting() {
+            const now = new Date();
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const w = weekdays[now.getDay()];
+            const h = now.getHours();
+            const min = String(now.getMinutes()).padStart(2, '0');
+            
+            // 更新时间显示
+            document.getElementById('timeDisplay').textContent = 
+                `${y}年${m}月${d}日 周${w} ${String(h).padStart(2, '0')}:${min}`;
+
+            // 根据小时确定问候语
+            let greeting = '';
+            let emoji = '';
+            if (h >= 6 && h < 12) {
+                greeting = '上午好';
+                emoji = '🌅';
+            } else if (h >= 12 && h < 14) {
+                greeting = '中午好';
+                emoji = '☀️';
+            } else if (h >= 14 && h < 18) {
+                greeting = '下午好';
+                emoji = '☀️';
+            } else if (h >= 18 && h < 24) {
+                greeting = '晚上好';
+                emoji = '🌙';
+            } else if (h >= 0 && h < 6) {
+                greeting = '夜深了';
+                emoji = '🌙';
+            } else {
+                greeting = '你好';
+                emoji = '🌾';
+            }
+            
+            // 更新问候语（保留高亮部分）
+            document.getElementById('greetingText').innerHTML = 
+                `${emoji} ${greeting}，<span class="highlight">张爷爷</span>`;
+        }
+        
+        // 立即执行一次
+        updateTimeAndGreeting();
+        // 每10秒更新一次
+        setInterval(updateTimeAndGreeting, 10000);
+
+        // ----- 2. 建议模块 - 动态数据接口（模拟数据分析）-----
+        // 该函数模拟根据温度、湿度、光照、行为习惯等数据生成个性化建议
+        function generatePersonalizedAdvice() {
+            // ===== 模拟数据采集（实际接入时替换为真实传感器数据） =====
+            // 这里用随机数模拟环境数据，实际应用中应从IoT设备或后端API获取
+            const now = new Date();
+            const hour = now.getHours();
+            
+            // 模拟温度（°C）：白天高一些，夜晚低一些，范围15-32
+            const baseTemp = 22 + Math.sin((hour - 8) / 12 * Math.PI) * 8;
+            const temperature = Math.round((baseTemp + (Math.random() - 0.5) * 4) * 10) / 10;
+            
+            // 模拟湿度（%）：范围40-85
+            const humidity = Math.round(55 + Math.random() * 30);
+            
+            // 模拟光照（lux）：白天高，夜晚低
+            let light = 0;
+            if (hour >= 6 && hour < 18) {
+                light = Math.round(300 + Math.random() * 700 + Math.sin((hour - 6) / 12 * Math.PI) * 400);
+            } else {
+                light = Math.round(5 + Math.random() * 20);
+            }
+            
+            // 模拟用户行为习惯（从历史数据中学习）
+            // 这里用随机数模拟，实际应基于用户画像
+            const habits = {
+                likesWalking: Math.random() > 0.3,      // 喜欢散步的概率70%
+                likesMusic: Math.random() > 0.4,        // 喜欢音乐的概率60%
+                likesReading: Math.random() > 0.5,      // 喜欢阅读的概率50%
+                likesGardening: Math.random() > 0.7,    // 喜欢园艺的概率30%
+                lastWalkTime: hour - Math.floor(Math.random() * 3) - 1, // 上次散步时间（小时）
+            };
+            
+            // 确保上次散步时间在合理范围
+            if (habits.lastWalkTime < 0) habits.lastWalkTime = 0;
+            
+            // ===== 数据分析与建议生成 =====
+            let advice = '';
+            let icon = '🌻';
+            
+            // 判断天气是否适合户外活动
+            const isGoodWeather = temperature >= 18 && temperature <= 30 && humidity >= 40 && humidity <= 75;
+            const isDaytime = hour >= 7 && hour < 19;
+            const isBright = light > 200;
+            
+            // 基于用户习惯和环境数据生成个性化建议
+            // 优先级：散步 > 音乐 > 阅读 > 园艺 > 通用建议
+            
+            // 1. 如果天气好 + 白天 + 用户喜欢散步 + 距离上次散步超过2小时
+            if (isGoodWeather && isDaytime && isBright && habits.likesWalking && habits.lastWalkTime > 2) {
+                const tempDesc = temperature > 26 ? '温暖' : '舒适';
+                const timeDesc = hour < 10 ? '上午' : (hour < 14 ? '中午' : '下午');
+                advice = `今天天气${tempDesc}，${timeDesc}阳光正好，您平常喜欢散步，要不要出去走走？`;
+                icon = '🚶';
+            }
+            // 2. 如果天气不好或夜晚，但用户喜欢音乐
+            else if (habits.likesMusic && (hour < 6 || hour > 20 || !isGoodWeather)) {
+                const musicGenres = ['经典老歌', '轻音乐', '民谣', '戏曲'];
+                const genre = musicGenres[Math.floor(Math.random() * musicGenres.length)];
+                advice = `外面天气不太适合外出，我为您准备了几首${genre}，要听听看吗？`;
+                icon = '🎵';
+            }
+            // 3. 如果用户喜欢阅读且光线充足
+            else if (habits.likesReading && isBright && hour >= 8 && hour <= 21) {
+                const bookTypes = ['养生保健', '历史故事', '散文诗歌', '回忆录'];
+                const bookType = bookTypes[Math.floor(Math.random() * bookTypes.length)];
+                advice = `安静的时光最适合阅读，这里有本${bookType}，您感兴趣吗？`;
+                icon = '📖';
+            }
+            // 4. 如果用户喜欢园艺且天气温和
+            else if (habits.likesGardening && isGoodWeather && isDaytime) {
+                advice = `今天气候温和，您种的花草可能正需要照料，要去看看吗？`;
+                icon = '🌱';
+            }
+            // 5. 通用温馨建议（兜底）
+            else {
+                const genericAdvice = [
+                    '今天过得怎么样？有什么想和我聊的吗？',
+                    '记得多喝水，保持身体水分哦。',
+                    '阳光正好，心情也要暖暖的。',
+                    '您最近睡眠质量不错，继续保持！',
+                    '今天想听点轻松的音乐吗？',
+                    '我注意到您最近心情很好，真为您开心。',
+                    '要不要听一段有趣的故事？',
+                    '记得按时休息，不要太劳累。'
+                ];
+                advice = genericAdvice[Math.floor(Math.random() * genericAdvice.length)];
+                icon = '🌻';
+            }
+            
+            // 更新DOM
+            document.getElementById('adviceText').textContent = advice;
+            document.getElementById('adviceIcon').textContent = icon;
+            
+            // 打印模拟数据到控制台（便于调试）
+            console.log('📊 [数据分析] 温度:', temperature, '°C, 湿度:', humidity, '%, 光照:', light, 'lux');
+            console.log('💡 [个性化建议]', advice);
+        }
+
+        // 首次加载时生成建议
+        generatePersonalizedAdvice();
+        // 每30秒刷新一次建议（模拟实时数据分析）
+        setInterval(generatePersonalizedAdvice, 30000);
+
+        // ----- 3. 右上角切换键（优活/无忧伴）交互 -----
+        // 获取两个切换按钮
+        const btnYouhuo = document.getElementById('btnYouhuo');
+        const btnWuyouban = document.getElementById('btnWuyouban');
+
+        // 点击"优活"：将激活状态从无忧伴转移到优活
+        btnYouhuo.addEventListener('click', function() {
+            // 移除无忧伴的激活状态
+            btnWuyouban.classList.remove('active-wuyouban');
+            // 给优活添加激活状态（蓝色样式）
+            btnYouhuo.classList.add('active-wuyouban');
+            console.log('切换到优活模式（蓝色）');
+            location.href="youhuo.html";
+        });
+
+        // 点击"无忧伴"：将激活状态从优活转移到无忧伴
+        btnWuyouban.addEventListener('click', function() {
+            // 移除优活的激活状态
+            btnYouhuo.classList.remove('active-wuyouban');
+            // 给无忧伴添加激活状态（橙黄色样式）
+            btnWuyouban.classList.add('active-wuyouban');
+            console.log('切换到无忧伴模式（橙黄色）');
+        });
+
+        // 注意：CSS中通过 #btnYouhuo:hover:not(.active-wuyouban) 实现了悬停变蓝的效果
+        // 无忧伴的悬停效果是 #btnWuyouban:hover:not(.active-wuyouban) 呈现橙黄色调
+
+        // ----- 4. 语音识别模块（Web Speech API）-----
+        const voiceBtn = document.getElementById('voiceBtn');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const transcriptText = document.getElementById('transcriptText');
+        const placeholderText = document.getElementById('placeholderText');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isRecording = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = function(event) {
+                let finalText = '';
+                let interimText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalText += transcript;
+                    } else {
+                        interimText += transcript;
+                    }
+                }
+                if (finalText) {
+                    placeholderText.style.display = 'none';
+                    transcriptText.textContent = finalText;
+                } else if (interimText) {
+                    placeholderText.style.display = 'none';
+                    transcriptText.textContent = interimText + ' ...';
+                }
+            };
+
+            recognition.onend = function() {
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+                voiceBtn.innerHTML = '🎤 点击说话';
+                voiceStatus.textContent = '点击说话';
+                voiceStatus.className = 'voice-status';
+                if (!transcriptText.textContent) {
+                    placeholderText.style.display = 'inline';
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.warn('语音识别错误:', event.error);
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+                voiceBtn.innerHTML = '🎤 点击说话';
+                voiceStatus.textContent = '请重试';
+                voiceStatus.className = 'voice-status';
+                if (!transcriptText.textContent) {
+                    placeholderText.style.display = 'inline';
+                }
+            };
+
+            voiceBtn.addEventListener('click', function() {
+                if (isRecording) {
+                    recognition.stop();
+                    return;
+                }
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    voiceBtn.classList.add('recording');
+                    voiceBtn.innerHTML = '🔴 录音中...';
+                    voiceStatus.textContent = '🎤 录音中...';
+                    voiceStatus.className = 'voice-status recording';
+                    transcriptText.textContent = '';
+                    placeholderText.style.display = 'none';
+                } catch (e) {
+                    console.warn('启动语音识别失败:', e);
+                    voiceStatus.textContent = '请允许麦克风权限';
+                    voiceStatus.className = 'voice-status';
+                }
+            });
+        } else {
+            voiceBtn.disabled = true;
+            voiceBtn.style.opacity = '0.5';
+            voiceBtn.innerHTML = '❌ 语音不支持';
+            voiceStatus.textContent = '浏览器不支持';
+            voiceStatus.className = 'voice-status';
+        }
+
+        // ----- 5. 鼠标划过特效：白纸折纸飞机 + 短横线虚线轨迹 -----
+        (function initMouseTrail() {
+            // 创建纸飞机容器（使用CSS绘制的白纸折纸飞机）
+            const plane = document.createElement('div');
+            plane.className = 'paper-plane-css';
+            // 使用SVG绘制白纸折纸飞机
+            plane.innerHTML = `
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="paperGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                            <stop offset="50%" style="stop-color:#f5f5f0;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#e8e8e0;stop-opacity:1" />
+                        </linearGradient>
+                        <linearGradient id="foldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#e0ddd5;stop-opacity:0.6" />
+                            <stop offset="100%" style="stop-color:#d0ccc0;stop-opacity:0.3" />
+                        </linearGradient>
+                    </defs>
+                    <!-- 机身 - 三角形折纸 -->
+                    <polygon points="32,6 8,44 32,34 56,44" fill="url(#paperGrad)" stroke="#d5d0c5" stroke-width="0.8"/>
+                    <!-- 左翼折痕 -->
+                    <polygon points="32,6 8,44 20,38 32,34" fill="url(#foldGrad)" opacity="0.4"/>
+                    <!-- 右翼折痕 -->
+                    <polygon points="32,6 56,44 44,38 32,34" fill="url(#foldGrad)" opacity="0.2"/>
+                    <!-- 中线折痕 -->
+                    <line x1="32" y1="6" x2="32" y2="34" stroke="#d0ccc0" stroke-width="0.5" opacity="0.4"/>
+                    <!-- 机头高光 -->
+                    <polygon points="32,6 26,16 32,14 38,16" fill="rgba(255,255,255,0.3)"/>
+                    <!-- 尾部细节 -->
+                    <polygon points="8,44 14,48 20,44 14,40" fill="url(#paperGrad)" stroke="#d5d0c5" stroke-width="0.5" opacity="0.6"/>
+                    <polygon points="56,44 50,48 44,44 50,40" fill="url(#paperGrad)" stroke="#d5d0c5" stroke-width="0.5" opacity="0.6"/>
+                </svg>
+            `;
+            document.body.appendChild(plane);
+
+            // 存储轨迹点（短横线）
+            const dashes = [];
+            const MAX_DASHES = 20; // 更多轨迹点，使短横线衔接更紧密
+            let dashIndex = 0;
+            let lastX = 0;
+            let lastY = 0;
+            let isActive = false;
+            let hideTimeout = null;
+            let moveCount = 0;
+
+            // 创建短横线轨迹点
+            for (let i = 0; i < MAX_DASHES; i++) {
+                const dash = document.createElement('div');
+                dash.className = 'trail-dash';
+                dash.textContent = '—'; // 短横线字符
+                document.body.appendChild(dash);
+                dashes.push(dash);
+            }
+
+            // 鼠标移动事件
+            document.addEventListener('mousemove', function(e) {
+                const x = e.clientX;
+                const y = e.clientY;
+
+                // 更新纸飞机位置（稍微偏移使飞机在鼠标上方）
+                plane.style.left = (x - 18) + 'px';
+                plane.style.top = (y - 30) + 'px';
+                plane.classList.add('show');
+
+                // 计算移动角度（让飞机朝向运动方向）
+                if (lastX !== 0 || lastY !== 0) {
+                    const dx = x - lastX;
+                    const dy = y - lastY;
+                    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                        plane.style.transform = 'rotate(' + (angle + 45) + 'deg)';
+                    }
+                }
+                lastX = x;
+                lastY = y;
+
+                // 添加短横线轨迹点（每移动一定距离添加，使衔接紧密）
+                if (isActive === false) {
+                    addDash(x, y);
+                    isActive = true;
+                } else {
+                    // 检查距离，点之间距离更小，使短横线衔接紧密
+                    const lastDash = dashes[(dashIndex - 1 + MAX_DASHES) % MAX_DASHES];
+                    if (lastDash) {
+                        const lx = parseFloat(lastDash.style.left) || 0;
+                        const ly = parseFloat(lastDash.style.top) || 0;
+                        const dist = Math.sqrt((x - lx) ** 2 + (y - ly) ** 2);
+                        if (dist > 8) { // 更小的间距（从15降至8），使短横线紧密衔接
+                            addDash(x, y);
+                        }
+                    } else {
+                        addDash(x, y);
+                    }
+                }
+
+                // 重置消失计时器（只要鼠标在移动就延长显示时间）
+                clearTimeout(hideTimeout);
+                hideTimeout = setTimeout(function() {
+                    // 淡出所有元素
+                    plane.classList.remove('show');
+                    dashes.forEach(d => d.classList.remove('show'));
+                    isActive = false;
+                }, 3000); // 鼠标停止移动3秒后消失
+            });
+
+            // 添加短横线轨迹点
+            function addDash(x, y) {
+                const dash = dashes[dashIndex % MAX_DASHES];
+                // 随机微调短横线的旋转角度，使其更自然
+                const rot = (Math.random() - 0.5) * 15;
+                dash.style.left = (x - 6) + 'px';
+                dash.style.top = (y - 6) + 'px';
+                dash.style.transform = 'rotate(' + rot + 'deg)';
+                dash.classList.add('show');
+                dashIndex++;
+            }
+
+            // 鼠标离开窗口时隐藏
+            document.addEventListener('mouseleave', function() {
+                plane.classList.remove('show');
+                dashes.forEach(d => d.classList.remove('show'));
+                isActive = false;
+                clearTimeout(hideTimeout);
+            });
+
+            // 鼠标进入窗口时重新激活（但需要移动才会显示）
+            document.addEventListener('mouseenter', function() {
+                // 不做自动显示，等待移动
+            });
+
+            console.log('✈️ 鼠标划过特效已启动：白纸折纸飞机 + 短横线虚线轨迹');
+        })();
+
+        // ----- 6. 初始化日志 -----
+        console.log('🌾 无忧伴 · 切换键：优活悬停变蓝，无忧伴保持橙黄色');
+        console.log('✈️ 鼠标移动时会显示白纸折纸飞机和短横线轨迹，停止移动3秒后消失');
+    if('webkitSpeechRecognition' in window){
+        const rec=new webkitSpeechRecognition();
+        rec.continuous=true;
+        rec.interimResults=false;
+        rec.lang="zh-CN";
+        rec.start();
+        rec.onresult=e=>{
+            const text=e.results[e.results.length-1][0].transcript.trim();
+            if(text.includes("优活")){
+            location.href="youhuo.html";
+            }
+        }
+    }
+    
+    </script>
+</body>
+</html>
