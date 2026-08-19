@@ -55,17 +55,59 @@ async function bootstrap() {
    展示记了什么。
    ========================================================================== */
 
+/** 载荷里的一个值，**只有真的在那儿**才返回它。
+ *
+ * 这一页出过一次「第 undefined 次通过」：模板读 `p.attempts`，种子没写这个字段，
+ * 读到 undefined 就原样拼进中文里。那一行的修法当时只修在 `attempts` 上，而同一份
+ * 模板里 `expected` / `heard` / `approval_digest` / `proof_digest` 全都是同一种裸插值
+ * ——一个字段一个字段地修，下一个漏掉的字段会以完全一样的方式再咬一次。
+ *
+ * 所以判据挪到值这一层：**先问「这一项在不在链上」，再决定要不要说这一句**。
+ * 五种「其实什么都没有」的形状一起挡掉：undefined / null / 空串 / NaN，
+ * 以及 `String({})` 得到的 `[object Object]`。
+ */
+function value(v) {
+  if (v === undefined || v === null) return '';
+  if (typeof v === 'number' && !Number.isFinite(v)) return '';
+  const s = String(v).trim();
+  return (s && s !== 'undefined' && s !== 'null' && s !== 'NaN'
+    && !/^\[object \w+\]$/.test(s)) ? s : '';
+}
+
+/** 「系统等的是 X，听到的是 Y」——**两个值都在才说**。
+ *
+ * 只有一个值的时候这句话是残的（「系统等的是 68.40，听到的是 」），
+ * 而一句残话出现在复述核对这一行上，正好推翻它要证明的那件事。
+ */
+function heardPair(expected, heard) {
+  const a = value(expected);
+  const b = value(heard);
+  return (a && b) ? `系统等的是 ${a}，听到的是 ${b}` : '';
+}
+
 /** 审计事件 → 凭证上的一行。
  *
  * 认得的类型逐条写；认不出的**不丢掉**，用一行中性说明放进去。丢掉的后果是链上有
  * 十条、凭证上有五行，而没有任何东西说得出差额去哪了——那正好是凭证最不该有的性质。
+ *
+ * `proof(payload, chain)` 的第二个参数是**这一件事的整条链**（见 `chainFacts`）。
+ * 加它的理由只有一个：「家人同意的和他确认的是同一个」这句话要成立，得真的把两个
+ * 摘要拿来比一次。原先它是无条件写死的一句断言——两边都没有摘要时屏幕上是
+ * 「同意的摘要 （无），和他确认的是同一个」，一句凭空的保证印在这一页最要紧的位置。
  */
 const RECEIPT_STEPS = {
   TASK_CREATED: {
     who: '优活',
-    what: '立了一件事，并去查了这个月该交多少',
+    // 「并去查了这个月该交多少」只对缴费成立。这一页已经不再按 `bill_payment`
+    // 过滤（挂号和提醒同样出凭证），写死就会给一次挂号配上一句查账单。
+    what: p => (p.task_type === 'bill_payment'
+      ? '立了一件事，并去查了这个月该交多少'
+      : '立了一件事'),
     proof: p => `${taskWord(p.task_type)} · ${RISK_WORD[p.risk] || '未标风险'}`
-      + ` · ${BASIS_WORD[p.semantic_basis] || '照他说的话'}`,
+      // 兜底原先是 `|| '照他说的话'`——那不是兜底，那是**换一个说法照样下结论**：
+      // 认不出 basis 时它会说「照他说的原话」，而 `engine.py:472`
+      // （老人接受「顺便帮您办」时走的那条）压根不写 `semantic_basis`。
+      + ` · ${BASIS_WORD[p.semantic_basis] || '没记下凭什么听懂的'}`,
   },
   TEACH_BACK_VERIFIED: {
     who: '他',
@@ -84,39 +126,132 @@ const RECEIPT_STEPS = {
       const howMany = Number.isFinite(times) && times > 0
         ? (times === 1 ? '，一次就念对了' : `，念到第 ${times} 遍才对上`)
         : '';
-      return `系统等的是 ${p.expected}，听到的是 ${p.heard}${howMany}`
+      const pair = heardPair(p.expected, p.heard);
+      return (pair ? `${pair}${howMany}` : `复述对上了${howMany}`)
         + '——念错就停下，不会按听到的数字去付';
     },
   },
   TEACH_BACK_REJECTED: {
     who: '他',
     what: '念的金额和账单不一致，停下了',
-    proof: p => `账单是 ${p.expected}，听到的是 ${p.heard}。没有执行任何支付`,
+    proof: p => {
+      const a = value(p.expected);
+      const b = value(p.heard);
+      return (a && b ? `账单是 ${a}，听到的是 ${b}。` : '') + '没有执行任何支付';
+    },
   },
   ELDER_CONFIRMED: {
     who: '他',
     what: '确认了这一笔',
-    proof: p => `确认摘要 ${short(p.approval_digest)}`,
+    // 摘要在链上就摆出来（`engine.py:913` 写的就是它），不在就说这一条上有的那件事。
+    // 原先无条件 `确认摘要 ${short(p.approval_digest)}`，而 `short()` 把缺失翻成
+    // 「（无）」——屏幕上是「确认摘要 （无）」，一行只剩标签的证据。
+    proof: p => {
+      const digest = value(p.approval_digest);
+      if (digest) return `确认摘要 ${short(digest)}——家人点头时要对上的就是它`;
+      const amount = value(p.amount_yuan);
+      return amount ? `他确认的是 ${amount} 元这一笔` : '';
+    },
   },
   FAMILY_APPROVAL_RECORDED: {
     who: '家人',
-    what: '点了同意',
-    proof: p => `同意的摘要 ${short(p.approval_digest)}`,
+    // **这一条从来不是「家人点了同意」。** 两种载荷都不是：
+    //   · 真实引擎（`engine.py:1100`）在**票数还不够**时才写它，
+    //     载荷是 `{approval_count, required_approvals}`；
+    //   · 演示种子（`database.py:419`）写的是 `{required: true}`，位置在
+    //     「推给家人」**之前**，意思是「记下：这一笔要家人点头」。
+    // 写死成「点了同意」的后果在种子上一眼就看得见：时间轴依次是「家人点了同意」→
+    // 「优活把这件事推给了家人」→「家人点了同意，随即办好」——同意、再被问、再同意。
+    what: p => (Number.isFinite(Number(p.approval_count))
+      ? '点了同意，还在等其他家人'
+      : '还没点头，这一笔停在这里等他们'),
+    // 同样地：这条事件的载荷里**没有** `approval_digest`，两种写法都没有。
+    // 原先读它，于是永远渲染成「同意的摘要 （无）」——不是种子缺字段，是这一行
+    // 读错了字段。
+    proof: p => {
+      const got = Number(p.approval_count);
+      const need = Number(p.required_approvals);
+      if (Number.isFinite(got) && Number.isFinite(need) && need > got) {
+        return `已经有 ${got} 位点头，要 ${need} 位才动手`;
+      }
+      return p.required === true ? '在他们点头之前，什么都不会做' : '';
+    },
   },
   FAMILY_APPROVED_AND_EXECUTED: {
     who: '家人',
     what: '点了同意，随即办好',
-    proof: p => `同意的摘要 ${short(p.approval_digest)}，和他确认的是同一个`
-      + (p.proof_digest ? `；缴费方回执 ${short(p.proof_digest)}` : ''),
+    // 「和他确认的是同一个」是这一页的第二条底线（「您确认的和家人同意的必须是同一笔，
+    // 对不上就停下」）。所以它要么**被真的比过一次**，要么就不说。
+    proof: (p, chain) => {
+      const bits = [];
+      const ours = value(p.approval_digest);
+      const his = chain.elderDigest;
+      if (ours && his) {
+        bits.push(ours === his
+          ? `同意的摘要 ${short(ours)}，和他确认的是同一个`
+          : `同意的摘要 ${short(ours)}，和他确认的 ${short(his)} 对不上`);
+      } else if (ours) {
+        bits.push(`同意的摘要 ${short(ours)}`);
+      }
+      const receipt = value(p.proof_digest);
+      const from = value(p.authority);
+      // 回执有摘要才叫回执。原先是 `p.proof_digest ? … : ''`——没有就整句消失，
+      // 而这一页写着「对方没回执就是没办成」，那一句于是无声地失去了它的证据。
+      if (receipt) bits.push(`${from || '对方'}给的回执 ${short(receipt)}`);
+      else {
+        const rest = [from && `对方是${from}`,
+                      value(p.amount_yuan) && `金额 ${value(p.amount_yuan)} 元`]
+          .filter(Boolean).join('、');
+        if (rest) bits.push(rest);
+      }
+      return bits.join('；');
+    },
   },
   FAMILY_REJECTED: {who: '家人', what: '拒绝了', proof: () => '没有执行任何支付'},
   FAMILY_APPROVED_EXECUTION_FAILED: {
     who: '家人', what: '同意了，但对方没办成',
     proof: () => '任务停在「未成功」，不会报成已完成',
   },
+  // 这一笔**没有**经家人接力时走的那条路（`engine.py:995`，低风险直接办）。
+  // 少了它，一件不需要家人点头的事在凭证上就只剩「系统留下一条记录」——
+  // 也就是这一页最想说的那句话（只有拿到回执才算办好）在那条路径上没有证据。
+  TASK_EXECUTED: {
+    who: '优活',
+    what: '把这件事办了，并核对了对方的状态',
+    proof: p => {
+      const receipt = value(p.proof_digest);
+      const ok = p.verification_accepted === true;
+      return [receipt && `回执 ${short(receipt)}`,
+              ok ? '对方系统的状态核对通过' : ''].filter(Boolean).join('；')
+        || '对方回报的状态已经核对过';
+    },
+  },
+  TASK_FAILED: {
+    who: '优活',
+    what: '没能办成，已经安全停下',
+    proof: () => '任务停在「未成功」，不会报成已完成',
+  },
+  TASK_CANCELLED: {who: '他', what: '取消了这件事', proof: () => '没有继续执行'},
+  // 这一条**真的会出现在凭证上**：`/judge` 每读一次「决策上下文」就往这一笔的链上
+  // 写一条（`v5_api.py:327`），而 `/judge` 正是评委看完之后点「可信中心」的来处。
+  // 实测：从 /judge 看过那一笔再打开 /trust，凭证末尾是两行
+  // 「系统留下一条记录」——两条没有任何说明的记录，出现在一张讲"每一条都可核验"
+  // 的凭证上。兜底分支本身没错，但一个**已知会发生**的类型不该落到兜底里。
+  TASK_EXPLANATION_VIEWED: {
+    who: '优活',
+    what: '记下了：有人调阅过这件事的说明',
+    proof: () => '查过的人也要留痕，这条规矩对我们自己也一样',
+  },
   NOTIFICATION_CREATED: {
     who: '优活',
-    what: p => (p.recipient_role === 'elder' ? '回头告诉了他' : '把这件事推给了家人'),
+    // 三分支，不是二分支：原先 `=== 'elder' ? … : '把这件事推给了家人'`，
+    // 于是任何一个不是 elder 的收件人（社区、系统）都被说成「推给了家人」。
+    what: p => {
+      const to = String(p.recipient_role || '');
+      if (to === 'elder') return '回头告诉了他';
+      if (to === 'family') return '把这件事推给了家人';
+      return '发出了一条通知';
+    },
     proof: p => NOTIFY_WORD[p.event_type] || '一条通知',
   },
 };
@@ -141,14 +276,53 @@ const RISK_WORD = {1: '信息查询', 2: '低风险', 3: '敏感操作', 4: '高
 const BASIS_WORD = {
   keyword_only: '照他说的原话', embedding: '照他说的意思', hybrid: '原话和意思都对上',
 };
+//: 通知类型的说法。键是 `NotificationService.send(event_type=…)` 真的会传的那些
+//: 值（`services.py` / `v3_services.py` 里逐个 grep 得到九个），不是猜的。
+//:
+//: 原先只有四个，其中 `task_failed` / `sos` **没有任何一处产生它们**，而真的会走到
+//: 屏幕上的 `additional_approval_required`（风险 4 的缴费要两位家属点头，这是演示里
+//: 走得到的一条路）不在表里——实测那一行渲染成一句没有信息量的「一条通知」。
+//: 兜底是诚实的，但一张凭证上出现两条一模一样的「一条通知」，读的人会以为链坏了。
+//: 两个不存在的键留着无害，删掉它们才要先确认后端真的不会再产生——所以只加不删，
+//: 并在这里写明哪两个当前没有产生者。
 const NOTIFY_WORD = {
-  approval_required: '有一笔要家人点头', task_completed: '这件事办好了',
+  approval_required: '有一笔要家人点头',
+  additional_approval_required: '还差一位家人点头',
+  task_completed: '这件事办好了',
+  task_rejected: '家人没同意，这件事停了',
+  family_reminder_created: '家人建了一条提醒',
+  reminder_advance_notice: '提前提醒了一声',
+  reminder_due: '到点了，提醒了他',
+  reminder_escalated: '一直没回应，找了家人',
+  emergency_call: '紧急联系',
+  // 下面两个当前后端不产生（全仓 grep 无 `event_type="task_failed"` / `"sos"`），
+  // 留着是因为它们是这一页想说的两件事，将来接上就直接有说法。
   task_failed: '这件事没办成', sos: '紧急求助',
 };
 
 function short(hash) {
   const s = String(hash || '');
   return s ? `${s.slice(0, 12)}…` : '（无）';
+}
+
+/** 站在整条链上才看得见的那几件事。
+ *
+ * 现在只有一件：**老人确认时的那个摘要**。家人同意那一行要用它来回答这一页的
+ * 第二条底线——「您确认的和家人同意的必须是同一笔」。那句话此前是写死的断言，
+ * 不比、也不看两边有没有值；改成真的比一次，就必须让那一行看得见另一条记录。
+ *
+ * 取**最后一条** `ELDER_CONFIRMED`：一笔任务被改过参数之后老人会再确认一次，
+ * 而家人点头对上的是最新那一个（`engine.py:894` 改参数时先把 digest 清成 null
+ * 再重算）。取第一条会在"改了金额再确认"这条路径上报出一个假的不一致。
+ */
+function chainFacts(events) {
+  let elderDigest = '';
+  for (const event of events) {
+    if (event.event_type !== 'ELDER_CONFIRMED') continue;
+    const found = value((event.payload || {}).approval_digest);
+    if (found) elderDigest = found;
+  }
+  return {elderDigest};
 }
 
 /** 时间戳带毫秒。
@@ -172,6 +346,24 @@ function el(tag, className, text) {
   return node;
 }
 
+/** 出错时给人看的那一句。
+ *
+ * 这一行原先是 `${error.message}` 直接上屏。`/trust` 是**消费者面**，而
+ * `error.message` 在断网时是 `Failed to fetch`——浏览器的内部说法，印在一位老人
+ * 家属的手机上。同一类泄漏在这个项目里被 `test_consumer_errors_are_typed_not_raw`
+ * 抓过八处，唯独漏了这一处：那条闸门按 **`catch (x) {` 绑定的变量名**找
+ * `x.message`，而这里走的是 `.catch(error => receiptFailed(error))` 加一个具名
+ * 函数的形参——形状不同，闸门看不见。
+ *
+ * 我们自己抛的消息（「审计链里找不到这件任务」）是中文，那种要原样留住：它比
+ * 四型兜底具体得多。判据就是「这句话里有没有中文」。
+ */
+function receiptWords(error) {
+  const raw = String((error && error.message) || '').trim();
+  if (/[一-鿿]/.test(raw)) return raw;
+  return window.YouHuo.errorWords(error, '这份凭证').text;
+}
+
 function receiptFailed(error) {
   const status = byId('status');
   if (status) {
@@ -183,7 +375,7 @@ function receiptFailed(error) {
   if (!host) return;
   // 不假装成功。这一页的全部内容就是"只有真办成了才说办成了"。
   host.replaceChildren(el('p', 'receipt-pending',
-    `这一次没能办成，所以这里没有凭证可出：${error.message}`));
+    `这一次没能办成，所以这里没有凭证可出：${receiptWords(error)}`));
 }
 
 /** 真的走一遍缴费，然后把它的审计记录渲染出来。
@@ -326,13 +518,20 @@ async function renderReceipt() {
   // 他当时说了什么。**
   const off = el('p', 'receipt-offchain');
   off.appendChild(el('strong', null, '他说的原话不在链上。'));
+  // 「一件**缴费**任务」原先写死在这里。这一页已经不再按 `bill_payment` 过滤，
+  // 所以一次挂号的凭证上会出现「链上只有『有一件缴费任务被建立』」——同一种写死，
+  // 这个文件在抬头那两行上已经修过一次（见 `receipt-head` 上面那段）。
   off.appendChild(document.createTextNode(
-    '这份凭证是从审计链上读出来的，而链上只有「有一件缴费任务被建立」'
+    `这份凭证是从审计链上读出来的，而链上只有「有一件${typeWord}任务被建立」`
     + '——连我们自己都没法从这条链上还原他当时说了什么。'
     + '少记一样东西也是要证明的事，所以写在这里。'));
   host.appendChild(off);
 
   // --- 时间轴 ---
+  //
+  // 先把**整条链上的事实**算出来，再逐行渲染。有些话只有站在整条链上才说得出口：
+  // 「家人同意的和他确认的是同一个」要拿两条记录比一次，而一行只看得见自己那一条。
+  const facts = chainFacts(mine);
   const list = el('ol', 'receipt-steps');
   for (const event of mine) {
     const spec = RECEIPT_STEPS[event.event_type];
@@ -347,7 +546,16 @@ async function renderReceipt() {
       const what = typeof spec.what === 'function' ? spec.what(payload) : spec.what;
       body.appendChild(el('strong', null, `${spec.who}${what}`));
       let proof = '';
-      try { proof = spec.proof(payload); } catch (_) { proof = ''; }
+      try {
+        proof = spec.proof(payload, facts) || '';
+      } catch (error) {
+        // **不静默吞掉。** 原先是 `catch (_) { proof = ''; }`——一条算不出说明的
+        // 记录和一条本来就没有说明的记录在屏幕上长得一模一样，而这一页的全部主张
+        // 是「链上每一条都在这儿、都能核」。`care.js` 的 `.catch(() => [])` 是同一
+        // 种写法，它把服务端 500 显示成了「还没有登记」。
+        console.error('凭证这一步的说明算不出来：', event.event_type, error);
+        proof = '这一步的说明没能算出来。它的原始记录在下面的哈希里。';
+      }
       if (proof) body.appendChild(el('p', 'receipt-proof', proof));
     } else {
       // 认不出的类型也要出现——链上有十条、凭证上有五行而没人说得出差额去哪了，

@@ -228,8 +228,13 @@ curl -L -o ohos-sdk.tar.gz \
 自动分到一份独立的演示家庭**（`POST /v2/auth/visitor`），所以多人同时访问不会互相
 看到对方的待办，也不能改动对方的数据——家庭隔离本来就按 `family_id` 强制执行。
 
-线上地址：<https://youhuo.onrender.com>（`/elder` 老人端、`/family` 家属端、
-`/care`、`/trust`、`/judge`）。
+线上地址：<https://youhuo.onrender.com>（`/elder`、`/elder2`、`/family`、`/family2`、
+`/care`、`/trust`、`/app`、`/stage`、`/judge`）。
+
+> **推送到公开演示之前有一件事要先定**：`backend/static/app/index.html` 是交接包
+> 留下的**开发索引页**，标题「优活老人端前端参考包」，正文里链着我们自己的交接文档，
+> 而 `backend/static` 整个挂在 `/static` 下、**不需要任何登录**。
+> 删掉、改 404、还是挪出 `static/`——见 `KNOWN_ISSUES.md` P1-D。
 
 部署走 **Render 原生 Python 运行时**，配置即仓库根目录的 `render.yaml`，完整步骤见
 `deploy/DEPLOY.md`；自有服务器用 `docker compose up -d` 即可。
@@ -244,8 +249,9 @@ curl -L -o ohos-sdk.tar.gz \
 
 ```text
 backend/youhuo/          FastAPI、业务模块、v5可信内核和v6适老信任层
-backend/static/          老人端、家属端、照护中心、可信实验室、评委导览
-backend/tests/           950项自动化测试
+backend/static/          十条路由的前端：老人端设计一/二、家人端设计一/二、
+                         照护中心、可信实验室、演示台、评委导览、山水版 /app
+backend/tests/           96 个测试文件、约 2100 项自动化测试
 backend/scripts/         Benchmark、性质审计、故障恢复、负载和交付检查
 evaluation/              ElderBench-v3/v4/v5与VoiceBench-v6
 harmonyos/               ArkTS工程壳、决赛导览及官方能力适配边界
@@ -277,20 +283,65 @@ python -m pip install -r requirements.txt
 ./run_demo.sh
 ```
 
-入口：
+**端口是 8041，不是 8000。** 每一页在没有服务器时露出的那句提示里印的就是 8041，
+`test_deployment.py::test_the_demo_runner_opens_the_port_the_pages_advertise` 钉住这件事
+（`run_demo.ps1` / `run_demo.sh` 原先开的是 8000，照着屏幕上的指示做的人得到一个连接被拒）。
 
-- 首页：http://127.0.0.1:8000/
-- 老人端：http://127.0.0.1:8000/elder
-- 家属端：http://127.0.0.1:8000/family
-- 照护中心：http://127.0.0.1:8000/care
-- 可信实验室：http://127.0.0.1:8000/trust
-- **决赛五分钟导览：http://127.0.0.1:8000/judge**
-- OpenAPI：http://127.0.0.1:8000/openapi.json
+入口（**十条路由，2026-08-19 逐条实测 200**）：
+
+| 地址 | 是什么 |
+|---|---|
+| <http://127.0.0.1:8041/> | 首页 / 身份入口，同时是**四套设计的对照入口** |
+| <http://127.0.0.1:8041/elder> | 老人端**设计一** |
+| <http://127.0.0.1:8041/elder2> | 老人端**设计二**（本轮新增） |
+| <http://127.0.0.1:8041/family> | 家人端**设计一**（今天 / 待办 / 我的） |
+| <http://127.0.0.1:8041/family2> | 家人端**设计二**（本轮新增，四屏合一） |
+| <http://127.0.0.1:8041/care> | 照护中心（设计一把它拆成独立一页） |
+| <http://127.0.0.1:8041/trust> | 可信实验室 / 事务凭证 |
+| <http://127.0.0.1:8041/app> | 山水版老人端（第五套 consumer 前端，去留未定） |
+| <http://127.0.0.1:8041/stage> | 演示台（评委笔记本上的展示环境） |
+| **<http://127.0.0.1:8041/judge>** | **决赛五分钟导览** |
+
+- OpenAPI：<http://127.0.0.1:8041/openapi.json>
   （Swagger UI 与 ReDoc 已关闭：这套 CSP 是 script-src 'self'、无 unsafe-inline，
    而它们必须加载 CDN 脚本和一段内联脚本，打开只会是白屏加三条 CSP 违规。
    接口定义本身完整，纯 JSON，离线可看。）
 
+**演示数据默认不种。** 不设 `YOUHUO_DEMO_STATE` 的话 `/reminders` 回 0 条、`/bills` 空、
+用药计划一份都没有——然后你会花半天去查一个不存在的缺陷。三挡：
+
+```
+YOUHUO_DEMO_STATE=empty       什么都不种
+YOUHUO_DEMO_STATE=normal      一切如常
+YOUHUO_DEMO_STATE=attention   normal 之上再有需要注意的偏离，且有一件等家属点头的事
+```
+
+**演示家人端的审批闭环要用 `attention`**：那件 `awaiting_family_approval` 的任务只在这一挡播。
+
 演示账号仅在 `YOUHUO_DEMO_MODE=true` 时启用：`elder-demo`、`daughter-demo`、`son-demo`。
+
+### 四套设计怎么对比看
+
+同一套业务逻辑现在挂着**四张皮**，两套设计二是本轮新增的：
+
+| 路由 | 版式与美术 | 业务逻辑（**共用**） |
+|---|---|---|
+| `/elder` | 六层样式表（`tokens`+`base`+`components`+`pages`+`art-cards`+`elder-family-v3`） | `elder.js` |
+| `/elder2` | `elder-v6.css` 单一样式表 + 内联 SVG 水墨 | **同一份** `elder.js` |
+| `/family` + `/care` | 五层，视觉层 `art-cards-family.css`，照护拆成独立一页 | `family.js` / `care.js` |
+| `/family2` | `family-v6.css` 单一样式表，**四屏合在一个文档里** | **同两份** `family.js` + `care.js` |
+
+**不给设计二单写接线**，理由不是省事：这个项目为「两套实现各自往返都绿、跨子系统才红」
+栽过（字号语速和 SOS 各有两套实现）。一份逻辑、两张皮，是唯一不会分叉的做法。
+包自带的 `script-01/02.js` 是 `fetch × 0` 的纯 UI 壳，落到仓库里叫
+`elder-v6-a/b.js` 与 `family-v6-a/b.js`，只负责纯视觉行为。
+
+首页 `/` 上四个入口的 id 是 `designElderOne` / `designElderTwo` / `designFamilyOne` /
+`designFamilyTwo`，排在两张身份卡**之后**。**注意首页会记住上次选过的身份并在 4 秒后
+自动打开那一端**——现场用 `/?stay=1`，或者在倒计时里按「留在这一页」。
+
+逐条对比、答辩时每一套适合讲什么、以及**哪些东西不要在这四套上讲**，
+见 [`docs/33_FOUR_DESIGNS_WALKTHROUGH.md`](docs/33_FOUR_DESIGNS_WALKTHROUGH.md)。
 
 ## 复验
 
@@ -304,7 +355,12 @@ python -m pip install -r requirements.txt
 ./verify_all.sh
 ```
 
-包括编译、950项测试与覆盖率、130项逐功能验收、12个页面/模式无障碍、**页面运行时逐控件点击**、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+包括编译、全量测试与覆盖率、130项逐功能验收、14个页面/模式无障碍、**页面运行时逐控件点击**、ElderBench三代回归、VoiceBench-v6、v6的500,000项断言、合约/JavaScript/凭据和交付检查。
+
+> **四道浏览器闸门（`check_page_runtime` / `check_contrast` / `shoot_pages` /
+> `test_mobile_reachability`）的页面清单仍写死为原来那七页，`/elder2` 与 `/family2`
+> 一条都不在里面。** 两套设计二通过的是各自那份静态契约闸门，不是浏览器里的运行时检查。
+> 见 `KNOWN_ISSUES.md` P1-C。
 
 重验证：
 
@@ -320,19 +376,59 @@ python -m pip install -r requirements.txt
 
 ## 本次实测
 
-- pytest：**950/950通过**；
-- 逐功能端到端验收：**130/130通过**，OpenAPI 操作覆盖 **103/103**；
-- 页面运行时闸门：**6个页面加载无异常，41个控件逐个按过**，无未捕获异常、无 console.error、无同源 4xx/5xx、无原生对话框；
-- 核心Python语句覆盖率：**91%**；
+每一行后面都标了它是**什么时候、由什么跑出来的**。没标就是没测。
+
+### 2026-08-19 这一轮亲自跑的
+
+```
+cd backend && ..\.venv\Scripts\python.exe -m pytest -q -p no:randomly
+7 failed, 2095 passed in 335.77s
+```
+
+**7 条红里有 4 条是稳定的、3 条是并行改动的中间态**（四十分钟后重跑那几个文件，
+只剩 4 条）。那 4 条全部是
+`test_release_hygiene.py::test_heavy_reports_were_produced_by_the_current_source`
+——四份重型报告盖着 08-18 的源码指纹，而 `backend/youhuo/` 这一轮改过。
+**这不是缺陷，是闸门在正确工作**；修法是重跑 `verify_heavy.ps1`（约四分钟）。
+逐条解释见 [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) 开头。
+
+- 十条页面路由 + `/health` `/ping` + 新增的六个静态资源：**逐条 200**；
+- OpenAPI：**145 个路径、153 个操作**（`/api/v1` 46 路径 / 50 操作；
+  `v2`–`v7` 共 102 个操作：14 / 9 / 39 / 21 / 15 / 4；`/health` 1 个）。
+  给小艺平台的 `xiaoyi/plugin_openapi_v6.generated.json` 仍是 **99 个路径**——
+  那份**刻意不含 `/api/v1`**，两个数不矛盾。
+
+### 上一次重型验证（`reports/`，2026-08-18 23:25–23:27 落盘）
+
+- v5回归性质断言：**1,000,000/1,000,000通过**；
+- Saga故障恢复：**400/400场景通过**；
+- 真实Uvicorn回环：**5,000/5,000请求成功，100并发**；
+- v6真实HTTP闭环：通过。
+
+**这四份的源码指纹已经过期**（`72848d13…` vs 当前 `d81114f0…`），
+所以在重跑之前，它们证明的是 08-18 那一版的源码，不是现在这一版。
+
+### 更早一轮（`reports/`，2026-08-15 / 08-16）
+
+- 逐功能端到端验收：**130/130通过**；
 - ElderBench：**34/34、120/120、300/300通过**；
 - VoiceBench-v6：**800/800通过**；
 - v6确定性性质断言：**500,000/500,000通过**；
-- v5回归性质断言：**1,000,000/1,000,000通过**；
-- Saga故障恢复：**400/400场景、1,400/1,400断言通过**；
-- 真实Uvicorn回环：**5,000/5,000请求成功，100并发**；
-- OpenAPI：**99个路径**；小艺Skill：**13个**。
+- 核心Python语句覆盖率：**91%**；小艺Skill：**13个**。
 
 准确解释见 `reports/TEST_REPORT.md`。合成文本和软件断言不是老人用户实验，也不代表真实医院、支付、语音或鸿蒙设备调用。
+
+### 这一轮明确**没有**做完的
+
+- **九个 `/api/v1` 端点没有任何页面在调**（隐私导出 / 两步删除 / 情绪回顾 /
+  生活日报 / 同意记忆的四个）。后端与测试都是完整的，缺的是前端入口。
+- 四份重型报告要重跑 `verify_heavy`。
+- `/elder2` `/family2` 不在四道浏览器闸门的页面清单里。
+- `backend/static/app/index.html` 是交接包留下的开发索引页，**公开可达**，去留未定。
+- `/family2` 不引 manifest、不注册 service worker。
+
+完整清单、每一条为什么没修、以及它在什么情况下会咬人，见
+[`KNOWN_ISSUES.md`](KNOWN_ISSUES.md)。**这份文件不声称零缺陷。**
 
 ## 本轮测试真实发现并修复的问题
 

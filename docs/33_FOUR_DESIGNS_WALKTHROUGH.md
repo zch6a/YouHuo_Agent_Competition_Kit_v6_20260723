@@ -3,7 +3,13 @@
 同一套业务逻辑现在挂着**四张皮**。这份文件回答三件事：它们分别在哪、差在哪、
 以及站在评委面前该拿哪一套讲哪一件事。
 
-最后更新：2026-08-19。写这份文件时四条路由都实际请求过，方法记在最后一节。
+最后更新：2026-08-19（第二轮核实：十条路由 + 新增静态资源逐条真实请求过，
+入口页四个 id 在服务端发出的 HTML 里核过，方法记在最后一节）。
+
+> **写这份文件时有五个 agent 正在并行改前端**，`elder-v6.{html,css}`、
+> `family-v6.css`、`art-cards.css`、`judge.*`、`trust.js`、`sw.js` 都在工作树里带着改动。
+> 路由、共用逻辑、面板集这些结构性的事实是稳的；**具体的像素、命中区、配色请以
+> 当时的截图为准**，不要引用这份文件里的数字去做验收。
 
 ---
 
@@ -109,19 +115,31 @@
 - <http://127.0.0.1:8041/family>
 - <http://127.0.0.1:8041/family2>
 
-### 一条现场必须先知道的
+### 一条现场必须先知道的：入口页会在 4 秒后自己走人
 
-入口页会**记住上次选过的身份**：`localStorage` 里有 `youhuo_role_v1`、而这个标签页
-还没打开过任何内页时，打开 `/` 会立刻 `location.replace` 到 `/elder` 或 `/family`
-——**四个设计入口一眼都看不到**。
+入口页**记住上次选过的身份**（`localStorage` 的 `youhuo_role_v1`）。冷启动时——
+也就是「这个标签页还没打开过任何内页」——它不会立刻弹走，但会**倒数 4 秒然后自动
+打开**上次那一端。
 
-现场两个办法，都不用改代码：
+> 这一段在 08-19 之前是 `location.replace`，打开 `/` 在第一帧之前就没了，四个设计入口
+> 一眼都看不到。`landing.js` 已经整个重写：现在页面**先渲染**，在正文顶上插一条
+> `#landingResume`，里面是一句话 + 逐秒倒数 + 两个按钮
+> （`#landingGo` 现在就进 / `#landingStay` 留在这一页）。表从**第一帧**开始走
+> （`requestAnimationFrame`），不是从脚本执行开始；页面在后台时不走表；
+> 按键、滚轮、触摸、指针按下任意一个都会停表；走人用 `location.assign`，
+> 所以按「后退」能回到 `/`。
 
-1. 地址直接写 `http://127.0.0.1:8041/?stay=1`，`stay` 参数会跳过这次跳转；
-2. 或者用一个从没点过身份卡的浏览器 / 无痕窗口。
+**默认行为仍然是「4 秒后离开首页」**，所以现场三个办法任选一个：
 
-彩排时**先用真正要用的那个浏览器窗口走一遍**——这条跳转只在「点过身份卡的浏览器
-+ 新标签页」这个组合下出现，用别的窗口试是试不出来的。详见 `KNOWN_ISSUES.md`。
+1. 地址直接写 `http://127.0.0.1:8041/?stay=1`，`stay` 参数会跳过这次接管；
+2. 倒计时里按一下「留在这一页」——它写 `youhuo_stay_v1`，**这台设备以后都会停**
+   （点身份卡时会清掉，所以不怕误按）；
+3. 或者用一个从没点过身份卡的浏览器 / 无痕窗口——那时压根不会有倒计时。
+
+彩排时**先用真正要用的那个浏览器窗口走一遍**。这条路径只在「点过身份卡的浏览器
++ 新标签页」这个组合下出现，用别的窗口试是试不出来的；**自动化闸门也摸不到它**
+（每轮全新 profile，`localStorage` 是空的，倒计时那一支恒不触发）。
+详见 `KNOWN_ISSUES.md` 的 P1-B。
 
 ### 建议顺序
 
@@ -185,27 +203,65 @@ mine 451）。
   评委的手机如果是深色模式，看到的就是浅色界面。
 - **不要连按两次 `/judge` 的「从头演一遍」**（第 5、6 拍会改读上一次的记录，
   见 `KNOWN_ISSUES.md` P2-2）。
+- **不要在这四套上演隐私导出、两步删除、情绪回顾、生活日报、同意记忆的批准与撤回。**
+  这九个 `/api/v1` 端点都真的在（`/openapi.json` 里有，逐条实测 200），
+  **但没有任何页面在调它们**——`backend/static/**` 全量扫过，一处调用都没有。
+  它们能在 `/openapi.json` 或 `curl` 上讲，不能在这四套界面上点。
+  见 `KNOWN_ISSUES.md` P1-E。
+  （「同意记忆」这四个端点尤其要当心：产品的招牌功能，端点齐了、后端测试齐了，
+  但老人端**仍然没有入口**。别顺口说成「老人可以在这里点头」。）
+- **不要把 `/family2` 装到主屏、也不要拿它演离线。** 它不引 `manifest`、
+  不注册 service worker、没有 `theme-color`（四项全空，见 `KNOWN_ISSUES.md` P1-F）。
+  要演 PWA 就用 `/family` 或 `/elder`。
 
 ---
 
 ## 七、怎么核对这份文件
 
-这里每一条路由、每一个文件名都是核对过的，不是抄来的。重跑：
+这里每一条路由、每一个文件名都是核对过的，不是抄来的。
 
-```bash
-.venv/Scripts/python.exe - <<'PY'
-import sys; sys.path.insert(0, "backend")
-from fastapi.testclient import TestClient
-from youhuo.api import create_app
-from youhuo import surfaces
-c = TestClient(create_app("data/_probe.db", demo_mode=True, seed_baseline_history=True))
-for r in surfaces.ROUTES:
-    print(r, c.get(r).status_code)
-PY
+### 起一个真服务再敲，不要只用 TestClient
+
+```powershell
+$env:YOUHUO_DEMO_STATE="attention"
+.\.venv\Scripts\python.exe -m uvicorn youhuo.api:app --host 127.0.0.1 --port 8057 --app-dir backend
 ```
 
-2026-08-19 的实测结果：`/` `/elder` `/elder2` `/family` `/family2` `/care` `/trust`
-`/app` `/stage` `/judge` **十条全部 200**。
+**这台机器上 `HTTP_PROXY=127.0.0.1:7897`，而 `urllib` 不认 `NO_PROXY`**——
+探针不显式绕过的话会卡在代理上，然后你以为是服务没起来：
+
+```python
+import urllib.request
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+for path in ("/", "/elder", "/elder2", "/family", "/family2",
+             "/care", "/trust", "/app", "/stage", "/judge"):
+    print(path, opener.open("http://127.0.0.1:8057" + path, timeout=20).status)
+```
+
+**挑端口时先确认它是空的。** 写这份文件时 8047 上已经有别人的服务在跑，
+uvicorn 报 `[Errno 10048]` 绑不上，而探针照样收到 200——**它敲的是别人的服务**。
+`Get-NetTCPConnection -State Listen` 先看一眼。
+
+### 2026-08-19 的实测结果
+
+`/` `/elder` `/elder2` `/family` `/family2` `/care` `/trust` `/app` `/stage` `/judge`
+**十条全部 200**；`/health` `/ping` 200；
+`/static/{elder-v6,family-v6}.{css}`、`/static/{elder-v6,family-v6}-{a,b}.js`、
+`/static/landing.js`、`/static/app/index.html` 全部 200。
+
+服务端发出的 `/` 里，`designElderOne` / `designElderTwo` / `designFamilyOne` /
+`designFamilyTwo` 四个 id 与 `.yh-designs` 那一节都在。
+`/elder2` 的 HTML 里有 `elder-v6.css` 和 `elder.js`；
+`/family2` 的 HTML 里有 `family-v6.css` 和 `family.js`——**共用逻辑这件事在服务端
+发出的字节里就能核**，不用开浏览器。
+
+`/openapi.json`：**145 个路径、153 个操作**，其中 `/api/v1` 46 个路径 / 50 个操作，
+`v2`–`v7` 102 个操作（14 / 9 / 39 / 21 / 15 / 4），`/health` 1 个。
+（`xiaoyi/plugin_openapi_v6.generated.json` 仍是 **99 个路径**——那份**刻意不含
+`/api/v1`**，是给小艺平台的插件契约。两个数不是矛盾，别互相改。）
 
 路由的唯一事实源是 `backend/youhuo/surfaces.py` 的 `SURFACES`，
 `test_surface_registry` 拿它和应用真正服务的路由逐条对——**新加一页只改那一处**。
+但要记住 `surfaces.py` 开头那段警告：路由字面量还散在**八个文件**里，
+其中四份浏览器闸门的页面清单**仍然写死为原来那七页**（实测 `elder2` / `family2`
+一个都不在，见第六节和 `KNOWN_ISSUES.md` P1-C）。

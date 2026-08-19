@@ -3,8 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- 状态栏用这一页**自己的**画布色。这一页不引 `tokens.css`，它的纸是
+     `html,body{background:#eee8dd}`，不是四层里那张 `--bg: #f7f6f3`。
+     只有 light 一条：`elder-v6.css` 里一条 `prefers-color-scheme` 都没有，
+     再声明一个深色状态栏，就是在一张永远浅色的纸上面顶一条黑边。 -->
+<meta name="theme-color" content="#eee8dd">
 <title>优活 · 老人端</title>
 <link rel="stylesheet" href="/static/elder-v6.css">
+<!-- 注册 service worker。这一行原先没有，而 `sw.js` 的 VERSION 已经**为这一页**
+     从 v14 升到 v15、外壳清单里躺着 `/elder2` 和它那四个文件——也就是说离线外壳
+     声明了这一页，而这一页自己永远不会去装那个 worker。
+     `test_the_offline_shell_covers_this_page` 查的是 sw.js 里有没有那几个字符串，
+     所以它一直是绿的：断网时这一页打不打得开，取决于用户此前有没有先访问过
+     `/elder` 或首页（同源的 worker 一旦装上就接管全站）。第一次就直接进
+     `/elder2` 的人拿不到任何缓存。
+
+     **刻意不引 manifest**，虽然装到主屏看起来是顺手的一步。
+     `test_theme_color_matches_the_canvas` 把「这一页引没引 manifest」当作可安装
+     页面的判据，并要求 `theme-color` 深浅两套都等于 `tokens.css` 的 `--bg`——
+     而这一页根本不引那个文件，它的画布是 #eee8dd。照着写 #f7f6f3 能让那条闸门
+     变绿，代价是状态栏和页面之间多一道横贯屏幕的接缝，也就是那条闸门存在的
+     **唯一理由**。写一个假颜色去满足一条测真颜色的检查，是这个项目最不该做的
+     一种妥协。另一套设计 `family-v6.html` 和 `stage.html` 同样不引它。
+     注册 worker 不需要它：离线缓存照常，少的只是「添加到主屏」。
+
+     ⚠ 这一段刻意**不逐字写出**那个 link 标签。上面那条闸门用的是整份文件的
+     子串搜索，连注释一起算——第一版这段解释里带着那个标签的原文，于是这一页
+     被判成"可安装页面"，红在它自己的解释上。同一个坑这个仓库踩过四次以上，
+     `test_elder_design2.py` 里那个 `_blank_html_comments` 就是为它写的。 -->
+<script src="/static/register-sw.js"></script>
 </head>
 <body data-surface="consumer" data-mode="youhuo" data-activity="idle" data-focus="off" data-tab="home">
 

@@ -13,7 +13,8 @@
 | **工作目录（唯一的成熟版本）** | `F:\优活\YouHuo_Agent_Competition_Kit_v6_20260723` |
 | Python 虚拟环境 | `F:\优活\YouHuo_Agent_Competition_Kit_v6_20260723\.venv` |
 | 后端源码 | `backend/youhuo/` |
-| 测试 | `backend/tests/`（约 1780 条） |
+| 前端 | `backend/static/`（**十条路由、四套设计**，见 `docs/33_FOUR_DESIGNS_WALKTHROUGH.md`） |
+| 测试 | `backend/tests/`（96 个文件、约 2100 条） |
 | 语音模型（**不在仓库里**） | `D:\youhuo-tts\`（`matcha-icefall-zh-baker` 139MB、`kokoro-multi-lang-v1_1` 407MB） |
 | 重型验证报告 | `reports/` |
 
@@ -27,17 +28,35 @@
 
 ## 二、十分钟跑起来
 
-所有命令都在仓库根目录执行。
+所有命令都在仓库根目录执行。**用 `run_demo`，它开的是 8041**：
+
+```powershell
+.\run_demo.ps1
+```
 
 ```bash
-.venv/Scripts/python.exe -m uvicorn youhuo.api:app --app-dir backend --port 8000
+./run_demo.sh
+```
+
+**端口是 8041，不是 8000。** 每一页在没有服务器时露出的那句提示里印的就是 8041，
+`test_deployment.py::test_the_demo_runner_opens_the_port_the_pages_advertise` 钉住它。
+自己起 uvicorn 时也别忘了挑一个空端口——**这台机器上经常同时有几个服务在跑**，
+端口被占时 uvicorn 报 `[Errno 10048]` 而你的探针照样收到 200，那是**别人的服务**：
+
+```powershell
+Get-NetTCPConnection -State Listen | Select-Object -ExpandProperty LocalPort
+$env:YOUHUO_DEMO_STATE="attention"
+.\.venv\Scripts\python.exe -m uvicorn youhuo.api:app --host 127.0.0.1 --port 8057 --app-dir backend
 ```
 
 跑测试（在 `backend/` 目录下）：
 
 ```bash
-cd backend && ../.venv/Scripts/python.exe -m pytest -q
+cd backend && ../.venv/Scripts/python.exe -m pytest -q -p no:randomly
 ```
+
+`-p no:randomly` 不是可选的装饰：有别人同时在改代码时，随机顺序会让「这一条为什么红」
+变得没法复现。
 
 推送前必跑的密钥扫描：
 
@@ -58,8 +77,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_heavy.ps1
 用药计划一份都没有——然后你会花半天去查一个不存在的缺陷。
 
 ```
-YOUHUO_DEMO_STATE=normal
+YOUHUO_DEMO_STATE=empty       什么都不种
+YOUHUO_DEMO_STATE=normal      一切如常
+YOUHUO_DEMO_STATE=attention   normal 之上再有需要注意的偏离
 ```
+
+只认这三个值，写别的会在启动时直接报错（`api.py:99`）。
+
+**要看家人端的审批闭环就必须用 `attention`。** 那件停在 `awaiting_family_approval`
+的任务只在这一挡播（`api.py:127`、`:466`）；`normal` 的定义就是「一切如常」，
+一件悬着的缴费不属于如常。用 `normal` 打开 `/family`，「今天」面板会显示
+「今天不用您操心，没有要您点头的事」——**那不是缺陷，是你没种那件事**。
 
 代码里等价的写法是 `create_app(..., seed_baseline_history=True)`。
 测试夹具几乎都要带上它。
@@ -74,12 +102,16 @@ YOUHUO_DEMO_STATE=normal
 
 ## 三、分层：这是理解这个仓库的关键
 
-后端**一共 139 个端点**，分成两类：
+后端**一共 152 个端点**（2026-08-19 实测 `/openapi.json`：145 个路径 / 153 个操作，
+其中 1 个是 `/health`），分成两类：
 
 ```
 /v2 … /v7     102 个    产品的能力子系统，按版本迭代堆起来的
-/api/v1        37 个    老人端 App 的门面（facade）
+/api/v1        50 个    老人端 App 的门面（facade）。本轮从 37 涨到 50
 ```
+
+（`xiaoyi/plugin_openapi_v6.generated.json` 是 **99 个路径**，那份**刻意不含
+`/api/v1`**，是给小艺平台的插件契约。看到两个数不一样别急着「修」。）
 
 `/api/v1` **不是新的一套业务**，它是给老人端那一屏用的**翻译层**：
 把 v2–v7 的能力包装成「一屏要什么就给什么」的形状，中文文案、
@@ -111,6 +143,25 @@ YOUHUO_DEMO_STATE=normal
 1737 条测试没有一条能红。
 
 所以：**新的老人端入口，判据必须跨子系统写。** 单端点往返一定绿，证明不了任何事。
+
+### 还有第三种「两边都绿」：端点有了，而没有页面在调
+
+这是这个仓库现在最大的一处欠账。**九个 `/api/v1` 端点已经完整实现、测试齐备，
+但 `backend/static/**` 里一处调用都没有**：
+
+```
+GET  /api/v1/privacy/data          POST /api/v1/privacy/erase/preview
+POST /api/v1/privacy/erase         GET  /api/v1/emotions/review
+GET  /api/v1/daily-report          GET  /api/v1/memories
+POST /api/v1/memories/{id}/approve  ...decline  ...forget
+```
+
+它在 `/openapi.json` 里看起来是有的，在演示里等于不存在。这个项目已经因为同一个形状
+栽过两次（同意记忆永远停在 `proposed`、用药计划）——**两次都是两边界面都正常、
+不报任何错**。核这类事情**要按接口核，不能按页面核**：把 `backend/static/**` 下所有
+`.js` / `.html` 逐行扫端点字面量，三套 consumer 前端各查一遍
+（`elder.js` 的 `api()`、`family.js`/`care.js` 的 `api()`、山水版 `/app` 的 `YouhuoAPI.*`）。
+详见 `KNOWN_ISSUES.md` P1-E。
 
 ---
 
@@ -149,47 +200,74 @@ YOUHUO_DEMO_STATE=normal
 
 ---
 
-## 五、当前状态（截至 2026-08-17）
+## 五、当前状态（截至 2026-08-19）
 
-- `pytest`：**1780 passed / 0 failed**（最后一次全量；本文写作时正在跑一次
-  时区修复后的回归，结果未出）
-- 重型验证：五阶段全过
-- `scan_secrets`：通过
-- 仓库里没有模型文件（`check_artifacts_v6` 会把大文件当泄漏）
-- `/api/v1`：37 个端点，36 个有类型化响应契约（`backend/youhuo/app_schemas.py`）
+> **读这一节的时候，工作树可能正在动。** 这一轮有**五个 agent 在并行改代码**，
+> 上一轮有九个。先跑 `git status` 和一次全量 pytest，再引用下面任何一个数。
 
-### 这一轮刚做完的
+- `pytest`：**7 failed, 2095 passed**（一次全量，335s）。
+  四十分钟后只重跑那 7 条所在的文件：**4 failed, 245 passed**——
+  **7 条里有 3 条是别人改到一半的中间态，自己消失了**。
+  剩下 4 条全部是 `test_heavy_reports_were_produced_by_the_current_source`：
+  四份重型报告盖着 08-18 的源码指纹，而 `backend/youhuo/` 这一轮改过。
+  **不是缺陷，是闸门在正确工作**；修法是重跑 `verify_heavy.ps1`（约四分钟）。
+- 十条页面路由 + `/health` `/ping`：逐条实测 **200**。
+- `scan_secrets`：推送前必跑，**红着不许提交**。
+- 仓库里没有模型文件（`check_artifacts_v6` 会把大文件当泄漏）。
+- `/api/v1`：**50 个操作**（本轮 +13），契约在 `backend/youhuo/app_schemas.py`。
 
-- **用药**（6 个端点）：今天吃什么/吃了没/还能吃几天、记「吃了」、记「没吃」、
-  待确认列表、同意、拒绝。只读和记录，**不建计划不改剂量**——
-  `create_medication_plan` 对 ELDER 角色建的计划直接生效，
-  接到老人端等于老人可以自己给自己开药。
-- **紧急呼叫改走安全策略**：按 `safety_policies_v4` 取接力名单，社区网格员进名单。
-  措辞上**不说「已经联系了社区」**——这个原型不自动拨号。
-- **固定安排（循环例程）**（4 个端点）：`recurring_routines` 建好了从没被用过，
-  两张表都是空的。老人端此前只能建一次性提醒。
+### 这一轮做完的
 
-### 还没做的（v4/v5/v7 那侧都完整，缺的是老人端入口）
+**前端：两套设计二并行上线，共用同一份业务逻辑**
 
-| 能力 | 端点 |
+- `/elder2`（`elder-v6.html` + `elder-v6.css`）与 `/family2`（`family-v6.html` +
+  `family-v6.css`）。**不给它们单写接线**——`elder.js` / `family.js` / `care.js`
+  一份逻辑、两张皮。理由就是上面第三节那两次事故。
+- 首页 `/` 加了四个设计对照入口（`designElderOne/Two`、`designFamilyOne/Two`）。
+- `landing.js` 重写：冷启动不再无声 `location.replace`，改成**页面先渲染 + 4 秒可
+  取消的接管**（倒计时从第一帧起算、后台不走表、任意输入停表、`assign` 不是 `replace`）。
+
+**功能：三处此前只有后端没有界面的洞**
+
+- **家人端审批闭环第一次能演示。** 在这之前，演示数据里**从来没有过一件需要家属
+  点头的事**——唯一那笔缴费一入库就是 `completed`，「今天」面板永远显示
+  「今天不用您操心」。现在 `attention` 挡种一件停在 `awaiting_family_approval` 的任务，
+  点「核对后确认接力」→ `POST /v2/family/approve` → 转 `completed`。
+- **`/care` 从纯读接上写**：记一次已吃 / 没吃、记一笔身体数据、添一位亲友。
+  这一页此前七个分区、零个写操作，而空态文案还在承诺界面上不存在的能力。
+- **亲友档案从来没被种过。** `seed_demo()` 种的是 `safety_contacts_v4`（应急接力名单），
+  而 `/v4/contacts/{elder}` 读的是**另一张表** `contact_profiles_v4`——0 行。
+  于是老人端「家人」屏和照护页「安全」屏**同时**是空的。已在 `seed_demo_content()` 补上。
+
+**后端：五个新的 `/api/v1` 门面端点**（隐私导出 / 两步删除 / 情绪回顾 / 生活日报）
+——一行新业务逻辑都没有，全部包在已有的 v5 / v4 / v7 上面。
+
+### 还没做的
+
+| 缺口 | 状态 |
 |---|---|
-| 同意记忆 | `/v3/memories/propose\|decide\|revoke` —— 产品招牌，老人端只借用了那张表存设置 |
-| 隐私导出与删除 | `/v5/privacy/export`、`/erase` |
-| 情绪 | `/v4/emotions/analyze`、`/v4/reports/emotion` |
-| 每日报告与基线 | `/v7/daily-report/{elder_id}`、`/v7/baseline` |
+| **九个 `/api/v1` 端点没有前端入口** | 端点、契约、测试都齐了；`backend/static/**` 里一处调用都没有。**这是现在最大的一处欠账**，见 `KNOWN_ISSUES.md` P1-E |
+| 四份重型报告要重跑 `verify_heavy` | 见 `KNOWN_ISSUES.md` 开头 |
+| `/elder2` `/family2` 不在四道浏览器闸门的页面清单里 | 四处写死为原来那七页，见 P1-C |
+| 两套设计二只有浅色一种模式 | `prefers-color-scheme` 各出现 0 次，见 P2 `-2` |
+| `/family2` 不引 manifest、不注册 sw、没有 `theme-color` 与 `.needs-server` | 见 P1-F |
+| `backend/static/app/index.html` 公开可达 | 见 P1-D |
 
 **明确不该上老人端的**（评委/研究/基础设施/家属侧）：
 `/v3/tools/*`、`/v5/capability-truth|metrics|traces`、`/v6/studies/*`、
 `/v6/competition/evidence`、`/v5/sagas|sync`、`/v4/contacts/faces/*`。
 
-### 两个待人决定的事
+### 三个待人决定的事
 
-- **前端可能整套作废。** 用户说过 `/app` 这套山水版前端可能不要了。
-  所以后端必须能独立成立，判据不要依赖任何页面、选择器、DOM。
-  `/app` 是第三套 consumer shell（另外两套是 `/elder` 和家属端），
-  要不要退役 `/elder` 是用户的决定，已记在 `KNOWN_ISSUES.md` 的 P1-A。
+- **consumer 侧现在有五套前端**：`/elder`、`/elder2`、`/family`(+`/care`)、`/family2`、
+  `/app`。前四套是**有意的设计对照**（见 `docs/33_FOUR_DESIGNS_WALKTHROUGH.md`），
+  `/app` 不是。要不要退役 `/elder` 或 `/app` 是用户的决定，记在 `KNOWN_ISSUES.md` P1-A。
+  后端必须能独立成立，判据不要依赖任何页面、选择器、DOM。
+- **四套设计最后留哪一套（或者都留）**，没人拍板过。
 - **`backend/static/app/index.html`** 是交接包的开发索引页，标题写着
-  「优活老人端前端参考包」，链到「Claude 交接说明」，**公开可达**。推送前处理。
+  「优活老人端前端参考包」，链到「Claude 交接说明」，**公开可达**（实测
+  `GET /static/app/index.html` → 200，2065 字节）。推送前处理。
+  这一条从 08-17 记到 08-19 还在。
 
 ---
 

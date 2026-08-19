@@ -61,25 +61,44 @@
          **不是**取 200 条再在浏览器里筛：那样"这一笔有几条记录"取决于这个家庭
          最近有多忙——同一笔事务在忙的那天会少几条，而页面不会有任何异样。 -->
     <form class="panel" id="txnForm">
-      <div class="controls">
-        <label for="txnPick">调阅哪一笔事务
-          <select id="txnPick">
-            <option value="">正在读这个家庭的事务清单……</option>
-          </select>
-        </label>
-        <button type="submit" id="txnGo">调阅</button>
-      </div>
+      <!-- 选单和输入框各占一整行，两个按钮并排在它们下面。
+           ....................................................................
+           原先是 `.controls`（`components.css:648`，`grid-template-columns: 1fr auto`）
+           里装「标签＋选单」和「调阅」两个格子。网格项默认 `stretch`，于是那个按钮
+           被拉到和左边整块一样高——手机 430px 下实测 **75×103**，一个又窄又高的
+           蓝条。宽屏上左边那块矮，所以这件事只在手机上显形。
+           两个按钮放进同一行就不会有这个问题：它们自然高度一样。 -->
+      <label for="txnPick">调阅哪一笔事务
+        <select id="txnPick">
+          <option value="">正在读这个家庭的事务清单……</option>
+        </select>
+      </label>
       <label for="txnId">或者直接粘一个事务编号
         <input id="txnId" name="txnId" type="text" autocomplete="off" spellcheck="false"
                list="txnOptions" placeholder="上面选一笔，这里会跟着填好" />
       </label>
       <!-- datalist 让粘编号的人也有补全。它不是控件，是补全数据。 -->
       <datalist id="txnOptions"></datalist>
-      <!-- 链会长：这一页自己每读一次决策上下文，链上就多一条调阅记录。
-           所以要有一个"再拉一遍"的办法，否则屏幕上的条数会停在打开这一页的那一刻。 -->
-      <button type="button" class="secondary" id="txnRefresh">重新调阅这一笔</button>
-      <!-- id 沿用 `judgeStatus`：`backend/scripts/check_page_runtime.py:815` 按这个
-           名字读状态行，而那份脚本不在这一轮的可改范围里。类名沿用全站的状态条。 -->
+      <div class="controls">
+        <!-- 不写 type：`<button>` 在 `<form>` 里本来就默认提交，回车照样走
+             `onSubmit`。原先写的是 `type="submit"`，行为完全一样。
+             `judge.js` 里那段「刻意不写 type，这样 `form > button:not([type])`
+             会给它 56px」的注释**两头都不成立**：它当时写了 type，而且它从来不是
+             `<form>` 的直接子元素（它一直在 `.controls` 里），那条规则怎么都选不中它。
+             注释已经改成实情。它拿的是全站 48px 触控下限，而这一步是「读一笔」，
+             56px 那一档留给不可逆的关键操作。 -->
+        <button id="txnGo">调阅</button>
+        <!-- 链会长：这一页自己每读一次决策上下文，链上就多一条调阅记录。
+             所以要有一个"再拉一遍"的办法，否则屏幕上的条数会停在打开这一页的那一刻。 -->
+        <button type="button" class="secondary" id="txnRefresh">重新调阅这一笔</button>
+      </div>
+      <!-- id 沿用 `judgeStatus`，类名沿用全站的状态条。
+           这里原先写着「`check_page_runtime.py:815` 按这个名字读状态行」——**它不读**。
+           那个位置上的 `document.querySelector('#stageProgress')` 是七拍叙事的进度条，
+           而七拍早已整体搬去 `/stage`（`check_judge_story` 现在 `if page != "/stage":
+           return 0`）。全仓 grep `judgeStatus`，脚本目录里一处都没有。
+           id 照旧不改：`judge.js` 自己按它取状态行。但"有一道闸门盯着它"这句话
+           是假的，留着会让下一个人不敢动一个其实没人管的名字。 -->
       <p class="notice good care-status" id="judgeStatus" aria-live="polite">正在连上这台服务器……</p>
     </form>
 
@@ -111,7 +130,11 @@
     <div class="dashboard-grid" id="workbench">
       <section class="panel feature-panel" id="laneTimeline" aria-label="时间轴">
         <h2 class="section-head"><svg class="tab-icon" width="20" height="20" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-log" /></svg> 时间轴</h2>
-        <p class="section-note">这一笔在链上留下的每一步，按发生先后。点一条，右边两栏跟着换。</p>
+        <!-- 「右边两栏」只在三栏并排时成立。`.dashboard-grid` 在 720px 以下退成单列，
+             那时另外两栏在**下面**——手机 430px 下这句话在给一个不存在的方向指路，
+             而这一页在手机上是完全可读的（它只是为电脑设计的，不是拒绝手机）。
+             按栏目名说，两种布局下都对。 -->
+        <p class="section-note">这一笔在链上留下的每一步，按发生先后。点一条，另外两栏跟着换。</p>
         <div class="controls">
           <button type="button" class="secondary" id="tlKey" aria-pressed="true">只看关键步骤</button>
           <button type="button" class="secondary" id="tlAll" aria-pressed="false">全部</button>
@@ -134,7 +157,7 @@
 
       <section class="panel feature-panel" id="laneEvidence" aria-label="证据查看">
         <h2 class="section-head"><svg class="tab-icon" width="20" height="20" aria-hidden="true"><use href="/static/icons/tabs.svg#tab-trust" /></svg> 证据查看</h2>
-        <p class="section-note">左边选中的那一步，它自己带的那份记录，逐字。</p>
+        <p class="section-note">在「时间轴」里选中的那一步，它自己带的那份记录，逐字。</p>
         <div class="digest" id="evHead"></div>
         <div class="result" id="evBody" aria-live="polite"></div>
         <details id="evChain">

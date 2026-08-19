@@ -107,6 +107,67 @@ def test_the_css_prints_no_english_either() -> None:
     assert not bad, f"CSS 的 content 里有英文会印到屏幕上：{bad}"
 
 
+def test_the_dock_glyphs_say_the_same_thing_as_the_tab_labels() -> None:
+    """底栏那四个大字画在 CSS 的 `content` 里，四个分区名写在 HTML 里。
+
+    两处必须说同一件事，而没有任何东西在核对——四个字只存在于 CSS，所有读 HTML
+    的闸门对它们是全盲的，连上一条「CSS 不许印英文」也只管拉丁字母。
+
+    真出过错：这张表里原先另有一套从老人端抄来的 `.dock button:nth-child(n)`，
+    写的是「今 记 亲 我」。分区是「今天 待办 照护 我的」，第二、三个字都不对。
+    它没显示出来，只因为另一套同名规则排在后面、同特异度后写覆盖先写——
+    也就是说它离显示出来只差「有人删掉了后面那四行」。
+
+    判据不要求「只许声明一次」（媒体查询里改一次是合理的），要求的是
+    **所有声明同一个位置的规则必须给出同一个字，而那个字要出自这一格的分区名**。
+    无论哪一条规则最终生效，屏幕都是对的。
+
+    判据是「取自分区名」，不是「分区名的头一个字」——后者是我第一版写的，
+    它自己当场就红了：四个字是「今 办 护 我」，而分区名是「今天 待办 照护 我的」，
+    「办」「护」都是第二个字。两侧都量过才定的这条线：
+      * 最宽的**该过**：办∈待办、护∈照护、今∈今天、我∈我的
+      * 最窄的**该拦**：记∉待办、亲∉照护 —— 正是真出过的那两个错字
+    """
+    html = _read(HTML)
+    nav = re.search(r'<nav[^>]*\bclass="[^"]*\bfamily-tabs\b[^"]*"[^>]*>(.*?)</nav>',
+                    html, re.S)
+    assert nav, "找不到底栏 `<nav class=\"dock family-tabs\">`"
+    labels = [re.findall(r"<span[^>]*>([^<]*)</span>", button)[-1].strip()
+              for button in re.findall(r"<button\b.*?</button>", nav.group(1), re.S)]
+    assert len(labels) == 4 and all(labels), f"底栏读出来的分区名不对：{labels}"
+
+    body = re.sub(r"/\*.*?\*/", " ", _read(CSS), flags=re.S)
+    declared: dict[int, set[str]] = {}
+    for match in re.finditer(
+        r"([^{}]*button:nth-child\((\d)\)[^{}]*\.nav-icon::before)\s*\{"
+        r'\s*content\s*:\s*"([^"]*)"',
+        body,
+    ):
+        declared.setdefault(int(match.group(2)), set()).add(match.group(3))
+
+    assert sorted(declared) == [1, 2, 3, 4], (
+        f"只解析到底栏第 {sorted(declared)} 个位置的字形——正则跟这张表对不上了，"
+        "而一条什么都没读到的判据是恒绿的"
+    )
+    wrong = []
+    for n, glyphs in sorted(declared.items()):
+        label = labels[n - 1]
+        if len(glyphs) > 1:
+            wrong.append(f"第 {n} 格「{label}」被声明成了好几个字：{sorted(glyphs)}")
+            continue
+        glyph = next(iter(glyphs))
+        if glyph not in label:
+            wrong.append(f"第 {n} 格是「{label}」，CSS 画的却是「{glyph}」")
+    assert not wrong, (
+        "底栏的字和分区名对不上：\n  " + "\n  ".join(wrong)
+        + "\n  那四个字取自分区名，而它们只活在 CSS 的 content 里——"
+        "读 HTML 的闸门一条都看不见。"
+    )
+    # 自证：这条判据认得出真出过的那两个错字，也不会误伤现在这四个。
+    assert "记" not in "待办" and "亲" not in "照护"
+    assert "办" in "待办" and "护" in "照护"
+
+
 def test_the_english_scan_reads_real_copy_and_catches_a_plant() -> None:
     """自证。
 
@@ -364,6 +425,42 @@ def test_the_shell_still_does_its_own_job() -> None:
     assert "hashchange" in bindings, (
         "没有 hashchange：`#ovSafety` 这种深链只会打开照护面板，"
         "停在概览，不会切到它指的那一节。"
+    )
+
+
+#: 机身高 + 舞台上下内边距 ≤ 视口。两处必须一起变，所以它们共用一个令牌。
+#:
+#: 漂移过一次：`.preview-stage{padding:20px}` 配 `.phone{height:min(920px,100dvh)}`，
+#: 于是 900px 高的桌面上机身算出 900px、连边距 940px，整页多出 40px 滚动，
+#: 机身底部那圈圆角和投影被视口下沿切掉。实测 1280×900 越界 20px、1280×700 越界
+#: 40px（后者是 `min-height:720px` 兜的底，那一档本来就该滚）。
+#:
+#: 为什么静态闸门此前碰不到：两个值各自都完全合法，错的是它们的**关系**。
+#: 而 960px 以上的屏幕自然装得下——开发机上一次都看不出来。
+def test_the_phone_fits_inside_its_own_stage() -> None:
+    body = re.sub(r"/\*.*?\*/", " ", _read(CSS), flags=re.S)
+
+    token = re.search(r"--stage-pad\s*:\s*(\d+)px", body)
+    assert token, "`--stage-pad` 没有声明——机身和舞台又变回两个会各自漂移的字面量了"
+
+    stage = re.search(r"\.preview-stage\s*\{([^}]*)\}", body)
+    assert stage, "找不到 `.preview-stage` 规则"
+    assert "var(--stage-pad)" in stage.group(1), (
+        "`.preview-stage` 的 padding 没有走 `--stage-pad`：\n  "
+        + " ".join(stage.group(1).split())
+        + "\n  写成字面量的话，改了它而忘了改机身高度就是一道谁都看不见的溢出。"
+    )
+
+    phone = re.search(r"\.phone\s*\{([^}]*)\}", body)
+    assert phone, "找不到 `.phone` 规则"
+    height = re.search(r"height\s*:\s*([^;]+)", phone.group(1))
+    assert height, "`.phone` 没有 height"
+    expr = " ".join(height.group(1).split())
+    assert "100dvh" in expr, f"`.phone` 的高度不再跟着视口走：{expr!r}"
+    assert re.search(r"calc\(\s*100dvh\s*-\s*var\(--stage-pad\)\s*\*\s*2\s*\)", expr), (
+        f"`.phone` 的高度上限没有减掉舞台上下两条边距：{expr!r}\n"
+        "  机身高 + 上下 padding 必须装得进视口，否则整页多一道滚动条，"
+        "而被切掉的正是机身底部的圆角和投影——在 960px 以上的屏幕上看不出来。"
     )
 
 

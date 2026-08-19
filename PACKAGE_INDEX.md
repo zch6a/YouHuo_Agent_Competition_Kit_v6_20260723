@@ -1,16 +1,53 @@
 # 优活 Agent v6.0 交付索引
 
+最后更新：2026-08-19（两套设计二上线、首页加四个对比入口、后端补九个门面端点之后）。
+
 ## 首先查看
 
 | 文件 | 内容 |
 |---|---|
 | `README.md` | 运行、功能、验证结果与能力边界 |
+| **`KNOWN_ISSUES.md`** | **已经知道但没修的东西。交付前请先读它，不要只读上面那份** |
+| `ONBOARDING.md` | 给下一个接手的人：位置、十分钟跑起来、硬约束、前人栽过的跟头 |
 | `reports/TEST_REPORT.md` | 最终测试证据和准确解释 |
+| **`docs/33_FOUR_DESIGNS_WALKTHROUGH.md`** | **四套设计各自的定位、路由、差异、答辩时各讲什么** |
+| `docs/ELDER_DESIGN2_WIRING.md` | 老人端设计二的接线施工图（23 个缺失 id 分类到落点） |
 | `docs/28_V6_CHAMPIONSHIP_PLAN.md` | 决赛主线、三项创新与线下Go/No-Go门槛 |
 | `docs/29_V6_RESEARCH_GROUNDING.md` | 官方赛事、鸿蒙、老年交互与Agent工程依据 |
 | `docs/30_V6_USER_STUDY_PROTOCOL.md` | 待执行的知情同意老人—家属实验 |
 | `docs/31_V6_DEMO_SCRIPT.md` | 五分钟决赛演示脚本 |
 | `docs/32_V6_JUDGE_QA.md` | 评委高频问题与边界回答 |
+
+## 十条路由（唯一事实源：`backend/youhuo/surfaces.py` 的 `SURFACES`）
+
+`run_demo.ps1` / `run_demo.sh` 开的是 **8041**，不是 8000。
+
+| 路由 | 文档 | 样式层 | 业务逻辑 |
+|---|---|---|---|
+| `/` | `index.html` | `landing.css` ＋ 全局四层 | `landing.js` |
+| `/elder` | `elder.html` | 六层（含 `art-cards.css`、`elder-family-v3.css`） | `elder.js` |
+| `/elder2` | `elder-v6.html` | `elder-v6.css`，单一样式表 | **同一份** `elder.js` |
+| `/family` | `family.html` | 五层（视觉层 `art-cards-family.css`） | `family.js` |
+| `/family2` | `family-v6.html` | `family-v6.css`，单一样式表 | **同两份** `family.js` + `care.js` |
+| `/care` | `care.html` | 同 `/family` | `care.js` |
+| `/trust` | `trust.html` | 同上 | `trust.js` |
+| `/app` | `app/pages/home.html` | `app/assets/css/app.css` | `app/assets/js/*`（走 `YouhuoAPI`） |
+| `/stage` | `stage.html` | 全局四层 | `proof-demos.js` |
+| `/judge` | `judge.html` | 全局四层 | `judge.js` |
+
+`/elder2` 与 `/family2` 是本轮新增的**设计二**，和设计一并行，**共用同一份业务逻辑**
+——差的只是版式和美术。首页 `/` 上四个对照入口的 id 是
+`designElderOne` / `designElderTwo` / `designFamilyOne` / `designFamilyTwo`。
+
+本轮新增的静态文件：
+
+```
+backend/static/elder-v6.html   elder-v6.css   elder-v6-a.js   elder-v6-b.js
+backend/static/family-v6.html  family-v6.css  family-v6-a.js  family-v6-b.js
+```
+
+`*-a.js` / `*-b.js` 是交付包自带的 `script-01/02.js` 改名而来，**`fetch × 0` 的纯 UI 壳**
+（吉祥物拖拽、动效），只负责纯视觉行为，不碰后端。
 
 ## v6核心代码
 
@@ -29,8 +66,11 @@
 - `backend/static/glassbox.js`：玻璃盒信任卡渲染，从 `elder.js` 抽出；
 - `backend/static/icons/tabs.svg`：底部标签栏五个图标的 symbol sprite，五个页面共用一份；
 - `backend/static/judge.html/js`：五步评委导览；
-- `backend/static/elder.js`：老人端接入v6档案、交互计划、玻璃盒与明语记录日志；
-- `backend/static/family.js`：待办日历、任务进度明语化与脱敏陪伴周报。
+- `backend/static/elder.js`：老人端接入v6档案、交互计划、玻璃盒与明语记录日志。**`/elder` 与 `/elder2` 共用这一份**；
+- `backend/static/family.js`：待办日历、任务进度明语化与脱敏陪伴周报，以及**家人端审批闭环**（`POST /v2/family/approve`）。`/family` 与 `/family2` 共用；
+- `backend/static/care.js`：照护中心七个分区。此前**零个写操作**，本轮接上三处真写——记一次已吃 / 没吃（`POST /api/v1/medications/{id}/taken|skipped`）、记一笔身体数据（`POST /api/v1/health/events`，`value` 保持字符串因为血压是「128/82」）、添一位亲友（`POST /v4/contacts`，家人添的记成「等他确认」）。`/family2` 把它和 `family.js` 装进同一个文档，所以首屏是 11 个端点；
+- `backend/static/landing.js`：首页身份记忆 + **可取消的 4 秒接管**（`#landingResume` 一句话 + 倒数 + 「现在就进」/「留在这一页」两个按钮）。上一版是无声的 `location.replace`，四个设计入口一眼都看不到；
+- `backend/static/{elder-v6,family-v6}.{html,css}` 与 `*-a/b.js`：两套**设计二**。
 
 ## 可信底座与产品功能
 
@@ -56,9 +96,39 @@
 - `xiaoyi/a2a/agent_card.json`：Agent能力声明；
 - `mcp/tool_manifest.json`：高风险通用工具保持禁用。
 
+## `/api/v1` 门面层：本轮加了九个端点，**其中一个都还没有前端入口**
+
+`/api/v1` 不是新的一套业务，是给老人端那一屏用的**翻译层**——把 v2–v7 的能力包装成
+「一屏要什么就给什么」的形状。本轮从 37 个操作涨到 **50 个**（`v2`–`v7` 仍是 102 个）：
+
+```
+GET  /api/v1/privacy/data              隐私导出。纯读，一条审计都不写（P0 契约）
+POST /api/v1/privacy/erase/preview     两步删除第一步：算「类别 + 当时条数」的 semantic_hash
+POST /api/v1/privacy/erase             第二步：重新数一遍再比。裸 POST 400、令牌过期 409、删空 409
+GET  /api/v1/emotions/review?days=     情绪回顾
+GET  /api/v1/daily-report?day=         生活日报
+GET  /api/v1/memories                  记住了什么 + 等我点头的（分两段）
+POST /api/v1/memories/{id}/approve     同意记
+POST /api/v1/memories/{id}/decline     不让记
+POST /api/v1/memories/{id}/forget      撤回一条已生效的
+```
+
+两步删除保证的**不是**防伪造（只有本人进得来），而是「确认的对象和你看到的那一份
+是同一份」——回执写「删掉 7 条」实际删了 9 条，两边都不报错，那才是要防的。
+
+契约在 `backend/youhuo/app_schemas.py`；测试在
+`backend/tests/test_app_{privacy,emotions,daily_report,memories}.py`。
+
+> ⚠ **这九个端点目前没有任何页面在调。** `backend/static/**` 全量扫过，一处调用都没有。
+> 后端与测试是完整的，缺的是前端入口——见 `KNOWN_ISSUES.md` P1-E。
+
 ## 评测和验证
 
-- `backend/tests/`：950项自动化测试；
+- `backend/tests/`：96 个测试文件、约 2100 项自动化测试；
+- `backend/tests/test_{elder,family}_design2.py`、`test_landing_design_entries.py`：
+  两套设计二与首页四入口的**静态契约**闸门。`test_elder_design2.py` 从 `elder.js`
+  自己推出必需的 41 个 id 与运行时类名，**不手抄清单**。
+  它们守的是「装进去了、接得上」，**不是**「在浏览器里跑得动、看得见、够得着」；
 - `evaluation/elderbench_v5.jsonl`：300条v5专项评测；
 - `evaluation/voicebench_youhuo_v6.jsonl`：800条合成ASR候选评测；
 - `run_mass_audit_v6.py`：500,000项v6确定性断言；
@@ -94,12 +164,25 @@
 
 ## 发布统计
 
-- FastAPI OpenAPI路径：99个；OpenAPI 操作覆盖：103/103；
-- 小艺Skill：13个；
-- 自动化测试：984项；逐功能验收：130项；
-- 页面运行时闸门：7个页面、99个控件逐个按过、Voice Orb 11 态、评委页 7 拍；
-- 对比度与触控：14个页面×模式组合；全尺寸截图：252 个文件；
-- 核心Python语句覆盖率：91%。
+2026-08-19 实测（起真服务敲 `/openapi.json`，跑全量 pytest）：
 
-以上全部是 `verify_all` 单次运行的实测输出，不是估计值。`MANIFEST.sha256` 由
+- FastAPI OpenAPI：**145 个路径 / 153 个操作**
+  （`/api/v1` 46 路径 / 50 操作；`v2`–`v7` 102 操作：14 / 9 / 39 / 21 / 15 / 4；`/health` 1）；
+- 页面路由：**10 条，逐条 200**；
+- 小艺插件契约 `xiaoyi/plugin_openapi_v6.generated.json`：**99 个路径**
+  （**刻意不含 `/api/v1`**，和上面那个 145 不矛盾，别互相改）；
+- 小艺Skill：13个；
+- 自动化测试：**7 failed, 2095 passed**——4 条是重型报告指纹过期
+  （重跑 `verify_heavy` 即消），3 条是并行改动的中间态，四十分钟后重跑已绿；
+- 控件清单：**376 个控件**，其中 9 个 `apis` 非空。
+
+更早一轮 `verify_all` 的输出（08-15 / 08-16，**不是这一轮跑的**）：
+逐功能验收 130 项；页面运行时闸门 7 个页面 / 99 个控件 / Voice Orb 11 态 / 评委页 7 拍；
+对比度与触控 14 个页面×模式组合；全尺寸截图 252 个文件；核心 Python 语句覆盖率 91%。
+
+**那一批闸门的页面清单是原来那七页，`/elder2` 与 `/family2` 不在里面**
+（见 `KNOWN_ISSUES.md` P1-C）。`MANIFEST.sha256` 由
 `backend/scripts/make_release.py` 在打包时按 `git ls-files` 重算。
+
+推送前必跑 `backend/scripts/scan_secrets.py`，**红着不许提交**
+（远端是公开仓库，而且发生过审计密钥被推上去的事故）。

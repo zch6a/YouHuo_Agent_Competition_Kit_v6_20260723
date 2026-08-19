@@ -250,8 +250,8 @@
 | `#` | judge | — | a | navigate | —:— | — | professional | evidence | shell | professional-only |
 | `#txnForm` | judge | — | form | submit | judge.js:bindControls | — | professional | evidence | shell | professional-only |
 | `#txnPick` | judge | — | select | change | judge.js:bindControls | — | professional | evidence | shell | professional-only |
-| `#txnGo` | judge | — | button | — | judge.js:busy | — | professional | evidence | shell | professional-only |
 | `#txnId` | judge | — | input | — | judge.js:wantedId | — | professional | evidence | shell | professional-only |
+| `#txnGo` | judge | — | button | — | judge.js:busy | — | professional | evidence | shell | professional-only |
 | `#txnRefresh` | judge | — | button | click | judge.js:bindControls | — | professional | evidence | shell | professional-only |
 | `#tlKey` | judge | — | button | click | judge.js:bindControls | — | professional | evidence | shell | professional-only |
 | `#tlAll` | judge | — | button | click | judge.js:bindControls | — | professional | evidence | shell | professional-only |

@@ -6,22 +6,46 @@
 分级：
 
 - **P0** 演示当场会坏，或者会让老人做错事。**当前为 0。**
-- **P1** 有真实用户或评委能撞到的功能缺失。**当前为 4 条。**
+- **P1** 有真实用户或评委能撞到的功能缺失。**当前为 6 条。**
 - **P2** 体验或工程上的欠账，不影响正确性。
 - **未验证** 我没有条件测的东西。它不是「通过」，是「不知道」。
 
-最后更新：2026-08-19（两套设计二 `/elder2` `/family2` 并行上线之后）。
+最后更新：2026-08-19（并行九路那一批落地之后，逐条重新核实过）。
 
 ---
 
-## 当前红灯：全量 pytest 有 5 条红
+## 当前红灯：全量 pytest 有 4 条稳定的红
 
-不藏。2026-08-19 02:00 的一次全量：
+不藏，而且要连测量条件一起说：**写这份文件时有五个 agent 正在并行改代码**，
+所以「全量测试数」是一个会动的数。下面两次运行都是实测的。
+
+一次全量（2026-08-19，约 5 分 36 秒）：
 
 ```
 cd backend && ..\.venv\Scripts\python.exe -m pytest -q -p no:randomly
-5 failed, 2053 passed in 387.75s
+7 failed, 2095 passed in 335.77s
 ```
+
+约四十分钟后，只重跑那 7 条所在的文件：
+
+```
+tests/test_theme_color_matches_the_canvas.py  tests/test_elder_design2.py
+tests/test_family_design2.py                  tests/test_release_hygiene.py
+tests/test_control_inventory_is_the_fact_source.py
+tests/test_landing_design_entries.py          tests/test_surface_registry.py
+4 failed, 245 passed in 33.85s
+```
+
+**7 条里有 3 条自己消失了**，因为改它们的那个 agent 在这两次运行之间把工作做完了：
+
+| 那 3 条 | 当时红在哪 | 现在 |
+|---|---|---|
+| `test_elder_design2.py::test_typing_reaches_the_backend_and_every_hit_area_is_big_enough` | `/elder2`「我的」两个分段按钮命中区 37×48，下限 48 | 绿 |
+| `test_theme_color_matches_the_canvas.py::test_theme_color_is_the_canvas_colour[elder-v6.html]` | 只有一条不带媒体查询的 `theme-color: #eee8dd` | 绿（`elder-v6.html` 改成**刻意不引 manifest**，于是不再算「可安装页面」） |
+| `test_theme_color_matches_the_canvas.py::test_every_installable_page_declares_both_schemes` | 同上 | 绿 |
+
+**这一条本身值得记住**：并行期间的一次全量快照，分不出「真缺陷」和「别人正改到一半」。
+读到这里请自己重跑一次，不要引用上面那个 7。
 
 ### 红 1–4：四份重型报告是用另一版源码跑出来的
 
@@ -30,10 +54,11 @@ test_release_hygiene.py::test_heavy_reports_were_produced_by_the_current_source
   [mass_audit_v5_1000000] [chaos_v5_400] [load_v6_5000] [http_smoke_v6]
 ```
 
-四份报告都盖着 `72848d13…`，而当前 `backend/youhuo` 的指纹是 `d81114f0…`。
-`backend/youhuo/` 在这一轮被改过（`api.py` 加了 `/elder2` 路由、`app_api.py` 加了
-五个 `/api/v1` 端点、`app_schemas.py` 加了对应契约、`surfaces.py` 登记了 `/elder2`），
-而重型验证是 08-18 23:27 跑的。
+四份报告都盖着 `72848d13075d…`，而当前 `backend/youhuo` 的指纹是 `d81114f09d0b…`
+（两次运行相隔四十分钟，两个值都没变——所以这一条不是别的 agent 造成的抖动）。
+`backend/youhuo/` 在这一轮被改过（`api.py` 加了 `/elder2` `/family2` 两条路由、
+`app_api.py` 加了九个 `/api/v1` 端点、`app_schemas.py` 加了对应契约、
+`surfaces.py` 登记了两条设计二），而那四份报告是 **2026-08-18 23:25–23:27** 落盘的。
 
 **这不是缺陷，是这道闸门在正确工作**——它防的正是「读一份报告等于跑过一次验证」。
 
@@ -44,26 +69,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_heavy.ps1
 ```
 
 **注意**：跑之前先确认没有别的 agent 正在改 `backend/youhuo/`——它跑完就盖当时的指纹，
-中途被改过就白跑。
+中途被改过就白跑。这四条是**交付前必须清掉**的，因为 `check_artifacts_v6` 会引用这
+四份 JSON 的结论。
 
-### 红 5：控件清单的 `apis` 列越过了它自己的天花板
+### 已经不存在的那条红：`test_the_apis_column_is_known_to_be_unimplemented`
 
-```
-test_control_inventory_is_the_fact_source.py::test_the_apis_column_is_known_to_be_unimplemented
-AssertionError: `apis` 列已经填到 9 个了——好事。assert 9 <= 8
-```
+上一版这份文件在这里记着「红 5：控件清单的 `apis` 列越过了它自己的天花板
+（`assert 9 <= 8`）」。**那条测试已经没有了，这一段是错的**，留在这里只为了说明它去哪了。
 
-这是一条**棘轮断言**：它写死了「`apis` 只填到 5/145，等于没实现」这个事实，并要求
-这件事不被忘记。断言本身带着修法（「把这条测试改成正向断言，并把 `_COVERAGE_FLOOR['apis']`
-抬上去」）。
+它是一条**上限**断言，于是把「多接通一个控件」罚成红——它自己的报错信息都承认这一点。
+现在 `test_control_inventory_is_the_fact_source.py` 里换成了三样东西：
 
-**触发它的是这一轮的改动，而且是往好里改的那个方向。** 逐条比过：
-`HEAD` 那版清单 339 个控件、`apis` 填了 **8** 个（正好卡在天花板上）；
-当前工作树 376 个控件、填了 **9** 个，多出来的是 `family-v6.html` 里第二个
-`#reminderTitle`（`/v2/family/reminders`）。
+- `_COVERAGE_FLOOR["apis"] = 8` —— **下限**，配 `test_no_inventory_column_gets_emptier`。
+  为什么钉 8 而不是当前的 9：第 9 条 `stage.html:id=stageEscape` 是**假边**
+  （清单给它挂了八个端点，而 `stage.js:275` 里它的全部行为是 `() => setClean(false)`，
+  一个请求都不发）。钉 9 等于要求那个归属错误永远别被修好。
+- `_REACHES_THE_BACKEND` —— 一张**核过的**「控件 → 端点」表，8 条，逐条参数化断言
+  它**还**打得到（`test_a_control_that_reaches_the_backend_still_does`）。
+  接通新控件不会红，**弄断**表里任何一条会红。
+- `test_a_declared_edge_is_verifiable_in_the_source_not_only_in_the_artifact` ——
+  同一件事去 JS 源码里再核一遍，不只读产物。
 
-**为什么这里没修**：`test_control_inventory_is_the_fact_source.py` 是代码文件，
-这一轮我只拥有文档。它归改 `family-v6.html` 的那个 agent，或者归下一个人。
+实测：落盘清单现在 **376 个控件、9 个 `apis` 非空**，这一组全绿。
 
 ---
 
@@ -87,37 +114,43 @@ AssertionError: `apis` 列已经填到 9 个了——好事。assert 9 <= 8
 `/family`(+`/care`)、`/family2`、`/app`。前四套是有意的设计对照（见
 `docs/33_FOUR_DESIGNS_WALKTHROUGH.md`），`/app` 不是。
 
-### B. 入口页会跳过自己：冷启动跳转让评委看不到四个设计入口
+### B. 入口页仍然会自己走人，只是现在给了 4 秒和一个按钮 ✅ 已改，但要在彩排里看一眼
 
-**在哪** `backend/static/landing.js:40`。
+**上一版这份文件在这里写的是「打开 `/` 会立刻 `location.replace` 弹走，四个设计入口
+一眼都看不到」。那句话现在是错的**——`landing.js` 已经整个重写了。核对方式见下。
 
-**什么样** 判据是「`localStorage` 里有 `youhuo_role_v1`（此前点过身份卡）
-**并且** 这个标签页的 `sessionStorage` 里没有 `youhuo_visited_v1`（本标签页还没打开过
-任何内页）」。两条同时成立时：
+**现在是什么样**（读 `backend/static/landing.js`，实测服务端发出的 `/` 里四条链接都在）：
 
-```js
-location.replace(DESTINATION[remembered]);   // '/elder' 或 '/family'
-```
+- 冷启动（`localStorage` 有 `youhuo_role_v1`、本标签页 `sessionStorage` 没有
+  `youhuo_visited_v1`、没按过「留在这一页」、地址里没有 `?stay=1`）时，页面**先渲染出来**，
+  在 `.landing-main` 顶上插一条 `#landingResume`：一句「这一页会自动为您打开 X 端。」
+  \+ 逐秒倒数 + 两个按钮 `#landingGo`（现在就进）与 `#landingStay`（留在这一页）。
+- `HANDOFF_MS = 4000`，而且表**从第一帧开始走**（`requestAnimationFrame`），不是从
+  脚本执行开始——文件头记着五档 CPU 节流的实测数据，1/20 CPU 下按钮 2821ms 才可按，
+  挂在脚本执行上会只剩 1.2 秒。
+- 四个否决项各挡一路；`document.hidden` 时那一拍直接跳过；
+  `keydown / wheel / touchmove / pointerdown` 任意一个都会停表。
+- 走人用 `location.assign` 不是 `replace`，所以按「后退」能回到 `/`。
+- 按过「留在这一页」会写 `youhuo_stay_v1`（localStorage，跨标签页），
+  点身份卡时清掉——一次误按不会让人从此永远停在选择页。
 
-于是打开 `/` 会**立刻**弹走，`.yh-designs` 那一节（四个设计入口）一眼都看不到。
+**为什么它仍然留在 P1**：默认行为依然是「4 秒后自动离开首页」。评委如果在这 4 秒里
+没有看向屏幕，四个设计入口这件事就还是会被错过；而这一节是这次并行设计在产品里
+**唯一**的入口。这是一个产品取舍，不是缺陷——但答辩前必须有人拍板。
 
-**这一段逻辑本身是对的**，而且是上一轮修好的：它防的是「从站内点回首页被一路弹回去」，
-第一版用 `document.referrer` 判冷启动，被 `Referrer-Policy: no-referrer` 弄成恒真。
-问题是**前提变了**：这一页多了一节只有停在首页才看得见的内容，而它是这次并行设计
-在产品里唯一的入口。
+**现场三个办法，都不用改代码**
 
-**为什么没修** 这是代码文件，这一轮我只拥有文档；另有 agent 在改前端。
-真要修，方向是「有设计入口这一节时不自动跳转」或者「跳转前给一个可取消的提示」，
-**不是**把身份记忆整个拿掉——那会把上一轮修好的问题带回来。
+1. 地址写 `http://127.0.0.1:8041/?stay=1`；
+2. 倒计时里按一下「留在这一页」（之后这台设备都会停）；
+3. 用一个从没点过身份卡的浏览器 / 无痕窗口——那时根本不会有倒计时。
 
-**现场绕过（两个都不用改代码）**
-
-1. 地址写 `http://127.0.0.1:8041/?stay=1`；`landing.js:32` 的 `params.has('stay')`
-   会跳过这次跳转。
-2. 或者用一个从没点过身份卡的浏览器 / 无痕窗口。
-
-**什么时候会咬人** 彩排时点过一次身份卡，答辩当天用同一个浏览器新开标签页打开首页。
-**自动化闸门天然看不到这一条**：每轮全新 profile，`localStorage` 是空的。
+**没有验到的部分（这是它还在这份文件里的第二个理由）**
+`test_landing_design_entries.py` 是静态契约闸门，实测 245 条那一批里它是绿的；
+但**「4 秒够不够一个人反应」没有在真人身上试过**，倒计时那套交互也不在
+`check_page_runtime.py` 的页面清单里跑（见 P1-C）。
+自动化闸门天然摸不到这条路径：每轮全新 profile，`localStorage` 是空的，
+`handOff` 恒为假——**它测的是不倒计时的那一支**。彩排时请用真正要用的那个浏览器
+窗口走一遍。
 
 ### C. `/elder2` 与 `/family2` 不在四道浏览器闸门的页面清单里
 
@@ -168,6 +201,80 @@ location.replace(DESTINATION[remembered]);   // '/elder' 或 '/family'
 **这个决定我没有替谁做。**（`ONBOARDING.md` 从 08-17 起就记着「推送前处理」，
 到 08-19 仍然在。）
 
+**核对过**：`GET /static/app/index.html` → **200，2065 字节**，标题
+「优活老人端前端参考包」，正文里确实有 `CLAUDE_HANDOFF.md` 这个链接。
+
+### E. 九个 `/api/v1` 端点没有任何页面在调
+
+**在哪** `backend/youhuo/app_api.py`。这九个端点都真的注册了、都在 `/openapi.json` 里
+（实测 145 个路径 / 153 个操作，逐条 200），**但整个 `backend/static/` 里一处调用都没有**。
+
+| 端点 | 这一轮加的 | 底层 |
+|---|---|---|
+| `GET  /api/v1/privacy/data` | ✔ 隐私导出（**纯读，一条审计都不写**，P0 契约） | `/v5/privacy/export` |
+| `POST /api/v1/privacy/erase/preview` | ✔ 两步删除第一步 | `/v5/privacy/erase` |
+| `POST /api/v1/privacy/erase` | ✔ 两步删除第二步（要带预览发的令牌） | 同上 |
+| `GET  /api/v1/emotions/review?days=` | ✔ 情绪回顾 | `/v4/emotions/*` |
+| `GET  /api/v1/daily-report?day=` | ✔ 生活日报 | `/v7/daily-report`＋`/v7/baseline` |
+| `GET  /api/v1/memories` | 上一轮 | `memory_vault` |
+| `POST /api/v1/memories/{id}/approve` | 上一轮 | 同上 |
+| `POST /api/v1/memories/{id}/decline` | 上一轮 | 同上 |
+| `POST /api/v1/memories/{id}/forget` | 上一轮 | 同上 |
+
+**怎么核的**（这一条一定要按接口核，不能按页面核）：把 `backend/static/**` 下所有
+`.js` 与 `.html` 逐行扫 `privacy/data|privacy/erase|emotions/review|/daily-report|/memories`，
+命中 5 处，**全部不是这九个**：`family.js:74/94` 是注释、`family.js:592` 与
+`care.js:360` 打的是家人侧的 `/v7/daily-report/{elder_id}`、`proof-demos.js` 打的是
+`/v3/memories/*`（演示台）。三套 consumer 前端各查一遍：`elder.js` 的 11 条调用路径里
+没有 `/api/v1`；山水版 `/app` 那 35 处 `YouhuoAPI.*` 里也没有。
+
+**为什么要单独列**：这个项目已经因为「后端有、前端没画」栽过两次
+（同意记忆停在 `proposed`、用药计划），两次都是**两边界面都正常、不报任何错**。
+一个只有端点没有入口的能力，在演示里等于不存在——而 OpenAPI 里它看起来是有的。
+
+**注意别把它读成「后端没做」**：`test_app_privacy.py` / `test_app_emotions.py` /
+`test_app_daily_report.py` 共 49 条新测试、27 个变异全部咬住，后端这一侧是完整的。
+缺的只是前端入口。
+
+**为什么没修** 是代码。这一轮我只拥有文档，而且前端正有五个 agent 在改。
+
+### F. `/family2` 不是一个可安装的页面，也不注册 service worker
+
+**在哪** `backend/static/family-v6.html`。
+
+**逐页数过**（`register-sw` / `rel="manifest"` / `theme-color` / `.needs-server` 四项）：
+
+```
+                register-sw  manifest  theme-color  needs-server
+care.html            1          ✔          2            2
+elder.html           1          ✔          2            2
+elder-v6.html        1          ✘(注释说刻意不引)  1      2
+family.html          1          ✔          2            2
+index.html           1          ✔          2            2
+judge.html           1          ✔          2            2
+trust.html           1          ✔          2            2
+stage.html           0          ✘          0            2   ← 刻意的，文件里写了理由
+family-v6.html       0          ✘          0            0   ← 四项全空
+```
+
+**后果有三个，一个比一个不明显**
+
+1. **装不到主屏。** 没有 manifest，`/family2` 只能当普通网页开；而
+   `README` 讲的「可以直接装到主屏、与 App 无异」对这一页不成立。
+2. **首次访问 `/family2` 不会安装 service worker。** `sw.js` 的外壳清单里确实有
+   `family-v6.*`（这一轮加进去的，VERSION 已到 `youhuo-shell-v16`），但那要**先有人
+   注册过 worker**。评委如果第一个打开的就是 `/family2`，离线外壳一份都没缓存。
+3. **双击文件得到一张裸 HTML。** 它的样式表写成绝对路径 `/static/family-v6.css`，
+   `file://` 下 404，而它没有那两句 `.needs-server` 兜底提示（这就是下面 P2 `-1.5` 条）。
+
+**闸门为什么没抓到**：`test_theme_color_matches_the_canvas.py` 的
+`INSTALLABLE` 是**按「这一页引没引 manifest」算出来的**，不是手写名单——
+这个设计本身是对的（`stage.html` 因此被正确地排除在外），但它的副作用是
+**一个页面只要不引 manifest 就整批绕开这条闸门**。`/family2` 现在就在这个缝里：
+它不是「测了没过」，是「没被测」。
+
+**为什么没修** 是代码，而且「设计二要不要做成可安装的 PWA」是个产品决定，不是笔误。
+
 ---
 
 ## P2
@@ -204,8 +311,13 @@ family-v6.html   0
 
 这一页的样式表是 `/static/family-v6.css`（绝对路径），`file://` 下 404，
 于是评委解开交付包**双击这个文件**得到的是一张裸 HTML。
-`test_file_protocol_fallback.py` 的 `PAGES` 写死为原来那七页，
-所以它既没抓到这一条，也没覆盖 `elder-v6.html`（那一页恰好有，是写它的人自己加的）。
+`test_file_protocol_fallback.py` 的 `PAGES` 写死为原来那七页（实测：`elder2`
+`family2` `app` 一个都不在），所以它既没抓到这一条，也没覆盖 `elder-v6.html`
+（那一页恰好有，是写它的人自己加的）。
+
+**这一条是 P1-F 的一部分**：`family-v6.html` 缺的不只是 `.needs-server`，
+`register-sw` / `rel="manifest"` / `theme-color` 也都是 0。四项一起看才看得出
+它是整批漏掉，不是漏了一句提示。
 
 ### -1. 那 87 张美术素材里，有十来张烤着界面文字的残留
 
@@ -343,27 +455,31 @@ exempt   /  /elder  /family  /care  /trust  /judge  /ping
 
 ---
 
-## 未提交：这一轮有一批工作在磁盘上而不在 git 里
+## 未提交：还有一批工作在磁盘上而不在 git 里
 
-2026-08-19 02:00 的 `git status`：
+上一版这一段说「`/elder2` 整页、它的闸门、五个新端点一次提交都没有」。**那已经不成立了**
+——它们在 `a788a94`（并行九路的检查点）里全部落进了 git。核对过：`git log -1` 对
+`backend/static/elder-v6.html`、`landing.js`、`index.html`、
+`docs/33_FOUR_DESIGNS_WALKTHROUGH.md` 都指向 `a788a94`。
+
+写这份文件时的 `git status --short`（2026-08-19，**五个 agent 正在并行改代码**）：
 
 ```
- M backend/static/family-v6-a.js  family-v6-b.js  family-v6.css  family-v6.html
- M backend/static/index.html  landing.css  sw.js
- M backend/youhuo/api.py  app_api.py  app_schemas.py  surfaces.py
+ M backend/static/art-cards.css
+ M backend/static/elder-v6.css      elder-v6.html
+ M backend/static/family-v6.css
+ M backend/static/judge.html        judge.js
+ M backend/static/sw.js             trust.js
+ M backend/tests/test_elder_design2.py   test_family_design2.py
  M frontend_redesign/ia/11_control_inventory.{json,md}
-?? backend/static/elder-v6.{html,css}  elder-v6-a.js  elder-v6-b.js
-?? backend/tests/test_elder_design2.py  test_family_design2.py
-?? backend/tests/test_landing_design_entries.py
-?? backend/tests/test_app_daily_report.py  test_app_emotions.py  test_app_privacy.py
+?? backend/tests/test_trust_judge_polish.py
 ```
-
-也就是说：**`/elder2` 整页、它的闸门、以及五个新的 `/api/v1` 端点
-（`privacy/data`、`privacy/erase/preview`、`privacy/erase`、`emotions/review`、
-`daily-report`）目前一次提交都没有。** 写这份文件时另有 agent 正在改这些文件。
 
 **这不是缺陷，是当时的事实**，写下来是因为「文档说有」和「git 里有」在交付时是两件事。
-读到这里时先跑一次 `git status` 核对。
+读到这里时先跑一次 `git status` 核对——上面这张表在写完的那一分钟就开始过期了。
+
+**并且**：`git log` 里 `20 个提交在本地，一个都没推`（`ONBOARDING.md` 第四节）这句话
+也要重新数一遍再引用。推送是对外动作，必须由人明确同意。
 
 ---
 
@@ -418,6 +534,9 @@ exempt   /  /elder  /family  /care  /trust  /judge  /ping
 | 设计二四屏里有两屏是死的，而版式看起来完全正常 | `family.js` 和 `care.js` 顶层同名 `const api`，`SyntaxError` 让整个文件不执行 | 数首屏发出的后端请求个数（6 → 11） |
 | 抽屉卡在屏幕中间，调平移百分比调不好 | 百分比按元素自己的高度算，藏不藏得住取决于锚点到视口底边的距离，两个数没有关系 | 改用 `visibility: hidden`；而**验证只能靠截图**——它不改变盒子几何，探针量不出来 |
 | 横屏打字入口在首屏外 900px，`position: fixed` 反而更差 | `animation-fill-mode: both` 保留的是插值结果**单位矩阵**，不是 `none`，照样给 fixed 后代创建包含块 | 取每一层的 `offsetTop` 和 `offsetParent`，不要数兄弟高度 |
+| 一条闸门把「多接通一个控件」罚成红 | 它写的是**上限**（`len(with_api) <= 8`），方向反了：接通更多变红、弄断反而变绿 | 换成下限 + 具名边表；它自己的报错信息早就写着该怎么改 |
+| 并行期间一次全量 pytest 的 7 条红，四十分钟后只剩 4 条 | 另外 3 条是别的 agent 改到一半的中间态 | 只重跑那几个文件；一次快照分不出「真缺陷」和「正在改」 |
+| 一个页面不引 manifest，就整批绕开了 theme-color 那条闸门 | `INSTALLABLE` 按「引没引 manifest」算——设计是对的，副作用是缺席即豁免 | 逐页把四项（sw / manifest / theme-color / needs-server）并排数一遍 |
 
 ---
 

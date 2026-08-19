@@ -11,6 +11,13 @@
   --red:#b85d48;
   --line:rgba(72,58,43,.12);
   --shadow:0 18px 50px rgba(66,48,33,.10);
+  /* 机身四周留给舞台的边距。声明成令牌是因为**有两处必须一起变**：
+     `.preview-stage` 的 padding 和 `.phone` 的 height 上限。写成两个字面量时它们
+     漂移过一次——机身 `height:min(920px,100dvh)` 在 900px 高的桌面上算出 900px，
+     加上舞台上下各 20px 就是 940px，比视口高 40px。表现是整页多出一道滚动条，
+     而机身底部那圈圆角和投影被视口下沿切掉。实测 1280×900 越界 20px、
+     1280×700 越界 40px；960px 以上才自然装得下，所以在这台机器上看不出来。 */
+  --stage-pad:20px;
   --kai:"KaiTi","STKaiti","Kaiti SC",serif;
   --sans:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
 }
@@ -29,12 +36,13 @@ body{
   min-height:100dvh;
   display:grid;
   place-items:center;
-  padding:20px;
+  padding:var(--stage-pad);
 }
 .phone{
   position:relative;
   width:min(430px,100vw);
-  height:min(920px,100dvh);
+  /* 减掉舞台上下两条边距，否则机身在矮桌面上比它自己的舞台还高。 */
+  height:min(920px,calc(100dvh - var(--stage-pad) * 2));
   min-height:720px;
   overflow:hidden;
   border-radius:38px;
@@ -328,10 +336,12 @@ body{
 .dock button.is-current::before{
   content:"";position:absolute;top:-3px;width:28px;height:2px;border-radius:99px;background:#b68a43
 }
-.dock button:nth-child(1) .nav-icon::before{content:"今"}
-.dock button:nth-child(2) .nav-icon::before{content:"记"}
-.dock button:nth-child(3) .nav-icon::before{content:"亲"}
-.dock button:nth-child(4) .nav-icon::before{content:"我"}
+/* 底栏那四个字**只在一处**声明，在 `.family-tabs` 那一段。
+   这里原先另有一套 `.dock button:nth-child(n)`，写的是「今 记 亲 我」——从老人端
+   照抄过来的，而这一页的四个分区是「今天 待办 照护 我的」，第二、三个字是错的。
+   它没显示出来，只是因为下面那套同名规则排在后面、同特异度后写覆盖先写。
+   也就是说：删掉下面那四行，屏幕上立刻出现两个错字，而任何静态闸门都不会响
+   ——它们都读 HTML，而这四个字只存在于 CSS 的 content 里。 */
 .tab-head{margin:10px 4px 4px;font:700 27px var(--kai)}
 .tab-note{margin:0 4px 16px;color:#887a6c;font-size:11px;line-height:1.55}
 .panel-kicker{margin:0 4px 7px;color:#a07b4f;font-size:9px;font-weight:800;letter-spacing:.16em}
@@ -512,10 +522,6 @@ body{
 .family-tabs button:nth-child(3) .nav-icon::before{content:"护"}
 .family-tabs button:nth-child(4) .nav-icon::before{content:"我"}
 .family-tabs button:nth-child(3).is-current{color:#365f54}
-.dock.family-tabs button:nth-child(3) .nav-icon::before{content:"护"}
-.dock.family-tabs button:nth-child(2) .nav-icon::before{content:"办"}
-.dock.family-tabs button:nth-child(1) .nav-icon::before{content:"今"}
-.dock.family-tabs button:nth-child(4) .nav-icon::before{content:"我"}
 .notice-line{
   margin:3px 0 12px;padding:8px 11px;border-left:2px solid rgba(73,111,98,.38);
   color:#64766d;background:rgba(255,255,255,.28);font-size:10px;line-height:1.55

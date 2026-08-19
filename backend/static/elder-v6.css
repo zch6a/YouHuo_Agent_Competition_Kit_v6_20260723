@@ -213,13 +213,19 @@ body{
 .next-title{margin:7px 0 4px;font:700 calc(20px * var(--fs))/1.2 var(--kai);color:#443429}
 .next-where{margin:0;color:#87786b;font-size:calc(11px * var(--fs))}
 .next-where[hidden]{display:none}
-/* 命中区是 48px 高，而字只有一行——原包那条 `border-bottom` 于是变成一条
+/* 命中区是 56px 高，而字只有一行——原包那条 `border-bottom` 于是变成一条
    飘在文字下面两厘米的横线，看着像分隔线不像按钮。改成描边胶囊：
-   48px 那块地本来就该看得出来是可以按的。 */
+   那块地本来就该看得出来是可以按的。
+
+   56 而不是 48：48 是这个项目的**下限**（`test_mobile_reachability` 按它判），
+   而**主要操作**的档位是 56。设计一那边同一批控件量出来全是 56
+   （`#nextOpen` 72×56、`#typeInstead` 127×56、`#kinContact` 292×56、
+   `#saveProfile` 292×56、`#taskDetailClose` 358×56）。这一页此前整批是 48/52，
+   也就是说两张皮在"手抖的人按不按得中"这一条上不是同一个产品。 */
 .next-item button{
   display:inline-flex;align-items:center;margin-top:9px;
   border:1px solid rgba(74,111,98,.28);border-radius:999px;
-  padding:0 16px;min-height:48px;background:rgba(255,255,255,.42);
+  padding:0 16px;min-height:56px;background:rgba(255,255,255,.42);
   color:#446d61;font-weight:700;font-size:calc(11px * var(--fs));cursor:pointer;
 }
 
@@ -271,9 +277,11 @@ body[data-activity="offline"] .mic-big{background:linear-gradient(145deg,#9a938a
 body[data-activity="offline"] .mic-orbit::before,
 body[data-activity="offline"] .mic-orbit::after{border-style:dotted;animation:none}
 
+/* 打字入口是**主要操作**，不是次要的：语音失败时它是唯一的入口，
+   所以它跟着 56 那一档走，不是 48 那一档。 */
 .keyboard-entry{
   margin-top:10px;border:0;background:none;color:#916843;font-size:calc(12px * var(--fs));
-  border-bottom:1px solid rgba(145,104,67,.25);padding:9px 6px;cursor:pointer;min-height:48px;
+  border-bottom:1px solid rgba(145,104,67,.25);padding:9px 6px;cursor:pointer;min-height:56px;
 }
 .section-head{
   display:flex;align-items:center;justify-content:space-between;margin:10px 2px 8px;
@@ -380,9 +388,11 @@ div.log-item{cursor:default}
 .kin-rel{margin:4px 0 0;color:#8c7d70;font-size:calc(11px * var(--fs))}
 .kin-help-label{margin:6px 4px 4px;color:#8a7c6e;font-size:calc(11px * var(--fs));font-weight:700}
 .kin-help{margin:0 4px 14px;padding-left:20px;color:#827365;font-size:calc(11px * var(--fs));line-height:1.9}
+/* 这一条同时是「联系家人」「保存我的习惯」「知道了」三个按钮的形态——
+   它们是各自那一屏的主要操作，所以是 56，不是 52。 */
 .contact-primary{
   display:block;width:calc(100% - 8px);margin:6px 4px 14px;border:0;border-radius:19px;
-  padding:15px;min-height:52px;background:linear-gradient(135deg,#345e53,#527b6d);color:#fff;
+  padding:15px;min-height:56px;background:linear-gradient(135deg,#345e53,#527b6d);color:#fff;
   box-shadow:0 12px 28px rgba(51,84,72,.16);font-weight:700;font-size:calc(13px * var(--fs));
   text-align:center;cursor:pointer;
 }
@@ -397,9 +407,15 @@ div.log-item{cursor:default}
 .habit-row .tool-name{display:block;font:700 calc(15px * var(--fs))/1.3 var(--kai)}
 .habit-why{display:block;margin-top:4px;color:#8d7f72;font-size:calc(10px * var(--fs));line-height:1.5}
 .segmented{display:flex;gap:5px}
+/* `min-width` 和 `min-height` 都要写。只写高度时，档位名只有一个字的那两个
+   （「慢」「大」）由文字撑宽——CDP 在 390×844 上量出来是 **37×48**，
+   低于这个项目 48px 的触控下限，而同一组里两个字的档位是 55 宽，
+   所以"这一组按钮都够大"这句话在肉眼和截图上都成立。
+   只有逐个量才看得出漏的是哪两个。 */
 .segmented button{
   border:1px solid rgba(74,111,98,.16);border-radius:999px;background:rgba(255,255,255,.4);
-  padding:10px 12px;min-height:48px;color:#6b5d51;font-size:calc(11px * var(--fs));cursor:pointer;
+  padding:10px 12px;min-width:48px;min-height:48px;
+  color:#6b5d51;font-size:calc(11px * var(--fs));cursor:pointer;
 }
 .segmented button.active{background:#4d7568;color:#fff;border-color:#4d7568}
 .segmented button:focus-visible{outline:2px solid #4d7568;outline-offset:2px}
@@ -452,9 +468,11 @@ div.log-item{cursor:default}
 .focus-layer > *{flex:0 0 auto}
 body[data-focus="on"] .focus-layer{display:flex}
 body[data-focus="on"] .app-viewport > .panel{visibility:hidden}
+/* Focus Mode 是一层模态：进去之后四个 Tab 是 `visibility: hidden`，
+   这个按钮是**唯一**的出口。所以它是主要操作，56。 */
 .focus-back{
   align-self:flex-start;border:0;background:none;color:#6e6257;
-  padding:10px 4px;min-height:48px;font-weight:700;font-size:calc(12px * var(--fs));cursor:pointer;
+  padding:10px 4px;min-height:56px;font-weight:700;font-size:calc(12px * var(--fs));cursor:pointer;
 }
 .focus-orb{margin:14px auto 12px}
 .chat{
@@ -481,14 +499,18 @@ body[data-focus="on"] .app-viewport > .panel{visibility:hidden}
   padding:14px 13px;outline:none;color:#493d33;font-size:calc(13px * var(--fs));
 }
 .composer input:focus{border-color:#4d7568;box-shadow:0 0 0 3px rgba(77,117,104,.16)}
+/* 「发送」是打字这条退路的最后一步。它和输入框在同一个 grid 行里，
+   所以这一条同时把 `#text` 撑到 56——两者一起长，不会错位。 */
 .composer button{
-  border:0;border-radius:16px;padding:0 19px;min-height:48px;background:#4c7568;color:#fff;
+  border:0;border-radius:16px;padding:0 19px;min-height:56px;background:#4c7568;color:#fff;
   font-weight:700;font-size:calc(13px * var(--fs));cursor:pointer;
 }
 .focus-tools{display:flex;gap:8px;margin-top:10px}
+/* 「再说一遍」「返回上一步」是对话进行中的主要操作——一位没听清的老人
+   要按的第一个键就是它。设计一那边这两个是 326×56。 */
 .focus-tool{
   flex:1;border:1px solid rgba(74,111,98,.16);border-radius:14px;background:rgba(255,255,255,.42);
-  padding:11px 8px;min-height:48px;color:#5f6f66;font-size:calc(11px * var(--fs));cursor:pointer;
+  padding:11px 8px;min-height:56px;color:#5f6f66;font-size:calc(11px * var(--fs));cursor:pointer;
 }
 
 /* Task Space：这件事办到哪一步，用**页面**说，不用一串气泡让她自己拼。 */

@@ -488,6 +488,14 @@
 
 /* 可信中心：凭证不是健康卡，是**票据**。边框、骑缝、印章都要说这件事。 */
 .art-receipt {
+  /* 印章的尺寸与内缩写成变量，是因为下面「给印章留出的那条带」要按它们算。
+     两处各写一个数字的话，改了章的大小、那条带不会跟着变——而错的方向只有一个：
+     章重新压回控件上，然后没有任何东西会报错。
+     **每一处引用都带兜底值**：这两个变量定义在 `.art-receipt` 上，而 `.art-seal`
+     将来可能挂在别的宿主下；变量取不到时整条声明会被丢掉（CSS 不报错），
+     那时印章会退回 auto 尺寸。 */
+  --art-seal-size: 64px;
+  --art-seal-inset: 14px;
   position: relative;
   isolation: isolate;
   border: 16px solid transparent;
@@ -508,14 +516,32 @@
    比没有印章糟得多。 */
 .art-seal {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  right: var(--art-seal-inset, 14px);
+  bottom: var(--art-seal-inset, 14px);
   z-index: 2;
-  width: 64px;
-  height: 64px;
+  width: var(--art-seal-size, 64px);
+  height: var(--art-seal-size, 64px);
   pointer-events: none;
   opacity: .88;
   transform: rotate(-8deg);
+}
+
+/* 给印章留出它自己的一条带。
+   ..........................................................................
+   凭证最后一个元素是 `<details class="receipt-chain">`——**这一页上唯一一个可以
+   点的东西**（`pages.css` 专门给它加了边框、48px 高和一个 `＋` 展开标记，注释里
+   写着「它藏着的偏偏是这一整页存在的理由：那条哈希链」）。而印章绝对定位在右下角，
+   正好压在那个 `＋` 上：实测截图里章盖住了展开标记的整块区域。
+
+   `pointer-events: none` 让它还点得动，所以三道闸门都是绿的——对比度只读颜色，
+   点击遍历只看有没有抛异常，截图看的是尺寸与溢出。但屏幕上是一枚章压着一个控件。
+
+   留一条带比挪章好：章盖在票据右下角是这套视觉语言里说得通的那个位置，
+   而一张真票据的骑缝章下面本来就是空的。特异度 (0,2,0) 压得住 `.panel` 的
+   `padding: clamp(...)`（0,1,0），也压得住本文件上面那条 `.art-receipt`（0,1,0）；
+   `padding-bottom` 是长写，和 `.panel` 的 `padding` 简写不在同一条声明里比。 */
+.art-receipt[data-art-seal] {
+  padding-bottom: calc(var(--art-seal-size, 64px) + var(--art-seal-inset, 14px) * 2);
 }
 
 /* 云纹分隔：段落之间，替代一条灰线。 */

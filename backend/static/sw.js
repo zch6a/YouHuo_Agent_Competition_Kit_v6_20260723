@@ -40,7 +40,16 @@
 //: 这一页的业务逻辑是 `elder.js`（已在册），它是 `type="module"`——漏缓存
 //: 它 import 的任何一个模块都是整页白屏，不是降级。那几个也早就在册了，
 //: 这里多的只是这一版自己的版式和两份视觉脚本。
-const VERSION = 'youhuo-shell-v15';
+//: v15 → v16：`/elder2` 的验收。两件事都改了缓存里的**内容**而不是清单：
+//:   ① `elder-v6.html` 补上了 manifest / apple 全屏那一套和 `register-sw.js`。
+//:      v15 是为这一页升的，可这一页当时**从不注册 service worker**——外壳
+//:      声明了它，而它自己永远装不上，第一次就直接进 `/elder2` 的人拿不到缓存。
+//:   ② `elder-v6.css` 把主要操作从 48/52 抬到 56（设计一那批同名控件量出来是 56），
+//:      并给 `.segmented button` 补 `min-width`（「慢」「大」实测 37×48，低于下限）。
+//: 清单一条没变，所以「漏文件」那种检查看不出区别——但 stale-while-revalidate
+//: 会先把 v15 缓存里的旧 HTML/CSS 返回去，用户看到的还是 37px 那一版。
+//: 「改文件」和「让浏览器拿到」是两件事，这个文件上面第 37 行已经为同一件事写过一次。
+const VERSION = 'youhuo-shell-v16';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
