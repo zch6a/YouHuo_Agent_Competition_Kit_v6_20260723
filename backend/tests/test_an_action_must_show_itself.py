@@ -34,6 +34,8 @@ import io
 import re
 from pathlib import Path
 
+import pytest
+
 STATIC = Path(__file__).resolve().parents[1] / "static"
 
 
@@ -89,6 +91,58 @@ def test_a_reminder_action_reports_where_the_elder_is_looking() -> None:
         "`#status` 空的时候自己 display:none，一有文字就出现——"
         "它是 Focus Mode 之外唯一能说话的地方。"
         "（`catch` 里有 `setStatus` 不算：那只保证失败时会说话。）")
+
+
+#: Focus Mode **之外**的按钮。它们被按下时 `.elder-focus` 是关着的，
+#: 所以回执不能只走 `#chat`（`addBubble`），也不能只走声音（`speak`）。
+#:
+#: 这张名单是巡检抓出来的：把 `/elder` 每个控件都点一遍、看有没有请求或界面变化，
+#: 记录页 15 个控件里只有 `#repeatLast` 什么都没发生——它当时**只调 `speak()`**。
+#: 没装中文音色、设备静音、页面还没拿到用户手势，三种情况下它都是完全静默的，
+#: 而这个按钮叫「再说一遍」，存在的全部理由就是给听不清的人再来一次。
+_OUTSIDE_FOCUS_BUTTONS = ("repeatLast", "stepBack")
+
+
+def _listener_of(src: str, element_id: str) -> str:
+    """取 `#id` 那个 click 监听的函数体。"""
+    m = re.search(
+        rf"querySelector\('#{re.escape(element_id)}'\)"
+        r"\.addEventListener\('click',\s*\(\)\s*=>\s*\{",
+        src)
+    assert m, f"elder.js 里找不到 #{element_id} 的 click 监听"
+    i, depth = m.end(), 1
+    while i < len(src) and depth:
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+        i += 1
+    return src[m.end():i]
+
+
+@pytest.mark.parametrize("element_id", _OUTSIDE_FOCUS_BUTTONS)
+def test_a_button_outside_focus_mode_writes_to_the_status_line(element_id: str) -> None:
+    """Focus Mode 之外的按钮，**每一条分支**都要往状态行写一句。
+
+    只走 `speak()` 不行：那条通道在三种常见情况下是哑的，而按这些按钮的人
+    恰恰最可能处在那三种情况里。
+    只走 `addBubble()` 也不行：它写的 `#chat` 住在 `.elder-focus` 里，
+    这些按钮被按下时那一层是关着的（实测盒子 [0,0]）。
+
+    「每一条分支」是要点：`#stepBack` 原先真的回到上一步时写状态行，而
+    「还没有上一步可以返回」那一支只有 `addBubble` + `speak`——
+    也就是**能办的时候会说话，办不了的时候不说**，正好反了。
+    """
+    body = _listener_of(_elder_js(), element_id)
+    # 按 `return` 切成几段，每一段都是一条真的会走完的分支。
+    branches = [b for b in re.split(r"\breturn\b", body) if b.strip()]
+    assert branches, f"#{element_id} 的监听是空的"
+    for i, branch in enumerate(branches):
+        assert "setStatus(" in branch, (
+            f"`#{element_id}` 的第 {i + 1} 条分支没有写状态行。\n"
+            f"  这一段是：{branch.strip()[:120]}\n"
+            "  只 speak() 的话，没有语音合成时屏幕上一个字都不会变；"
+            "只 addBubble() 的话，它写的 `#chat` 在 Focus Mode 里、默认不显示。")
 
 
 def test_a_status_change_changes_the_word_on_screen() -> None:

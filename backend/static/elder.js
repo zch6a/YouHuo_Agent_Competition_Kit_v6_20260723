@@ -1283,8 +1283,22 @@ document.querySelector('#toggleReminders').addEventListener('click', () => {
   loadReminders();
 });
 
+//: 「再说一遍」原先**只念，不写屏**。
+//:
+//: 没有语音合成的时候（浏览器没装中文音色、设备静音、页面还没拿到用户手势
+//: 因而 speechSynthesis 被拦），按下去屏幕上一个字都不动。而这个按钮叫
+//: 「再说一遍」，它存在的全部理由就是**给听不清、看不清的人再来一次**——
+//: 恰恰是最不该只走声音那一条通道的地方。
+//:
+//: 巡检（把每个控件都点一遍、看有没有请求或界面变化）抓到的就是它：
+//: /elder 记录页 15 个控件里，只有这一个点下去什么都没发生。
+//:
+//: 这和 `reminderAction` 那次是同一个缺陷（见 `test_an_action_must_show_itself`）：
+//: 回执只走了一条她可能收不到的通道。两条都走：写进状态行，同时念。
 document.querySelector('#repeatLast').addEventListener('click', () => {
-  if (lastSpoken) speak(lastSpoken); else speak('目前还没有需要重复的内容。');
+  const words = lastSpoken || '目前还没有需要重复的内容。';
+  setStatus(words);
+  speak(words);
 });
 
 // "返回上一步" replays the previous question instead of pretending to roll back
@@ -1293,6 +1307,12 @@ document.querySelector('#stepBack').addEventListener('click', () => {
   if (promptHistory.length < 2) {
     const only = promptHistory[0];
     const text = only ? only.text : '这是第一步，还没有上一步可以返回。';
+    //: 这一支原先只有 `addBubble` + `speak`，**没有 `setStatus`**。
+    //: `addBubble` 写的 `#chat` 住在 `.elder-focus` 里，Focus Mode 关着时
+    //: display:none——而她在记录页按这个按钮时，Focus Mode 正是关着的。
+    //: 于是「还没有上一步可以返回」这句话，屏幕上一个字都不会出现。
+    //: 下面那一支（真的回到上一步）本来就写状态行，两支不该只有一支说话。
+    setStatus(text);
     addBubble(text, 'agent', '返回上一步');
     speak(only ? only.speak : text, only ? only.rate : null);
     return;
