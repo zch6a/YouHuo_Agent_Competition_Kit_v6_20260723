@@ -532,6 +532,29 @@ _UNBOUND_BUT_EXPLAINED: dict[str, tuple[str, str]] = {
         )
         for n in range(1, 8)
     },
+    **{
+        f"family-v3.html:id={ident}": (
+            "data-app",
+            "家人端设计三顶部那两个切换（家人端 / 照护中心）。绑定是**属性委托**："
+            "`script-01.js:3` 的 `querySelectorAll('[data-app]')`，`family3.js` 里"
+            "读照护数据那一处也是 `$$('[data-app]')`。id 是后加的，只为了让这份清单"
+            "认得出它们是两个不同的控件——原先两条身份都是空的，连彼此都分不开。",
+        )
+        for ident in ("appFamily", "appCare")
+    },
+    # ---- 表单字段：按 name 取值，脚本里不会出现这个属性名 ----
+    **{
+        f"family-v3.html:name={field}{suffix}": (
+            "FormData",
+            "家人端设计三两个 `.flow-editor` 里的时间/事项输入。`family3.js` 的 "
+            "submit 处理用 `new FormData(fresh)` 再 `fd.get('time')` / "
+            "`fd.get('title')` 取值——按 **name** 读，脚本里永远不会出现 "
+            "`name=time` 这个字面串，所以按属性名去搜必然搜不到。"
+            "和 `records.html` 那四个 `data-kind` 是同一个形状。",
+        )
+        for field in ("time", "title")
+        for suffix in ("", "#2")
+    },
     # ---- 原生行为：本来就不需要 JS ----
     "stage.html:id=directorDeck/summary": (
         "",

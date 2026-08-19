@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>优活 V5.8 · 小优像素机器人向导预览</title>
+<link rel="stylesheet" href="/static/family3/style-01.css">
+<link rel="stylesheet" href="/static/family3-wiring.css"><meta name="theme-color" content="#fbf8f1"></head>
+<body data-surface="consumer">
+<!-- V5.8.4R：原 desksprite 小佑已删除；此处直接挂载可拖动的优活像素机器人「小优」。 -->
+<div class="youhuo-robot-mascot" id="youhuoRobotMascot" aria-live="polite" aria-label="优活小优向导">
+  <div class="youhuo-robot-bubble" id="youhuoRobotBubble" role="status"></div>
+  <canvas class="youhuo-robot-canvas" id="youhuoRobotCanvas" width="56" height="90" aria-hidden="true"></canvas>
+</div>
+
+<!-- V5.7.4：照护→概览专属清爽模式，隐藏全局爬山虎；飞鹤与五脉枝条保留。 -->
+<!-- V5.7.3：整数周期飞鹤。每次点击自动根据距离求完整扇翅周期数、每周期帧数和帧时长；最后一帧与到达终点严格同步。 -->
+
+<div class="crane-companion" id="craneCompanion" aria-hidden="true">
+  <div class="crane-hint">点击任意位置，鹤会飞过去</div>
+  <div class="crane-tilt" id="craneTilt">
+    <div class="crane-facing" id="craneFacing">
+      <img class="crane-frame" id="craneFrame" alt="">
+    </div>
+  </div>
+</div>
+
+<!-- V5.6.1：五脉清线版。枝脉只在月晕外围分区生长，不穿过中央主标题、不互相交叉。 -->
+<!-- V5.6：照护中心 7 个子界面全部完成，可点击顶部 概览/今天/用药/身体/心情/安全/趋势 切换。 -->
+<!-- V5.5 五脉照护图：中央月晕 + 五条生命分支 + 五个信息果实 -->
+<!-- V5.4.3.6
+修正逻辑：
+进入真实页面后，左上身份区动画 与 左下今日待办/最近记录动画同时开始。
+两边各自独立生长，不再排队。
+同时修复“今日待办 / 最近记录”标题消失，并保留强化曲线。
+-->
+<!-- V5.4.3.5
+动画明确拆成三幕：
+第一幕：左上身份枝条 + 问候 + 主标题；
+第二幕：陪伴心形 + 曲线 + 文案；
+第三幕：今日待办/最近记录单独出现，再按“椭圆 → 曲线 → 椭圆”生成。
+连接曲线同步增强可见度。
+-->
+<!-- V5.4.3.4 · 五项艺术层次改造
+1) 身份区生长枝；2) 题签模式切换；3) 三层景深；4) 一笔心形陪伴场景；
+5) 进入界面后按层次依次生长，最后生成动态事项链。
+照护事项链升级为“生命节律链”：正常 / 关注 / 待补充 三种语义。
+-->
+<!-- V5.4.3.3
+左下角时间轴升级为 Organic Bubble Flow：
+椭圆气泡 → 自然曲线 → 椭圆气泡逐段生长；
+已完成自动淡化；未完成带麦克风呼吸；
+支持动态增加、删除以及删除后的自然重连。
+-->
+<!-- V5.4.3.2
+切页动画与爬山虎彻底分离：
+1. 先完整播放切页动画；
+2. 真正进入页面；
+3. 短暂停顿；
+4. 爬山虎像树一样慢慢攀爬、分枝、生叶；
+5. 完成后留在背景。
+-->
+
+<div class="page-scene" id="pageScene" aria-hidden="true">
+
+  <div class="scene-copy">
+    <div class="scene-kicker" id="sceneKicker">YOUHUO · SCENE</div>
+    <div class="scene-name" id="sceneName"></div>
+    <div class="scene-sub" id="sceneSub"></div>
+  </div>
+
+  <div class="scene-today-lotus"></div>
+  <span class="scene-today-ripple r1"></span>
+  <span class="scene-today-ripple r2"></span>
+
+  <div class="scene-todo-track"></div>
+  <div class="scene-todo-leaves"><i></i><i></i><i></i><i></i><i></i></div>
+
+  <div class="scene-care-crane"></div>
+  <span class="scene-care-ring"></span>
+
+  <div class="scene-mine-tree">
+    <svg viewBox="0 0 340 280">
+      <path class="trunk" d="M42 270 C74 236 92 204 114 167 C136 131 153 91 168 34"/>
+      <path class="twig" d="M105 183 C72 164 54 143 38 115 M126 144 C166 139 198 119 229 82 M145 105 C188 82 220 60 253 26 M86 214 C119 207 145 197 169 179"/>
+      <ellipse class="leaf" cx="37" cy="113" rx="14" ry="7" transform="rotate(-22 37 113)"/>
+      <ellipse class="leaf" cx="229" cy="81" rx="16" ry="8" transform="rotate(-26 229 81)"/>
+      <ellipse class="leaf" cx="253" cy="26" rx="14" ry="7" transform="rotate(-34 253 26)"/>
+      <ellipse class="leaf" cx="169" cy="179" rx="13" ry="6" transform="rotate(-12 169 179)"/>
+      <ellipse class="leaf" cx="169" cy="34" rx="13" ry="6" transform="rotate(-62 169 34)"/>
+    </svg>
+  </div>
+</div>
+
+<div class="vine-field" id="vineField" aria-hidden="true">
+  <svg viewBox="0 0 720 820">
+    <path class="vine-main" d="M700 805 C655 742 670 683 628 632 C584 579 602 525 555 474 C514 430 525 374 479 329 C440 291 444 235 405 194 C365 151 353 104 312 66 C291 47 269 29 242 17"/>
+    <path class="vine-side" d="M627 632 C592 620 561 601 539 574 M555 474 C592 452 617 425 632 390 M478 329 C443 313 413 292 390 264 M405 194 C432 170 447 143 452 111 M353 104 C322 97 297 84 276 65"/>
+    <ellipse class="vine-leaf" cx="624" cy="628" rx="22" ry="11" transform="rotate(-24 624 628)"/>
+    <ellipse class="vine-leaf" cx="541" cy="573" rx="20" ry="10" transform="rotate(28 541 573)"/>
+    <ellipse class="vine-leaf" cx="558" cy="471" rx="24" ry="12" transform="rotate(-36 558 471)"/>
+    <ellipse class="vine-leaf" cx="631" cy="388" rx="21" ry="10" transform="rotate(-52 631 388)"/>
+    <ellipse class="vine-leaf" cx="479" cy="327" rx="23" ry="11" transform="rotate(18 479 327)"/>
+    <ellipse class="vine-leaf" cx="392" cy="262" rx="19" ry="9" transform="rotate(33 392 262)"/>
+    <ellipse class="vine-leaf" cx="407" cy="193" rx="22" ry="10" transform="rotate(-28 407 193)"/>
+    <ellipse class="vine-leaf" cx="452" cy="109" rx="18" ry="9" transform="rotate(-54 452 109)"/>
+    <ellipse class="vine-leaf" cx="354" cy="102" rx="19" ry="9" transform="rotate(23 354 102)"/>
+    <ellipse class="vine-leaf" cx="274" cy="64" rx="17" ry="8" transform="rotate(38 274 64)"/>
+  </svg>
+</div>
+
+
+<div class="lotus-opening" id="lotusOpening" aria-hidden="true">
+  <div class="opening-copy">
+    <div class="brand"><span>优</span><span>活</span></div>
+    <div class="sub">让照护更从容</div>
+    <div class="skip">点击可直接进入</div>
+  </div>
+</div>
+<button class="motion-replay" id="motionReplay" type="button">重播开场动效</button>
+
+<div class="shell">
+  <div class="app-switch"><a class="v3-home" href="/">返回首页</a>
+    <button class="active" id="appFamily" data-app="family">家人端</button>
+    <button id="appCare" data-app="care">照护中心</button>
+  </div>
+
+  <section class="workspace" id="familyView"><div class="page-art-layers" aria-hidden="true"><span class="art-far"></span><span class="art-mid"></span><span class="art-near"></span></div>
+    <div class="identity-island">
+
+      <svg class="identity-grow-branch" viewBox="0 0 120 310" aria-hidden="true">
+        <path class="ig-main" d="M18 301 C24 246 17 213 31 171 C45 130 39 85 62 48 C71 34 82 22 98 10"/>
+        <path class="ig-side s1" d="M30 182 C55 170 72 151 85 130"/>
+        <path class="ig-side s2" d="M42 118 C22 101 15 84 12 66"/>
+        <ellipse class="ig-leaf l1" cx="84" cy="130" rx="12" ry="6" transform="rotate(-28 84 130)"/>
+        <ellipse class="ig-leaf l2" cx="13" cy="66" rx="10" ry="5" transform="rotate(34 13 66)"/>
+        <ellipse class="ig-leaf l3" cx="98" cy="10" rx="11" ry="5" transform="rotate(-42 98 10)"/>
+      </svg>
+      <div class="identity-depth-art" aria-hidden="true">
+        <span class="id-far"></span><span class="id-mid"></span><span class="id-near"></span>
+      </div>
+
+      <div class="hello">下午好 · 张爷爷</div>
+      <h1>今天整体平稳</h1>
+      <p>2026年08月18日 周二 · 17:25</p>
+      <div class="mode"><button class="active">优活</button><button>无忧伴</button></div>
+    </div>
+
+    <div class="companion-note">
+
+      <div class="companion-art" aria-hidden="true">
+        <svg class="heart-draw" viewBox="0 0 72 62">
+          <path d="M36 54 C25 45 8 34 8 20 C8 10 20 6 28 13 C32 16 34 20 36 24 C39 18 43 12 50 10 C59 8 66 15 65 24 C64 37 49 46 36 54"/>
+        </svg>
+        <svg class="companion-vine" viewBox="0 0 260 76">
+          <path class="cv-main" d="M4 48 C62 44 82 15 132 23 C175 30 192 54 252 31"/>
+          <path class="cv-side" d="M132 23 C126 9 118 4 107 2 M195 48 C207 38 220 33 233 34"/>
+          <ellipse class="cv-leaf a" cx="106" cy="2" rx="9" ry="4" transform="rotate(-22 106 2)"/>
+          <ellipse class="cv-leaf b" cx="232" cy="34" rx="10" ry="4.5" transform="rotate(-28 232 34)"/>
+        </svg>
+      </div>
+
+      <strong>傍晚了，今天状态不错</strong>
+      <span>起居和平常接近。如果您愿意，可以看看今天还有什么需要家里确认。</span>
+    </div>
+
+    <div class="bubble-flow" id="familyFlow" data-flow="family">
+      <div class="flow-head">
+        <div>
+          <div class="flow-kicker">TODAY · FLOW</div>
+          <h2>今日待办</h2>
+        </div>
+        <button class="flow-add clickable" type="button" aria-label="增加待办">＋</button>
+      </div>
+      <div class="flow-canvas">
+        <svg class="flow-links" aria-hidden="true"></svg>
+        <div class="flow-items"></div>
+      </div>
+      <form class="flow-editor" hidden>
+        <label><span>时间</span><input name="time" type="time" value="19:30" required></label>
+        <label class="grow"><span>事项</span><input name="title" value="晚间测量血压" required></label>
+        <button type="submit">生成</button>
+        <button type="button" class="flow-cancel">取消</button>
+      </form>
+    </div>
+
+    <div class="main-stage" id="familyMain"><div class="drag-hint">按住拖动空间</div><div class="stage-art-cloud"></div><div class="stage-art-flower"></div>
+      <div class="stage-title">
+        <div><div class="label">TODAY · 家庭摘要</div><h2 id="stageTitle">今天最重要的事</h2>
+<span class="title-tree" aria-hidden="true">
+<svg viewBox="0 0 82 74">
+  <path class="branch" d="M6 69 C20 58 28 49 34 36 C39 26 40 15 45 5" />
+  <path class="branch secondary" d="M28 47 C20 38 16 32 11 25 M34 36 C48 34 57 29 65 19 M39 25 C50 18 57 12 63 7" />
+  <ellipse class="leaf l2" cx="11" cy="24" rx="4.8" ry="2.4" transform="rotate(-27 11 24)"/>
+  <ellipse class="leaf l3" cx="65" cy="18" rx="5.4" ry="2.6" transform="rotate(-22 65 18)"/>
+  <ellipse class="leaf l4" cx="62" cy="7" rx="4.7" ry="2.3" transform="rotate(-18 62 7)"/>
+  <ellipse class="leaf l5" cx="46" cy="5" rx="4.6" ry="2.2" transform="rotate(-54 46 5)"/>
+</svg>
+</span>
+</div>
+        <div class="mini">最后更新 17:25</div>
+      </div>
+      <div class="center-message">
+        <div class="seal">今</div>
+        <h3 id="mainHeadline">有一件事需要您确认</h3>
+        <p id="mainCopy">燃气费缴纳已经核对到最后一步。金额 ¥86.50，确认后系统才会继续执行。</p>
+      </div>
+      <div class="action-band">
+        <button class="primary-action clickable">查看并确认这件事</button>
+        <button class="secondary-action clickable">今天怎么样</button>
+      </div>
+    </div>
+
+    <nav class="dock">
+      <button class="active clickable" data-family="today"><span class="icon">◉</span><span class="text">今天</span></button>
+      <button class="clickable" data-family="todo"><span class="icon">◇</span><span class="text">待办</span></button>
+      <button class="clickable" id="goCare"><span class="icon">○</span><span class="text">照护</span></button>
+      <button class="clickable" data-family="mine"><span class="icon">⌁</span><span class="text">我的</span></button>
+      <button class="contact clickable">☎ 一键联系子女</button>
+    </nav>
+  </section>
+
+  <section class="workspace" id="careView" hidden><div class="page-art-layers" aria-hidden="true"><span class="art-far"></span><span class="art-mid"></span><span class="art-near"></span></div>
+    <div class="identity-island">
+
+      <svg class="identity-grow-branch" viewBox="0 0 120 310" aria-hidden="true">
+        <path class="ig-main" d="M18 301 C24 246 17 213 31 171 C45 130 39 85 62 48 C71 34 82 22 98 10"/>
+        <path class="ig-side s1" d="M30 182 C55 170 72 151 85 130"/>
+        <path class="ig-side s2" d="M42 118 C22 101 15 84 12 66"/>
+        <ellipse class="ig-leaf l1" cx="84" cy="130" rx="12" ry="6" transform="rotate(-28 84 130)"/>
+        <ellipse class="ig-leaf l2" cx="13" cy="66" rx="10" ry="5" transform="rotate(34 13 66)"/>
+        <ellipse class="ig-leaf l3" cx="98" cy="10" rx="11" ry="5" transform="rotate(-42 98 10)"/>
+      </svg>
+      <div class="identity-depth-art" aria-hidden="true">
+        <span class="id-far"></span><span class="id-mid"></span><span class="id-near"></span>
+      </div>
+
+      <div class="hello">照护中心 · 张爷爷</div>
+      <h1>最近整体稳定</h1>
+      <p>今天 17:25 更新 · 先看整体，再看细节</p>
+      <div class="mode"><button class="active">照护</button><button>趋势</button></div>
+    </div>
+
+    <div class="companion-note">
+
+      <div class="companion-art" aria-hidden="true">
+        <svg class="heart-draw" viewBox="0 0 72 62">
+          <path d="M36 54 C25 45 8 34 8 20 C8 10 20 6 28 13 C32 16 34 20 36 24 C39 18 43 12 50 10 C59 8 66 15 65 24 C64 37 49 46 36 54"/>
+        </svg>
+        <svg class="companion-vine" viewBox="0 0 260 76">
+          <path class="cv-main" d="M4 48 C62 44 82 15 132 23 C175 30 192 54 252 31"/>
+          <path class="cv-side" d="M132 23 C126 9 118 4 107 2 M195 48 C207 38 220 33 233 34"/>
+          <ellipse class="cv-leaf a" cx="106" cy="2" rx="9" ry="4" transform="rotate(-22 106 2)"/>
+          <ellipse class="cv-leaf b" cx="232" cy="34" rx="10" ry="4.5" transform="rotate(-28 232 34)"/>
+        </svg>
+      </div>
+
+      <strong>今天和平常差不多</strong>
+      <span>上午起得稍晚一些，没有需要立刻处理的异常。</span>
+    </div>
+
+    <div class="bubble-flow" id="careFlow" data-flow="care">
+      <div class="flow-head">
+        <div>
+          <div class="flow-kicker">CARE · RHYTHM</div>
+          <h2>最近记录</h2>
+        </div>
+        <button class="flow-add clickable" type="button" aria-label="增加记录">＋</button>
+      </div>
+      <div class="flow-canvas">
+        <svg class="flow-links" aria-hidden="true"></svg>
+        <div class="flow-items"></div>
+      </div>
+      <form class="flow-editor" hidden>
+        <label><span>时间</span><input name="time" type="time" value="18:40" required></label>
+        <label class="grow"><span>记录</span><input name="title" value="晚间血压复测" required></label>
+        <button type="submit">生成</button>
+        <button type="button" class="flow-cancel">取消</button>
+      </form>
+    </div>
+
+    <div class="care-tabs" id="careTabs">
+      <button class="active" data-care-panel="overview">概览</button>
+      <button data-care-panel="today">今天</button>
+      <button data-care-panel="med">用药</button>
+      <button data-care-panel="body">身体</button>
+      <button data-care-panel="mood">心情</button>
+      <button data-care-panel="safety">安全</button>
+      <button data-care-panel="trend">趋势</button>
+    </div>
+
+    <div class="care-panel care-panel-overview active" data-care-page="overview"><div class="main-stage care-stage five-vein-stage" id="fiveVeinStage">
+      <div class="drag-hint">按住拖动空间</div>
+
+      <div class="care-landscape-depth" aria-hidden="true">
+        <span class="care-depth far"></span>
+        <span class="care-depth mid"></span>
+        <span class="care-depth near"></span>
+      </div>
+
+      <div class="care-moon" aria-hidden="true">
+        <span class="moon-ring ring-a"></span>
+        <span class="moon-ring ring-b"></span>
+        <span class="moon-mist"></span>
+      </div>
+
+      <div class="care-verdict-core">
+        <div class="care-verdict-kicker">整体判断</div>
+        <h3>今天整体平稳，<br>只有上午比平常起得晚一些。</h3>
+        <p>把生活节律、身体、用药、心情与安全放在一起看；这里只整理趋势，不替代医生判断。</p>
+      </div>
+
+      <svg class="care-vein-svg" id="careVeinSvg" viewBox="0 0 1000 650" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="careVeinGoldJade" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#b88739" stop-opacity=".84"/>
+            <stop offset=".48" stop-color="#8d7652" stop-opacity=".62"/>
+            <stop offset="1" stop-color="#466f60" stop-opacity=".80"/>
+          </linearGradient>
+          <filter id="careVeinGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.3" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <path class="care-vein trunk" pathLength="1" d="M500 325 C500 325 500 325 500 325"/>
+        <path class="care-vein branch branch-today" pathLength="1" d="M354 210 C305 184 255 154 205 142 C162 132 128 130 104 130"/>
+        <path class="care-vein branch branch-med" pathLength="1" d="M342 424 C294 441 248 462 205 480 C164 496 129 500 92 493"/>
+        <path class="care-vein branch branch-body" pathLength="1" d="M646 206 C704 178 756 151 811 142 C856 134 895 135 932 143"/>
+        <path class="care-vein branch branch-mood" pathLength="1" d="M680 325 C744 326 795 334 842 349 C879 361 906 366 934 366"/>
+        <path class="care-vein branch branch-safety" pathLength="1" d="M650 442 C704 466 754 497 807 526 C852 550 892 559 930 557"/>
+
+        <path class="care-vein vein-shadow shadow-today" pathLength="1" d="M354 210 C305 184 255 154 205 142 C162 132 128 130 104 130"/>
+        <path class="care-vein vein-shadow shadow-med" pathLength="1" d="M342 424 C294 441 248 462 205 480 C164 496 129 500 92 493"/>
+        <path class="care-vein vein-shadow shadow-body" pathLength="1" d="M646 206 C704 178 756 151 811 142 C856 134 895 135 932 143"/>
+        <path class="care-vein vein-shadow shadow-mood" pathLength="1" d="M680 325 C744 326 795 334 842 349 C879 361 906 366 934 366"/>
+        <path class="care-vein vein-shadow shadow-safety" pathLength="1" d="M650 442 C704 466 754 497 807 526 C852 550 892 559 930 557"/>
+
+        <g class="vein-leaf-group leaf-today"><ellipse cx="182" cy="138" rx="10" ry="4.6" transform="rotate(18 182 138)"/><ellipse cx="128" cy="132" rx="8" ry="3.8" transform="rotate(-14 128 132)"/></g>
+        <g class="vein-leaf-group leaf-med"><ellipse cx="174" cy="491" rx="10" ry="4.6" transform="rotate(-18 174 491)"/><ellipse cx="120" cy="495" rx="8" ry="3.8" transform="rotate(20 120 495)"/></g>
+        <g class="vein-leaf-group leaf-body"><ellipse cx="824" cy="140" rx="10" ry="4.6" transform="rotate(-18 824 140)"/><ellipse cx="887" cy="138" rx="8" ry="3.8" transform="rotate(16 887 138)"/></g>
+        <g class="vein-leaf-group leaf-mood"><ellipse cx="842" cy="349" rx="10" ry="4.6" transform="rotate(10 842 349)"/><ellipse cx="900" cy="362" rx="8" ry="3.8" transform="rotate(-12 900 362)"/></g>
+        <g class="vein-leaf-group leaf-safety"><ellipse cx="824" cy="536" rx="10" ry="4.6" transform="rotate(20 824 536)"/><ellipse cx="890" cy="557" rx="8" ry="3.8" transform="rotate(-16 890 557)"/></g>
+      </svg>
+
+      <button class="vein-node node-today clickable" data-vein-node="today" type="button">
+        <span class="node-art art-today"></span><span class="node-meta">生活节律</span>
+        <strong>今天</strong><small>起居节律基本稳定</small><i class="status-seed stable"></i>
+      </button>
+
+      <button class="vein-node node-med clickable" data-vein-node="med" type="button">
+        <span class="node-art art-med"></span><span class="node-meta">用药记录</span>
+        <strong>在吃什么药</strong><small>2 种药，今日均已记录</small><i class="status-seed stable"></i>
+      </button>
+
+      <button class="vein-node node-body clickable" data-vein-node="body" type="button">
+        <span class="node-art art-body"></span><span class="node-meta">身体状态</span>
+        <strong>身体</strong><small>最近一次记录 8 月 2 日</small><i class="status-seed stable"></i>
+      </button>
+
+      <button class="vein-node node-mood clickable" data-vein-node="mood" type="button">
+        <span class="node-art art-mood"></span><span class="node-meta">两周趋势</span>
+        <strong>心情</strong><small>以平静为主</small><i class="status-seed stable"></i>
+      </button>
+
+      <button class="vein-node node-safety clickable" data-vein-node="safety" type="button">
+        <span class="node-art art-safety"></span><span class="node-meta">安全设置</span>
+        <strong>安全</strong><small>联系人和提醒设置正常</small><i class="status-seed stable"></i>
+      </button>
+
+      <div class="care-detail-whisper" id="careDetailWhisper" aria-live="polite">把鼠标移到任一分支，枝条会回应。</div>
+    </div>
+
+
+    <div class="care-panel" data-care-page="today">
+      <div class="care-substage rhythm-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">DAY RHYTHM · 今日节律</span>
+          <h2>今天，身体按自己的节奏走着</h2>
+          <p>起床稍晚，午休和活动都接近平常。</p>
+        </div>
+
+        <div class="rhythm-orbit">
+          <svg viewBox="0 0 620 420" aria-hidden="true">
+            <path class="rhythm-path rp1" pathLength="1" d="M80 270 C155 118 311 62 468 115 C550 143 578 215 529 283 C479 352 367 375 262 340 C158 305 110 303 80 270"/>
+            <path class="rhythm-path rp2" pathLength="1" d="M138 277 C207 176 310 132 419 157 C486 172 517 226 482 277 C442 334 349 342 268 320 C198 301 158 298 138 277"/>
+          </svg>
+          <div class="sun-center"><span>17:25</span><small>今天</small></div>
+          <button class="rhythm-node n1"><time>08:42</time><b>起床</b><small>晚约 40 分钟</small></button>
+          <button class="rhythm-node n2"><time>12:30</time><b>午休</b><small>32 分钟</small></button>
+          <button class="rhythm-node n3"><time>16:10</time><b>血压</b><small>无异常提醒</small></button>
+          <button class="rhythm-node n4"><time>18:30</time><b>晚间</b><small>等待后续记录</small></button>
+        </div>
+
+        <div class="today-whispers">
+          <div><strong>步行</strong><span>3,240 步</span></div>
+          <div><strong>饮水</strong><span>约 1.2 L</span></div>
+          <div><strong>午休</strong><span>32 分钟</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="care-panel" data-care-page="med">
+      <div class="care-substage medicine-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">MEDICINE · 用药</span>
+          <h2>今天的药，都有迹可循</h2>
+          <p>2 种长期用药，今日记录完整。</p>
+        </div>
+
+        <div class="medicine-scroll">
+          <svg class="med-vine" viewBox="0 0 760 470" aria-hidden="true">
+            <path class="med-stem" pathLength="1" d="M92 379 C173 324 195 263 252 228 C318 188 379 195 426 142 C461 102 500 78 558 73"/>
+            <path class="med-stem branch" pathLength="1" d="M252 228 C225 183 211 143 212 104"/>
+            <path class="med-stem branch" pathLength="1" d="M426 142 C475 170 518 188 579 188"/>
+            <ellipse class="med-leaf l1" cx="211" cy="102" rx="18" ry="8"/>
+            <ellipse class="med-leaf l2" cx="578" cy="188" rx="18" ry="8"/>
+            <ellipse class="med-leaf l3" cx="346" cy="184" rx="14" ry="7"/>
+          </svg>
+
+          <article class="medicine-seal med-a">
+            <span class="med-time">08:00</span><strong>缬沙坦</strong><small>80 mg · 早餐后</small>
+            <i>已记录</i>
+          </article>
+          <article class="medicine-seal med-b">
+            <span class="med-time">20:00</span><strong>阿托伐他汀</strong><small>20 mg · 睡前</small>
+            <i>待今晚</i>
+          </article>
+          <div class="med-summary">
+            <b>今日完成 1 / 2</b>
+            <span>晚间用药将在 19:45 开始提醒</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="care-panel" data-care-page="body">
+      <div class="care-substage body-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">BODY · 身体</span>
+          <h2>体征平稳，重点看变化</h2>
+          <p>数字只显示趋势与最近记录，不代替医生判断。</p>
+        </div>
+
+        <div class="body-watermap">
+          <svg viewBox="0 0 900 500" aria-hidden="true">
+            <path class="body-stream bs1" pathLength="1" d="M74 326 C206 288 274 124 427 141 C566 156 619 310 816 247"/>
+            <path class="body-stream bs2" pathLength="1" d="M89 385 C224 353 310 242 439 257 C570 272 651 381 818 334"/>
+          </svg>
+          <div class="body-core"><small>整体</small><strong>平稳</strong><span>最近 14 天</span></div>
+
+          <article class="body-metric bm1"><span>血压</span><strong>128/76</strong><small>mmHg · 16:10</small></article>
+          <article class="body-metric bm2"><span>体温</span><strong>36.5°</strong><small>今天 09:15</small></article>
+          <article class="body-metric bm3"><span>体重</span><strong>68.2</strong><small>kg · 8 月 15 日</small></article>
+          <article class="body-metric bm4"><span>心率</span><strong>72</strong><small>次/分 · 16:10</small></article>
+        </div>
+      </div>
+    </div>
+
+    <div class="care-panel" data-care-page="mood">
+      <div class="care-substage mood-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">MOOD · 心情</span>
+          <h2>这两周，大多时候都很平静</h2>
+          <p>来自每日问候、语音和家人记录的趋势整理。</p>
+        </div>
+
+        <div class="mood-garden">
+          <div class="mood-flower">
+            <span class="petal p1"></span><span class="petal p2"></span><span class="petal p3"></span>
+            <span class="petal p4"></span><span class="petal p5"></span><span class="petal p6"></span>
+            <span class="flower-heart">平静</span>
+          </div>
+          <div class="mood-day md1"><b>周一</b><span>平静</span></div>
+          <div class="mood-day md2"><b>周二</b><span>愉快</span></div>
+          <div class="mood-day md3"><b>周三</b><span>平静</span></div>
+          <div class="mood-day md4"><b>今天</b><span>不错</span></div>
+          <blockquote>“傍晚想出去走一走。”</blockquote>
+        </div>
+      </div>
+    </div>
+
+    <div class="care-panel" data-care-page="safety">
+      <div class="care-substage safety-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">SAFETY · 安全</span>
+          <h2>守护一直在，但不打扰</h2>
+          <p>联系人、提醒与异常事件设置都正常。</p>
+        </div>
+
+        <div class="guardian-field">
+          <div class="guardian-rings"><i></i><i></i><i></i></div>
+          <div class="guardian-core"><strong>安全</strong><small>今日无异常</small></div>
+
+          <button class="guard-node g1"><b>家人联系人</b><span>3 人 · 正常</span></button>
+          <button class="guard-node g2"><b>用药提醒</b><span>已开启</span></button>
+          <button class="guard-node g3"><b>紧急联系</b><span>一键可用</span></button>
+          <button class="guard-node g4"><b>异常事件</b><span>今天 0 条</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="care-panel" data-care-page="trend">
+      <div class="care-substage trend-stage">
+        <div class="substage-head">
+          <span class="sub-kicker">TREND · 趋势</span>
+          <h2>把变化画成一段山势</h2>
+          <p>看 14 天，不被某一次数字带着走。</p>
+        </div>
+
+        <div class="trend-landscape">
+          <svg viewBox="0 0 900 430" aria-hidden="true">
+            <defs>
+              <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#567968" stop-opacity=".22"/>
+                <stop offset="1" stop-color="#567968" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path class="trend-area" d="M45 320 C102 290 136 276 190 284 C247 292 272 239 325 247 C385 257 413 208 470 220 C531 233 562 188 623 202 C683 215 716 183 766 193 C815 203 839 179 866 166 L866 380 L45 380 Z"/>
+            <path class="trend-line" pathLength="1" d="M45 320 C102 290 136 276 190 284 C247 292 272 239 325 247 C385 257 413 208 470 220 C531 233 562 188 623 202 C683 215 716 183 766 193 C815 203 839 179 866 166"/>
+          </svg>
+          <div class="trend-label tl1"><b>起居</b><span>趋于稳定</span></div>
+          <div class="trend-label tl2"><b>活动</b><span>略有增加</span></div>
+          <div class="trend-label tl3"><b>心情</b><span>平静为主</span></div>
+          <div class="trend-summary"><strong>总体：稳定</strong><span>最近 14 天没有持续恶化趋势</span></div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+
+    <nav class="dock">
+      <button class="clickable" id="backFamily"><span class="icon">◉</span><span class="text">今天</span></button>
+      <button class="clickable"><span class="icon">◇</span><span class="text">待办</span></button>
+      <button class="active clickable"><span class="icon">○</span><span class="text">照护</span></button>
+      <button class="clickable"><span class="icon">⌁</span><span class="text">我的</span></button>
+      <button class="contact clickable">☎ 一键联系子女</button>
+    </nav>
+  </section>
+</div>
+
+<script src="/static/family3/script-01.js"></script>
+
+<script src="/static/family3/script-02.js"></script>
+
+
+<script src="/static/family3/script-03.js"></script>
+
+
+<script src="/static/family3/script-04.js"></script>
+
+
+<script src="/static/family3/script-05.js"></script>
+
+
+<script src="/static/family3/script-06.js"></script>
+
+
+<script src="/static/family3/script-07.js"></script>
+
+
+<script src="/static/family3/script-08.js"></script>
+
+
+<script src="/static/family3/script-09.js"></script>
+
+
+<script src="/static/v3/crane-animation-master.js"></script>
+
+
+<script src="/static/family3/script-11.js"></script>
+
+
+
+
+
+
+<script src="/static/family3/script-12.js"></script>
+
+<script src="/static/identity.js"></script><script src="/static/common.js"></script><script src="/static/family3.js" defer></script><script src="/static/register-sw.js" defer></script></body>
+</html>

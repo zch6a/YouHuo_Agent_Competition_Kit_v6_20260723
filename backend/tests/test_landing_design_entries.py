@@ -53,6 +53,9 @@ EXPECTED = [
     ("designElderTwo", "/elder2", "老人端设计二"),
     ("designFamilyOne", "/family", "家人端设计一"),
     ("designFamilyTwo", "/family2", "家人端设计二"),
+    # 设计三是**网页端**（双栏，跟窗口宽度走），不是前两套的放大版。
+    ("designElderThree", "/elder3", "老人端设计三"),
+    ("designFamilyThree", "/family3", "家人端设计三"),
 ]
 
 

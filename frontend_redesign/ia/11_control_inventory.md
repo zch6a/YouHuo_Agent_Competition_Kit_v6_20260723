@@ -3,12 +3,12 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 384 |
+| 总数 | 479 |
 |---|---|
-| 有 id | 384 |
+| 有 id | 479 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
-| 追不到 handler（非 `<a>`） | 14 |
+| 追不到 handler（非 `<a>`） | 20 |
 
 ## 全部控件
 
@@ -20,6 +20,8 @@
 | `#designElderTwo` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#designFamilyOne` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#designFamilyTwo` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designElderThree` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designFamilyThree` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#nextOpen` | elder | home | button | click | elder.js:open | — | consumer | elder | home | hidden-until-state |
@@ -93,6 +95,47 @@
 | `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#taskDetailClose` | elder-v6 | — | button | — | elder.js:setDetailOpen | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | a | navigate | —:— | — | consumer | elder | shell | primary |
+| `#modeYouhuo` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:spawnLotus | — | consumer | elder | shell | primary |
+| `#modeCompanion` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:spawnLotus | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#voiceOrb` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:setMode | — | consumer | elder | shell | primary |
+| `#keyboardEntry` | elder-v3 | — | button | — | elder3/yoli-mascot.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#repeatLast` | elder-v3 | — | button | — | elder3/yoli-mascot.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#stepBack` | elder-v3 | — | button | — | elder3/yoli-mascot.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#refreshRecords` | elder-v3 | — | button | — | elder3/yoli-mascot.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#contactFamily` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:playCinematic | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#savePref` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:setMode | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
+| `#dockContact` | elder-v3 | — | button | pointerup | elder3/page-motion-and-ui.js:playCinematic | — | consumer | elder | shell | primary |
 | `#refresh` | family | — | button | click | family.js:load | — | consumer | family | shell | secondary |
 | `#` | family | today | summary | details-toggle | common.js:tryScroll | — | consumer | family | today | primary |
 | `#reminderForm` | family | todo | form | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
@@ -131,6 +174,58 @@
 | `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
 | `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
 | `#` | family-v6 | — | button | click | family-v6-a.js:(顶层) | — | consumer | family | shell | primary |
+| `#motionReplay` | family-v3 | — | button | click | family3/script-02.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | a | navigate | —:— | — | consumer | family | shell | primary |
+| `#appFamily` | family-v3 | — | button | — | —:— | — | consumer | family | shell | primary |
+| `#appCare` | family-v3 | — | button | — | —:— | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | form | submit | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | input | — | —:— | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | input | — | —:— | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:showApp | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:showApp | — | consumer | family | shell | secondary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#goCare` | family-v3 | — | button | click | family3/script-01.js:showApp | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | primary |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | form | submit | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | input | — | —:— | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | input | — | —:— | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-12.js:waitForWorkspace | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-09.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-08.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-08.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-08.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-08.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | — | family3/script-08.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#backFamily` | family-v3 | — | button | click | family3/script-01.js:showApp | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
+| `#` | family-v3 | — | button | click | family3/script-01.js:(顶层) | — | consumer | family | shell | hidden-until-state |
 | `#` | care | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | care | — | button | click | common.js:tryScroll | — | consumer | family | shell | primary |

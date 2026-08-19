@@ -65,8 +65,8 @@ def _api_routes() -> list[str]:
             continue
         # 页面路由和静态资源不是 API，它们**本来就该**被缓存——
         # 那是这个 worker 存在的理由（地铁上也能翻）。
-        if path in {"/", "/elder", "/elder2", "/family", "/family2", "/care",
-                    "/trust", "/judge", "/stage", "/app"}:
+        if path in {"/", "/elder", "/elder2", "/elder3", "/family", "/family2",
+                    "/family3", "/care", "/trust", "/judge", "/stage", "/app"}:
             continue
         # 带后缀的都是静态文件，哪怕它是用一条路由发出去的
         # （`/favicon.ico`、`/sw.js`、`/manifest.webmanifest` 都是）。

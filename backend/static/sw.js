@@ -53,7 +53,13 @@
 //: 已安装的 worker 缓存里躺着一批 `/api/v1` 的旧响应，`activate` 只删 key 不等于
 //: VERSION 的缓存——不升这个字符串，改了 `isApi()` 也救不回已经装好的那批，
 //: 而它们会继续把「上一次的答案」交给老人。详见下面 `isApi()` 上面那段。
-const VERSION = 'youhuo-shell-v17';
+//: v17 → v18：设计三（网页端）上线，`/elder3` 与 `/family3`。
+//: 这一版**不共用**设计一二的业务脚本——它是另一套 DOM，接线是
+//: `elder3.js` / `family3.js`。清单里因此多出两页 HTML、两份接线、两份接线样式，
+//: 外加交付包自己的 CSS/JS 与两页共用的 `v3/`（飞鹤动画 2.2 MB + 国风麦克风）。
+//: 漏掉 `v3/crane-animation-master.js` 不是"少个动画"：它是 `<script src>`，
+//: 离线时取不到就是一次加载失败，后面的接线脚本照跑，但飞鹤那一层不存在。
+const VERSION = 'youhuo-shell-v18';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -96,6 +102,37 @@ const SHELL = [
   '/static/elder-v6.css',
   '/static/elder-v6-a.js',
   '/static/elder-v6-b.js',
+  // 老人端 / 家人端**设计三 · 网页端**（/elder3 /family3）。
+  //
+  // 和设计二不同：这两页不共用 `elder.js` / `family.js`，它们是另一套 DOM，
+  // 接线各自一份。交付包自己的 CSS 很大（2.3 MB / 1.6 MB，内联了美术），
+  // 但那正是这一版的全部价值，缺了就是一张没有画的纸。
+  '/elder3',
+  '/static/elder-v3.html',
+  '/static/elder3.js',
+  '/static/elder3-wiring.css',
+  '/static/elder3/app-01.css',
+  '/static/elder3/page-motion-and-ui.js',
+  '/static/elder3/yoli-mascot.js',
+  '/family3',
+  '/static/family-v3.html',
+  '/static/family3.js',
+  '/static/family3-wiring.css',
+  '/static/family3/style-01.css',
+  '/static/family3/script-01.js',
+  '/static/family3/script-02.js',
+  '/static/family3/script-03.js',
+  '/static/family3/script-04.js',
+  '/static/family3/script-05.js',
+  '/static/family3/script-06.js',
+  '/static/family3/script-07.js',
+  '/static/family3/script-08.js',
+  '/static/family3/script-09.js',
+  '/static/family3/script-11.js',
+  '/static/family3/script-12.js',
+  // 两页共用。飞鹤动画在两个交付包里字节一致，装一份。
+  '/static/v3/crane-animation-master.js',
+  '/static/v3/mic-guofeng.png',
   '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：

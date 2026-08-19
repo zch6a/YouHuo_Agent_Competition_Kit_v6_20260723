@@ -1,0 +1,74 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>优活 · 老人端 V2.4.4 · 背景画卷增强动态版</title><link rel="stylesheet" href="/static/elder3/app-01.css"><link rel="stylesheet" href="/static/elder3-wiring.css"><meta name="theme-color" content="#f8f4ea"></head><body data-surface="consumer">
+<div id="app">
+  <div class="depth-art"><span class="far"></span><span class="mid"></span><span class="near"></span></div>
+  <header class="topbar">
+    <div class="brand"><div class="brand-seal">优</div><div class="brand-copy"><b>优活</b></div></div>
+    <div class="mode-switch"><a class="v3-home" href="/">返回首页</a><button id="modeYouhuo" class="active">优活</button><button id="modeCompanion">无忧伴</button></div>
+  </header>
+  <div class="mode-toast" id="companionToast"></div>
+
+  <section class="workspace active" data-workspace="today">
+    <div class="page-grid">
+      <div class="left-column">
+        <section class="identity-island">
+          <svg class="identity-grow" viewBox="0 0 70 300"><path class="main" d="M18 288 C24 231 15 200 31 158 C44 122 40 80 60 41 C64 32 69 23 69 18"/><path class="side" d="M31 164 C49 151 58 138 63 121 M42 112 C24 96 16 78 12 60"/><ellipse cx="63" cy="121" rx="8" ry="4"/><ellipse cx="12" cy="60" rx="7" ry="3.5"/></svg>
+          <div class="identity-kicker">今天</div><h1>晚上好 · 张爷爷</h1><p>今天整体平稳。下一件事是晚间用药，别着急，一件一件来。</p><div class="identity-meta">2026年08月18日 周二 · 19:10</div>
+        </section>
+        <section class="left-story"><div class="story-head"><b>今天的事</b></div><div class="story-canvas">
+          <svg class="flow-line" viewBox="0 0 300 300" preserveAspectRatio="none"><path d="M36 33 C185 43 210 94 161 133 C110 175 28 160 55 216 C78 265 190 237 224 282"/></svg>
+          <button class="story-node timeline-node n1 done"><span class="t">08:00</span><span class="n">早餐后吃药</span><span class="s">已记录</span></button>
+          <button class="story-node timeline-node n2 done"><span class="t">16:10</span><span class="n">量过血压</span><span class="s">128 / 76 · 已记录</span></button>
+          <button class="story-node timeline-node n3 pending"><span class="t">20:00</span><span class="n">晚间用药</span><span class="s">到时间会提醒您</span></button>
+        </div></section>
+      </div>
+      <main class="right-stage">
+        <div class="stage-art" style="background-image:var(--scene-mountain)"></div><div class="stage-accent"></div>
+        <div class="stage-copy"><div class="stage-kicker">语音办事</div><h2>我在，您请说。</h2><p>按一下麦克风，慢慢说。要紧的步骤，优活会再念一遍给您确认。</p></div>
+        <div class="quick-row"><button class="quick-chip">今天有什么事</button><button class="quick-chip">交水费</button><button class="quick-chip">挂号</button><button class="quick-chip">上次的血压</button></div>
+        <div class="voice-zone"><div class="voice-orbit"></div><button class="voice-orb" id="voiceOrb" aria-label="按一下开始说话">
+          <img class="voice-art-mic" src="/static/v3/mic-guofeng.png" alt="">
+        </button><div class="voice-caption"><b>按一下，然后慢慢说</b><span>正在等您 · 不会自动扣钱</span></div></div>
+        <div class="next-card"><div class="label">下一件 · 20:00</div><strong>睡前吃阿托伐他汀</strong><div class="meta"><span>20 mg</span><span>到点提醒</span></div></div>
+        <button class="keyboard-entry" id="keyboardEntry">⌨ 用打字说</button>
+      </main>
+    </div>
+  </section>
+
+  <section class="workspace" data-workspace="records">
+    <div class="page-grid">
+      <div class="left-column">
+        <section class="identity-island"><svg class="identity-grow" viewBox="0 0 70 300"><path class="main" d="M18 288 C24 231 15 200 31 158 C44 122 40 80 60 41 C64 32 69 23 69 18"/><path class="side" d="M31 164 C49 151 58 138 63 121 M42 112 C24 96 16 78 12 60"/><ellipse cx="63" cy="121" rx="8" ry="4"/><ellipse cx="12" cy="60" rx="7" ry="3.5"/></svg><div class="identity-kicker">RECORDS · 办事有据</div><h1>做过的事，都有来路。</h1><p>这里只记办过的事；和无忧伴聊天的内容不会混进来。</p><div class="identity-meta">刚刚已更新</div></section>
+        <section class="left-story"><div class="story-head"><b>最近记录</b></div><div class="story-canvas"><svg class="flow-line" viewBox="0 0 300 300" preserveAspectRatio="none"><path d="M35 34 C178 50 204 91 153 135 C105 176 37 160 62 216 C90 263 185 238 224 280"/></svg><button class="story-node timeline-node n1 done"><span class="t">今天 16:12</span><span class="n">血压已记录</span><span class="s">128 / 76</span></button><button class="story-node timeline-node n2 done"><span class="t">今天 09:05</span><span class="n">早餐后用药</span><span class="s">已完成</span></button><button class="story-node timeline-node n3"><span class="t">昨天 18:40</span><span class="n">挂号信息已查看</span><span class="s">没有付款</span></button></div></section>
+      </div>
+      <main class="right-stage"><div class="stage-art" style="background-image:var(--art-study)"></div><div class="stage-accent"></div><div class="stage-copy"><div class="stage-kicker">办事记录</div><h2>慢慢摊开，您一眼就懂。</h2><p>看不清就让优活再念一遍；走错了，也可以返回上一步。</p></div>
+        <div class="record-river"><svg viewBox="0 0 760 360" preserveAspectRatio="none"><path d="M15 95 C155 20 270 177 384 108 C505 35 590 174 748 80 M74 254 C230 175 323 321 468 250 C598 185 646 263 730 226"/></svg><button class="record-event e1"><b>血压已记录</b><small>今天 16:12 · 128 / 76<br>已记录</small></button><button class="record-event e2"><b>早餐后用药</b><small>今天 09:05 · 已完成</small></button><button class="record-event e3"><b>挂号信息已查看</b><small>昨天 18:40 · 未付款</small></button><button class="record-event e4"><b>燃气费步骤已核对</b><small>8月16日 · 等待家人确认</small></button></div>
+        <div class="record-tools"><button class="ghost-btn" id="repeatLast">↻ 再说一遍</button><button class="ghost-btn" id="stepBack">↶ 返回上一步</button><button class="ghost-btn" id="refreshRecords">刷新记录</button></div>
+      </main>
+    </div>
+  </section>
+
+  <section class="workspace" data-workspace="family">
+    <div class="page-grid"><div class="left-column"><section class="identity-island"><svg class="identity-grow" viewBox="0 0 70 300"><path class="main" d="M18 288 C24 231 15 200 31 158 C44 122 40 80 60 41 C64 32 69 23 69 18"/><path class="side" d="M31 164 C49 151 58 138 63 121 M42 112 C24 96 16 78 12 60"/><ellipse cx="63" cy="121" rx="8" ry="4"/><ellipse cx="12" cy="60" rx="7" ry="3.5"/></svg><div class="identity-kicker">家人守护</div><h1>家人一直在，但不打扰。</h1><p>重要付款、高一点风险的事情，优活会先问您，再问家人。</p><div class="identity-meta">3 位家人可以联系</div></section><section class="left-story"><div class="story-head"><b>需要家人时</b></div><div class="story-canvas"><svg class="flow-line" viewBox="0 0 300 300" preserveAspectRatio="none"><path d="M35 31 C174 52 206 94 152 134 C108 169 34 162 61 214 C92 260 184 239 225 280"/></svg><button class="story-node timeline-node n1"><span class="t">付款</span><span class="n">先问您</span><span class="s">再请家人二次确认</span></button><button class="story-node timeline-node n2"><span class="t">紧急</span><span class="n">第一个知道</span><span class="s">联系人顺序已设置</span></button><button class="story-node timeline-node n3"><span class="t">代办</span><span class="n">家人可以替您添事</span><span class="s">您仍能看到来源</span></button></div></section></div>
+      <main class="right-stage"><div class="stage-art" style="background-image:var(--art-autumn)"></div><div class="stage-accent"></div><div class="stage-copy"><div class="stage-kicker">家人守护</div><h2>有些事，多问一句更安心。</h2><p>谁能帮您、能帮什么、怎么找到家人，一眼看清。</p></div><div class="family-tree"><svg viewBox="0 0 780 360" preserveAspectRatio="none"><path d="M390 190 C290 155 220 85 110 68 M390 190 C275 220 210 293 92 302 M390 190 C505 146 570 93 690 105"/></svg><div class="family-core"><div><b>我的家人</b><span>重要时刻一起确认</span><button class="contact-family" id="contactFamily">☎ 联系家人</button></div></div><button class="family-branch b1"><b>重要付款</b><small>您先确认，再请家人确认。</small></button><button class="family-branch b2"><b>紧急的时候</b><small>需要时，优先联系。</small></button><button class="family-branch b3"><b>替您添一件事</b><small>家人可以替您加提醒。</small></button><div class="family-note">高一点风险的事，优活会先问您，再问家人。<br><b>两边都同意，才继续。</b></div></div></main>
+    </div>
+  </section>
+
+  <section class="workspace" data-workspace="mine">
+    <div class="page-grid"><div class="left-column"><section class="identity-island"><svg class="identity-grow" viewBox="0 0 70 300"><path class="main" d="M18 288 C24 231 15 200 31 158 C44 122 40 80 60 41 C64 32 69 23 69 18"/><path class="side" d="M31 164 C49 151 58 138 63 121 M42 112 C24 96 16 78 12 60"/><ellipse cx="63" cy="121" rx="8" ry="4"/><ellipse cx="12" cy="60" rx="7" ry="3.5"/></svg><div class="identity-kicker">我的习惯</div><h1>调成您舒服的样子。</h1><p>语速、文字大小、常用服务和保护方式都放在这里，不藏起来。</p><div class="identity-meta">设置会自动记住</div></section><section class="left-story"><div class="story-head"><b>优活怎么保护您</b></div><div class="story-canvas"><div class="guard-row"><b>一次只问一件事</b><span>不连续追问</span></div><div class="guard-row"><b>要紧的事请您念一遍</b><span>先听准再继续</span></div><div class="guard-row"><b>不会自动扣钱</b><span>付款前一定确认</span></div></div></section></div>
+      <main class="right-stage"><div class="stage-art" style="background-image:var(--scene-water)"></div><div class="stage-accent"></div><div class="stage-copy"><div class="stage-kicker">使用习惯</div><h2>按您的习惯来。</h2><p>只留常用设置。选一次，优活就记住。</p></div><div class="settings-grid"><div><div class="setting-block"><h3>语速</h3><p>选「慢」的时候，优活会一字一句地说。</p><div class="segmented" data-seg="speed"><button class="seg-btn">慢</button><button class="seg-btn active">舒适</button><button class="seg-btn">正常</button></div></div><div class="setting-block"><h3>文字大小</h3><p>屏幕上的字会变大，按钮也跟着变大。</p><div class="segmented" data-seg="font"><button class="seg-btn active">较大</button><button class="seg-btn">大</button><button class="seg-btn">特大</button></div></div><button class="save-pref" id="savePref">保存我的习惯</button></div><div><div class="setting-block"><h3>常用服务</h3><p>常用的，就放在手边。</p><div class="service-row"><b>找无忧伴聊聊</b><span>只聊天</span></div><div class="service-row"><b>今天吃药了吗</b><span>只念记录</span></div><div class="service-row"><b>药还够吃吗</b><span>查看余量记录</span></div><div class="service-row"><b>上次的血压</b><span>只念记录</span></div></div></div></div></main>
+    </div>
+  </section>
+
+  <nav class="dock"><button class="active" data-page="today" data-scene-type="today"><span class="ico">◉</span><span class="txt">今天</span></button><button data-page="records" data-scene-type="todo"><span class="ico">◇</span><span class="txt">记录</span></button><button data-page="family" data-scene-type="care"><span class="ico">○</span><span class="txt">家人</span></button><button data-page="mine" data-scene-type="mine"><span class="ico">⌁</span><span class="txt">我的</span></button><button class="contact" id="dockContact"><span class="ico">☎</span><span class="txt">联系家人</span></button></nav>
+
+  <!-- EXACT family V5.8.4 cinematic scene structure -->
+  <div class="page-scene" id="pageScene" aria-hidden="true"><div class="scene-copy"><div class="scene-kicker" id="sceneKicker">YOUHUO · SCENE</div><div class="scene-name" id="sceneName"></div><div class="scene-sub" id="sceneSub"></div></div><div class="scene-today-lotus"></div><span class="scene-today-ripple r1"></span><span class="scene-today-ripple r2"></span><div class="scene-todo-track"></div><div class="scene-todo-leaves"><i></i><i></i><i></i><i></i><i></i></div><div class="scene-care-crane"></div><span class="scene-care-ring"></span><div class="scene-mine-tree"><svg viewBox="0 0 340 280"><path class="trunk" d="M42 270 C74 236 92 204 114 167 C136 131 153 91 168 34"/><path class="twig" d="M105 183 C72 164 54 143 38 115 M126 144 C166 139 198 119 229 82 M145 105 C188 82 220 60 253 26 M86 214 C119 207 145 197 169 179"/><ellipse class="leaf" cx="37" cy="113" rx="14" ry="7" transform="rotate(-22 37 113)"/><ellipse class="leaf" cx="229" cy="81" rx="16" ry="8" transform="rotate(-26 229 81)"/><ellipse class="leaf" cx="253" cy="26" rx="14" ry="7" transform="rotate(-34 253 26)"/><ellipse class="leaf" cx="169" cy="179" rx="13" ry="6" transform="rotate(-12 169 179)"/><ellipse class="leaf" cx="169" cy="34" rx="13" ry="6" transform="rotate(-62 169 34)"/></svg></div></div>
+
+  <div class="vine-field" id="vineField" aria-hidden="true"><svg viewBox="0 0 720 820"><path class="vine-main" d="M700 805 C655 742 670 683 628 632 C584 579 602 525 555 474 C514 430 525 374 479 329 C440 291 444 235 405 194 C365 151 353 104 312 66 C291 47 269 29 242 17"/><path class="vine-side" d="M627 632 C592 620 561 601 539 574 M555 474 C592 452 617 425 632 390 M478 329 C443 313 413 292 390 264 M405 194 C432 170 447 143 452 111 M353 104 C322 97 297 84 276 65"/><ellipse class="vine-leaf" cx="624" cy="628" rx="22" ry="11" transform="rotate(-24 624 628)"/><ellipse class="vine-leaf" cx="541" cy="573" rx="20" ry="10" transform="rotate(28 541 573)"/><ellipse class="vine-leaf" cx="558" cy="471" rx="24" ry="12" transform="rotate(-36 558 471)"/><ellipse class="vine-leaf" cx="631" cy="388" rx="21" ry="10" transform="rotate(-52 631 388)"/><ellipse class="vine-leaf" cx="479" cy="327" rx="23" ry="11" transform="rotate(18 479 327)"/></svg></div>
+
+  <!-- EXACT family V5.8.4 click-to-fly crane structure -->
+  <div class="crane-companion" id="craneCompanion" aria-hidden="true"><div class="crane-hint">点击任意位置，鹤会飞过去</div><div class="crane-tilt" id="craneTilt"><div class="crane-facing" id="craneFacing"><img class="crane-frame" id="craneFrame" alt=""></div></div></div>
+
+  <div class="youhuo-robot-mascot" id="youhuoRobotMascot" aria-live="polite" aria-label="优活小优向导"><div class="youhuo-robot-bubble" id="youhuoRobotBubble" role="status"></div><canvas class="youhuo-robot-canvas" id="youhuoRobotCanvas" width="56" height="90" aria-hidden="true"></canvas></div>
+</div>
+<script src="/static/elder3/page-motion-and-ui.js"></script><script src="/static/v3/crane-animation-master.js"></script><script src="/static/elder3/yoli-mascot.js"></script><script src="/static/identity.js"></script><script src="/static/common.js"></script><script src="/static/elder3.js" defer></script><script src="/static/register-sw.js" defer></script></body></html>

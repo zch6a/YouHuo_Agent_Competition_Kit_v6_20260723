@@ -63,6 +63,10 @@ SURFACES: dict[str, RouteSurface] = {
     # 同一套四格（首页 / 记录 / 家人 / 我的）。归进别的 shell 会让老人端那一批
     # 判据整批绕开它——「掉出所有名单」和「通过」在结果里长得一模一样。
     "/elder2": RouteSurface("consumer",     "elder",    None,   "elder-v6.html"),
+    # 老人端**设计三 · 网页端**。双栏（左叙事 / 右主舞台），跟窗口宽度走，
+    # 不是手机版的放大。shell 仍是 `elder`，理由同设计二：surface 描述的是意图，
+    # 而它服务的是同一个人、同一套四格（今天 / 记录 / 家人 / 我的）。
+    "/elder3": RouteSurface("consumer",     "elder",    None,   "elder-v3.html"),
     "/family": RouteSurface("consumer",     "family",   "today", "family.html"),
     # 家人端**设计二**。和 `/family` 并行，供比较；业务逻辑共用 family.js/care.js。
     #
@@ -70,6 +74,10 @@ SURFACES: dict[str, RouteSurface] = {
     # 拆到独立的 `/care`。所以它的 entry 是 `today`、shell 仍是 `family`——
     # surface 描述的是意图，不是 URL，这一点是这个文件开头就写明的。
     "/family2": RouteSurface("consumer",    "family",   "today", "family-v6.html"),
+    # 家人端**设计三 · 网页端**。它把家人端和照护中心装在**同一个文档**里
+    # （`#familyView` / `#careView` 两个 workspace 顶部切换），照护那边还有
+    # 七个子面板。所以 entry 记 `today`：进来落在家人端那一侧。
+    "/family3": RouteSurface("consumer",    "family",   "today", "family-v3.html"),
     # `/care` 与 `/trust` 是 family shell 的两个 deep link，不是独立网站。
     "/care":   RouteSurface("consumer",     "family",   "care",  "care.html"),
     # `/trust` 的 entry 原先写的是 `"care"`，和这个文件**自己第 11 行的文档**矛盾
@@ -102,8 +110,13 @@ DEFAULT_PANEL: dict[str, str | None] = {
     "/":       None,
     "/elder":  "home",
     "/elder2": "home",
+    # 设计三用的是自己的 `data-workspace`（today/records/family/mine），
+    # 名字和设计一二的 `data-panel` 不同——两个命名空间，这个文件开头讲过。
+    # 这里记的是**分区名**，所以写它自己那套里的第一格。
+    "/elder3": "today",
     "/family": "today",
     "/family2": "today",
+    "/family3": "today",
     "/care":   "today",
     "/trust":  None,    # 一张凭证没有分区
     "/stage":  "product",

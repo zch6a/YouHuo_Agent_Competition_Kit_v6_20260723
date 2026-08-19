@@ -1,0 +1,159 @@
+/* 老人端设计三（`/elder3`）接线所需的样式。
+ *
+ * 只有两类内容，都**只加不改**：
+ *   ① 接线新增的两个元素（状态行、打字框）——交付包里没有它们
+ *   ② 字号设置真的作用在屏幕上所需的覆盖
+ *
+ * 必须排在 `app-01.css` 之后加载。同优先级靠源码顺序定胜负，这是唯一的依据。
+ *
+ * ## 为什么字号要逐条覆盖
+ *
+ * 设计一在自己的 CSS 里通篇写着 `calc(20px * var(--elder-font-scale) / 1.25)`，
+ * 所以它改一个变量就够了。设计三的 CSS（2.3 MB，非本项目撰写）里没有这个变量，
+ * 字号是写死的 px 和 `clamp(…vw…)`——**改根字号一个字都不会变**。
+ *
+ * 试过的另外两条路都不行：
+ *   · `zoom` 缩放 `#app`：`#app` 是 `position:fixed;inset:0;overflow:hidden`，
+ *     放大之后内容被裁；而且小优和飞鹤用的是视口坐标，缩放会让它们错位。
+ *   · `zoom` 缩放 `.page-grid`：它是 `34% 1fr` 的栅格，放大就溢出。
+ *
+ * 所以照设计一的做法来：一个变量 + 逐条 `calc`。基数写 1.25，
+ * 因为那是这个设置的默认值——`--e3-font-scale: 1.25` 时每一条都等于原值，
+ * 不动设置的人看到的和交付包一模一样。
+ */
+
+:root {
+  --e3-font-scale: 1.25;
+}
+
+/* ---- 字号：读的字 ---------------------------------------------------------- */
+
+.identity-island h1 { font-size: calc(clamp(31px, 3.15vw, 46px) * var(--e3-font-scale) / 1.25); }
+.identity-island p  { font-size: calc(14px * var(--e3-font-scale) / 1.25); }
+.identity-meta      { font-size: calc(12px * var(--e3-font-scale) / 1.25); }
+
+.story-head b       { font-size: calc(clamp(23px, 2.05vw, 29px) * var(--e3-font-scale) / 1.25); }
+.story-node .t      { font-size: calc(14px * var(--e3-font-scale) / 1.25); }
+.story-node .n      { font-size: calc(17px * var(--e3-font-scale) / 1.25); }
+.story-node .s      { font-size: calc(11px * var(--e3-font-scale) / 1.25); }
+
+.stage-copy h2      { font-size: calc(clamp(34px, 4.8vw, 50px) * var(--e3-font-scale) / 1.25); }
+.stage-copy p       { font-size: calc(15px * var(--e3-font-scale) / 1.25); }
+
+.next-card strong   { font-size: calc(clamp(22px, 2.2vw, 29px) * var(--e3-font-scale) / 1.25); }
+.next-card .meta    { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+
+.record-event small { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+.voice-caption b    { font-size: calc(18px * var(--e3-font-scale) / 1.25); }
+.voice-caption span { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+
+.service-row b,
+.guard-row b        { font-size: calc(clamp(17px, 1.45vw, 20px) * var(--e3-font-scale) / 1.25); }
+
+/* ---- 字号：按钮也跟着变大 ---------------------------------------------------
+ *
+ * 设置页那句话写的是「屏幕上的字会变大，**按钮也跟着变大**」。
+ * 只放大字而按钮不变，那句话就是假的，而且触控目标不会随之变宽。 */
+
+.quick-chip {
+  font-size: calc(14px * var(--e3-font-scale) / 1.25);
+  padding: calc(11px * var(--e3-font-scale) / 1.25) calc(16px * var(--e3-font-scale) / 1.25);
+}
+.seg-btn {
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  padding: calc(11px * var(--e3-font-scale) / 1.25) calc(15px * var(--e3-font-scale) / 1.25);
+  min-width: calc(82px * var(--e3-font-scale) / 1.25);
+}
+.dock .txt { font-size: calc(15px * var(--e3-font-scale) / 1.25); }
+
+/* ---- 状态行 ----------------------------------------------------------------
+ *
+ * 这一页原先没有任何地方能说「刚才那一下怎么样了」：按下麦克风、保存设置、
+ * 联系家人，成功或失败都没有一句话。加在麦克风说明下面——那是她按完之后
+ * 眼睛所在的位置。
+ *
+ * 空的时候 `:empty` 自己不占位：留一条空线在那里，等于告诉她这里本来就该有东西。 */
+
+.e3-status {
+  margin: 10px auto 0;
+  max-width: 34ch;
+  padding: 10px 14px;
+  border-left: 2px solid var(--jade, #496f60);
+  background: rgba(255, 253, 247, .86);
+  border-radius: 3px;
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  line-height: 1.6;
+  color: #5b5044;
+  text-align: left;
+}
+.e3-status:empty { display: none; }
+.e3-status[data-tone="warning"] { border-left-color: var(--gold, #a8762d); }
+.e3-status[data-tone="bad"]     { border-left-color: var(--red, #a74e40); color: #7a3f34; }
+
+/* ---- 打字说 ----------------------------------------------------------------
+ *
+ * 「⌨ 用打字说」原先按下去什么都不会发生。Firefox 上没有 SpeechRecognition，
+ * 那里这是**唯一**的输入通道。 */
+
+.e3-composer {
+  position: absolute;
+  right: 1.5%;
+  bottom: 11%;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 253, 247, .95);
+  border: 1px solid rgba(168, 118, 45, .22);
+  border-radius: 6px;
+  box-shadow: 0 14px 34px rgba(70, 54, 36, .10);
+}
+.e3-composer input {
+  width: clamp(180px, 22vw, 300px);
+  padding: 10px 12px;
+  border: 1px solid rgba(112, 87, 51, .22);
+  border-radius: 4px;
+  background: #fff;
+  font-family: var(--sans);
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  color: var(--ink, #342b22);
+}
+.e3-composer button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(49, 94, 82, .3);
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #315e52;
+}
+
+/* ---- 出口 ------------------------------------------------------------------
+ *
+ * 这一页原先**没有任何回首页的路**：进来之后只能靠浏览器后退。
+ * 底栏那五格全是页内切换，`.dock` 也不是全站那个 `.tabbar`。
+ * 对一位可能不熟悉浏览器手势的老人，"退不出去"是真的退不出去。 */
+
+.v3-home {
+  margin-left: 14px;
+  align-self: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(168, 118, 45, .28);
+  color: #6a5b49;
+  font: 700 calc(14px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.v3-home:hover { color: var(--tea, #5e4324); }
+.v3-home:focus-visible { outline: 2px solid var(--jade, #496f60); outline-offset: 2px; }
+
+/* 交付包 README 第 8 条：「UI 最终状态必须默认可见」。
+ * 接线会把用不上的节点 `hidden`，而这份 CSS 里有 `.record-event{opacity:1}`
+ * 这类带 `!important` 语义的最终态规则——`[hidden]` 的默认 `display:none`
+ * 会被 `display:` 声明覆盖掉。钉死它，否则「隐藏多余的卡片」会变成
+ * 「留下一张写着别人事情的卡片」。 */
+.workspace [hidden] { display: none !important; }

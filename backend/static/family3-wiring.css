@@ -1,0 +1,67 @@
+/* 家人端设计三（`/family3`）接线所需的样式。只加不改，排在 `style-01.css` 之后。
+ *
+ * 交付包里没有「刚才那一下成了没有」的位置，也没有「确认接力」这个按钮——
+ * 后者是有意新增的：原来的「查看并确认这件事」一次点击就该把钱付掉，
+ * 而本项目的 P0 不允许一次点击既是查看又是执行。查看和确认必须是两个动作。
+ */
+
+/* ---- 回执 / 状态 ---------------------------------------------------------- */
+
+.f3-notice {
+  margin: 0 0 12px;
+  padding: 11px 15px;
+  border-left: 2px solid #496f60;
+  background: rgba(255, 253, 247, .9);
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #5b5044;
+}
+.f3-notice:empty { display: none; }
+.f3-notice[data-tone="warning"] { border-left-color: #a8762d; }
+.f3-notice[data-tone="bad"]     { border-left-color: #a74e40; color: #7a3f34; }
+
+/* ---- 第二步：确认接力 ------------------------------------------------------
+ *
+ * 和「查看并确认这件事」长得不一样是**故意**的：它是这一页唯一会真的动钱的
+ * 控件，不该和旁边那个只读的按钮看起来是同一类东西。 */
+
+.f3-approve {
+  margin-left: 10px;
+  padding: 12px 20px;
+  border: 1px solid rgba(167, 78, 64, .5);
+  border-radius: 4px;
+  background: rgba(167, 78, 64, .07);
+  color: #8c3b2e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  /* 触控目标 ≥48px：这是这一页最不该按错的按钮。 */
+  min-height: 48px;
+}
+.f3-approve:hover { background: rgba(167, 78, 64, .12); }
+.f3-approve:focus-visible { outline: 2px solid #a74e40; outline-offset: 2px; }
+
+/* ---- 出口 ------------------------------------------------------------------
+ * 这一页原先没有任何回首页的路：顶部只有「家人端 / 照护中心」两个页内切换，
+ * 底栏五格也全在页内。 */
+
+.v3-home {
+  margin-left: 12px;
+  align-self: center;
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(168, 118, 45, .28);
+  color: #6a5b49;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.v3-home:hover { color: #5e4324; }
+.v3-home:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* 接线会把用不上的节点 `hidden`。这份 CSS 里有 `.medicine-seal{opacity:1}`
+ * 这类"最终态必须可见"的规则，它们会盖掉 `[hidden]` 的默认 `display:none`——
+ * 那样「隐藏多余的卡片」就变成了「留下一张写着别人事情的卡片」。 */
+.workspace [hidden] { display: none !important; }

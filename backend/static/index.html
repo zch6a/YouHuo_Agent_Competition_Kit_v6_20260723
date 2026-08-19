@@ -182,7 +182,10 @@
          `youhuo/surfaces.py` 里。四条已全部实测通到各自的页面。 -->
     <section class="yh-designs" aria-labelledby="yh-designs-title">
       <h2 id="yh-designs-title" class="yh-designs-title">也可以直接打开某一套界面</h2>
-      <p class="yh-designs-sub">两套设计的功能完全一样，不同的只是版式和美术。</p>
+      <!-- 别在这里写「后端」：入口页的门以外不许出现工程词
+           （`test_app_surface_speaks_no_engineering`）。「办的是同一件事」
+           对读它的人也更准确——她关心的是能不能办成，不是底下接的是什么。 -->
+      <p class="yh-designs-sub">三套设计办的是同一件事，不同的只是版式和美术。前两套是手机版，第三套是网页端。</p>
 
       <div class="yh-designs-grid">
         <a class="yh-design-link is-elder" id="designElderOne" href="/elder">
@@ -215,6 +218,24 @@
             <span class="yh-design-go" aria-hidden="true">→</span>
           </span>
           <span class="yh-design-note">今天、待办、照护、我的，四屏合在一页。</span>
+        </a>
+
+        <!-- 设计三是**网页端**：双栏，左叙事右主舞台，跟窗口宽度走。
+             设计一二都是手机版式，这一套不是它们的放大版。 -->
+        <a class="yh-design-link is-elder" id="designElderThree" href="/elder3">
+          <span class="yh-design-head">
+            <span class="yh-design-name">老人端设计三</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">网页端。左边今天的事，右边说话办事。</span>
+        </a>
+
+        <a class="yh-design-link is-family" id="designFamilyThree" href="/family3">
+          <span class="yh-design-head">
+            <span class="yh-design-name">家人端设计三</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">网页端。家人端和照护中心在同一页切换。</span>
         </a>
       </div>
     </section>

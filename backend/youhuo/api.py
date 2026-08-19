@@ -385,6 +385,23 @@ def create_app(
     def elder_v6_ui() -> FileResponse:
         return FileResponse(static_dir / "elder-v6.html")
 
+    # ---- 并行的第三套设计：网页端 ------------------------------------------
+    #
+    # 设计一二都是手机版式（单栏、底部四格）。设计三是**网页端**：双栏，
+    # 左栏叙事、右栏主舞台，跟着窗口宽度走。它们不是手机版的放大，
+    # 版式本身就是另一套，所以并列而不是替换。
+    #
+    # 和设计二同一条规矩：**不给它们单写一份业务逻辑**。接线脚本
+    # （`elder3.js` / `family3.js`）只负责把这套 DOM 接到同一批后端端点上，
+    # 用的是同一份 `common.js` 的 `api()` / `login()` / `once()`。
+    @app.get("/elder3", include_in_schema=False)
+    def elder_v3_ui() -> FileResponse:
+        return FileResponse(static_dir / "elder-v3.html")
+
+    @app.get("/family3", include_in_schema=False)
+    def family_v3_ui() -> FileResponse:
+        return FileResponse(static_dir / "family-v3.html")
+
     @app.get("/trust", include_in_schema=False)
     def trust_ui() -> FileResponse:
         return FileResponse(static_dir / "trust.html")
