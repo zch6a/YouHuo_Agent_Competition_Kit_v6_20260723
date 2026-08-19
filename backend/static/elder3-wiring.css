@@ -90,6 +90,44 @@
 .e3-status[data-tone="warning"] { border-left-color: var(--gold, #a8762d); }
 .e3-status[data-tone="bad"]     { border-left-color: var(--red, #a74e40); color: #7a3f34; }
 
+/* ---- 待办的两个动作 ---------------------------------------------------------
+ *
+ * 点一颗待办气泡之后长在状态行下面。**不是**点一下就把事情标记掉：
+ * 一整块椭圆点一下就改记录，手一抖就改了，而她看不出刚才发生过什么。
+ *
+ * 触控目标 ≥48px：这是老人真的会按的地方。 */
+
+.e3-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px auto 0;
+  max-width: 34ch;
+}
+.e3-actions button {
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 1px solid rgba(73, 111, 96, .32);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+  color: var(--tea, #5e4324);
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  cursor: pointer;
+}
+.e3-actions button:hover { background: #fff; border-color: var(--jade, #496f60); }
+.e3-actions button:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 2px;
+}
+
+/* 「常用服务」那四行交付包里是 div，看起来能点、实际不能。
+ * 接线给它们补了 role/tabindex，这里补上键盘可见的焦点圈和手型。 */
+.service-row[role="button"] { cursor: pointer; }
+.service-row[role="button"]:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 3px;
+}
+
 /* ---- 打字说 ----------------------------------------------------------------
  *
  * 「⌨ 用打字说」原先按下去什么都不会发生。Firefox 上没有 SpeechRecognition，

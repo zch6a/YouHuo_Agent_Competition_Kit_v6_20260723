@@ -23,7 +23,31 @@ import io
 import re
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+
 STATIC = Path(__file__).resolve().parents[1] / "static"
+V1 = "/api/v1"
+
+
+@pytest.fixture()
+def client(tmp_path):
+    from youhuo.api import create_app
+
+    app = create_app(tmp_path / "v3.db", demo_mode=True, seed_baseline_history=True)
+    with TestClient(app) as c:
+        yield c
+
+
+def _elder(client: TestClient) -> dict[str, str]:
+    """`/v2/*` 要 Bearer 令牌；`/api/v1` 在演示模式下可以不带。
+
+    浏览器那一侧两条路都带（`common.js` 统一加），所以这里也得带——
+    不带的话测的是一条真实前端从不会走的路径。
+    """
+    r = client.post("/v2/auth/demo", json={"actor_id": "elder-demo"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": "Bearer " + r.json()["access_token"]}
 
 
 def _src(name: str) -> str:
@@ -208,7 +232,155 @@ def test_viewing_a_payment_is_not_approving_it() -> None:
         "第二个按钮上没有审批调用——那这两步里没有一步真的能确认。")
 
 
-# ---- ⑥ 切到照护必须让它显形 ----------------------------------------------------
+# ---- ⑥ 「知道了」不是「办完了」 -------------------------------------------------
+
+def test_acknowledging_a_reminder_is_not_completing_it(client: TestClient) -> None:
+    """老人按「我知道了」之后，日程上那一行**不许**写成「已完成」。
+
+    这一条抓的是真发生过的事：设计三的待办气泡接上之后，按「我知道了」，
+    气泡当场从「待进行」跳到「已完成」——系统替她宣称她把药吃了，
+    而她只是说了句知道。她第二天回头看记录，看到的是一件没做的事被记成做了。
+
+    成因在门面层：`/api/v1/agenda` 原先是
+    `done = status in {COMPLETED, ACKNOWLEDGED}` 然后
+    `"已完成" if done else "待进行"`——两个状态合成一个词。
+    而设计一那边 `elder.js` 的 `REMINDER_STATUS` 里 acknowledged 是「知道了」、
+    语气 `todo`。**同一条提醒，两个子系统说法相反。**
+
+    `done` 也要跟着分开：它决定「接下来」挑哪一件，而按过「知道了」的那件药
+    还是没吃，它就该继续待在「接下来」里。
+    """
+    made = client.post(f"{V1}/reminders", json={"title": "吃钙片", "time": "23:30"})
+    assert made.status_code == 200, made.text
+    rid = made.json()["item"]["id"]
+
+    def row():
+        items = client.get(f"{V1}/agenda").json()["today"]
+        hit = [x for x in items if x["id"] == rid]
+        assert hit, f"新建的提醒不在今天的安排里：{items}"
+        return hit[0]
+
+    assert row()["status"] == "待进行", row()
+    assert row()["done"] is False
+
+    head = _elder(client)
+    ack = client.post(f"/v2/reminders/{rid}/acknowledge", json={}, headers=head)
+    assert ack.status_code == 200, ack.text
+
+    after = row()
+    assert after["status"] == "知道了", (
+        f"按过「我知道了」之后，日程上写的是 {after['status']!r}。"
+        "「知道了」和「已完成」不是一回事——后者是在替她宣称一件她没做的事。")
+    assert after["done"] is False, (
+        "「知道了」被算成了 done。那会把这件事从「接下来」里拿掉——"
+        "而按过「知道了」的那件药还是没吃。")
+
+    done = client.post(f"/v2/reminders/{rid}/complete", json={}, headers=head)
+    assert done.status_code == 200, done.text
+    assert row()["status"] == "已完成" and row()["done"] is True, row()
+
+
+def test_the_three_reminder_words_are_all_different(client: TestClient) -> None:
+    """三个状态在屏幕上必须是三个不同的词。
+
+    单独一条，因为上面那条可以被「把「知道了」也改成「待进行」」满足——
+    那样她按完之后屏幕上一个字都不动，正是这一整轮在修的另一件事。
+    """
+    made = client.post(f"{V1}/reminders", json={"title": "量血压", "time": "23:40"})
+    rid = made.json()["item"]["id"]
+
+    def word():
+        items = client.get(f"{V1}/agenda").json()["today"]
+        return next(x["status"] for x in items if x["id"] == rid)
+
+    head = _elder(client)
+    seen = [word()]
+    assert client.post(f"/v2/reminders/{rid}/acknowledge", json={},
+                       headers=head).status_code == 200
+    seen.append(word())
+    assert client.post(f"/v2/reminders/{rid}/complete", json={},
+                       headers=head).status_code == 200
+    seen.append(word())
+    assert len(set(seen)) == 3, (
+        f"三次状态迁移在屏幕上只有 {len(set(seen))} 种说法：{seen}。"
+        "相同就等于「什么都没发生」。")
+
+
+def test_every_endpoint_the_wiring_calls_really_exists(client: TestClient) -> None:
+    """两份接线里写死的每一条接口路径，`app.routes` 上都要有。
+
+    这一条是从我自己刚犯的一个错来的：「已经办好了」调的是
+    `/v2/reminders/{id}/done`，而真正的动作名是 `complete`——**按下去 404**。
+    死控件巡检抓不到它：那一轮只点了气泡（第一步），第二步的按钮根本没被点到。
+    「这一屏没有死控件」和「这一屏每个动作都成立」是两件事。
+
+    判的是**字面量里的固定前缀**，模板变量部分用通配。够抓住写错动作名、
+    写错版本号、写错拼写这三类，而它们都是「看起来完全正常」的错。
+    """
+    routes = [r.path for r in client.app.routes if getattr(r, "path", "")]
+
+    def known(path: str) -> bool:
+        want = [p for p in path.strip("/").split("/") if p]
+        for r in routes:
+            have = [p for p in r.strip("/").split("/") if p]
+            if len(have) != len(want):
+                continue
+            if all(h.startswith("{") or h == w for h, w in zip(have, want)):
+                return True
+        return False
+
+    bad: list[str] = []
+    for name in ("elder3.js", "family3.js"):
+        js = _src(name)
+        # 动作名是变量的那一处（`/v2/reminders/${id}/${action}`）单独展开。
+        # 不展开的话，**恰恰是写错动作名这一类**逃得掉——而那正是这条判据
+        # 存在的理由：`done` 不存在，真名叫 `complete`。
+        actions = set(re.findall(r"reminderAction\([^,]+,\s*'(\w+)'", js))
+        for raw in re.findall(r"""api\(\s*[`'"](/[^`'"]+)[`'"]""", js):
+            paths = [re.sub(r"\$\{[^}]*\}", "X", raw).split("?")[0]]
+            if raw.rstrip("`'\"").endswith("${action}") and actions:
+                paths = [re.sub(r"\$\{action\}", a, re.sub(r"\$\{(?!action\})[^}]*\}",
+                                                           "X", raw)).split("?")[0]
+                         for a in sorted(actions)]
+            for path in paths:
+                if not known(path):
+                    bad.append(f"{name}: {path}"
+                               + (f"（来自 {raw}）" if path != raw else ""))
+        if name == "elder3.js":
+            assert actions, "一个 `reminderAction(id, '…')` 都没数到——展开这一段在空转"
+    assert not bad, (
+        "接线里这些路径在 `app.routes` 上不存在：\n  " + "\n  ".join(bad))
+    assert routes, "一条路由都没数到——这条判据在空转"
+
+
+def test_tapping_a_reminder_bubble_does_not_change_it(client: TestClient) -> None:
+    """点一颗待办气泡本身**不许**发出任何写请求。
+
+    这一版的待办是一整块椭圆气泡。点一下就把事情标记掉，手一抖就改了记录，
+    而她看不出刚才发生过什么。所以气泡只负责问一句，两个动作各是一个按钮。
+    静态判：气泡那个处理器里不许出现提醒接口，它只许调 `offer(...)`。
+    """
+    js = _src("elder3.js")
+    handler = re.search(r"document\.addEventListener\('click'.*?\n    \}\);", js, re.S)
+    assert handler, "找不到气泡那个委托处理器"
+    body = handler.group(0)
+    assert "offer([" in body, "点气泡之后没有给出可选的动作。"
+
+    # 每一次 `reminderAction(` 都必须在回调里（前面紧挨着 `=> `）。
+    #
+    # 第一版查的是「处理器里有没有 `/v2/reminders/`」。变异测试证明它松：
+    # 真正的写操作走的是 `reminderAction()` 这个辅助函数，URL 在别处，
+    # 于是把「点一下直接标记完成」放回去，门照样绿——而那正是要防的那件事。
+    hits = [m.start() for m in re.finditer(r"\breminderAction\(", body)]
+    assert hits, "处理器里一次 `reminderAction` 都没有——这条判据在空转"
+    直接调 = [h for h in hits if not body[max(0, h - 4):h].rstrip().endswith("=>")]
+    assert not 直接调, (
+        "点气泡就直接调了 `reminderAction`——一下把状态改掉。\n"
+        "  它只许出现在 `offer([...])` 的回调里：她得看见两个写着字的按钮，"
+        "再自己选一个。一整块椭圆手一抖就改了记录，而她看不出发生过什么。")
+
+
+# ---- ⑦ 切到照护必须让它显形 ----------------------------------------------------
 
 def test_switching_to_care_makes_it_visible() -> None:
     """切到照护中心必须补 `page-bloom`，否则整屏是空的。
@@ -240,3 +412,35 @@ def test_switching_to_care_makes_it_visible() -> None:
     assert not missing, (
         f"这些进照护的路没有补 `page-bloom`：{missing}。\n"
         "  走这条路进去，整屏的字停在 opacity:0——实测淡掉 89 段。")
+
+
+# ---- ⑧ 交付包里那些没有钩子的控件 ----------------------------------------------
+
+def test_the_care_dock_is_not_three_dead_buttons() -> None:
+    """照护那一屏底栏的「待办」「我的」必须有 `data-family`。
+
+    交付包里它们**连一个属性都没有**——没有 id、没有 data、没有 class 钩子，
+    而家人端那一屏同样两个键是有的。实测（把每个控件都点一遍、看有没有请求
+    或界面变化）：点下去什么都不发生。
+    """
+    html = io.open(STATIC / "family-v3.html", encoding="utf-8").read()
+    dock = html[html.rindex('<nav class="dock">'):]
+    for word, slot in (("待办", "todo"), ("我的", "mine")):
+        assert re.search(rf'data-family="{slot}"[^>]*>(?:(?!</button>).)*{word}', dock, re.S) \
+            or re.search(rf'{word}(?:(?!<button).)*?</button>', dock, re.S) and f'data-family="{slot}"' in dock, (
+            f"照护底栏的「{word}」没有 `data-family=\"{slot}\"`——它是个死键。")
+
+
+def test_the_service_rows_can_be_reached_by_keyboard() -> None:
+    """「常用服务」那四行必须能用键盘到达。
+
+    交付包里它们是 `<div class="service-row">`：看起来能点、实际不能，
+    读屏和键盘也完全够不着。接线把它们接成了「说这句话」，
+    那就得同时给 role 和 tabindex，否则只有鼠标用户用得上。
+    """
+    js = _src("elder3.js")
+    block = re.search(r"\$\$\('\.service-row'\)\.forEach.*?\n    \}\);", js, re.S)
+    assert block, "elder3.js 里没有接「常用服务」那四行"
+    body = block.group(0)
+    for need in ("'role', 'button'", "'tabindex', '0'", "keydown"):
+        assert need in body, f"「常用服务」缺了 {need}——键盘用户够不着。"

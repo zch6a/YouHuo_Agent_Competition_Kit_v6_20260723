@@ -444,14 +444,30 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             # 而首页顶上仍然写着「07:30 吃钙片」——同一条提醒，两个屏幕两种说法。
             if r.status is ReminderStatus.CANCELLED:
                 continue
-            done = r.status in {ReminderStatus.COMPLETED, ReminderStatus.ACKNOWLEDGED}
+            # **「知道了」不是「办完了」。**
+            #
+            # 这两个原先合并成一个 `done`，屏幕上一起写「已完成」。后果：老人在
+            # 一条用药提醒上按「我知道了」，日程上那一行当场变成「已完成」——
+            # 系统替她宣称她吃过药了，而她只是说了句知道。她第二天回头看记录，
+            # 看到的是一件她其实没做的事被记成做了。
+            #
+            # 同一件事在设计一那边是分开的：`elder.js` 的 `REMINDER_STATUS` 里
+            # `acknowledged` 是「知道了」，语气 `todo`（还没办）。也就是说这一层
+            # 和那一层对同一条提醒的说法是相反的——这个项目为「两套实现各自
+            # 都对、跨子系统才错」栽过一次（字号语速与 SOS）。
+            #
+            # `done` 只认真的办完了。它同时决定「接下来」挑哪一件
+            # （下面 `undone = [it for it in items if not it["done"]]`）：
+            # 按过「知道了」的那件药还是没吃，它就该继续待在「接下来」。
+            acknowledged = r.status is ReminderStatus.ACKNOWLEDGED
+            done = r.status is ReminderStatus.COMPLETED
             items.append(
                 {
                     "id": r.id,
                     "time": due.strftime("%H:%M"),
                     "title": r.title,
                     "done": done,
-                    "status": "已完成" if done else "待进行",
+                    "status": "已完成" if done else ("知道了" if acknowledged else "待进行"),
                     "at": due.isoformat(),
                 }
             )

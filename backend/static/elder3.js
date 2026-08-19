@@ -79,6 +79,33 @@
   }
   const trouble = (e, what) => say(errorWords(e, what).text, 'bad');
 
+  /** 在状态行下面摆几个动作按钮。空数组 = 收掉。
+   *
+   * 为什么要「问一句再做」：这一版的待办是一个整块的椭圆气泡，
+   * 点一下就把一件事标成办好了，手一抖就改了记录，而她看不出刚才发生过什么。
+   * 设计一那边是两个写着字的按钮，这里照它来——只是按钮长在状态行下面。
+   */
+  function offer(actions) {
+    let row = $('#e3Actions');
+    if (!actions || !actions.length) { if (row) row.remove(); return; }
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'e3Actions';
+      row.className = 'e3-actions';
+      const host = ensureStatus();
+      if (!host) return;
+      host.insertAdjacentElement('afterend', row);
+    }
+    row.replaceChildren();
+    actions.forEach(({label, run}) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.addEventListener('click', () => once(b, run));
+      row.appendChild(b);
+    });
+  }
+
   /* 念出来。用浏览器自带的合成，语速取她自己存的那个值。 */
   let speechRate = 0.88;
   function speakOut(text) {
@@ -174,8 +201,13 @@
       }
     }
 
+    /* 状态词用**后端给的那个**（`it.status`），不在这里另写一套。
+     *
+     * 第一版写的是 `it.done ? '已完成' : '还没办'`——两个词，而后端有三个状态
+     * （待进行 / 知道了 / 已完成）。实测：按「我知道了」之后气泡上写的是
+     * 「已完成」，也就是屏幕替她宣称药已经吃了。 */
     fillTimeline(page, agenda.today.map((it) => ({
-      t: it.time, n: it.title, s: it.done ? '已完成' : '还没办',
+      t: it.time, n: it.title, s: it.status,
       done: it.done, id: it.id,
     })), '今天没有要办的事');
   }
@@ -194,6 +226,10 @@
       node.classList.toggle('done', !!row.done);
       node.classList.toggle('pending', !row.done);
       if (row.id) node.dataset.reminderId = row.id;
+      // 每一条都要能做点什么。这几个是 `<button>`——按下去什么都不发生的按钮，
+      // 是一句永远为假的承诺（实测：今天那一屏点遍所有控件，只有它是死的）。
+      node.dataset.act = row.act || (row.id ? 'reminder' : 'speak');
+      node.dataset.speak = [row.n, row.s].filter(Boolean).join('，');
     });
     const head = $('.left-story .story-head b', page);
     if (head && !rows.length && emptyWord) head.textContent = emptyWord;
@@ -363,10 +399,86 @@
     return fresh;
   }
 
+  /* 待办气泡：先问，再做。
+   *
+   * 用 `/v2/reminders/{id}/{action}`，和设计一走的是同一条路
+   * （`elder.js::reminderAction`），状态词也用同一批。
+   */
+  async function reminderAction(id, action, word) {
+    try {
+      const data = await api(`/v2/reminders/${encodeURIComponent(id)}/${action}`,
+                             {method: 'POST', body: JSON.stringify({})});
+      offer([]);
+      say(data.message || `好，记下了：${word}。`, YH.toneOf(data));
+      speakOut(data.message || word);
+      await loadToday();
+      loadRecords();
+    } catch (e) {
+      offer([]);
+      trouble(e, '这一条');
+    }
+  }
+
   function wire() {
+    /* 左边那条时间轴上的每一颗气泡。
+     *
+     * 待办：问一句再改。一整块椭圆点一下就把事情标成办好了，手一抖就改了记录，
+     * 而她看不出刚才发生过什么——所以两个动作各是一个写着字的按钮。
+     * 记录：念给她听。这一版最常见的困难是看不清，「再说一遍」也是为此存在的。
+     */
+    document.addEventListener('click', (e) => {
+      const node = e.target.closest('.story-node, .record-event, .family-branch');
+      if (!node) return;
+      const id = node.dataset.reminderId;
+      const spoken = node.dataset.speak
+        || (node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (node.dataset.act === 'reminder' && id) {
+        const title = ($('.n', node) || {}).textContent || '这一条';
+        say(`${title} —— 要记一下吗？`, 'warning');
+        offer([
+          // 动作名是 `complete` 不是 `done`——`/v2/reminders/{id}/done` 是 404。
+          // 第一版写的就是 `done`，而「点气泡」那一层的扫描只点到第一步，
+          // 看不到第二步会 404：一个按钮点下去报错，而巡检说这一屏没有死控件。
+          {label: '我知道了', run: () => reminderAction(id, 'acknowledge', title)},
+          {label: '已经办好了', run: () => reminderAction(id, 'complete', title)},
+          {label: '先不改', run: async () => { offer([]); say('好，先不改。'); }},
+        ]);
+        return;
+      }
+      offer([]);
+      if (spoken) { say(spoken); speakOut(spoken); lastSpoken = spoken; }
+    });
+
     // 常用说法：按钮上写什么就说什么，不另建一张映射表。
     $$('.quick-chip').forEach((chip) => {
       chip.addEventListener('click', () => once(chip, () => send(chip.textContent.trim())));
+    });
+
+    /* 「我的 · 常用服务」那四行。
+     *
+     * 它们写的本来就是**一句可以说出口的话**（「今天吃药了吗」「药还够吃吗」
+     * 「上次的血压」「找无忧伴聊聊」），所以直接当成她说了这句话送进对话——
+     * 不另建一张「这一行对应哪个接口」的映射表。那张表一旦存在，
+     * 屏幕上的字和它真的会做的事就有了两个来源。
+     *
+     * 交付包里它们是 `<div class="service-row">`，不是按钮：看起来能点、
+     * 实际不能，连键盘也够不着。补上 role 与 tabindex。
+     */
+    $$('.service-row').forEach((row) => {
+      const what = ($('b', row) || {}).textContent || '';
+      if (!what) return;
+      row.setAttribute('role', 'button');
+      row.setAttribute('tabindex', '0');
+      const go = () => {
+        // 切回「今天」再说：回答会写在状态行上，而状态行在那一屏。
+        const dock = $('.dock [data-page="today"]');
+        if (dock) dock.dispatchEvent(new PointerEvent('pointerup', {bubbles: true}));
+        setTimeout(() => send(what), 400);
+      };
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+      });
     });
 
     // 麦克风。交付包那个「假装在听」的监听先摘掉。

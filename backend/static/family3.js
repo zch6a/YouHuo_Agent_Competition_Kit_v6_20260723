@@ -599,6 +599,13 @@
     $$('[data-family]').forEach((old) => {
       const btn = strip(old);
       btn.addEventListener('click', () => {
+        /* 照护那一屏的底栏也有这三个键（安装时补的 `data-family`——
+         * 交付包里它们连一个属性都没有，是死键）。从照护点「待办」，
+         * 得先切回家人端，否则改的是一屏看不见的东西。 */
+        if ($('#careView') && !$('#careView').hidden) {
+          const back = $('[data-app="family"]');
+          if (back) back.click();
+        }
         $$('[data-family]').forEach((x) => x.classList.remove('active'));
         btn.classList.add('active');
         const main = $('#familyMain');
@@ -733,7 +740,11 @@
         }
         e.stopPropagation();
         e.preventDefault();
-        api(`/v2/reminders/${encodeURIComponent(id)}/cancel`, {method: 'POST'}, FAMILY)
+        // 取消在 **`/api/v1`** 上，不在 `/v2`——`/v2/reminders/{id}/` 只有
+        // `acknowledge` 和 `complete` 两个动作。第一版写的是 `/v2/.../cancel`，
+        // 点「×」会 404，而气泡照样从屏幕上消失（交付包那个纯前端删除先跑了）。
+        api(`/api/v1/reminders/${encodeURIComponent(id)}/cancel`,
+            {method: 'POST', body: JSON.stringify({})}, FAMILY)
           .then((data) => {
             say(data.message || '这一条取消了。', YH.toneOf(data));
             loadFamilyFlow();
