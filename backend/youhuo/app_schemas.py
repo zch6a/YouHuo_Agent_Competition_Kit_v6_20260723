@@ -584,4 +584,139 @@ class AppEmergencyResult(StrictModel):
     communityPrepared: bool = False
 
 
+# ---- 隐私：导出与删除 -------------------------------------------------------
+#
+# 底层是 `/v5/privacy/export` 与 `/v5/privacy/erase`。这一层要做的两件事：
+# 把七个英文类别名翻成老人认得的说法，以及**把删除拆成两步**。
+
+class AppPrivacyBucket(StrictModel):
+    """一类数据，以及这一类下面有几条。"""
+    #: 中文类别名。界面上不出现 `emotion_events` 这种键。
+    name: str
+    count: int
+
+
+class AppPrivacyExport(StrictModel):
+    """「导出我的数据」。**这是一个纯读端点**，它不写任何东西。
+
+    `records` 里是真实的行——一份不含数据的"导出"不是导出。键是中文类别名，
+    行内容由 `PrivacyRedactor` 脱敏过（手机号、身份证号、密钥字段），
+    那是**存着的数据本身**，不是界面文案。屏幕上要显示的是 `buckets` 和 `message`。
+    """
+    generatedAt: str
+    buckets: list[AppPrivacyBucket]
+    #: 全部类别加起来一共几条。
+    total: int
+    #: 这份导出的回执摘要（截断到能念的长度）。同样的数据导两次，摘要一样。
+    digest: str
+    records: dict[str, list[dict[str, Any]]]
+    #: 底层写的那句"导出已隐藏……"。原样转述，不在这一层改写。
+    note: str
+    message: str
+
+
+class AppPrivacyErasePreview(StrictModel):
+    """删除的第一步：**先看一眼**。这一步不删任何东西。
+
+    `confirmToken` 是把「您看到的那一份」和「您确认的那一次」绑在一起的东西：
+    它由类别和**当时的条数**算出来，中间数据变了就对不上，第二步会请您重看一遍。
+    """
+    willDelete: list[AppPrivacyBucket]
+    total: int
+    #: 删不掉的那些，以及为什么留着。界面必须把这一栏显示出来——
+    #: 只说"已删除"而不说"还剩什么"，是在给一个做不到的承诺。
+    preserved: list[str]
+    confirmToken: str
+    message: str
+
+
+class AppPrivacyErased(StrictModel):
+    """删除的第二步：真的删了。"""
+    ok: bool
+    deleted: list[AppPrivacyBucket]
+    total: int
+    preserved: list[str]
+    message: str
+
+
+# ---- 心情回顾 ---------------------------------------------------------------
+
+class AppMoodCount(StrictModel):
+    name: str
+    count: int
+
+
+class AppEmotionReview(StrictModel):
+    """老人自己看得到的情绪回顾。
+
+    **这里没有聊天原文，也没有它的指纹。** 底层 `/v4/reports/emotion` 给的就是
+    汇总（类别计数 + 趋势 + 几句建议），这一层只翻译，不往里加东西——
+    "他和无忧伴聊过的话不会出现在这里"是写在界面上的承诺。
+
+    `trend` 是**底层算出来的那一个值的中文说法**，不是这一层看着计数编的。
+    这个项目在情绪上栽过一次：上一版把一条编出来的"情绪好转"曲线写进了演示数据，
+    死在它自己的变异测试上。结论归底层，门面只负责说人话。
+    """
+    days: int
+    fromDate: str
+    toDate: str
+    count: int
+    moods: list[AppMoodCount]
+    trend: str
+    #: 底层筛出来的、**真的在建议做点什么**的那几句。可能是空的。
+    suggestions: list[str]
+    privacyNote: str
+    message: str
+
+
+# ---- 生活基线 / 日报 ---------------------------------------------------------
+
+class AppBaselineChannel(StrictModel):
+    """一个通道上的「平常 vs 今天」。
+
+    给的是**字段**而不是句子：底层那几句 `explanation` 是写给子女的
+    （"比**他**平常晚了 1 小时 40 分"），照搬到老人自己这一屏上人称就错了。
+    在这里改写人称同样不行——`其他` 会被改成 `其您`。所以只转述结构化的值。
+    """
+    name: str
+    #: 他平常是几点 / 平常几次。还没攒够历史时是 null。
+    usual: str | None = None
+    #: 今天是几点 / 今天几次。还没有记录时是 null。
+    today: str | None = None
+    #: 中文。界面上不出现 `typical` / `marked`。
+    word: str
+
+
+class AppErrandDigest(StrictModel):
+    dueToday: int
+    done: int
+    waitingFamily: int
+    overdue: int
+    lines: list[str]
+
+
+class AppDailyReport(StrictModel):
+    """老人端的「我这几天怎么样」。
+
+    底层是 `/v7/daily-report` 与 `/v7/baseline`，两个都真的调——不在这一层
+    重算一遍基线。日报本身是子女侧视图，但一份关于自己的报告不让本人看，
+    与这个项目"过程透明"的立场相悖。
+    """
+    day: str
+    #: 今天整体怎么样。中文，来自底层的 overall。
+    todayWord: str
+    #: 攒够历史了没有。false = 下面那些"平常"暂时还说不准。
+    established: bool
+    observedDays: int
+    channels: list[AppBaselineChannel]
+    errands: AppErrandDigest
+    #: **家人会不会因为今天的情况被打扰。** 老人有权知道系统替他说了什么。
+    familyWillSee: str
+    #: 触发推送要同时满足的两个条件里，今天满足了哪些。都不满足时是空列表。
+    familyWillSeeBecause: list[str] = []
+    environmentNote: str | None = None
+    privacyNote: str
+    message: str
+
+
 __all__ = [name for name in dir() if name.startswith("App")]

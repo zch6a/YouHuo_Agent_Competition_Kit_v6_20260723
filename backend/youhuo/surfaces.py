@@ -58,6 +58,11 @@ class RouteSurface(NamedTuple):
 SURFACES: dict[str, RouteSurface] = {
     "/":       RouteSurface("consumer",     "entry",    None,   "index.html"),
     "/elder":  RouteSurface("consumer",     "elder",    None,   "elder.html"),
+    # 老人端**设计二**。和 `/elder` 并行，共用同一份 `elder.js`。
+    # shell 仍是 `elder`：surface 描述的是意图不是 URL，而这两页服务的是同一个人、
+    # 同一套四格（首页 / 记录 / 家人 / 我的）。归进别的 shell 会让老人端那一批
+    # 判据整批绕开它——「掉出所有名单」和「通过」在结果里长得一模一样。
+    "/elder2": RouteSurface("consumer",     "elder",    None,   "elder-v6.html"),
     "/family": RouteSurface("consumer",     "family",   "today", "family.html"),
     # 家人端**设计二**。和 `/family` 并行，供比较；业务逻辑共用 family.js/care.js。
     #
@@ -96,6 +101,7 @@ SURFACES: dict[str, RouteSurface] = {
 DEFAULT_PANEL: dict[str, str | None] = {
     "/":       None,
     "/elder":  "home",
+    "/elder2": "home",
     "/family": "today",
     "/family2": "today",
     "/care":   "today",

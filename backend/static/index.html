@@ -155,6 +155,70 @@
       <p id="landingHint" class="landing-hint yh-hint" hidden></p>
     </section>
 
+    <!-- 设计对照入口。
+         ......................................................................
+         老人端和家人端各有两套界面，这一节让人不必先挑身份就能直接打开其中任意一套
+         对着看。
+
+         **它必须是次要层级。** 这一页的定位是「入口」，主角是上面那两张身份卡——
+         真实用户在这里只需要回答「今天您是谁」。所以这一节排在身份卡**之后**，
+         用小标题、无图标、无投影的一行式链接，视觉重量刻意压在身份卡之下。
+
+         为什么不像 `/stage` `/judge` 那样套 `.landing-wide`（只在 ≥761px 显示）：
+         那两道门通向的页面在窄屏上没有意义，而这四套界面本身就是手机界面——
+         在 320×568 上把它们藏起来，等于在最需要对比的那块屏幕上没有入口。
+
+         顺序：这一节排在 `.yh-choose` **之后**是有意的，而且不只是版面上的选择。
+         控件清单按文档顺序给重复的 `href=` 编号（`build_control_inventory.py:511`），
+         排在前面的拿无后缀的键。身份卡是既有控件，它的键必须保持 `href=/elder`；
+         这一节要是排到它前面，清单里会显示成「身份卡消失了、多出一个 href=/elder#2」。
+
+         四条都带 `id`：其中两条和身份卡指向同一个地址，光靠 `href` 分不开它们，
+         清单会退回按序号编号——而序号正是那份清单点名的「没有稳定身份」，搬走了
+         不会有任何东西发现。`id` 排在 `_KEY_ATTRS` 第一位，给了它们真身份，
+         顺带把身份卡也从那份名单里摘了出来。
+
+         `/elder2` 由另一版老人端（`elder-v6.html`）承载，和 `/family2` 一样登记在
+         `youhuo/surfaces.py` 里。四条已全部实测通到各自的页面。 -->
+    <section class="yh-designs" aria-labelledby="yh-designs-title">
+      <h2 id="yh-designs-title" class="yh-designs-title">也可以直接打开某一套界面</h2>
+      <p class="yh-designs-sub">两套设计的功能完全一样，不同的只是版式和美术。</p>
+
+      <div class="yh-designs-grid">
+        <a class="yh-design-link is-elder" id="designElderOne" href="/elder">
+          <span class="yh-design-head">
+            <span class="yh-design-name">老人端设计一</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">现在这一版，大字、大按钮。</span>
+        </a>
+
+        <a class="yh-design-link is-elder" id="designElderTwo" href="/elder2">
+          <span class="yh-design-head">
+            <span class="yh-design-name">老人端设计二</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">另一套版式与美术。</span>
+        </a>
+
+        <a class="yh-design-link is-family" id="designFamilyOne" href="/family">
+          <span class="yh-design-head">
+            <span class="yh-design-name">家人端设计一</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">今天、待办、我的三屏，照护另开一页。</span>
+        </a>
+
+        <a class="yh-design-link is-family" id="designFamilyTwo" href="/family2">
+          <span class="yh-design-head">
+            <span class="yh-design-name">家人端设计二</span>
+            <span class="yh-design-go" aria-hidden="true">→</span>
+          </span>
+          <span class="yh-design-note">今天、待办、照护、我的，四屏合在一页。</span>
+        </a>
+      </div>
+    </section>
+
     <!-- 通往另外两个表面的门。**只在桌面显示**（≥761px，断点与全站同一档）。
          ......................................................................
          这一版首页把这两个入口整个去掉了，于是从入口页再也到不了 `/stage` 与

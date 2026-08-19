@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -47,8 +47,10 @@ from .app_schemas import (
     AppCertificate,
     AppContact,
     AppContactList,
+    AppDailyReport,
     AppDoseRecorded,
     AppEmergencyResult,
+    AppEmotionReview,
     AppHealthRecorded,
     AppHealthSummary,
     AppMedicationDecided,
@@ -60,6 +62,9 @@ from .app_schemas import (
     AppPaymentMoved,
     AppPaymentPrepared,
     AppPendingMedicationList,
+    AppPrivacyErased,
+    AppPrivacyErasePreview,
+    AppPrivacyExport,
     AppProfile,
     AppRecordList,
     AppReminderChanged,
@@ -74,7 +79,7 @@ from .app_schemas import (
     AppWaterBill,
 )
 from .security import SafetyPolicy
-from .utils import local_now, local_zone, request_fingerprint, semantic_hash
+from .utils import local_now, local_today, local_zone, request_fingerprint, semantic_hash
 from .models import (
     ActorRole,
     AuthContext,
@@ -136,6 +141,9 @@ _EV_MEMORY_FORGOTTEN = "app.memory.forgotten"
 _EV_ROUTINE_CREATED = "app.routine.created"
 _EV_ROUTINE_PAUSED = "app.routine.paused"
 _EV_ROUTINE_RESUMED = "app.routine.resumed"
+#: 删除个人数据。这是这三个新端点里**唯一**的写操作——导出、心情回顾、生活日报
+#: 都是纯读，一条审计都不该写（写了就意味着"看一眼"改动了状态）。
+_EV_PRIVACY_ERASED = "app.privacy.erased"
 
 
 def _yuan(cents: int) -> str:
@@ -1148,6 +1156,9 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         # 例程排期由 `v4_store.materialize_routines` 那一侧写。
         "ROUTINES_MATERIALIZED": ("排好了接下来的固定安排", "健康", "record_confirm"),
         "ROUTINE_OCCURRENCE_COMPLETED": ("完成了一件固定安排", "健康", "record_confirm"),
+        # 删除个人数据。这一条**必须**在记录页上留名：它是不可逆的，而落到兜底的
+        # 「办了一件事」会让整条时间线上最重的一步看起来和别的一样轻。
+        "app.privacy.erased": ("删掉了一批个人数据", "服务", "record_request"),
     }
 
     _OUTCOME_WORDS = {
@@ -2794,5 +2805,457 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
                 "time": created.strftime("%m月%d日 %H:%M") if created else None,
             })
         return {"items": items, "count": len(items)}
+
+    # ==== 下面三组：v4/v5/v7 里有能力，老人端此前没有入口 =======================
+    #
+    #: 惰性构造的下游 store。`api.py` 只把 v4 / v6 传进这一层，v5 与 v7 没有，
+    #: 而 `api.py` 不归这一轮改。两个 store 的 `_init_schema` 都是
+    #: `CREATE TABLE IF NOT EXISTS`，再建一个实例是安全的；它们又都通过
+    #: `self.db._conn` / `self.db._lock` 共用同一条连接，所以读写的和 `/v5`、`/v7`
+    #: 是**同一份数据**，不是第二个副本。
+    _downstream: dict[str, Any] = {}
+
+    def _v5_store(request: Request):
+        """优先用 `api.py` 已经建好的那一个（`app.state.v5_store`）。"""
+        store = getattr(request.app.state, "v5_store", None)
+        if store is not None:
+            return store
+        if "v5" not in _downstream:
+            from .v5_store import V5FeatureStore
+
+            _downstream["v5"] = V5FeatureStore(db)
+        return _downstream["v5"]
+
+    _V7_BASELINE = "/v7/baseline/{elder_id}"
+    _V7_DAILY_REPORT = "/v7/daily-report/{elder_id}"
+
+    def _v7_call(path: str, elder: str, day, ctx: AuthContext):
+        """直接调 `/v7` 那两个端点的**函数本体**。
+
+        为什么调它们，而不是把 `baseline_api._snapshot` 那六行抄过来：那六行里有
+        两处这个项目踩过的坑——「今天」要按老人所在时区切（用 UTC 就等于把一天切在
+        早上八点），以及当天没过完时要压制还没到点的通道（不压制的话上午十点打开
+        会看到「就寝：比平常晚了 8 小时」）。抄一份就是第二个实现，而
+        「同一件事两套实现」在这个项目里已经红过三次（字号语速、SOS、导航命名空间）。
+
+        按**路径**取，不按下标：v7 以后再加端点，下标会静默指向另一个函数，
+        而返回的东西长得很像，屏幕上看不出来。
+        """
+        if "v7" not in _downstream:
+            from .baseline_api import build_baseline_router
+            from .baseline_store import BaselineStore
+
+            store = BaselineStore(db)
+            # `current_actor` 给一个永远不会被调用的占位：下面每次都显式传
+            # `actor=`，依赖注入只在 FastAPI 解析真实请求时才会走到。
+            router7 = build_baseline_router(
+                db, store, lambda: None, store.errand_facts
+            )
+            _downstream["v7"] = {
+                r.path: r.endpoint for r in router7.routes if isinstance(r, APIRoute)
+            }
+        fn = _downstream["v7"].get(path)
+        if fn is None:
+            # v7 改了路径就在这里当场停下，而不是让这一屏悄悄少半边内容。
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="生活日报暂时用不了。",
+            )
+        # `day=` **必须**显式传。这两个函数的默认值是 `Query(default=None)` 那个
+        # 对象本身，不是 `None`——直接调用时 FastAPI 不在链路上，没人替它解析，
+        # 漏传就会拿一个 Query 实例去和 date 比大小，报一个看不懂的 TypeError。
+        return fn(elder, day=day, actor=ctx)
+
+    # ---- 隐私：把我的数据导出来 / 删掉 ----------------------------------------
+    #
+    # 底层两个端点早就在（`POST /v5/privacy/export`、`POST /v5/privacy/erase`），
+    # 老人端**没有入口**：他既拿不到自己的数据，也删不掉自己的数据。
+    #
+    # 这一层不新增任何业务逻辑，只做三件事：
+    #
+    #   ① 七个英文类别名翻成他认得的说法
+    #   ② 把删除拆成「先看一眼」和「确认」两步，中间用一个绑定了条数的令牌
+    #   ③ 回执上写清**删了什么、还剩什么**——只说「已删除」是在给一个做不到的承诺
+    #
+    # **导出是纯读，它一条审计都不写。** 底层 `/v5/privacy/export` 那一侧会写
+    # `PRIVACY_EXPORT_CREATED`，需要留痕的调用方走那条；这一层是老人在自己屏幕上
+    # 看一眼自己的东西，而「看一眼」不许改动任何状态。这个项目为这条性质付过代价：
+    # `trust.js` 的凭证页曾经在渲染时真的发起过一笔缴费。
+
+    #: 七类可以导出 / 删除的数据。键是 `PrivacyCategory` 的取值。
+    #: **加一类就必须同时加一条**——漏掉的那一类在请求里会被判成「不认识」，
+    #: 而它在 `/v5` 那一侧是真能删的。`test_app_privacy.py` 按枚举逐条核对。
+    _PRIVACY_WORDS: dict[str, str] = {
+        "emotion_events": "心情记录",
+        "location_history": "去过哪儿",
+        "item_memories": "东西放在哪儿",
+        "contact_profiles": "亲友档案",
+        "medical_documents": "就医单据",
+        "health_events": "身体数据",
+        "device_history": "用过的设备",
+    }
+    _PRIVACY_KEYS = {word: key for key, word in _PRIVACY_WORDS.items()}
+
+    def _privacy_word(key: str) -> str:
+        """漏翻的那一类**当场停下**，不给兜底。
+
+        别处（记录页那张 `_WORDS`）漏一条会落到「办了一件事」，难看但无害。
+        这里不行：兜底会把 `emotion_events` 这种键印到屏幕上，而两类共用一个
+        兜底名会让它们在导出里挤进同一个格子——那时条数就不再对得上任何东西。
+        """
+        word = _PRIVACY_WORDS.get(key)
+        if word is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="有一类数据还没有中文说法，这次先不导出，免得说不清删了什么。",
+            )
+        return word
+
+    def _privacy_self(ctx: AuthContext) -> str:
+        """导出和删除**只有老人本人**能做。
+
+        这一层别的端点允许家人拿令牌进来看老人的数据（它是老人端的门面）。
+        这两个不行，而且不是这一层自己立的规矩：`v5_store.privacy_erase` 里写着
+        「只有老人本人可以执行个人数据删除」，`/v5/privacy/export` 同样只放行本人。
+        在这里先拦一道，是为了给一句人话，而不是让底层抛一个 PermissionError
+        变成 500。
+        """
+        if ctx.role is not ActorRole.ELDER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="这一项只有老人本人能做。您可以陪着他一起看，但不能替他决定。",
+            )
+        return ctx.actor_id
+
+    def _privacy_categories(names: Any) -> list[Any]:
+        """请求里收**中文**类别名，不收 `emotion_events`。
+
+        前端不该知道表名。这一层里已经有同样的做法（记忆那一屏的 `_SCOPE_WORDS`
+        就是「私密」→`private`）。不认识的名字当场 400 并把可选项列出来——
+        悄悄忽略一个拼错的类别，等于按用户没要求的范围去删。
+        """
+        from .v5_models import PrivacyCategory
+
+        if not names:
+            return list(PrivacyCategory)
+        if not isinstance(names, list):
+            raise HTTPException(status_code=400, detail="要删哪几类，请给一个列表。")
+        picked: list[PrivacyCategory] = []
+        for raw in names:
+            key = _PRIVACY_KEYS.get(str(raw).strip())
+            if key is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"「{raw}」不是一类可以删的数据。可以选："
+                           + "、".join(_PRIVACY_KEYS),
+                )
+            item = PrivacyCategory(key)
+            if item not in picked:
+                picked.append(item)
+        return picked
+
+    def _privacy_buckets(counts: dict[str, int], categories) -> list[dict[str, Any]]:
+        return [
+            {"name": _privacy_word(c.value), "count": int(counts.get(c.value, 0) or 0)}
+            for c in categories
+        ]
+
+    def _spell_out(buckets: list[dict[str, Any]]) -> str:
+        return "、".join(f"{b['name']} {b['count']} 条" for b in buckets if b["count"])
+
+    def _erase_token(ctx: AuthContext, elder: str, counts: dict[str, int]) -> str:
+        """把「您看到的那一份」和「您确认的那一次」绑在一起。
+
+        令牌算的是**类别加当时的条数**。它保证的**不是**防伪造——这两个端点本来
+        就只有老人本人进得来，而且算法就写在这里，谁都算得出。它保证的是
+        **确认的对象和您看到的那一份是同一份**：中间数据变了，条数就变了，
+        令牌对不上，第二步会请您重看一遍。
+
+        要防的是这个：回执上写着「删掉 7 条」，实际删了 9 条，而两边都不报错。
+        顺带也挡住了「一个裸 POST 就把数据抹了」——那一条另有 400 分支明说。
+        """
+        return semantic_hash([
+            "app.privacy.erase", ctx.family_id, elder,
+            *(f"{key}={counts[key]}" for key in sorted(counts)),
+        ])
+
+    @router.get("/privacy/data")
+    def export_my_data(
+        request: Request, ctx: AuthContext = Depends(_actor)
+    ) -> AppPrivacyExport:
+        """「把优活替我存的东西导出来」。
+
+        **这是一个纯读端点。** 它不写审计、不落库、不碰任何一笔事务。
+        """
+        elder = _privacy_self(ctx)
+        from .v5_models import PrivacyCategory
+
+        categories = list(PrivacyCategory)
+        bundle = _v5_store(request).privacy_export(ctx.family_id, elder, categories)
+        counts = {key: len(rows) for key, rows in bundle.records.items()}
+        buckets = _privacy_buckets(counts, categories)
+        total = sum(b["count"] for b in buckets)
+        kinds = [b for b in buckets if b["count"]]
+        generated = bundle.generated_at
+        if generated.tzinfo is None:
+            generated = generated.replace(tzinfo=UTC)
+        return {
+            "generatedAt": local_now(generated).isoformat(),
+            "buckets": buckets,
+            "total": total,
+            #: 截断是为了能念出来。完整摘要在 `/v5/privacy/export` 那一侧。
+            "digest": bundle.manifest_digest[:12] + "…",
+            # 键换成中文，行内容原样给。行里是**存着的数据本身**（已经过
+            # `PrivacyRedactor` 脱敏），不是界面文案——一份不含数据的「导出」
+            # 不是导出。屏幕上要显示的是 `buckets` 和 `message`。
+            "records": {_privacy_word(k): v for k, v in bundle.records.items()},
+            "note": bundle.note,
+            "message": (
+                f"优活替您存着 {total} 条记录，分 {len(kinds)} 类："
+                + _spell_out(kinds)
+                + "。这份是您自己的，可以存下来，也可以给家人看。"
+            ) if total else "这几类里，优活现在没有替您存任何记录。",
+        }
+
+    @router.post("/privacy/erase/preview")
+    def preview_erase(
+        request: Request,
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppPrivacyErasePreview:
+        """删除的**第一步**：先看一眼要删掉什么。这一步什么都不删。
+
+        「重要的事两边都同意才办」是这个产品的核心主张。删除没有第二个人可以
+        点头（按设计只有本人能删），所以两次同意都由本人给：看一眼，再确认。
+        """
+        elder = _privacy_self(ctx)
+        categories = _privacy_categories((body or {}).get("categories"))
+        result = _v5_store(request).privacy_erase(
+            ctx.family_id, ctx, elder, categories, False
+        )
+        buckets = _privacy_buckets(result.affected_rows, categories)
+        total = sum(b["count"] for b in buckets)
+        preserved = list(result.preserved_records)
+        return {
+            "willDelete": buckets,
+            "total": total,
+            "preserved": preserved,
+            "confirmToken": _erase_token(ctx, elder, result.affected_rows),
+            "message": (
+                "还没有删。确认之后会删掉：" + _spell_out(buckets)
+                + f"，一共 {total} 条。这些会留下来："
+                + "、".join(preserved) + "。删掉的找不回来。"
+            ) if total else (
+                "这几类里现在没有可以删的记录。"
+                + "、".join(preserved) + "本来就不在可删的范围里。"
+            ),
+        }
+
+    @router.post("/privacy/erase")
+    def erase_my_data(
+        request: Request,
+        body: dict[str, Any] | None = None,
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppPrivacyErased:
+        """删除的**第二步**：真的删。要带上第一步给的 `confirmToken`。"""
+        elder = _privacy_self(ctx)
+        body = body or {}
+        categories = _privacy_categories(body.get("categories"))
+        token = str(body.get("confirmToken") or "").strip()
+        if not token:
+            raise HTTPException(
+                status_code=400,
+                detail="删除要先看一眼、再确认。请先打开「看看要删掉什么」。",
+            )
+        store = _v5_store(request)
+        # 再数一遍，而且以**这一遍**为准：令牌对得上，说明现在的情况和您刚才
+        # 看到的那一份一模一样。
+        seen = store.privacy_erase(ctx.family_id, ctx, elder, categories, False)
+        if token != _erase_token(ctx, elder, seen.affected_rows):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="刚才看到的情况已经变了。请再看一遍要删掉什么，然后重新确认。",
+            )
+        if sum(int(n or 0) for n in seen.affected_rows.values()) == 0:
+            # 「本来就没有可删的」不是一次成功的删除。回 409，让界面照着说，
+            # 而不是画一个绿勾让老人以为刚刚抹掉了什么。
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="这几类里现在没有可以删的记录，什么都没有改动。",
+            )
+        result = store.privacy_erase(ctx.family_id, ctx, elder, categories, True)
+        db.append_audit(
+            family_id=ctx.family_id,
+            actor_id=ctx.actor_id,
+            event_type=_EV_PRIVACY_ERASED,
+            entity_id=elder,
+            payload={
+                "categories": [c.value for c in categories],
+                "affected": result.affected_rows,
+            },
+        )
+        buckets = _privacy_buckets(result.affected_rows, categories)
+        total = sum(b["count"] for b in buckets)
+        preserved = list(result.preserved_records)
+        return {
+            "ok": True,
+            "deleted": buckets,
+            "total": total,
+            "preserved": preserved,
+            "message": (
+                "已经删掉：" + _spell_out(buckets) + f"，一共 {total} 条。"
+                + "还留着：" + "、".join(preserved)
+                + "。留下的这几样是为了将来能查清楚谁在什么时候办了什么，删不掉。"
+            ),
+        }
+
+    # ---- 心情回顾 -------------------------------------------------------------
+    #
+    # 底层是 `/v4/reports/emotion/{elder}`——一份**汇总**：类别计数、趋势、
+    # 几句建议。聊天原文不在里面，连原文的指纹也不在。
+    # 「他和无忧伴聊过的话不会出现在这里」是写在界面上的承诺，这一层不许把它破掉。
+
+    _MOOD_WORDS = {
+        "positive": "心情不错", "calm": "平静", "lonely": "孤单",
+        "low_mood": "低落", "anxious": "着急", "angry": "烦躁",
+        "urgent": "急着要人帮忙",
+    }
+    #: 底层的趋势一共只有这三个取值（`v4_store.generate_emotion_report`）。
+    #:
+    #: **这一层不做趋势判断。** 它只是把底层算出来的那个值说成人话。
+    #: KNOWN_ISSUES 记着：上一个 agent 做情绪时，它自己写的测试报「情绪趋势是
+    #: 编造出来的上升」，那批改动整段回退。结论归底层，门面只负责翻译。
+    _TREND_WORDS = {
+        "distress_increasing": "比上一段时间紧张一些",
+        "distress_decreasing": "比上一段时间松快一些",
+        "stable_or_insufficient": "和上一段时间差不多，或者记录还不够多",
+    }
+
+    @router.get("/emotions/review")
+    def emotion_review(
+        days: int = Query(default=14, ge=1, le=31),
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppEmotionReview:
+        """「我这段时间心情怎么样」。"""
+        if v4_store is None:
+            raise HTTPException(status_code=404, detail="这台机器上没有开启心情记录。")
+        elder = _elder_of(ctx)
+        # 「今天」按老人所在时区切。用 UTC 的今天，在东八区等于把一天切在早上八点。
+        end = local_today(datetime.now(UTC))
+        start = end - timedelta(days=days - 1)
+        summary = (
+            v4_store.generate_emotion_report(ctx.family_id, elder, start, end).summary
+            or {}
+        )
+        counts = summary.get("label_counts") or {}
+        moods = sorted(
+            (
+                {"name": _MOOD_WORDS.get(str(label), "说不上来"), "count": int(n)}
+                for label, n in counts.items() if int(n) > 0
+            ),
+            key=lambda m: (-m["count"], m["name"]),
+        )
+        count = int(summary.get("event_count") or 0)
+        return {
+            "days": days,
+            "fromDate": start.isoformat(),
+            "toDate": end.isoformat(),
+            "count": count,
+            "moods": moods,
+            # 认不出来的取值给一句**不下结论**的话。说「记录还不够多」是在替
+            # 底层解释原因，而这一层并不知道原因。
+            "trend": _TREND_WORDS.get(
+                str(summary.get("trend")), "这段时间的变化，暂时说不上来。"
+            ),
+            # 底层已经筛过：只有**真的在建议做点什么**的那几句才在这里。
+            "suggestions": [str(s) for s in (summary.get("safe_suggestions") or [])],
+            "privacyNote": "这里只有心情的类别和变化。您和无忧伴聊过的话不会出现在这里。",
+            "message": (
+                f"这 {days} 天里记下 {count} 次心情，最多的是"
+                f"{moods[0]['name'] if moods else '说不上来'}。"
+            ) if count else f"这 {days} 天里还没有记下心情。没有记录不等于不好，只是没有可说的。",
+        }
+
+    # ---- 我这几天怎么样 --------------------------------------------------------
+    #
+    # 底层是 `/v7/daily-report/{elder}` 与 `/v7/baseline/{elder}`。日报按设计是
+    # 子女侧视图，但一份关于自己的报告不让本人看，与这个项目「过程透明」的立场相悖
+    # ——`baseline_api.py` 顶上就是这么写的，它也确实放行了老人本人。缺的只是入口。
+
+    _VERDICT_WORDS = {
+        "typical": "和平常一样",
+        "notice": "和平常有点不一样",
+        "marked": "和平常差得比较多",
+        "unknown": "今天还没有记录",
+        "pending": "现在还说不准",
+    }
+    _ALERT_WORDS = {
+        "push": "已经提醒家人看一眼。",
+        "digest": "不单独打扰家人，会并进给家人的日报里。",
+        "none": "今天不会因为这些打扰家人。",
+    }
+
+    @router.get("/daily-report")
+    def my_daily_report(
+        day: date | None = Query(default=None, description="默认今天（老人所在时区）"),
+        ctx: AuthContext = Depends(_actor),
+    ) -> AppDailyReport:
+        """「我这几天怎么样」——他自己的常态，和今天差在哪儿。
+
+        给的是**结构化的值**（平常几点 / 今天几点 / 一句中文判断），不是底层那几句
+        `explanation`。那几句是写给子女的：「比**他**平常晚了 1 小时 40 分」——
+        照搬到老人自己这一屏上人称就错了，而在这里改写人称同样不行
+        （`其他` 会被改成 `其您`）。
+        """
+        elder = _elder_of(ctx)
+        envelope = _v7_call(_V7_DAILY_REPORT, elder, day, ctx)
+        snapshot = _v7_call(_V7_BASELINE, elder, day, ctx)
+        report, alert = envelope.report, envelope.alert
+
+        usual = {b.channel: b.center_text for b in snapshot.baselines}
+        because = []
+        if alert.baseline_deviated:
+            because.append("今天的作息和您平常不一样")
+        if alert.errand_at_risk:
+            because.append("有该办的事快要误了")
+        errands = report.errands
+        return {
+            "day": report.day.isoformat(),
+            "todayWord": _VERDICT_WORDS.get(report.overall.value, "说不准"),
+            "established": snapshot.established,
+            "observedDays": snapshot.observed_days,
+            "channels": [
+                {
+                    "name": d.label,
+                    "usual": usual.get(d.channel) or d.center_text,
+                    "today": d.observed_text,
+                    "word": _VERDICT_WORDS.get(d.verdict.value, "说不准"),
+                }
+                for d in snapshot.deviations
+            ],
+            "errands": {
+                "dueToday": errands.due_today,
+                "done": errands.completed,
+                "waitingFamily": errands.awaiting_family,
+                "overdue": errands.overdue,
+                "lines": list(errands.lines),
+            },
+            "familyWillSee": _ALERT_WORDS.get(
+                alert.channel, "家人那边这次没有给出处理方式。"
+            ),
+            "familyWillSeeBecause": because,
+            "environmentNote": report.environment_note,
+            "privacyNote": report.privacy_note,
+            "message": (
+                f"优活已经记了您 {snapshot.observed_days} 天的作息，"
+                "还在熟悉您的规律，暂时不下结论。"
+            ) if not snapshot.established else (
+                # 判断词自带主语（「今天还没有记录」），前面**不能**再加一个「今天」
+                # ——拼出来是「今天今天还没有记录」。五个取值里有两个是这样，
+                # 而另外三个拼起来完全通顺，所以只看一眼演示数据是发现不了的。
+                f"{_VERDICT_WORDS.get(report.overall.value, '说不准')}。"
+                f"该办的 {errands.due_today} 件里办好了 {errands.completed} 件。"
+            ),
+        }
 
     return router

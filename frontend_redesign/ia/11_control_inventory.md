@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 339 |
+| 总数 | 376 |
 |---|---|
-| 有 id | 339 |
+| 有 id | 376 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 16 |
@@ -16,6 +16,10 @@
 |---|---|---|---|---|---|---|---|---|---|---|
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designElderOne` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designElderTwo` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designFamilyOne` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
+| `#designFamilyTwo` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#` | index | — | a | navigate | —:— | — | consumer | entry | shell | primary |
 | `#nextOpen` | elder | home | button | click | elder.js:open | — | consumer | elder | home | hidden-until-state |
@@ -48,6 +52,39 @@
 | `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
 | `#` | elder | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#nextOpen` | elder-v6 | home | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | home | hidden-until-state |
+| `#mic` | elder-v6 | home | button | click | elder-v6-a.js:paintClock | — | consumer | elder | home | primary |
+| `#typeInstead` | elder-v6 | home | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | home | primary |
+| `#toggleReminders` | elder-v6 | home | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | home | hidden-until-state |
+| `#logEntry` | elder-v6 | log | button | click | elder.js:task | — | consumer | elder | log | hidden-until-state |
+| `#kinContact` | elder-v6 | kin | button | click | elder.js:open | — | consumer | elder | kin | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#speechRate` | elder-v6 | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#` | elder-v6 | me | button | — | common.js:tryScroll | — | consumer | elder | me | hidden-until-state |
+| `#fontScale` | elder-v6 | me | select | change | elder.js:writeStore | — | consumer | elder | me | hidden-until-state |
+| `#saveProfile` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#companionEntry` | elder-v6 | me | button | click | elder.js:task | — | consumer | elder | me | hidden-until-state |
+| `#leaveApp` | elder-v6 | me | a | navigate | —:— | — | consumer | elder | me | hidden-until-state |
+| `#focusBack` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#focusMic` | elder-v6 | — | button | click | elder-v6-a.js:paintClock | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#text` | elder-v6 | — | input | — | elder.js:writeStore | — | consumer | elder | shell | primary |
+| `#send` | elder-v6 | — | button | — | elder-v6-b.js:waitForWorkspace | — | consumer | elder | shell | primary |
+| `#repeatLast` | elder-v6 | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
+| `#stepBack` | elder-v6 | — | button | click | elder.js:task | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#` | elder-v6 | — | button | click | common.js:tryScroll | — | consumer | elder | shell | primary |
+| `#taskDetailClose` | elder-v6 | — | button | — | elder.js:setDetailOpen | — | consumer | elder | shell | primary |
 | `#refresh` | family | — | button | click | family.js:load | — | consumer | family | shell | secondary |
 | `#` | family | today | summary | details-toggle | common.js:tryScroll | — | consumer | family | today | primary |
 | `#reminderForm` | family | todo | form | submit | family.js:load | — | consumer | family | todo | hidden-until-state |
@@ -65,12 +102,12 @@
 | `#` | family | — | a | navigate | common.js:tryScroll | — | consumer | family | shell | primary |
 | `#` | family-v6 | — | a | navigate | —:— | — | consumer | family | shell | primary |
 | `#` | family-v6 | today | button | — | family-v6-b.js:waitForWorkspace | — | consumer | family | today | primary |
-| `#refresh` | family-v6 | today | button | click | family-v6-a.js:showCare | — | consumer | family | today | primary |
-| `#reminderForm` | family-v6 | todo | form | submit | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
-| `#reminderTitle` | family-v6 | todo | input | — | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
+| `#refresh` | family-v6 | today | button | — | family-v6-b.js:waitForWorkspace | — | consumer | family | today | primary |
+| `#reminderForm` | family-v6 | todo | form | submit | family-v6-b.js:waitForWorkspace | — | consumer | family | todo | hidden-until-state |
+| `#reminderTitle` | family-v6 | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
 | `#reminderDue` | family-v6 | todo | input | — | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
 | `#escalation` | family-v6 | todo | input | change | family.js:createReminder | /v2/family/reminders | consumer | family | todo | hidden-until-state |
-| `#` | family-v6 | todo | button | submit | family-v6-a.js:showCare | — | consumer | family | todo | hidden-until-state |
+| `#` | family-v6 | todo | button | — | family-v6-a.js:(顶层) | — | consumer | family | todo | hidden-until-state |
 | `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
 | `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |
 | `#` | family-v6 | care | button | click | family-v6-a.js:(顶层) | — | consumer | family | care | hidden-until-state |

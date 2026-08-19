@@ -404,6 +404,16 @@ body{
   border:0;background:none;padding:3px 0;border-bottom:1px solid rgba(73,111,98,.25);color:#426d60;font-weight:800;font-size:10px
 }
 .metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0 16px}
+/* 「我的」那一行只剩一格活的（#mChain），铺满整行。
+   这个类名此前就写在标记上，但没有任何规则配它——一个看起来在起作用、
+   实际什么都不做的类名。 */
+.metric-row-one{grid-template-columns:1fr}
+.metric-row-one .metric{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  min-height:0;padding:15px 17px;
+}
+.metric-row-one .metric span{font-size:11px}
+.metric-row-one .metric strong{margin-top:0}
 .metric{
   position:relative;min-height:73px;padding:11px 9px;border:1px solid rgba(79,65,50,.08);
   border-radius:18px 14px 22px 15px;background:rgba(255,253,248,.48)
@@ -432,15 +442,10 @@ body{
 .day-pill span{font-size:9px}
 .day-pill.active{background:linear-gradient(145deg,#547b6e,#345d52);color:#fff;border-color:transparent}
 .day-pill.active b{color:#fff}
-.todo-list{position:relative;margin:1px 0 16px;padding-left:9px}
-.todo-item{
-  display:grid;grid-template-columns:47px 1fr auto;gap:9px;align-items:center;
-  padding:12px 3px 12px 13px;border-bottom:1px solid rgba(74,57,43,.08);position:relative
-}
-.todo-item::before{content:"";position:absolute;left:0;width:6px;height:6px;border-radius:50%;background:#b58a48}
-.todo-item time{font:700 13px var(--kai);color:#765c48}
-.todo-item strong{display:block;font-size:12px}.todo-item small{display:block;color:#918274;font-size:9px;margin-top:2px}
-.todo-item em{font-style:normal;color:#52786c;font-size:9px}
+/* `.todo-list` / `.todo-item` 的规则跟着标记一起删了：待办面板里那一节
+   写死的「今天」已经去掉（真日历在它上面，两份「今天」只能留一份），
+   现在全站没有任何东西再产出这两个类名。留着一份没有标记配的样式，
+   下一个人会以为这一页还有那个列表。 */
 .family-form{
   margin:5px 0 18px;padding:14px 15px;border:1px solid rgba(84,65,48,.08);
   border-radius:21px 16px 25px 17px;background:rgba(255,253,247,.50)
@@ -486,7 +491,12 @@ body{
   height:112px;margin:11px 0 17px;padding:14px;border-top:1px solid rgba(75,58,44,.08);
   border-bottom:1px solid rgba(75,58,44,.08);display:flex;align-items:flex-end;gap:10px
 }
-.care-chart i{flex:1;border-radius:10px 10px 3px 3px;background:linear-gradient(180deg,rgba(76,117,103,.52),rgba(76,117,103,.10));height:var(--h)}
+/* 高度由下面那组 `.h48`…`.h72` 给。
+   这里原先还写着 `height:var(--h)`，而 `--h` 全站没有任何地方声明过——
+   CSS 对未声明的自定义属性的处理是把**整条声明**丢掉（invalid at computed-value
+   time），所以它从来没起过作用，也从来不会报错。留着它会让下一个人以为
+   柱高是通过内联 `--h` 传进来的，而这一页禁止内联 style。 */
+.care-chart i{flex:1;border-radius:10px 10px 3px 3px;background:linear-gradient(180deg,rgba(76,117,103,.52),rgba(76,117,103,.10))}
 .record-flow{position:relative;margin:7px 0 16px;padding-left:22px}
 .record-flow::before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:1px;background:linear-gradient(#b98a3b,rgba(185,138,59,.08))}
 .record-row{position:relative;padding:0 0 15px 8px}
@@ -521,3 +531,307 @@ body{
 .care-chart i.h66{height:66%}
 .care-chart i.h68{height:68%}
 .care-chart i.h72{height:72%}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   注水之后的样子
+   ──────────────────────────────────────────────────────────────────────
+   这一页的业务逻辑用的是**设计一那一份**（family.js / care.js），而设计一的
+   样式住在四层全局表里（tokens/base/components/pages.css）——这一页一层都没引，
+   只有 family-v6.css 一张。
+
+   后果不是「有点不一样」，是断成两截：静态标记好看，数据一到、`replaceChildren`
+   一跑，那一块就变成浏览器默认样式的 16px 段落。实测活 DOM 里有 38 个类名在
+   这张表里一条规则都没有——「需要您确认」那张带朱印的卡变成两个灰色系统按钮，
+   「做过的事」变成「优活登录了2026/8/19 01:23:16」这样标题和时间挤成一行的长条，
+   「照护」那句结论变成一行 16px 粗体顶格压在分区按钮下面。
+
+   为什么闸门没抓到：闸门读的是**静态 HTML**，而这些标记只在浏览器里存在。
+   风格指纹、对比度、溢出探针量的也都是注水前那一屏。
+
+   下面按 JS 真正写出来的结构补齐，用的是这一页自己的纸面语言（楷体标题、
+   9–11px 正文、有机圆角、竹青与藤黄），不是把那四层抄过来。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 退出口 ────────────────────────────────────────────────────────────
+   「返回首页」原先是一个**没有任何规则**的 <a>：浏览器默认的蓝色下划线，
+   21px 高，压在圆角机身的最上沿——它是这一页唯一的退出口，却是屏幕上唯一
+   一个不属于这套设计的元素，而且触控高度只有 21px。
+   现在它是机身顶上一条独立的窄栏，48px 触控高度；`.app-viewport` 的高度里
+   把这 48px 减掉，否则整机内容会顶出 `.phone` 的 overflow:hidden。 */
+.back-link{
+  position:relative;z-index:5;
+  display:inline-flex;align-items:center;gap:6px;
+  height:48px;padding:0 22px;
+  color:#5c7a6e;font-size:12px;font-weight:700;letter-spacing:.04em;
+  text-decoration:none;-webkit-tap-highlight-color:transparent;
+}
+.back-link:hover,.back-link:focus-visible{color:#33564a}
+.app-viewport{height:calc(100% - 112px)}
+
+/* 操作回执做成浮层，不占布局高度。
+   它 `hidden` 时不画，一旦 care.js 把它打开，如果它是普通流内元素，
+   下面 64px 的顶栏和整个视口会被往下推——而 `.phone` 是 overflow:hidden，
+   被推出去的那一截（底栏上方的内容）直接被裁掉。 */
+#careNotice{
+  position:absolute;z-index:32;left:14px;right:14px;top:54px;margin:0;
+  padding:11px 14px;border:1px solid rgba(150,110,60,.22);
+  border-radius:16px 12px 18px 13px;
+  background:rgba(255,252,245,.96);backdrop-filter:blur(10px);
+  box-shadow:0 12px 30px rgba(70,52,35,.14);
+  color:#5d4f42;font-size:11px;line-height:1.6;
+}
+
+/* ── 语气 ──────────────────────────────────────────────────────────────
+   四套词汇共用一组颜色：判定词（good/warn/bad/unknown/pending）、
+   任务步骤（todo/confirm/relay/done/cancelled）、回执语气（good/warning/bad）、
+   以及计数格的 alert。`unknown` 有意和 `warn` 分开——common.js 里写明了
+   「本该有记录却一条都没有」必须被看见，而 `pending`（今天还没过完）是中性的。 */
+.pill,.status-chip{
+  display:inline-block;margin-left:7px;padding:3px 9px;
+  border:1px solid rgba(74,111,98,.16);border-radius:999px;
+  background:rgba(255,255,255,.5);
+  color:#6b5d51;font-size:9px;font-weight:700;line-height:1.5;
+  white-space:nowrap;vertical-align:middle;
+}
+.pill.good,.status-chip.good,.status-chip.done{
+  color:#3f6d5c;border-color:rgba(73,111,98,.26);background:rgba(105,149,131,.12)}
+.pill.warn,.pill.pending,.status-chip.confirm,.status-chip.relay{
+  color:#8a6222;border-color:rgba(185,138,59,.30);background:rgba(185,138,59,.13)}
+.pill.unknown{
+  color:#8a6a3e;border-color:rgba(150,110,60,.30);background:rgba(150,110,60,.10);
+  border-style:dashed}
+.pill.bad,.status-chip.escalated{
+  color:#9d4c37;border-color:rgba(178,90,68,.30);background:rgba(184,93,72,.12)}
+.status-chip.cancelled{color:#8b7c6e;opacity:.8}
+
+/* 文字语气。只在这几个宿主上生效，不做成裸的 `.good{color:…}`——
+   `.good` 同时会被挂到 `.metric` 这种整块容器上，裸规则会把整格染色。 */
+.meta{color:#8b7c6e;font-size:10px;line-height:1.62}
+.meta.bad{color:#9d4c37}
+.metric.alert strong,.metric.bad strong{color:#9d4c37}
+.metric.good strong{color:#41695a}
+.identity-island h1.fam-verdict.warn{color:#8a6222}
+.identity-island h1.fam-verdict.bad{color:#9d4c37}
+
+/* 提示条。`#familyNotice` 的静态类是 `notice-line`，但 family.js 的 notify()
+   直接 `host.className = 'notice ' + tone`——静态那条被整个换掉，所以
+   `.notice` 必须自己成立，不能靠 `.notice-line` 兜着。 */
+.notice{
+  margin:6px 0 12px;padding:10px 13px;
+  border-left:2px solid rgba(73,111,98,.38);
+  background:rgba(255,255,255,.34);
+  color:#5f7168;font-size:11px;line-height:1.62;
+}
+.notice.good{border-left-color:rgba(73,111,98,.5)}
+.notice.warning,.notice.warn{border-left-color:rgba(185,138,59,.55);color:#7a6338;
+  background:rgba(185,138,59,.07)}
+.notice.bad{border-left-color:rgba(178,90,68,.55);color:#8e4c39;
+  background:rgba(184,93,72,.07)}
+.notice strong{display:block;margin-bottom:4px;font:700 13px/1.4 var(--kai)}
+.notice .care-lines{margin:0}
+
+/* ── 「需要您确认」与「其他正在办的事」 ────────────────────────────────
+   family.js 的 fmtTask() 写出来的是 `.task`：一个 <strong> 标题、两行说明、
+   （只有等家属点头时）两个按钮。给它静态 `.confirm-card` 同一张纸和那枚朱印。 */
+.task{
+  position:relative;margin:0 0 10px;padding:15px 16px 14px 49px;
+  border-top:1px solid rgba(176,133,62,.14);border-bottom:1px solid rgba(176,133,62,.12);
+  background:rgba(255,253,248,.45);
+}
+.task:last-child{margin-bottom:0}
+.task::before{
+  content:"签";position:absolute;left:9px;top:14px;width:27px;height:27px;
+  display:grid;place-items:center;border:1px solid rgba(150,84,58,.42);
+  color:#9e614b;font:700 14px var(--kai);transform:rotate(-4deg);
+}
+.task>strong{display:block;margin-bottom:6px;font:700 16px/1.35 var(--kai);color:#4b3b2f}
+.task>div{margin-top:3px;color:#827466;font-size:10px;line-height:1.6}
+.task button{
+  min-height:56px;margin:11px 8px 0 0;padding:0 18px;
+  border:1px solid rgba(73,111,98,.26);border-radius:16px 13px 18px 14px;
+  background:linear-gradient(135deg,rgba(53,95,84,.96),rgba(83,124,110,.96));
+  color:#fffdf8;font:700 12px var(--kai);letter-spacing:.04em;cursor:pointer;
+}
+.task button.danger{
+  background:rgba(255,255,255,.5);border-color:rgba(178,90,68,.34);color:#9d4c37;
+}
+.task button[disabled]{opacity:.55;cursor:default}
+/* 「其他正在办的事」里的没有按钮，也不该带朱印——那枚印章的意思是
+   「这一件在等您签」。 */
+#otherTasks .task{padding-left:16px;background:none}
+#otherTasks .task::before{content:none}
+
+/* ── 待办日历 ──────────────────────────────────────────────────────────
+   `.todo-calendar` 原本是一条横向滚动的日期胶囊带（静态 `.day-pill`，
+   `flex:0 0 61px`，五个正好排满一行）。renderCalendar() 写进来的却是
+   `.calendar-day`——每一天一个分组，里面有标题和若干条目。塞进同一条横向
+   flex 里，两天并排、条目竖着挤成两栏，就是截图上那一坨。
+   加 `flex-wrap:wrap` 并让 `.calendar-day` 占满一行：静态胶囊不受影响
+   （它们加起来不到一行宽），真数据则竖着排。这一屏的说明写的就是「先按日期看」。 */
+.todo-calendar{flex-wrap:wrap}
+.calendar-day{
+  flex:1 1 100%;margin:0 0 10px;padding:12px 14px 6px;
+  border:1px solid rgba(79,63,47,.09);border-radius:20px 15px 23px 16px;
+  background:rgba(255,253,248,.48);
+}
+.calendar-day.today{
+  border-color:rgba(73,111,98,.26);
+  background:linear-gradient(135deg,rgba(255,254,250,.86),rgba(238,244,238,.62));
+}
+.calendar-day h3{
+  margin:0 0 6px;font:700 15px/1.3 var(--kai);color:#57452f;
+}
+.calendar-day.today h3{color:#33574b}
+.calendar-entry{
+  display:grid;grid-template-columns:48px 1fr auto;gap:9px;align-items:center;
+  padding:9px 0;border-top:1px solid rgba(74,57,43,.08);
+}
+.calendar-entry time{font:700 13px var(--kai);color:#765c48}
+.calendar-entry>div{color:#4a3b30;font-size:12px;line-height:1.45}
+.calendar-entry .status-chip{margin-left:0}
+
+/* ── 可信记录 ──────────────────────────────────────────────────────────
+   `.audit-row` 是 `<span class="audit-what">做了什么</span><time>什么时候</time>`。
+   两个都是行内元素，没有样式时它们挤成一行、16px、没有分隔——屏幕上读到的是
+   「优活登录了2026/8/19 01:23:16」。静态 `.record-row` 早就有正确的形状
+   （粗体一行 + 灰色小字一行 + 时间轴上的一个点），这里让它们长得一样。 */
+.record-flow .audit-row{position:relative;padding:0 0 14px 8px}
+.record-flow .audit-row::before{
+  content:"";position:absolute;left:-18px;top:4px;width:7px;height:7px;border-radius:50%;
+  background:#668a7d;box-shadow:0 0 0 4px rgba(102,138,125,.08);
+}
+.audit-what{display:block;font:700 14px/1.35 var(--kai);color:#4b3b2f}
+.audit-row time{display:block;margin-top:3px;color:#8b7c6e;font-size:9px}
+.record-flow>.meta{padding-left:8px}
+
+/* ── 生活日报 ──────────────────────────────────────────────────────────
+   `#dailyReport` 是静态 `.report-strip`（右上角有一枚装饰圆环），
+   注水后里面是 `p.meta` + 若干 `.report-section` + 一个 `<details class="report-more">`。
+   前两块要给圆环让出位置，否则标题会压在环上。 */
+.report-strip>.meta:first-child{padding-right:56px}
+.report-section{margin:12px 0 0}
+.report-section:first-of-type{padding-right:52px}
+.report-section h3{
+  display:flex;align-items:center;flex-wrap:wrap;gap:0;
+  margin:0 0 5px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.report-section>div{color:#7f7164;font-size:10px;line-height:1.72}
+.report-section>div.meta{color:#8b7c6e}
+.report-more{margin:12px 0 0;border-top:1px solid rgba(75,58,44,.08)}
+.report-more>summary{
+  display:flex;align-items:center;min-height:48px;
+  color:#7b6a5c;font-size:11px;font-weight:700;cursor:pointer;
+  list-style:none;-webkit-tap-highlight-color:transparent;
+}
+.report-more>summary::-webkit-details-marker{display:none}
+.report-more>summary::before{
+  content:"＋";margin-right:7px;color:#a07b4f;font-size:12px;
+}
+.report-more[open]>summary::before{content:"－"}
+.report-more[open]{padding-bottom:6px}
+
+/* ── 照护结论 ──────────────────────────────────────────────────────────
+   `.report-verdict` 是 `#ovVerdict` 和 `#todayBody` 顶上那一条，
+   结构是 `<span class="report-badge">判定词</span><strong>整句</strong>`。
+   没有样式时两个都是行内，于是屏幕上是「还没有记录今天该有的记录还没出现（…」
+   ——判定词和句子黏成一句读不通的话。给它静态 `.care-verdict` 那张纸。 */
+.report-verdict{
+  position:relative;display:block;margin:2px 0 13px;padding:15px 17px;
+  border:1px solid rgba(178,135,63,.22);border-radius:25px 19px 29px 17px;
+  background:linear-gradient(135deg,rgba(255,254,250,.83),rgba(241,236,220,.75));
+}
+.report-verdict.good{border-color:rgba(73,111,98,.26)}
+.report-verdict.bad{border-color:rgba(178,90,68,.30)}
+.report-badge{
+  display:block;margin-bottom:6px;color:#987647;
+  font-size:9px;font-weight:800;letter-spacing:.13em;
+}
+.report-verdict.good .report-badge{color:#41695a}
+.report-verdict.bad .report-badge{color:#9d4c37}
+.report-verdict>strong{display:block;font:700 17px/1.42 var(--kai);color:#493a2d}
+
+/* ── 照护档案的各分区 ──────────────────────────────────────────────────
+   care.js 用同一组积木画六个分区：`.care-block`（一小节）、`.care-item`（一张卡）、
+   `.digest`（键值摘要）、`.care-form`（表单）。 */
+.care-block{margin:0 0 14px}
+.care-block-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin:0 0 6px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.care-lines{margin:0;padding-left:17px;color:#7f7164;font-size:10px;line-height:1.78}
+.care-lines li{margin:2px 0}
+.care-lines li::marker{color:#a5b3a6}
+.care-period{margin:0 0 10px;color:#8b7c6e;font-size:10px}
+
+.care-item{
+  margin:0 0 11px;padding:14px 15px;
+  border:1px solid rgba(84,65,48,.09);border-radius:21px 16px 24px 17px;
+  background:rgba(255,253,247,.52);
+}
+.care-item-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:9px;
+  margin:0 0 6px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.care-item-head .meta{font:400 9px/1.5 var(--sans)}
+.care-item p{margin:3px 0 0;color:#7f7164;font-size:10px;line-height:1.66}
+
+.digest{margin:0 0 12px;border-top:1px solid rgba(75,58,44,.08)}
+.digest-row{
+  display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;
+  padding:9px 2px;border-bottom:1px solid rgba(74,57,43,.08);
+}
+.digest-row strong{font:700 12px/1.4 var(--kai);color:#5b4a3c}
+.digest-row>div{color:#7f7164;font-size:11px;line-height:1.5;text-align:right}
+
+/* 表单：标签在上、输入在下，触控高度 48px，提交 56px。 */
+.care-form{
+  margin:14px 0 12px;padding:14px 15px;
+  border:1px solid rgba(84,65,48,.08);border-radius:21px 16px 25px 17px;
+  background:rgba(255,253,247,.50);
+}
+.care-form>.care-block-head{margin-bottom:10px}
+.care-field{margin:0 0 10px}
+.care-field label{display:block;margin-bottom:4px;color:#746558;font-size:10px}
+.care-field input{
+  display:block;width:100%;min-height:48px;
+  border:0;border-bottom:1px solid rgba(73,111,98,.20);
+  background:transparent;padding:6px 2px;color:#493d33;outline:none;font-size:14px;
+}
+.care-field input:focus{border-bottom-color:rgba(73,111,98,.55)}
+.care-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.care-actions button{
+  flex:1 1 auto;min-height:48px;padding:0 16px;
+  border:1px solid rgba(73,111,98,.24);border-radius:16px 13px 18px 14px;
+  background:linear-gradient(135deg,rgba(53,95,84,.96),rgba(83,124,110,.96));
+  color:#fffdf8;font:700 12px var(--kai);letter-spacing:.04em;cursor:pointer;
+}
+.care-actions button[type="submit"]{min-height:56px}
+.care-actions button.secondary{
+  background:rgba(255,255,255,.5);color:#5c6b62;border-color:rgba(73,111,98,.20);
+}
+.care-actions button[disabled]{opacity:.55;cursor:default}
+.care-form>.meta{margin:10px 0 0}
+
+/* `#notices` 在「没有通知」时是一段裸文本，在有通知时是若干 `.task`。 */
+#notices{color:#7f7164;font-size:11px;line-height:1.7}
+
+/* ── 触控目标 ──────────────────────────────────────────────────────────
+   硬约束：可点的东西不小于 48px，主要操作不小于 56px。
+   实测这一页原先有五个不合格：返回链接 21px、三个输入框 31–33px、
+   「同步到他的手机」37px。照护分区那排胶囊只有 26px。 */
+/* 这排胶囊原先是 26px 高、10px 字。撑到 48px 之后横向也要跟着放，
+   否则「概览」两个字挤在一个近乎正圆的球里。
+   放大之后七个装不下一行了，横向滚动是它本来就有的行为（overflow-x:auto）；
+   但那样一来最右边那个会贴着屏幕边、被切掉半个字——所以左右各留一段
+   scroll-padding，配合 a.js 里点击后把当前那个滚进视野。 */
+.care-seg{scroll-behavior:smooth;scroll-padding-inline:14px}
+.care-seg::after{content:"";flex:0 0 6px}
+.care-seg button{min-height:48px;padding:0 19px;font-size:12px}
+.family-form label{margin-bottom:12px}
+.family-form input{min-height:48px;padding:6px 2px;font-size:14px}
+.family-form button{min-height:56px;padding:0 12px;font-size:12px}
+.more-btn{min-height:48px}
+.confirm-card button{min-height:48px;padding:0}
+.fam-link{display:flex;align-items:center;min-height:56px}
+.care-row{min-height:56px}

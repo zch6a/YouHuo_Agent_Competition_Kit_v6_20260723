@@ -1,0 +1,776 @@
+/* 老人端设计二（v6.0）的版式。
+ *
+ * 来源是 v6.0 包里的 `css/style-01.css`，这一份在它之上做了三件事：
+ *
+ *   ① Focus Mode 的开关从 `.phone.focus-on` 改成 `body[data-focus="on"]`。
+ *      后者是 `elder.js` 的 `setFocus()` 实际写的东西——两套皮共用同一份逻辑，
+ *      开关就必须是逻辑那一侧认得的那个。
+ *   ② 字号跟着 `--elder-font-scale` 走。原包的字号全是死 px，而「文字大小」
+ *      那个控件写着「屏幕上的字会变大」——不接上去，那句话就是屏幕上的一句假话。
+ *   ③ 补上 `elder.js` 与它三个模块**在运行时建出来的**那些类：
+ *      `.task` / `.log-item` / `.kin-person` / `.bubble` / `.empty-state` /
+ *      `.task-space*` / `.reliance-*` / `.detail-*` / `.notice`。
+ *      原包只有它自己那份静态样例的类名（`.reminder-item` / `.record-bubble`
+ *      / `.family-person` / `.msg`），那些节点在这一页**一个都不会出现**。
+ *      少了这一段的后果不是"少一点样式"——是内容写进去了、渲染高度是 0，
+ *      屏幕上什么也没有。这个项目最典型的失败形态就是这个。
+ *
+ * 这一份**不引** tokens/base/components/pages 四层：它是一整套自带的视觉语言，
+ * 混进去会两边互相覆写。代价是下面这些通用件要在这里再定义一次。
+ */
+
+:root{
+  --paper:#f9f5eb;
+  --paper-2:#fffdf8;
+  --ink:#3f352d;
+  --muted:#77695d;
+  --jade:#496f62;
+  --jade-dark:#244b43;
+  --jade-soft:#a8bcae;
+  --gold:#b98a3b;
+  --gold-soft:#e8d6ad;
+  --red:#b85d48;
+  --line:rgba(72,58,43,.12);
+  --shadow:0 18px 50px rgba(66,48,33,.10);
+  --kai:"KaiTi","STKaiti","Kaiti SC",serif;
+  --sans:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+
+  /* 「文字大小」那个控件的落点。
+     `elder.js` 的 `applyProfile()` 只做一件事：把 `--elder-font-scale` 写到
+     `documentElement` 的行内样式上。1.25 是后端 profile 的默认值，也是这里
+     的基准——所以 `--fs` 在默认档位下正好是 1。 */
+  --elder-font-scale:1.25;
+  --fs:calc(var(--elder-font-scale) / 1.25);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#eee8dd;color:var(--ink);font-family:var(--sans)}
+button,input,select{font:inherit}
+button{-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+body{
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 50% -20%,rgba(255,255,255,.92),transparent 46%),
+    linear-gradient(180deg,#efe9df,#e7e0d4);
+}
+
+/* 双击 HTML 打开时唯一会说话的东西。藏它的必须是 CSS——用 `hidden` 属性藏，
+   样式表 404 的那一刻它照样是隐藏的，而那正是它唯一该出现的时刻。 */
+.needs-server{display:none}
+
+.preview-stage{
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:20px;
+}
+.phone{
+  position:relative;
+  width:min(430px,100vw);
+  /* 高度要**减掉舞台自己的内边距**。原包写的是 `min(920px,100dvh)` 外加
+     `min-height:720px`，于是在 1024×768 上手机高 768、加 20px×2 的舞台内边距
+     一共 808，比视口高 40px——底栏被切掉一截，而页面看起来只是"能滚"。
+     `min-height` 一并撤掉：它在横屏（视口高 390）上把手机撑成 720px，
+     整个应用被顶出屏幕。短视口由下面那条 `max-height` 规则接管。 */
+  height:min(920px,calc(100dvh - 40px));
+  overflow:hidden;
+  border-radius:38px;
+  background:
+    radial-gradient(circle at 78% 11%,rgba(255,255,255,.8),transparent 25%),
+    linear-gradient(180deg,#fbf8f0 0%,#f6f1e6 46%,#f9f5eb 100%);
+  box-shadow:0 30px 80px rgba(58,43,30,.20),0 0 0 1px rgba(62,48,36,.08);
+  isolation:isolate;
+}
+.phone::before{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.23;
+  background-image:
+    radial-gradient(rgba(70,55,42,.2) .45px,transparent .45px);
+  background-size:4px 4px;
+  mix-blend-mode:multiply;
+}
+.ink-mountains{
+  position:absolute;inset:0 0 auto;height:265px;z-index:0;pointer-events:none;opacity:.64;
+}
+.ink-mountains svg{width:100%;height:100%;display:block}
+.bottom-grass{
+  position:absolute;left:0;right:0;bottom:70px;height:150px;z-index:0;pointer-events:none;opacity:.52;
+}
+.bottom-grass svg{width:100%;height:100%;display:block}
+.topbar{
+  position:relative;z-index:4;height:64px;padding:17px 22px 0;
+  display:flex;align-items:flex-start;justify-content:space-between;
+}
+.brand-mark{display:flex;align-items:center;gap:10px}
+.brand-seal{
+  width:34px;height:34px;border:1px solid rgba(145,81,54,.5);
+  display:grid;place-items:center;color:#96573f;
+  font:700 18px/1 var(--kai);transform:rotate(-2deg);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.45);
+}
+.brand-copy strong{display:block;font:700 17px/1.15 var(--kai);letter-spacing:.08em}
+.brand-copy small{display:block;margin-top:3px;color:#8c7e70;font-size:calc(10px * var(--fs));letter-spacing:.1em}
+.top-weather{padding-top:4px;text-align:right;color:#72665a}
+.top-weather strong{display:block;font:700 calc(13px * var(--fs))/1.15 var(--kai)}
+.top-weather span{font-size:calc(10px * var(--fs))}
+.app-viewport{
+  position:relative;z-index:3;height:calc(100% - 64px);
+  overflow:hidden;padding-bottom:86px;
+}
+.panel{
+  height:100%;overflow-y:auto;overflow-x:hidden;
+  padding:5px 18px 132px;
+  scrollbar-width:none;
+  animation:panelIn .44s cubic-bezier(.16,.82,.18,1);
+}
+.panel::-webkit-scrollbar{display:none}
+.panel[hidden]{display:none!important}
+@keyframes panelIn{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .panel{animation:none}
+  .mic-orbit::before,.mic-orbit::after{animation:none}
+  .companion-note .heart-line path{animation:none;stroke-dashoffset:0}
+}
+.identity-island{
+  position:relative;margin:5px 0 10px;padding:8px 6px 11px 24px;min-height:116px;
+}
+.identity-island::before{
+  content:"";position:absolute;left:3px;top:4px;width:1px;height:102px;
+  background:linear-gradient(180deg,transparent,rgba(73,111,98,.54),rgba(73,111,98,.06));
+}
+.identity-island::after{
+  content:"";position:absolute;left:-3px;top:23px;width:14px;height:7px;
+  border:1px solid rgba(73,111,98,.5);border-radius:100% 0 100% 0;
+  transform:rotate(-28deg);background:rgba(169,190,176,.18);
+  box-shadow:14px 27px 0 -1px rgba(138,166,151,.18),7px 57px 0 -2px rgba(138,166,151,.16);
+}
+.hello{color:#786a5d;font-size:calc(12px * var(--fs));letter-spacing:.06em}
+.identity-island h1{
+  margin:7px 0 5px;font:700 calc(31px * var(--fs))/1.15 var(--kai);letter-spacing:.035em;color:#4e3c2d;
+}
+.identity-island p{margin:0;color:#8a7c6e;font-size:calc(11px * var(--fs))}
+
+/* 角色徽章。`setMode()` 会给它加 `orange`（无忧伴陪伴模式）。
+   模式不能只靠颜色区分——徽章上的字自己就把模式说全了。 */
+.mode-badge{
+  display:inline-block;margin-top:8px!important;padding:4px 10px;
+  border:1px solid rgba(73,111,98,.22);border-radius:999px;
+  background:rgba(255,255,255,.42);
+  color:#4a6d61!important;font-size:calc(10px * var(--fs));font-weight:700;letter-spacing:.04em;
+}
+.mode-badge.orange{
+  border-color:rgba(185,138,59,.42);background:rgba(232,214,173,.34);color:#8d6224!important;
+}
+
+.status-ribbon{
+  position:relative;display:block;margin:2px 0 13px;padding-left:39px;
+  color:#45695e;font-weight:700;font-size:calc(12px * var(--fs));line-height:1.5;
+}
+/* 那颗点是伪元素，不是子节点——`renderTodayLine()` 写的是 `textContent`，
+   任何子元素都会被它抹掉。 */
+.status-ribbon::before{
+  content:"";position:absolute;left:23px;top:.55em;width:7px;height:7px;border-radius:50%;
+  background:#6d9b86;box-shadow:0 0 0 5px rgba(109,155,134,.10);
+}
+.companion-note{
+  position:relative;margin:0 0 13px;padding:15px 18px 15px 56px;
+  border-top:1px solid rgba(153,119,68,.12);border-bottom:1px solid rgba(153,119,68,.10);
+  background:linear-gradient(90deg,rgba(255,255,255,.44),rgba(255,250,239,.10));
+}
+.companion-note .heart-line{
+  position:absolute;left:14px;top:16px;width:31px;height:31px;
+}
+.companion-note .heart-line path{
+  fill:none;stroke:#b86550;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:120;animation:drawHeart 1.3s ease forwards;
+}
+@keyframes drawHeart{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+.companion-note strong{display:block;font:700 calc(16px * var(--fs))/1.35 var(--kai);color:#594334}
+.companion-note span{display:block;margin-top:4px;color:#817365;font-size:calc(11px * var(--fs));line-height:1.6}
+
+.next-item{
+  position:relative;margin:4px 0 16px;padding:17px 17px 16px 18px;
+  border:1px solid rgba(178,135,63,.24);border-radius:24px 20px 28px 18px;
+  background:
+    radial-gradient(circle at 92% 4%,rgba(255,255,255,.9),transparent 25%),
+    linear-gradient(135deg,rgba(255,253,248,.88),rgba(246,238,221,.80));
+  box-shadow:0 14px 38px rgba(89,63,38,.07);
+}
+/* 内容的**盖章**，不是显隐开关。`renderNextItem()` 填完才写 `data-ready`；
+   只靠 `hidden` 的话，数据回来之前会露出一张只有一个按钮的空卡。 */
+.next-item:not([data-ready]){display:none}
+.next-item::after{
+  content:"";position:absolute;right:12px;top:12px;width:62px;height:62px;border-radius:50%;
+  border:1px solid rgba(185,138,59,.16);
+  box-shadow:inset 0 0 0 10px rgba(185,138,59,.025);
+}
+.next-label{margin:0;color:#9a7850;font-size:calc(10px * var(--fs));letter-spacing:.15em;font-weight:700}
+.next-time{margin:7px 0 0;font:700 calc(23px * var(--fs))/1 var(--kai);color:#a56442}
+.next-title{margin:7px 0 4px;font:700 calc(20px * var(--fs))/1.2 var(--kai);color:#443429}
+.next-where{margin:0;color:#87786b;font-size:calc(11px * var(--fs))}
+.next-where[hidden]{display:none}
+/* 命中区是 48px 高，而字只有一行——原包那条 `border-bottom` 于是变成一条
+   飘在文字下面两厘米的横线，看着像分隔线不像按钮。改成描边胶囊：
+   48px 那块地本来就该看得出来是可以按的。 */
+.next-item button{
+  display:inline-flex;align-items:center;margin-top:9px;
+  border:1px solid rgba(74,111,98,.28);border-radius:999px;
+  padding:0 16px;min-height:48px;background:rgba(255,255,255,.42);
+  color:#446d61;font-weight:700;font-size:calc(11px * var(--fs));cursor:pointer;
+}
+
+.mic-stage{
+  position:relative;margin:7px 0 18px;padding:4px 0 2px;text-align:center;
+}
+.mic-orbit{
+  position:relative;width:calc(124px * var(--fs));height:calc(124px * var(--fs));
+  margin:auto;display:grid;place-items:center;
+}
+.mic-orbit::before,.mic-orbit::after{
+  content:"";position:absolute;border-radius:50%;border:1px solid rgba(73,111,98,.18);
+}
+.mic-orbit::before{inset:5px;animation:breath 2.2s ease-in-out infinite}
+.mic-orbit::after{inset:-6px;border-color:rgba(185,138,59,.13);animation:breath 2.2s .45s ease-in-out infinite}
+@keyframes breath{50%{transform:scale(1.08);opacity:.35}}
+.mic-big{
+  position:relative;z-index:2;width:calc(92px * var(--fs));height:calc(92px * var(--fs));
+  border:0;border-radius:50%;
+  color:#fff;background:
+    radial-gradient(circle at 34% 27%,rgba(255,255,255,.24),transparent 26%),
+    linear-gradient(145deg,#648f7c,#315a50);
+  box-shadow:0 13px 30px rgba(52,85,73,.20),inset 0 0 0 1px rgba(255,255,255,.20);
+  cursor:pointer;
+}
+.mic-big svg{width:calc(36px * var(--fs));height:calc(36px * var(--fs))}
+.mic-hint{margin-top:7px;color:#6d6257;font-size:calc(12px * var(--fs));font-weight:700}
+
+/* Voice Orb 十一态。**不能只靠颜色**——每一态同时换环的形态或节奏，
+   而 `#micHint` 那行字（由 `ACTIVITY` 表写）始终说着同一件事。 */
+body[data-activity="pressed"] .mic-big{transform:scale(.94)}
+body[data-activity="listening"] .mic-orbit::before{animation-duration:1s}
+body[data-activity="listening"] .mic-orbit::after{animation-duration:1s;border-color:rgba(73,111,98,.45)}
+body[data-activity="processing"] .mic-orbit::after,
+body[data-activity="executing"] .mic-orbit::after{
+  border-style:dashed;border-color:rgba(185,138,59,.55);animation-duration:3.4s;
+}
+body[data-activity="clarifying"] .mic-orbit::before,
+body[data-activity="confirming"] .mic-orbit::before{
+  border-width:2px;border-color:rgba(185,138,59,.7);animation:none;
+}
+body[data-activity="speaking"] .mic-orbit::before{animation-duration:1.5s;border-color:rgba(73,111,98,.5)}
+body[data-activity="success"] .mic-big{background:linear-gradient(145deg,#5f9a7f,#2c6a4f)}
+body[data-activity="success"] .mic-orbit::after{border-color:rgba(73,140,98,.5);animation:none}
+body[data-activity="error"] .mic-big{background:linear-gradient(145deg,#b8705d,#8e4433)}
+body[data-activity="error"] .mic-orbit::before,
+body[data-activity="error"] .mic-orbit::after{border-color:rgba(184,93,72,.55);animation:none}
+body[data-activity="offline"] .mic-big{background:linear-gradient(145deg,#9a938a,#6a635b)}
+body[data-activity="offline"] .mic-orbit::before,
+body[data-activity="offline"] .mic-orbit::after{border-style:dotted;animation:none}
+
+.keyboard-entry{
+  margin-top:10px;border:0;background:none;color:#916843;font-size:calc(12px * var(--fs));
+  border-bottom:1px solid rgba(145,104,67,.25);padding:9px 6px;cursor:pointer;min-height:48px;
+}
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;margin:10px 2px 8px;
+}
+.section-head h2{margin:0;font:700 calc(18px * var(--fs))/1.2 var(--kai);color:#4b3b2f}
+.section-head span{font-size:calc(10px * var(--fs));color:#9a8a79;letter-spacing:.08em}
+.today-block[hidden]{display:none}
+.reminders{position:relative;padding-left:10px}
+.more-btn{
+  width:100%;margin-top:6px;border:0;background:none;color:#7d6b5d;padding:12px;
+  font-size:calc(12px * var(--fs));cursor:pointer;min-height:48px;
+}
+
+/* ── 这一段以下的类，全部是 `elder.js` 在运行时建出来的 ────────────────── */
+
+/* 今天那一列。`loadReminders()` 建的是 `.task`，不是原包样例里的
+   `.reminder-item`——那个类在这一页一次都不会出现。 */
+.task{
+  position:relative;padding:12px 4px 14px 14px;border-bottom:1px solid rgba(74,57,43,.08);
+}
+.task::before{
+  content:"";position:absolute;left:0;top:19px;width:7px;height:7px;border-radius:50%;
+  background:#739786;box-shadow:0 0 0 4px rgba(115,151,134,.08);
+}
+.task strong{display:block;font:700 calc(15px * var(--fs))/1.3 var(--kai);color:#4a3b30}
+.task div{margin-top:3px;color:#948577;font-size:calc(11px * var(--fs))}
+.task button{
+  margin:9px 6px 0 0;border:1px solid rgba(74,111,98,.22);border-radius:999px;
+  padding:9px 15px;min-height:48px;background:#4d7568;color:#fff;
+  font-size:calc(11px * var(--fs));font-weight:700;cursor:pointer;
+}
+.task button.secondary{background:rgba(255,255,255,.5);color:#5c6f66}
+.status-chip{
+  display:inline-block;margin-left:4px;padding:3px 9px;border-radius:999px;
+  font-size:calc(10px * var(--fs));font-style:normal;
+  color:#537a6d;background:rgba(105,149,131,.12);
+}
+.status-chip.done{color:#3d6b52;background:rgba(88,141,105,.14)}
+.status-chip.confirm{color:#8d6224;background:rgba(185,138,59,.15)}
+.status-chip.relay{color:#8d6224;background:rgba(185,138,59,.15)}
+.status-chip.cancelled{color:#7c7168;background:rgba(120,110,100,.12)}
+
+/* 空态。`emptyState()` 建的：一个描边图标 + 一句结论 + 一句她可以做什么。 */
+.empty-state{
+  padding:22px 16px;text-align:center;color:#8b7c6e;
+  border:1px dashed rgba(120,100,76,.22);border-radius:22px 17px 25px 18px;
+  background:rgba(255,253,247,.4);
+}
+.empty-state svg{color:#a8977f}
+.empty-state strong{display:block;margin-top:8px;font:700 calc(15px * var(--fs))/1.3 var(--kai);color:#5b4b3d}
+.empty-state div{margin-top:5px;font-size:calc(11px * var(--fs));line-height:1.6}
+
+/* 记录那一列。`loadActivity()` 建的是 `.log-item`（有主体的行是真 `<button>`），
+   结构是 `button > (div > .who + time) + div`。
+
+   原包那条时间轴把时间放在左侧一条 40px 的槽里。照搬过来是错的，实测截图上：
+   ①「家人 / 8月18日 / 19:27」三行挤在 54px 的槽里，和那条竖线**叠在一起**；
+   ② 一条记录只有一行字，而 `.record-bubble` 的 `border-radius: 44% 56% …`
+      在扁盒子上算出来是一个椭圆——七个椭圆排下来不像时间线，像一串药片。
+   现在改成：竖线在最左边，每行一个圆点，时间和主体在卡片自己的第一行。 */
+.organic-flow{position:relative;margin-top:7px;padding:10px 0 20px 22px}
+.organic-flow::before{
+  content:"";position:absolute;left:7px;top:16px;bottom:22px;width:1px;
+  background:linear-gradient(#6d9283,rgba(109,146,131,.12));
+}
+.log-item{
+  position:relative;display:block;width:100%;margin:0 0 12px;
+  padding:12px 15px 13px;text-align:left;
+  border:1px solid rgba(81,104,91,.14);
+  border-radius:24px 18px 26px 17px;
+  background:rgba(255,253,247,.68);color:inherit;font:inherit;cursor:pointer;
+}
+div.log-item{cursor:default}
+.log-item::before{
+  content:"";position:absolute;left:-19px;top:20px;width:7px;height:7px;border-radius:50%;
+  background:#668a7d;box-shadow:0 0 0 4px rgba(102,138,125,.08);
+}
+.log-item > div:first-child{
+  display:flex;align-items:baseline;gap:8px;margin-bottom:4px;
+}
+.log-item .who{color:#8d7e70;font-size:calc(10px * var(--fs));letter-spacing:.04em}
+.log-item time{font:700 calc(11px * var(--fs))/1.25 var(--kai);color:#886949}
+.log-item > div:last-child{font:700 calc(14px * var(--fs))/1.45 var(--kai);color:#4a3b30}
+.log-item:focus-visible{outline:2px solid #4d7568;outline-offset:3px}
+
+/* 家人那一屏。`renderKin()` 建的是 `.kin-person` / `.kin-name` / `.kin-rel`。
+   头像是伪元素：那一段代码只写名字、关系和打过码的电话，不发明头像字。 */
+/* 原包这里是一棵「家谱树」：中间一条竖线，卡片左右交错。它是为**三张写死的卡**
+   画的。真数据下这个家庭常常只有一两位，实测截图上那条竖线从两行中间穿过去，
+   看着像一条画错的分隔线，而交错的偏移没有任何东西与之呼应。
+   树撤掉，留下这一版真正需要的东西：一行一位，谁、什么关系、怎么找。 */
+.family-tree{position:relative;padding:10px 0 4px}
+.family-tree:empty{display:none}
+.kin-person{
+  position:relative;padding:14px 8px 14px 62px;
+  min-height:70px;border-bottom:1px solid rgba(74,57,43,.10);
+}
+.kin-person::before{
+  content:"亲";position:absolute;left:5px;top:12px;width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;background:linear-gradient(145deg,#e8ded0,#fdf9f1);
+  border:1px solid rgba(168,125,66,.18);font:700 19px var(--kai);color:#805942;
+}
+.kin-name{margin:0;font:700 calc(16px * var(--fs))/1.3 var(--kai);color:#4a3b30}
+.kin-rel{margin:4px 0 0;color:#8c7d70;font-size:calc(11px * var(--fs))}
+.kin-help-label{margin:6px 4px 4px;color:#8a7c6e;font-size:calc(11px * var(--fs));font-weight:700}
+.kin-help{margin:0 4px 14px;padding-left:20px;color:#827365;font-size:calc(11px * var(--fs));line-height:1.9}
+.contact-primary{
+  display:block;width:calc(100% - 8px);margin:6px 4px 14px;border:0;border-radius:19px;
+  padding:15px;min-height:52px;background:linear-gradient(135deg,#345e53,#527b6d);color:#fff;
+  box-shadow:0 12px 28px rgba(51,84,72,.16);font-weight:700;font-size:calc(13px * var(--fs));
+  text-align:center;cursor:pointer;
+}
+
+/* 「我的」那两项。屏幕上的控件是 `.segmented`，值挂在旁边一个 `hidden` 的
+   `<select>` 上（`elder.js` 读 `.value`），两边由 `elder-v6-a.js` 同步。 */
+.habit-group{margin-top:10px}
+.habit-row{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;
+  padding:14px 5px;border-bottom:1px solid rgba(73,57,43,.09);
+}
+.habit-row .tool-name{display:block;font:700 calc(15px * var(--fs))/1.3 var(--kai)}
+.habit-why{display:block;margin-top:4px;color:#8d7f72;font-size:calc(10px * var(--fs));line-height:1.5}
+.segmented{display:flex;gap:5px}
+.segmented button{
+  border:1px solid rgba(74,111,98,.16);border-radius:999px;background:rgba(255,255,255,.4);
+  padding:10px 12px;min-height:48px;color:#6b5d51;font-size:calc(11px * var(--fs));cursor:pointer;
+}
+.segmented button.active{background:#4d7568;color:#fff;border-color:#4d7568}
+.segmented button:focus-visible{outline:2px solid #4d7568;outline-offset:2px}
+
+.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.service-entry{
+  display:block;min-height:96px;padding:13px;text-align:left;
+  border:1px solid rgba(76,61,46,.09);
+  border-radius:21px 16px 24px 17px;background:rgba(255,253,247,.52);
+  color:inherit;text-decoration:none;font:inherit;cursor:pointer;
+}
+.service-entry b{display:block;font:700 calc(15px * var(--fs))/1.3 var(--kai);color:#514034}
+.service-entry span{display:block;margin-top:6px;color:#8b7c6e;font-size:calc(10px * var(--fs));line-height:1.55}
+.service-entry:focus-visible{outline:2px solid #4d7568;outline-offset:3px}
+
+.trust-strip{
+  position:relative;margin:11px 0;padding:17px 17px 17px 50px;
+  border-top:1px solid rgba(168,126,61,.15);border-bottom:1px solid rgba(168,126,61,.12);
+  color:#645446;font-size:calc(11px * var(--fs));line-height:1.7;
+}
+.trust-strip::before{
+  content:"信";position:absolute;left:8px;top:15px;width:29px;height:29px;
+  display:grid;place-items:center;border:1px solid rgba(151,83,58,.44);color:#995a45;
+  font:700 15px var(--kai);transform:rotate(-3deg);
+}
+.trust-strip > strong{display:block;font:700 calc(15px * var(--fs))/1.35 var(--kai);color:#594334}
+.trust-line{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.trust-pill{
+  padding:6px 11px;border:1px solid rgba(74,111,98,.18);border-radius:999px;
+  background:rgba(255,255,255,.46);color:#4f6b60;font-size:calc(10px * var(--fs));font-weight:700;
+}
+.trust-pill.neutral{border-color:rgba(120,110,100,.2);background:rgba(240,236,228,.6);color:#7b7067}
+
+/* ── Focus Mode ─────────────────────────────────────────────────────────
+   开关是 `body[data-focus]`，由 `elder.js` 的 `setFocus()` 写。
+   原包用的是 `.phone.focus-on`，那是它自带脚本的写法——两套皮共用一份逻辑，
+   开关就得是逻辑那一侧认得的那一个。 */
+.focus-layer{
+  position:absolute;inset:0;z-index:25;display:none;flex-direction:column;
+  /* 不透明。原包是 .98/.99，实测顶栏的日期和时间会从这一层底下透出来一层鬼影。 */
+  background:linear-gradient(180deg,#faf7ef,#f6efe2);
+  padding:17px 18px 132px;overflow:auto;scrollbar-width:none;
+}
+.focus-layer::-webkit-scrollbar{display:none}
+/* **不许收缩。** 这是一个 `flex-direction: column` 的滚动容器，而 flex 项默认
+   `flex-shrink: 1`——内容一多，`#chat` 会被压到它的 `min-height`，里面的气泡
+   照原样画出来，**盖在下一个兄弟节点上**。实测就是这样：老人正在被要求复述确认
+   一笔 68.40 元的付款，玻璃盒确认卡和上一条气泡叠印在一起，两边都读不清。
+   设计一在 `pages.css` 里对同一批节点写了同一行，理由一样。 */
+.focus-layer > *{flex:0 0 auto}
+body[data-focus="on"] .focus-layer{display:flex}
+body[data-focus="on"] .app-viewport > .panel{visibility:hidden}
+.focus-back{
+  align-self:flex-start;border:0;background:none;color:#6e6257;
+  padding:10px 4px;min-height:48px;font-weight:700;font-size:calc(12px * var(--fs));cursor:pointer;
+}
+.focus-orb{margin:14px auto 12px}
+.chat{
+  margin:8px 0 14px;min-height:120px;padding:12px 0;
+  border-top:1px solid rgba(75,58,44,.08);border-bottom:1px solid rgba(75,58,44,.08);
+}
+/* `addBubble()` 建的是 `.bubble user` / `.bubble agent`，不是原包样例的 `.msg`。 */
+.bubble{
+  max-width:85%;margin:8px 0;padding:11px 14px;border-radius:16px;
+  font-size:calc(12px * var(--fs));line-height:1.6;
+}
+.bubble.agent{background:rgba(85,119,105,.09);color:#43564d}
+.bubble.user{margin-left:auto;background:rgba(180,137,62,.12);color:#6b5238}
+.bubble .meta{margin-top:5px;color:#8d8175;font-size:calc(10px * var(--fs));font-weight:700}
+.quick{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.quick button{
+  flex:0 0 auto;border:1px solid rgba(76,111,97,.14);border-radius:999px;background:#fffaf1;
+  padding:11px 14px;min-height:48px;font-size:calc(11px * var(--fs));color:#5a4b40;cursor:pointer;
+}
+.composer{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:auto}
+.composer input{
+  min-width:0;border:1px solid rgba(73,111,98,.18);border-radius:16px;background:rgba(255,255,255,.70);
+  padding:14px 13px;outline:none;color:#493d33;font-size:calc(13px * var(--fs));
+}
+.composer input:focus{border-color:#4d7568;box-shadow:0 0 0 3px rgba(77,117,104,.16)}
+.composer button{
+  border:0;border-radius:16px;padding:0 19px;min-height:48px;background:#4c7568;color:#fff;
+  font-weight:700;font-size:calc(13px * var(--fs));cursor:pointer;
+}
+.focus-tools{display:flex;gap:8px;margin-top:10px}
+.focus-tool{
+  flex:1;border:1px solid rgba(74,111,98,.16);border-radius:14px;background:rgba(255,255,255,.42);
+  padding:11px 8px;min-height:48px;color:#5f6f66;font-size:calc(11px * var(--fs));cursor:pointer;
+}
+
+/* Task Space：这件事办到哪一步，用**页面**说，不用一串气泡让她自己拼。 */
+.task-space{
+  display:block;margin:2px 0 14px;padding:18px 18px 17px;
+  border:1px solid rgba(178,135,63,.24);border-radius:25px 19px 29px 17px;
+  background:linear-gradient(135deg,rgba(255,254,250,.86),rgba(243,238,224,.78));
+  box-shadow:0 12px 32px rgba(89,63,38,.06);
+}
+.task-space svg{color:#3f7a5c}
+.task-label{margin:0;color:#987647;font-size:calc(10px * var(--fs));letter-spacing:.12em;font-weight:700}
+.task-amount{margin:8px 0 0;font:700 calc(26px * var(--fs))/1 var(--kai);color:#a56442}
+.task-headline{margin:9px 0 0;font:700 calc(20px * var(--fs))/1.28 var(--kai);color:#443429}
+.task-where{margin:6px 0 0;color:#87786b;font-size:calc(11px * var(--fs))}
+.task-ask{margin:9px 0 0;color:#5b4b3d;font-size:calc(12px * var(--fs));line-height:1.6}
+.task-note{margin:8px 0 0;color:#847668;font-size:calc(11px * var(--fs));line-height:1.6}
+.task-diff{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 0;font-size:calc(11px * var(--fs))}
+.task-diff-heard{color:#8e5744;font-weight:700}
+.task-diff-sep{color:#a2968a}
+.task-diff-expected{color:#3f6a58;font-weight:700}
+
+/* 玻璃盒：我听到什么、准备做什么、谁来决定、能不能撤销。 */
+.reliance-card{
+  margin:2px 0 14px;padding:16px 17px;
+  border:1px solid rgba(73,111,98,.20);border-radius:22px 17px 26px 18px;
+  background:rgba(255,253,247,.82);box-shadow:0 12px 30px rgba(66,48,33,.06);
+}
+.reliance-card h3{margin:0 0 10px;font:700 calc(17px * var(--fs))/1.3 var(--kai);color:#4b3b2f}
+.reliance-row{
+  display:grid;grid-template-columns:74px 1fr;gap:10px;
+  padding:7px 0;border-top:1px solid rgba(74,57,43,.07);
+  font-size:calc(11px * var(--fs));line-height:1.6;
+}
+.reliance-row strong{color:#8a7a68;font-weight:700}
+.reliance-row div{color:#4f4238}
+.notice{
+  margin:10px 0 0;padding:10px 12px;border-left:3px solid rgba(73,111,98,.4);border-radius:0 10px 10px 0;
+  background:rgba(255,255,255,.5);color:#54655c;font-size:calc(11px * var(--fs));line-height:1.6;
+}
+.notice.good{border-left-color:#4d7568;background:rgba(105,149,131,.12);color:#3d6b52}
+.notice.info{border-left-color:#b98a3b;background:rgba(232,214,173,.28);color:#7d5a20}
+.notice.warning{border-left-color:#b85d48;background:rgba(184,93,72,.10);color:#8e4433}
+.notice.bad{border-left-color:#8e4433;background:rgba(184,93,72,.14);color:#7d3826}
+.preview-details{margin-top:10px;font-size:calc(11px * var(--fs))}
+.preview-details > summary{
+  padding:9px 2px;min-height:48px;color:#446d61;font-weight:700;cursor:pointer;
+}
+.preview-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.preview-columns h4{margin:0 0 5px;font:700 calc(12px * var(--fs))/1.3 var(--kai);color:#5b4b3d}
+.preview-columns ul{margin:0;padding-left:17px;color:#7f7265;line-height:1.7}
+
+/* ── 状态通道 ───────────────────────────────────────────────────────────
+   压在标签栏上方，四格都看得见，Focus Mode 下也看得见。
+   **不在 `.focus-layer` 里**：保存字号、刷新记录、待办加载失败都发生在
+   Focus Mode 之外，放进去等于把这些反馈写进一个默认隐藏的节点。 */
+.status-line{
+  position:absolute;z-index:45;left:13px;right:13px;
+  bottom:calc(84px + max(10px,env(safe-area-inset-bottom)));
+  margin:0;padding:9px 13px;border-radius:14px;
+  border:1px solid rgba(89,69,48,.10);background:rgba(255,252,245,.94);
+  backdrop-filter:blur(12px);box-shadow:0 10px 24px rgba(64,47,32,.10);
+  color:#5d5147;font-size:calc(11px * var(--fs));line-height:1.55;
+}
+.status-line:empty{display:none}
+
+.dock{
+  position:absolute;z-index:40;left:13px;right:13px;bottom:max(10px,env(safe-area-inset-bottom));
+  height:72px;padding:8px 8px 6px;display:grid;grid-template-columns:repeat(4,1fr);
+  border:1px solid rgba(89,69,48,.10);border-radius:26px 26px 23px 23px;
+  background:rgba(255,252,245,.90);backdrop-filter:blur(18px);
+  box-shadow:0 16px 42px rgba(64,47,32,.13);
+}
+.dock button{
+  position:relative;border:0;background:none;color:#817367;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;font-size:calc(10px * var(--fs));cursor:pointer;
+}
+.dock button .nav-icon{
+  width:30px;height:26px;display:grid;place-items:center;font:700 calc(18px * var(--fs))/1 var(--kai);
+}
+.dock button.is-current{color:#365f54;font-weight:800}
+.dock button.is-current::before{
+  content:"";position:absolute;top:-3px;width:28px;height:2px;border-radius:99px;background:#b68a43;
+}
+.dock button:nth-child(1) .nav-icon::before{content:"今"}
+.dock button:nth-child(2) .nav-icon::before{content:"记"}
+.dock button:nth-child(3) .nav-icon::before{content:"亲"}
+.dock button:nth-child(4) .nav-icon::before{content:"我"}
+.dock button:focus-visible{outline:2px solid #4d7568;outline-offset:-2px;border-radius:14px}
+
+.tab-head{margin:10px 4px 4px;font:700 calc(27px * var(--fs))/1.2 var(--kai)}
+.tab-note{margin:0 4px 16px;color:#887a6c;font-size:calc(11px * var(--fs));line-height:1.6}
+.panel-kicker{margin:0 4px 7px;color:#a07b4f;font-size:calc(10px * var(--fs));font-weight:800;letter-spacing:.1em}
+
+/* ── 事务详情：压在四个 Tab 之上的一层 ────────────────────────────────
+   在任何宽度下都是模态，所以它的样式不放在任何 media query 里——
+   设计一那边用一整段注释记着为什么：复用只在窄屏生效的背板类，
+   会造出一个在桌面上静默失效的模态。 */
+.detail-backdrop{
+  position:absolute;inset:0;z-index:60;background:rgba(45,34,24,.42);
+  opacity:0;visibility:hidden;transition:opacity .22s ease,visibility .22s step-end;
+}
+.detail-backdrop.is-open{opacity:1;visibility:visible;transition:opacity .22s ease,visibility 0s}
+.detail-layer{
+  position:absolute;z-index:61;left:12px;right:12px;bottom:12px;max-height:76%;
+  display:flex;flex-direction:column;
+  padding:18px 18px 16px;border-radius:26px;
+  border:1px solid rgba(89,69,48,.12);background:rgba(255,252,245,.98);
+  box-shadow:0 24px 60px rgba(56,41,27,.24);
+  transform:translateY(14px);opacity:0;visibility:hidden;
+  transition:transform .24s ease,opacity .24s ease,visibility .24s step-end;
+}
+.detail-layer.is-open{transform:none;opacity:1;visibility:visible;transition:transform .24s ease,opacity .24s ease,visibility 0s}
+.detail-layer-title{margin:0 0 10px;font:700 calc(19px * var(--fs))/1.3 var(--kai);color:#4b3b2f}
+.detail-layer-body{flex:1 1 auto;overflow:auto;scrollbar-width:none}
+.detail-layer-body::-webkit-scrollbar{display:none}
+.detail-layer-exit{flex:0 0 auto;padding-top:12px}
+.detail-layer-exit .contact-primary{margin:0;width:100%}
+.detail-head{display:block;padding-bottom:10px;border-bottom:1px solid rgba(74,57,43,.08)}
+.detail-subject{margin:0;font:700 calc(17px * var(--fs))/1.3 var(--kai);color:#443429}
+.detail-amount{margin:6px 0 0;font:700 calc(22px * var(--fs))/1 var(--kai);color:#a56442}
+.detail-status{
+  display:inline-block;margin:9px 0 0;padding:4px 11px;border-radius:999px;
+  font-size:calc(10px * var(--fs));font-weight:700;
+  background:rgba(240,236,228,.7);color:#6f6459;
+}
+.detail-status.good{background:rgba(105,149,131,.16);color:#3d6b52}
+.detail-status.warning{background:rgba(232,214,173,.4);color:#8d6224}
+.detail-status.bad{background:rgba(184,93,72,.14);color:#8e4433}
+.detail-rows{margin:12px 0 0;display:grid;grid-template-columns:80px 1fr;gap:7px 12px;font-size:calc(11px * var(--fs))}
+.detail-rows dt{margin:0;color:#8a7a68;font-weight:700}
+.detail-rows dd{margin:0;color:#4f4238;line-height:1.6}
+body.detail-open .dock{opacity:.35}
+
+@media(max-width:520px){
+  .preview-stage{padding:0}
+  .phone{width:100vw;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* ── 矮视口：把「用打字说」拉回第一屏 ───────────────────────────────────
+   打字是语音失败时**唯一**的退路（Firefox 没有 Web Speech；权限被拒、
+   没有麦克风、网络不好时语音一样用不了）。它在第一屏之外，等于没有。
+
+   判据是**高度**，不是宽度。这个项目在设计一那边为同一件事栽过一次：
+   整套定高处理挂在 `max-width: 760px` 下，手机一转 90°、宽度变成 844，
+   整套失效，打字入口掉到第一屏外 522px。所以这里两条规则都按 `max-height` 写。 */
+@media(max-height:700px){
+  .topbar{height:52px;padding:11px 20px 0}
+  .app-viewport{height:calc(100% - 52px)}
+  .panel{padding-top:2px}
+  .identity-island{min-height:0;margin:2px 0 6px;padding:3px 6px 6px 20px}
+  .identity-island::before{height:64px}
+  .identity-island::after{top:18px}
+  .identity-island h1{margin:4px 0 3px;font-size:calc(21px * var(--fs))}
+  .mode-badge{margin-top:4px!important;padding:3px 9px}
+  .status-ribbon{margin:0 0 8px}
+  .next-item{margin:2px 0 10px;padding:10px 13px 11px 14px}
+  .next-item::after{width:44px;height:44px}
+  .next-label{font-size:calc(9px * var(--fs))}
+  .next-time{margin-top:5px;font-size:calc(19px * var(--fs))}
+  .next-title{margin:5px 0 3px;font-size:calc(18px * var(--fs))}
+  /* 命中区**不许**在矮屏上缩水。48px 是这个项目的下限，不是 44——
+     省空间要从留白和字号上省，不能从"她按不按得中"上省。 */
+  .next-item button{margin-top:2px}
+  .mic-stage{margin:2px 0 10px}
+  .mic-orbit{width:calc(92px * var(--fs));height:calc(92px * var(--fs))}
+  .mic-big{width:calc(70px * var(--fs));height:calc(70px * var(--fs))}
+  .mic-big svg{width:calc(28px * var(--fs));height:calc(28px * var(--fs))}
+  .mic-hint{margin-top:4px}
+  .keyboard-entry{margin-top:4px}
+  .companion-note{padding:12px 15px 12px 50px}
+  .companion-note .heart-line{top:13px;width:26px;height:26px}
+}
+
+/* 320×568（在售最小屏）。上一档压完还差 39px：实测「用打字说」落在
+   473–521，而面板在 482 就被裁掉、底栏从 486 开始——它只露出 9px，
+   而且那 9px 还压在底栏下面。对一位手抖、看不清小字的老人，
+   「露出一点」和「不存在」没有区别。
+   所以这一档把「下一件」压成三行网格（时间、标题、按钮同一行），
+   麦克风再缩一圈。省的是留白和字号，**不省命中区**。 */
+@media(max-height:600px){
+  .identity-island{padding-bottom:2px}
+  .identity-island h1{font-size:calc(19px * var(--fs))}
+  .identity-island p{font-size:calc(10px * var(--fs))}
+  .status-ribbon{margin-bottom:6px;font-size:calc(11px * var(--fs))}
+  .next-item{
+    display:grid;grid-template-columns:auto 1fr auto;
+    grid-template-areas:"label label label" "time title act" "where where where";
+    gap:0 10px;align-items:center;padding:9px 12px 9px 14px;margin:2px 0 8px;
+  }
+  .next-item::after{display:none}
+  .next-label{grid-area:label}
+  .next-time{grid-area:time;margin:3px 0 0}
+  .next-title{grid-area:title;margin:3px 0 0;font-size:calc(16px * var(--fs))}
+  .next-where{grid-area:where;margin-top:2px}
+  .next-item button{grid-area:act;justify-self:end;margin-top:0}
+  .mic-orbit{width:calc(80px * var(--fs));height:calc(80px * var(--fs))}
+  .mic-big{width:calc(62px * var(--fs));height:calc(62px * var(--fs))}
+  .mic-big svg{width:calc(24px * var(--fs));height:calc(24px * var(--fs))}
+  .mic-hint{font-size:calc(11px * var(--fs))}
+}
+
+/* 横屏。手机的语汇在 390px 高的窗口里放不下，所以这一档整个改形态：
+   手机铺满窗口，麦克风与打字入口钉在右侧一栏，左边那一列照常滚。 */
+@media(max-height:560px){
+  .preview-stage{padding:0}
+  .phone{width:100vw;height:100dvh;border-radius:0;box-shadow:none}
+  .ink-mountains{height:150px}
+  .bottom-grass{display:none}
+  .topbar{height:48px;padding:9px 18px 0}
+  .app-viewport{height:calc(100% - 48px);padding-bottom:72px}
+  .panel{padding:4px 16px 92px}
+  .elder-panel[data-panel="home"]{padding-right:206px}
+  /* 定位到 `.app-viewport`（它是 `position: relative`），不是到滚动的面板里——
+     这样它不跟着内容滚走。面板 hidden 的时候它跟着一起消失，因为它是面板的子节点。 */
+  .mic-stage{
+    position:absolute;right:14px;top:8px;width:186px;margin:0;
+    padding:10px 8px 12px;border-radius:20px 16px 22px 17px;
+    background:rgba(255,253,247,.72);border:1px solid rgba(89,69,48,.10);
+  }
+  .mic-orbit{width:calc(88px * var(--fs));height:calc(88px * var(--fs))}
+  .mic-big{width:calc(66px * var(--fs));height:calc(66px * var(--fs))}
+  .mic-big svg{width:calc(26px * var(--fs));height:calc(26px * var(--fs))}
+  .dock{height:58px;bottom:max(6px,env(safe-area-inset-bottom))}
+  .dock button .nav-icon{height:20px}
+  .status-line{bottom:calc(66px + max(6px,env(safe-area-inset-bottom)))}
+  .focus-layer{padding:12px 16px 86px}
+  .focus-orb{display:none}
+  .chat{min-height:56px;margin:6px 0 10px}
+  .focus-back{padding:7px 4px}
+  .service-grid{grid-template-columns:repeat(3,1fr)}
+}
+
+/* ── 像素向导「小优」────────────────────────────────────────────────────
+   它只在**手机框旁边放得下它**的时候出现。
+
+   理由是量出来的，不是审美：它的画布是 112×180、`pointer-events: auto`，
+   而且它会自己走动。CDP 在 320×568 和 667×375 上量到 `#typeInstead` 的中心点
+   `elementFromPoint` 命中的是这块画布——一只桌宠盖住了语音失败时唯一的退路。
+   因为它会走，同一个视口连测两次可以一次绿一次红。
+
+   两道防线：这一条（放不下就不出现）和 `elder-v6-b.js` 里的 `keepOutLeft()`
+   （放得下时它只能待在框外）。只有前者的话，768px 宽下它照样能走进框里；
+   只有后者的话，手机上它无处可去、只能压在应用上面。
+
+   430（手机框）+ 112（它自己）+ 2×24（余量）≈ 702。 */
+.youhuo-robot-mascot{
+  position:fixed;left:0;top:0;width:112px;height:180px;z-index:1505;
+  pointer-events:none;opacity:0;transform:translate3d(0,0,0);
+  transition:opacity .28s ease;will-change:transform;
+  display:none;
+}
+@media (min-width:702px) and (min-height:601px){
+  .youhuo-robot-mascot{display:block}
+}
+.youhuo-robot-mascot.is-ready{opacity:1}
+.youhuo-robot-canvas{
+  position:absolute;left:0;bottom:0;width:112px;height:180px;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  filter:drop-shadow(0 7px 6px rgba(65,49,36,.14)) drop-shadow(0 0 1px rgba(255,255,255,.72));
+  pointer-events:auto;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
+}
+.youhuo-robot-mascot.is-dragging{z-index:9999}
+.youhuo-robot-mascot.is-dragging .youhuo-robot-canvas{cursor:grabbing}
+.youhuo-robot-bubble{
+  position:absolute;bottom:145px;right:88px;width:min(286px,calc(100vw - 28px));
+  padding:10px 14px 11px;border:1px solid rgba(164,113,40,.38);
+  border-radius:20px 25px 18px 24px;color:#49382a;
+  background:radial-gradient(circle at 14% 12%,rgba(255,255,255,.9),transparent 35%),rgba(255,251,242,.97);
+  box-shadow:0 12px 34px rgba(74,54,35,.12),inset 0 0 20px rgba(255,255,255,.34);
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:12px;line-height:1.62;font-weight:650;
+  letter-spacing:.01em;white-space:normal;backdrop-filter:blur(12px);
+  opacity:0;visibility:hidden;translate:0 6px;
+  transition:opacity .22s ease,translate .22s ease,visibility .22s step-end;
+}
+.youhuo-robot-mascot.bubble-right .youhuo-robot-bubble{right:auto;left:88px}
+.youhuo-robot-bubble::after{
+  content:"";position:absolute;bottom:-7px;right:28px;width:12px;height:12px;
+  border-right:1px solid rgba(164,113,40,.30);border-bottom:1px solid rgba(164,113,40,.30);
+  background:#fffaf0;transform:rotate(45deg);
+}
+.youhuo-robot-mascot.bubble-right .youhuo-robot-bubble::after{right:auto;left:28px}
+.youhuo-robot-bubble.show{
+  opacity:1;visibility:visible;translate:0 0;
+  transition:opacity .22s ease,translate .22s ease,visibility 0s;
+}

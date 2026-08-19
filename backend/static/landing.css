@@ -120,11 +120,74 @@ html::before {
  * 计划书写的是「`/` 只做入口……删掉巨大 Hero、八张能力卡、技术数字」。
  * 那八项能力在 /elder 与 /family 里都有真实入口，首页不再替它们做一份目录。
  */
+/* 设计对照入口（`.yh-designs`）。四条通往具体界面的链接，排在身份卡之后。
+ *
+ * **这一节的每一个尺寸决定都是「比身份卡轻」。** 身份卡是 `--surface` 底 + `--shadow-1`
+ * + 48px 图标 + `--text-xl` 标题 + `--space-5` 内距；这里**不填底色**、无投影、
+ * 无图标、`--text-base` 标题、`--space-3/4` 内距（留空底色的理由见 `.yh-design-link`
+ * 里面那段——它不只是「更轻」，是深色模式下唯一站得住的做法）。同一页上两组入口，
+ * 权重必须分得开，否则「先选身份」这个唯一的问题会被四个选项冲散。
+ *
+ * 动效**不新造一套**：复用上面 `.yh-choose` 用的 `yh-fade-up`，延迟排在它
+ * （0.12s）之后、页脚（1.3s）之前。0.2s 这个位置读起来是「跟着上面一起进来」，
+ * 而不是又一段独立的表演。它同样受文件末尾 `prefers-reduced-motion` 那条统管。
+ *
+ * 为什么延迟不能再往后：`.yh-choose` 那段注释记着入场动效把这一页唯一的两个控件
+ * 藏了 1.3 秒的那次事故。这四条也是控件，同一条理由对它们成立。
+ */
+.yh-designs { display: flex; flex-direction: column; gap: var(--space-2); opacity: 0; animation: yh-fade-up 0.45s var(--ease-out) 0.2s both; }
+/* 标题用 `--ink-2` 而不是 `--ink`：它和上面那句 `.yh-choose-title`（`--ink`、
+   clamp 到 30px）在同一条视线上，同色同重会读成两个并列的主问题。 */
+.yh-designs-title { margin: 0; font-size: var(--text-lg); font-weight: 700; line-height: var(--lh-tight); color: var(--ink-2); }
+.yh-designs-sub { margin: 0; font-size: var(--text-sm); color: var(--ink-3); line-height: var(--lh-snug); }
+/* gap 必须和 `.yh-choose-grid` 一样是 `--space-4`。
+   两个网格装在同一个容器里、都是两列，列宽 = (W − gap) / 2——gap 差 4px，第二列
+   的左边缘就差 2px。量出来是身份卡 240、这里 242：不是「差不多」，是右半边整体
+   错开两像素，而它正好落在人扫视时最容易看出来的那条竖直边上。 */
+.yh-designs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); margin-top: var(--space-2); }
+/* `min-height` 对行内元素无效——`<a>` 必须先变成 flex 容器（本项目在这一条上栽过
+   四次，见 UI 约束第五条）。`--tap-key` 是 56px，而七个视口实测下来这四格的真实
+   高度在 79–102px 之间：也就是说这条**平时不起作用**，它防的是下一次有人把说明
+   文字删短、命中区跟着缩到 48 以下。 */
+.yh-design-link {
+  /* 内容**顶对齐**，不居中。同一行两格的高度由网格拉平，居中会让说明短的那格
+     整体下沉——实测行首两个名字的基线差 10px。这是一组用来对比的入口，
+     名字对不齐，读起来就不像一组。 */
+  display: flex; flex-direction: column; gap: var(--space-1);
+  min-height: var(--tap-key); padding: var(--space-3) var(--space-4);
+  /* 底色**留空**，只描一道边。
+     第一版填的是 `--surface-2`，浅色下没问题（身份卡 #fff 更亮 = 更高），
+     深色下整个反过来：画布 #141311、身份卡 --surface #1a1917、而 --surface-2
+     是 #211f1c ——**次要入口比主入口还亮**，也就是比它更「浮」。深色模式里高度
+     是靠亮度表达的，这一层填任何一档面色都会在某一个模式下站错位置。
+     不填就没有这个问题：它在两个模式下都躺在画布上，纸纹从它身上透过去，
+     而身份卡是压在纸上的卡片。层级由材质本身说清楚，不靠调参。 */
+  background: transparent; border: 1px solid var(--line); border-radius: var(--r-sm);
+  text-decoration: none; color: inherit;
+  transition: background var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+}
+.yh-design-link:hover { background: var(--surface-2); border-color: var(--line-strong); }
+.yh-design-link:active { background: var(--surface-3); }
+/* 角色色和上面两张身份卡同源：老人蓝、家人橙。用 `--role-ink` 而不是
+   `--role-accent`——后者在白底上只有 3.29:1，做字不够。 */
+.yh-design-link.is-elder  { --role-ink: var(--youhuo-blue-ink); }
+.yh-design-link.is-family { --role-ink: var(--wuyou-orange-ink); }
+.yh-design-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.yh-design-name { font-size: var(--text-base); font-weight: 700; color: var(--ink); }
+/* 箭头在 HTML 里是 `aria-hidden`：它是「这是一个去处」的视觉记号，读屏念出来
+   只会多一个「右箭头」。链接自己的文字已经说清楚去哪。 */
+.yh-design-go { flex: 0 0 auto; font-size: var(--text-sm); font-weight: 700; color: var(--role-ink); transition: transform var(--dur-fast) var(--ease-out); }
+.yh-design-link:hover .yh-design-go { transform: translateX(2px); }
+.yh-design-note { font-size: var(--text-sm); color: var(--ink-2); line-height: var(--lh-snug); }
 .yh-foot { display: flex; align-items: center; justify-content: center; gap: var(--space-3); margin-top: var(--space-2); opacity: 0; animation: yh-fade-up 0.5s var(--ease-out) 1.3s both; }
 .yh-foot-line { flex: 1; height: 1px; background: var(--line); max-width: 72px; }
 .yh-foot-sign { font-size: var(--text-xs); color: var(--ink-3); letter-spacing: 0.06em; white-space: nowrap; }
 .yh-stamp { position: fixed; top: var(--space-5); left: var(--space-5); width: 68px; height: 68px; opacity: 0.16; pointer-events: none; z-index: 0; animation: yh-stamp-in 0.9s var(--ease-out) 0.3s both; }
 @keyframes yh-stamp-in { from { opacity: 0; transform: rotate(-12deg) scale(1.25); } to { opacity: 0.16; transform: rotate(0) scale(1); } }
-@media (max-width: 520px) { .yh-hero { grid-template-columns: 1fr; text-align: center; } .yh-hero-art { order: -1; margin: 0 auto; } .yh-choose-grid { grid-template-columns: 1fr; } .yh-stamp { width: 52px; height: 52px; top: var(--space-4); left: var(--space-4); } }
+/* 窄屏：身份卡与设计入口一起收成单列。
+   两格并排在 320px 上每格只有 138px，减去内距只剩 106px——「家人端设计二」六个字
+   加一个箭头正好排不下，说明文字会折成三行。断点跟 `.yh-choose-grid` 走同一档，
+   不另设一个：两组入口在同一次折行里一起换形态，读起来才是同一页。 */
+@media (max-width: 520px) { .yh-hero { grid-template-columns: 1fr; text-align: center; } .yh-hero-art { order: -1; margin: 0 auto; } .yh-choose-grid { grid-template-columns: 1fr; } .yh-designs-grid { grid-template-columns: 1fr; } .yh-stamp { width: 52px; height: 52px; top: var(--space-4); left: var(--space-4); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } html::before { display: none; } .yh-stamp { animation: none; opacity: 0.10; } .yh-card { transition: none; } }
 @media print { html::before { display: none; } .yh-stamp, .yh-house { display: none; } .yh-card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; } .yh-hero-title { font-size: 28px; } }

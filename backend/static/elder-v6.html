@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>优活 · 老人端</title>
+<link rel="stylesheet" href="/static/elder-v6.css">
+</head>
+<body data-surface="consumer" data-mode="youhuo" data-activity="idle" data-focus="off" data-tab="home">
+
+<!-- 双击 HTML 打开时唯一会说话的东西。
+     `elder-v6.css` 是 `/static/...` 绝对路径，`file://` 下它 404，于是藏它的那条
+     `.needs-server { display: none }` 一起消失，这段话就成了屏幕上唯一的内容。
+     它不用 JS（file:// 下同样取不到），也不用内联脚本（严格 CSP 禁止）。 -->
+<p class="needs-server">
+  这个页面要用服务器打开，不能直接双击 HTML 文件。<br />
+  在项目根目录运行 <b>run_demo.ps1</b>（Windows）或 <b>run_demo.sh</b>，
+  然后访问 <b>http://127.0.0.1:8041/</b>
+</p>
+
+<div class="preview-stage">
+  <main class="phone" id="elderPhone">
+
+    <div class="ink-mountains">
+<svg viewBox="0 0 430 265" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="fadeM6" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#769487" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#769487" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blurM6"><feGaussianBlur stdDeviation="2.2"/></filter>
+  </defs>
+  <path d="M0 157 C46 132 70 93 104 101 C126 106 140 137 162 130 C196 118 212 61 249 71 C286 81 291 125 318 127 C350 129 372 89 430 73 L430 0 L0 0Z" fill="url(#fadeM6)" filter="url(#blurM6)"/>
+  <path d="M0 178 C62 151 83 119 116 127 C148 135 157 163 187 149 C226 131 238 95 270 103 C303 111 315 151 346 148 C374 145 394 121 430 112" fill="none" stroke="#5d7e70" stroke-opacity=".28" stroke-width="1.3"/>
+  <path d="M272 92 C286 79 297 68 306 48 M305 49 C296 48 291 44 286 38 M305 49 C314 42 319 36 323 29" fill="none" stroke="#957045" stroke-opacity=".28" stroke-width="1.2"/>
+  <ellipse cx="286" cy="38" rx="7" ry="3" fill="#789489" fill-opacity=".28" transform="rotate(24 286 38)"/>
+  <ellipse cx="323" cy="29" rx="7" ry="3" fill="#789489" fill-opacity=".25" transform="rotate(-30 323 29)"/>
+</svg>
+    </div>
+
+    <div class="bottom-grass">
+<svg viewBox="0 0 430 150" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 137 C40 126 62 132 98 120 C136 107 169 124 205 115 C248 104 278 118 318 110 C355 102 391 108 430 94 L430 150 L0 150Z" fill="#8fa18b" fill-opacity=".10"/>
+  <g fill="none" stroke="#638173" stroke-opacity=".27" stroke-width="1.1">
+    <path d="M34 148 C39 128 38 111 31 94 M39 128 C49 117 55 108 59 94"/>
+    <path d="M103 150 C103 129 108 115 118 98 M107 126 C97 115 91 104 89 91"/>
+    <path d="M336 150 C334 128 328 112 318 97 M331 127 C345 118 354 106 358 92"/>
+    <path d="M386 150 C388 129 397 113 410 102"/>
+  </g>
+  <g fill="#799181" fill-opacity=".25">
+    <ellipse cx="59" cy="94" rx="8" ry="3" transform="rotate(-42 59 94)"/>
+    <ellipse cx="89" cy="91" rx="8" ry="3" transform="rotate(38 89 91)"/>
+    <ellipse cx="118" cy="98" rx="9" ry="3" transform="rotate(-36 118 98)"/>
+    <ellipse cx="318" cy="97" rx="9" ry="3" transform="rotate(35 318 97)"/>
+    <ellipse cx="358" cy="92" rx="8" ry="3" transform="rotate(-35 358 92)"/>
+  </g>
+</svg>
+    </div>
+
+    <!-- 顶栏。原包在右上角印着「周二 · 17:25 / 26℃ · 微风」——日期是写死的，
+         天气这个产品根本没有。屏幕上一句与事实无关的话，比一个工程词严重。
+         现在这两行由 `elder-v6-a.js` 从这台设备的真实时钟渲染，天气整条撤掉。 -->
+    <header class="topbar">
+      <div class="brand-mark">
+        <div class="brand-seal">优</div>
+        <div class="brand-copy"><strong>优活</strong><small>老人端</small></div>
+      </div>
+      <div class="top-weather"><strong id="clockDay"></strong><span id="clockTime"></span></div>
+    </header>
+
+    <div class="app-viewport" id="main">
+
+      <!-- ① 首页 ──────────────────────────────────────────────────────────
+           只回答三个问题：今天有没有事、下一件是什么、怎么让优活帮我。
+           对话与输入行在下面的 Focus Mode 里。 -->
+      <section class="panel elder-panel" data-panel="home" aria-label="首页">
+        <div class="identity-island" id="roleHeader">
+          <!-- 「下午好 · 张爷爷」里的名字删掉了。这个产品**不编人名**——
+               `elder.js` 的 `renderKin()` 用一整段注释记着为什么（唯一那个人名
+               不在任何数据里）。问候语按这台设备的真实时刻由脚本写。 -->
+          <div class="hello" id="helloLine">您好</div>
+          <h1 id="agentTitle">优活</h1>
+          <p id="roleOpening">我在，您请说。</p>
+          <!-- 当前是哪个角色。`elder.js` 的 `setMode()` 会写 `#modeName` 并给
+               `#modeBadge` 加 `orange`——两个 id 在设计一里被撤掉了，读它们的代码
+               还在（都做了 null 判断）。设计二有位置放它，所以放回来。 -->
+          <p class="mode-badge" id="modeBadge"><span id="modeName">优活办事模式</span></p>
+        </div>
+
+        <!-- 一行「今天」。由 `renderTodayLine()` 填，填之前不显示。
+             左边那颗点是 CSS 的 `::before`，不是子元素——`renderTodayLine` 写的是
+             `textContent`，任何子元素都会被它抹掉。 -->
+        <p class="status-ribbon" id="todayLine" hidden></p>
+
+        <!-- 「下一件」。`renderNextItem()` 填完才盖 `data-ready`，
+             CSS 里 `.next-item:not([data-ready])` 兜底不显示——只靠 `hidden`
+             会在数据回来之前露出一张空卡。 -->
+        <article id="nextItem" class="next-item" hidden>
+          <p class="next-label">下一件</p>
+          <p class="next-time" id="nextTime"></p>
+          <h2 class="next-title" id="nextTitle"></h2>
+          <p class="next-where" id="nextWhere"></p>
+          <button type="button" id="nextOpen">说说这件事 →</button>
+        </article>
+
+        <div class="mic-stage">
+          <div class="mic-orbit">
+            <button id="mic" class="mic-big" type="button" aria-label="按一下开始说话">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/>
+              </svg>
+            </button>
+          </div>
+          <div id="micHint" class="mic-hint" role="status" aria-live="polite">按一下，然后慢慢说</div>
+          <!-- 打字入口。语音是首选，打字是**唯一的退路**：Firefox 没有 Web Speech，
+               权限被拒、没有麦克风时也一样。这个按钮必须在首屏、看得见、够大。 -->
+          <button id="typeInstead" class="keyboard-entry" type="button">不方便说话？用打字说</button>
+        </div>
+
+        <!-- 这一段原包排在麦克风**上面**。挪到下面，理由是一次可测的失败：
+             打字是语音失败时唯一的退路，而它在 320×568 上被这一段推出了第一屏。
+             设计一那边有一整条闸门（`test_the_typing_route_is_in_the_first_screen`）
+             钉着这件事，它测的是 `/elder`，测不到这一页。 -->
+        <div class="companion-note">
+          <svg class="heart-line" viewBox="0 0 36 32" aria-hidden="true"><path d="M18 28C12 23 4 17 4 10.5 4 6 9 4 13 7.2 15.2 8.9 16.4 11 18 13.4 20 9.3 22 6 26.3 5.8 31.2 5.6 33 9.5 31.3 13.7 29 19.2 23.7 23.5 18 28Z"/></svg>
+          <strong>不知道怎么开口也没关系</strong>
+          <span>您可以直接说「我今天有什么事」「帮我挂个号」。一次说一件就好，我会一件一件问清楚。</span>
+        </div>
+
+        <!-- `renderTodayBlock()` 按 `.today-block` 找这一整块，没有未完成的事就收起。
+             上面那行 `#todayLine` 已经写着「今天没有要办的事」，这里再放一个空状态
+             等于同一屏里两处说同一件事。 -->
+        <section class="today-block" aria-label="今天">
+          <div class="section-head"><h2>今天</h2><span>按时间</span></div>
+          <div id="reminders" class="reminders"></div>
+          <button id="toggleReminders" class="more-btn" type="button" hidden>查看全部</button>
+        </section>
+      </section>
+
+      <!-- ② 记录 ────────────────────────────────────────────────────────── -->
+      <section class="panel elder-panel" data-panel="log" aria-label="记录" hidden>
+        <p class="panel-kicker">办过的事</p>
+        <h2 class="tab-head">办事与生活记录</h2>
+        <p class="tab-note">只记对生活有用的结果。和无忧伴聊天的内容不会放在这里。</p>
+
+        <!-- 容器必须**空着**发出去。带内容的容器有两种坏法：JS 没跑时它是假数据；
+             接口返回空而 `replaceChildren()` 漏调时它被留在原地。两种都是在说谎。 -->
+        <div class="organic-flow" id="activityLog" aria-live="polite"></div>
+
+        <!-- 施工图把这个按钮放在首页。放在这里，理由是它的行为：
+             `elder.js` 的处理器做的是 `loadActivity()`——刷新**这一屏**的列表。
+             放在首页，按钮上写着「刷新我的记录」而刷新的是另一格看不见的内容。 -->
+        <button type="button" id="logEntry" class="more-btn">
+          <span id="logEntryLabel">刷新我的记录</span>
+        </button>
+      </section>
+
+      <!-- ③ 家人 ──────────────────────────────────────────────────────────
+           不做社交系统。一位老人在这里只需要知道：谁能帮我、能帮什么、怎么找她。 -->
+      <section class="panel elder-panel" data-panel="kin" aria-label="家人" hidden>
+        <p class="panel-kicker">谁能帮您</p>
+        <h2 class="tab-head">我的家人</h2>
+        <p class="tab-note">需要家人接力的事，会先问您本人。平时不打扰，需要时再出现。</p>
+
+        <!-- 原包这里写死三个人（女儿张敏、儿子张伟、邻居王叔）。全部删掉：
+             `renderKin()` 读 `/v4/contacts/{elder}`，有真实档案就显示真名字，
+             没有就只说这个家庭真实存在的角色。**不编名字。** -->
+        <div class="family-tree" id="kinList" aria-live="polite"></div>
+
+        <p class="kin-help-label">家人可以帮您</p>
+        <ul class="kin-help">
+          <li>重要付款的第二次确认</li>
+          <li>紧急的时候第一个知道</li>
+          <li>替您添一件要记的事</li>
+        </ul>
+        <button class="contact-primary" type="button" id="kinContact">联系家人</button>
+        <p class="tab-note">高一点风险的事，优活会先问您，再问家人。两边都同意才办。</p>
+      </section>
+
+      <!-- ④ 我的 ────────────────────────────────────────────────────────── -->
+      <section class="panel elder-panel" data-panel="me" aria-label="我的" hidden>
+        <p class="panel-kicker">看得清 · 听得懂</p>
+        <h2 class="tab-head">我的习惯</h2>
+        <p class="tab-note">把字和声音调成您最舒服的样子。设置少一点，但每一项都真正有用。</p>
+
+        <!-- 「我的」这两项是设计一与设计二**唯一一处真正的结构冲突**。
+             `elder.js` 读 `#speechRate.value` / `#fontScale.value`，而设计二的控件
+             是三个按钮的 `.segmented`。施工图给了两条路，推荐改 `elder.js` 同时认
+             两种形态——但这一轮我只拥有这一页自己的四个文件，`elder.js` 不在其内。
+
+             所以走第三条：**按钮组仍然是屏幕上的控件**，旁边挂一个隐藏的
+             `<select>` 当值的载体，两边由 `elder-v6-a.js` 双向同步。
+             这样 `elder.js` 一个字不用改，设计二的观感也保住了。
+             隐藏用 `hidden` 属性而不是视觉隐藏：视觉隐藏的 `<select>` 仍然可聚焦，
+             键盘用户会在同一个设置上按到两次 Tab，其中一次落在看不见的控件上。 -->
+        <div class="profile-tools habit-group" aria-label="看得清、听得懂">
+          <div class="habit-row">
+            <div class="habit-text">
+              <strong class="tool-name">说话速度</strong>
+              <span class="habit-why">选「慢」的时候，优活会一字一句地说</span>
+            </div>
+            <div class="segmented" data-mirrors="speechRate" role="group" aria-label="说话速度">
+              <button type="button" data-value="0.72" aria-pressed="false">慢</button>
+              <button type="button" data-value="0.88" aria-pressed="true">舒适</button>
+              <button type="button" data-value="1.0" aria-pressed="false">正常</button>
+            </div>
+            <select id="speechRate" aria-hidden="true" tabindex="-1" hidden>
+              <option value="0.72">慢</option>
+              <option value="0.88" selected>舒适</option>
+              <option value="1.0">正常</option>
+            </select>
+          </div>
+
+          <div class="habit-row">
+            <div class="habit-text">
+              <strong class="tool-name">文字大小</strong>
+              <span class="habit-why">屏幕上的字会变大，按钮也跟着变大</span>
+            </div>
+            <div class="segmented" data-mirrors="fontScale" role="group" aria-label="文字大小">
+              <button type="button" data-value="1.1" aria-pressed="false">较大</button>
+              <button type="button" data-value="1.25" aria-pressed="true">大</button>
+              <button type="button" data-value="1.5" aria-pressed="false">特大</button>
+            </div>
+            <select id="fontScale" aria-hidden="true" tabindex="-1" hidden>
+              <option value="1.1">较大</option>
+              <option value="1.25" selected>大</option>
+              <option value="1.5">特大</option>
+            </select>
+          </div>
+        </div>
+        <!-- 原包还有第三行「听力辅助 · 开启」。删掉了：`saveProfile()` 把
+             `hearing_support` 写死成 `false`，那个开关拨了不算数。
+             屏幕上放一个假开关，比少一个设置严重得多。 -->
+        <button id="saveProfile" class="contact-primary" type="button">保存我的习惯</button>
+
+        <div class="section-head"><h2>常用</h2><span>点一下就能用</span></div>
+        <!-- 原包这里是四张「用药 / 健康记录 / 日程 / 可信记录」卡片，都是 `<div>`，
+             点下去什么都不会发生。对这一位用户，一个看起来能按、按了没反应的东西
+             比没有它更糟。换成两个**真的通向某处**的入口。 -->
+        <div class="service-grid">
+          <button type="button" id="companionEntry" class="service-entry">
+            <b id="companionEntryLabel">找无忧伴聊聊</b>
+            <span>不想办事的时候，找它说说话。聊天内容不进家人日报。</span>
+          </button>
+          <a id="leaveApp" class="service-entry" href="/">
+            <b>换一个人用</b>
+            <span>回到入口页，换成家人那一侧。</span>
+          </a>
+        </div>
+
+        <div class="trust-strip">
+          <strong>优活怎么保护您</strong>
+          <div class="trust-line">
+            <span id="semanticPill" class="trust-pill neutral">正在检查听得准不准…</span>
+            <span id="voicePill" class="trust-pill neutral">正在检查念得清不清…</span>
+            <span class="trust-pill">一次只问一件事</span>
+            <span class="trust-pill">要紧的事请您念一遍</span>
+            <span class="trust-pill">不会自动扣钱</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Focus Mode ──────────────────────────────────────────────────────────
+         它**刻意没有 `data-panel`**：`initSections` 把每个 `[data-panel]` 当成
+         一个要轮换的分区，这一段会变成第五格而被 hidden 掉。它的显隐由
+         `body[data-focus]` 在 CSS 里决定，由 `elder.js` 的 `setFocus()` 写。 -->
+    <section class="focus-layer" id="focusLayer" aria-label="对话">
+      <button id="focusBack" class="focus-back" type="button">‹ 返回首页</button>
+
+      <!-- 这个圈**不是第二个麦克风**，它只是把点击转交给首页那一个 `#mic`。
+           `elder.js` 的注释写得很清楚：Voice Orb 只能有一个，两个 orb 的状态机
+           会立刻分叉。而设计二的 Focus 屏是围着一个圈画的，圈没了这一屏就散了。
+           所以：一个状态机、一个识别器、两处呈现——转交而不是复制，
+           aria-label 由 `elder-v6-a.js` 从 `#mic` 镜像过来。 -->
+      <div class="mic-orbit focus-orb">
+        <button class="mic-big" type="button" id="focusMic" aria-label="按一下开始说话">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>
+        </button>
+      </div>
+
+      <!-- 这件事本身。`task-space.js` 从后端状态渲染；认不出的状态它什么都不画。 -->
+      <div id="taskSpace" aria-live="polite"></div>
+
+      <div id="chat" class="chat" aria-live="polite"></div>
+
+      <!-- 玻璃盒确认卡。位置很要紧：`elder.js:608` 用一整段注释记着一个真实缺陷
+           ——系统正在等老人口头确认一笔 126.50 元的付款，而确认卡被写进了一个
+           渲染高度为 0 的节点，屏幕上什么都没有。这里必须是看得见的地方。 -->
+      <div id="relianceHost" aria-live="polite"></div>
+
+      <div class="quick" aria-label="常说的话">
+        <button type="button" data-text="我今天有什么事">今天有什么事</button>
+        <button type="button" data-text="我今天吃药了吗">今天吃药了吗</button>
+        <button type="button" data-text="帮我交水费">交水费</button>
+        <button type="button" data-text="帮我挂个号">挂号</button>
+        <button type="button" data-text="帮我联系家人">联系家人</button>
+      </div>
+
+      <div class="composer">
+        <input id="text" aria-label="对优活说" placeholder="也可以打字">
+        <button id="send" type="button">发送</button>
+      </div>
+
+      <!-- 这两个是**对话控件**，所以放在对话这一屏里。
+           「再说一遍」重念上一句，「返回上一步」把她放回上一个问题——
+           两件事都只有在对话进行中才说得通。 -->
+      <div class="focus-tools">
+        <button type="button" id="repeatLast" class="focus-tool">再说一遍</button>
+        <button type="button" id="stepBack" class="focus-tool">返回上一步</button>
+      </div>
+    </section>
+
+    <!-- 状态通道。**不在 Focus Mode 里面**，这一条和施工图不同，理由是设计一
+         那边用注释记下来的一次真实失败：保存字号、刷新记录、首页待办加载失败
+         都发生在 Focus Mode 之外，把 `#status` 放进去，这些操作的反馈会写进一个
+         默认隐藏的节点，用户一个字也看不到。它压在标签栏上方，四格都看得见。 -->
+    <p id="status" class="status-line" role="status" aria-live="polite"></p>
+
+    <!-- 四个 Tab。页内切换，不换路由。
+         每个都必须带 `seg`：`common.js` 的 `initSections` 第一句是
+         `querySelectorAll('.seg')`，没有它就**静默返回**，四个面板永远打不开。
+         这一栏用的是 `dock` 而不是 `tabbar`——`data-nav="tabbar"` 是向全局样式
+         承诺「有底部标签栏，可以藏返回链接」，那套样式这一页根本没引。
+         这一页的出口是「我的」里的 `#leaveApp`。 -->
+    <nav class="dock elder-tabs" aria-label="主要分区">
+      <button type="button" class="seg is-current" data-section="home" aria-current="true"><span class="nav-icon"></span><span>首页</span></button>
+      <button type="button" class="seg" data-section="log"><span class="nav-icon"></span><span>记录</span></button>
+      <button type="button" class="seg" data-section="kin"><span class="nav-icon"></span><span>家人</span></button>
+      <button type="button" class="seg" data-section="me"><span class="nav-icon"></span><span>我的</span></button>
+    </nav>
+
+    <!-- 事务详情：压在四个 Tab 之上的一层。从「记录」点一行进来。
+         它和背板必须是 `main` 的**直接子元素**：`elder.js` 的
+         `detailOutsideLayers()` 按 `main > *` 找要临时 `inert` 掉的兄弟节点，
+         少了这一步，键盘用户会 Tab 进一个被完全盖住的输入框和麦克风。
+         出口在**底部**：75 岁单手持机的人碰不到左上角。 -->
+    <div id="detailBackdrop" class="detail-backdrop" aria-hidden="true"></div>
+    <aside id="taskDetail" class="detail-layer" role="dialog" aria-modal="true"
+           aria-labelledby="taskDetailTitle" aria-hidden="true" inert>
+      <h2 id="taskDetailTitle" class="detail-layer-title">这件事的经过</h2>
+      <div id="taskDetailBody" class="detail-layer-body" aria-live="polite"></div>
+      <div class="detail-layer-exit">
+        <button id="taskDetailClose" type="button" class="contact-primary">知道了</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="youhuo-robot-mascot" id="youhuoRobotMascot" aria-live="polite" aria-label="优活小优向导">
+  <div class="youhuo-robot-bubble" id="youhuoRobotBubble" role="status"></div>
+  <canvas class="youhuo-robot-canvas" id="youhuoRobotCanvas" width="56" height="90" aria-hidden="true"></canvas>
+</div>
+
+<!-- 视觉层。包自带的两份脚本 `fetch × 0`，只做纯视觉行为（时钟、吉祥物拖拽、
+     动效）。业务逻辑一个字都不在这里。 -->
+<script src="/static/elder-v6-a.js"></script>
+<script src="/static/elder-v6-b.js"></script>
+
+<!-- 业务逻辑用仓库的这四份，**和设计一同一份代码**。
+     不给设计二单写一份接线：这个项目已经因为「两套实现各自往返都绿、跨子系统
+     才红」栽过（字号语速和 SOS 各有两套实现）。一份逻辑、两张皮。
+     顺序要紧：identity → common 提供 `window.YouHuo`，`elder.js` 依赖它。 -->
+<script src="/static/identity.js"></script>
+<script src="/static/common.js"></script>
+<!-- `elder.js` 必须是 `type="module"`：它顶层写着
+     `const {api, byId, errorWords} = window.YouHuo` 那一类声明，而这一页同时还
+     加载着两份经典脚本。同名标识符在同一个全局作用域里重复声明会
+     `SyntaxError: Identifier 'api' has already been declared`——**整个文件不执行**。
+     它本来就是 module（`import` 了 speech / glassbox / task-space / task-detail），
+     这里只是把这个前提写下来，别有人顺手把它改成经典脚本。 -->
+<script type="module" src="/static/elder.js"></script>
+</body>
+</html>

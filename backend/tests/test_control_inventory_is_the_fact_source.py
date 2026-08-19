@@ -28,7 +28,15 @@
 """
 from __future__ import annotations
 
+# `functools` 和 `re` 都是补的。改这个文件的那一轮被中断在半途，
+# 新写的判据用了它们而 import 没跟上。
+#
+# 后果不是「这一个文件报错」，是 **pytest 收集阶段直接中断**，2000 多条测试
+# 一条都跑不了。半途中断的编辑最危险的形态就是这种：它不在自己那一格里失败，
+# 而是把整个门堵上——而「全都没跑」和「全都通过」在退出码之外看起来很像。
+import functools
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -277,7 +285,14 @@ _COVERAGE_FLOOR = {
     "interaction_type": 102,
     "handler_file": 117,
     "handler": 117,
-    "apis": 5,
+    # 从 5 抬到 8。抬它的理由写在 `_REACHES_THE_BACKEND` 上面那一段。
+    #
+    # 为什么是 8 而不是 9：落盘清单里现在有 **9** 个控件的 `apis` 非空，但其中
+    # `stage.html:id=stageEscape` 那一条是**假的**——它挂着八个端点，而
+    # `stage.js:275` 里它的全部行为是 `() => setClean(false)`，一个请求都不发。
+    # 把 9 钉成下限，就等于要求那个归属错误**永远别被修好**：谁修好了 `function_body()`
+    # 的过度归属，这一条就红。那和这一轮要治的「罚进步」是同一个病。
+    "apis": 8,
 }
 
 
@@ -304,24 +319,395 @@ def test_no_inventory_column_gets_emptier(column: str) -> None:
     )
 
 
-def test_the_apis_column_is_known_to_be_unimplemented() -> None:
-    """`apis` 只填了 5/145，其中 3 个还是同一个端点——这一列等于没实现。
+# --- apis 这一列：下限 + 名单，不是上限 --------------------------------------
+#
+# 上一版这里是一条**上限**：`len(with_api) <= 8`。于是这一轮把 /family 的
+# 「加一条提醒」三个输入从本地 toast 真接到 `POST /v2/family/reminders` 之后，
+# 计数从 6 涨到 9，闸门**变红**——它罚的是进步。它自己的报错信息也承认这一点，
+# 让越过阈值的人把它改成正向断言。这一段就是那次改写。
+#
+# 换成什么：
+#   ① `_REACHES_THE_BACKEND` —— 一张**核过的**「控件 → 端点」表，逐条断言它
+#      **还**打得到。接通更多控件不会让它红；**弄断**表里任何一条会。
+#   ② `_UNBOUND_BUT_EXPLAINED` —— 「这一页的脚本里找不到对它的引用」那一批的
+#      具名白名单，每一条写清是被什么绑的；解释不了的单独列进 `_NOTHING_BINDS_THEM`。
+#   ③ `_why_there_is_no_edge()` —— 剩下没有端点的控件按**结构性**理由分类，
+#      分类判据从代码里算出来，不是手写的状态字段。
 
-    这条测试**不是**要求它变好，是要求这件事**不被忘记**。产品有近百个 API，
-    而 `/judge` 上七拍每一拍的可见文案都点名了一个端点
-    （`/v2/chat` `/v2/tasks` `/v5/voice/resolve` `/v6/interaction/plan`），
-    清单里那 27 个控件的 `apis` 却全是空数组。
+#: 一个正则，回答「这份脚本里到底有没有一处打后端」。
+#:
+#: 三种调用形态都要认，少认一种就会把「接了」读成「没接」：
+#:   `api('/v2/...')`        老六页（common.js 的 `api()` 直接 `fetch(path)`）
+#:   `fetch('/...')`         少数直接 fetch 的地方
+#:   `YouhuoAPI.get('/...')` 山水版 `/app` 那一套（api-client.js 里
+#:                           `fetch(cfg.apiBase + path)`，apiBase = `/api/v1`）
+#:
+#: 第三种是清单的 `apis` 列**完全看不见**的：`build_control_inventory.py` 的
+#: `_API_CALL` 只认前两种，而 `/app` 的 35 处后端调用全走第三种。所以
+#: 「`apis` 为空」在 `/app` 上根本不能读成「没接后端」。
+_BACKEND_CALL = re.compile(
+    r"""\b(?:api|fetch)\(\s*[`'"]/|\bYouhuoAPI\.(?:get|post|put|request)\("""
+)
 
-    也就是说迁移矩阵**追踪不了「这个控件背后的 API 有没有跟着搬」**。
-    计划书里矩阵的形状是「现有控件 → handler → API → 新位置」，
-    中间那一环现在是空的。修它之前，不许声称矩阵覆盖了 API 这一维。
+
+@functools.lru_cache(maxsize=1)
+def _scripts_with_no_backend_call() -> frozenset[str]:
+    """全文件一处后端调用都没有的脚本。绑在它们上的控件是**证得出来**的纯本地 UI。"""
+    static = ROOT / "backend" / "static"
+    return frozenset(
+        str(p.relative_to(static)).replace("\\", "/")
+        for p in static.rglob("*.js")
+        if not _BACKEND_CALL.search(p.read_text(encoding="utf-8"))
+    )
+
+
+@functools.lru_cache(maxsize=None)
+def _scripts_of(page: str) -> tuple[str, ...]:
+    """这一页真正加载的脚本。用生成器自己那份实现，不在这里抄第二遍。"""
+    sys.path.insert(0, str(BUILDER.parent))
+    import build_control_inventory  # noqa: PLC0415
+
+    return tuple(build_control_inventory.scripts_for(page))
+
+
+def _where(control: dict) -> str:
+    return f"{control['source_file']}:{control['key']}"
+
+
+#: **核过的**「控件 → 端点」边：`页面:稳定身份 → 这个控件参与的那个端点`。
+#:
+#: 这张表是**下限**，判据是「这条边还在不在」。
+#:
+#: 每一条都是读着 JS 核出来的，**不是照抄清单的 `apis` 列**。为什么不能照抄：
+#: 那一列记的是「抽取器在 handler 的花括号块里看见了一个字面端点」，而它会**多报**。
+#: 现成的例子就是第 9 条：`stage.html:id=stageEscape` 在清单里挂着八个端点
+#: （`/v2/tasks` `/v5/sagas` `/v3/delegation/preview` …），而 `stage.js:275` 里
+#: 它的全部行为是
+#:
+#:     escape.addEventListener('click', () => setClean(false));
+#:
+#: 一个请求都不发。它挂着八个端点，只是因为 `stage.js:19` 那句
+#: `getElementById('stageEscape')` 落在整份文件那个 IIFE 的花括号里，于是
+#: `function_body()` 把**整份 stage.js** 的端点都算给了它。
+#: 照抄那一列 = 把一条假边钉成判据 = 将来谁修好归属谁就红。所以这里只有 8 条。
+_REACHES_THE_BACKEND: dict[str, str] = {
+    # /family「加一条提醒」表单的三个输入。三个都在 `createReminder()` 的函数体里
+    # 被读走，同一个函数里 `api('/v2/family/reminders', {method: 'POST'})`
+    # （family.js:248-273），提交口是 `#reminderForm` 的 submit（family.js:683）。
+    #
+    # 这三个就是让旧上限变红的那三个：它们这一轮才从「只弹一句本地 toast」
+    # 接到真后端。旧闸门把这件事读成越界，新闸门把它读成**必须守住的三条边**。
+    "family.html:id=reminderTitle": "/v2/family/reminders",
+    "family.html:id=reminderDue": "/v2/family/reminders",
+    "family.html:id=escalation": "/v2/family/reminders",
+    # family-v6.html 是同一套表单的第二份 DOM，它也加载 family.js，所以同一个
+    # `createReminder` 绑的是六个控件而不是三个。两份都要守：只修好一份，
+    # 另一份的用户看到的还是那个假成功。
+    "family-v6.html:id=reminderTitle": "/v2/family/reminders",
+    "family-v6.html:id=reminderDue": "/v2/family/reminders",
+    "family-v6.html:id=escalation": "/v2/family/reminders",
+    # /stage 的两个演示输入框。文本框的值直接进 POST 的 body——
+    # proof-demos.js:473-482 的 `emotionDemo` 与 :485-494 的 `medicalDemo`。
+    # 它们在演示台上，但打的是真端点，所以是真边。
+    "stage.html:id=emotionText": "/v4/emotions/analyze",
+    "stage.html:id=medicalText": "/v4/medical-reports/analyze",
+}
+
+
+@pytest.mark.parametrize("where", sorted(_REACHES_THE_BACKEND))
+def test_a_control_that_reaches_the_backend_still_does(where: str) -> None:
+    """正向断言：这些控件必须**还**打得到它那个端点。
+
+    方向是这一条判据的全部意义：
+
+        接通一个新控件  → 这张表不管它 → **绿**（旧的上限判据在这里是红的）
+        弄断表里一条边  → 它的 `apis` 空掉 → **红**
+
+    上限判据两件事都做反了。
     """
-    controls = _load()
-    with_api = [c for c in controls if _is_filled(c, "apis")]
-    assert len(with_api) <= 8, (
-        f"`apis` 列已经填到 {len(with_api)} 个了——好事。"
-        "把这条测试改成正向断言（比如要求 handler 里出现 fetch 的控件都要有 apis），"
-        "并把 `_COVERAGE_FLOOR['apis']` 抬上去。"
+    endpoint = _REACHES_THE_BACKEND[where]
+    control = next((c for c in _load() if _where(c) == where), None)
+    assert control is not None, (
+        f"`{where}` 在清单里没有了。它是一条核过的「控件 → 端点」边，"
+        "控件不在了这条边也就不在了。\n"
+        "  如果是搬走了，在 `MIGRATIONS` 里声明，并把这张表里的页面改掉；\n"
+        "  如果是删掉了，那 `/v2/family/reminders` 这条链路少了一个入口。"
+    )
+    assert endpoint in control["apis"], (
+        f"`{where}` 原来打到 `{endpoint}`，现在它的 apis 是 {control['apis'] or '空'}。\n"
+        f"  绑它的是 {control['handler_file'] or '（这一页的脚本里没有引用它）'}"
+        f"::{control['handler'] or '—'}。\n"
+        "  这条判据是**下限**：多接一个端点不会让它红，只有**弄断**才会。"
+    )
+
+
+@pytest.mark.parametrize("where", sorted(_REACHES_THE_BACKEND))
+def test_a_declared_edge_is_verifiable_in_the_source_not_only_in_the_artifact(
+    where: str,
+) -> None:
+    """上面那条判据读的是**产物**；这一条去代码里核同一件事。
+
+    只读产物是不够的：清单是脚本生成的，脚本的归属会多报（`#stageEscape` 那八个
+    端点就是），也会漏报（`/app` 的 35 处 `YouhuoAPI.*` 一处都看不见）。
+    一张照着产物抄出来的表，等于把抽取器的毛病抄成了判据。
+
+    这里核的是：那个端点字面上**真的**写在绑这个控件的那份脚本里。
+    """
+    endpoint = _REACHES_THE_BACKEND[where]
+    page, _key = where.split(":", 1)
+    sources = [
+        (ROOT / "backend" / "static" / name).read_text(encoding="utf-8")
+        for name in _scripts_of(page)
+    ]
+    assert any(endpoint in text for text in sources), (
+        f"`{where}` 声明打到 `{endpoint}`，但 {page} 加载的脚本"
+        f"（{'、'.join(_scripts_of(page)) or '一个都没有'}）里找不到这个字面端点。\n"
+        "  要么端点改名了（那就改这张表），要么这条边已经断了。"
+    )
+
+
+def test_the_declared_edges_do_not_contradict_the_local_only_scripts() -> None:
+    """两张表不许打架。
+
+    如果一个控件被声明成「打到某个端点」，而绑它的那份脚本里**一处后端调用都没有**，
+    那两张表至少有一张是错的。这一条把它们钉在一起，免得各自漂移。
+    """
+    local_only = _scripts_with_no_backend_call()
+    controls = {_where(c): c for c in _load()}
+    contradictions = [
+        f"{where}（绑它的 {controls[where]['handler_file']} 全文件没有后端调用）"
+        for where in sorted(_REACHES_THE_BACKEND)
+        if where in controls and controls[where]["handler_file"] in local_only
+    ]
+    assert not contradictions, (
+        "这些控件被声明成打到后端，但绑它们的脚本里一处后端调用都没有：\n  "
+        + "\n  ".join(contradictions)
+    )
+
+
+#: 「这一页加载的脚本里找不到对它的引用」那 16 个，逐个查过的结论。
+#:
+#: `值` 是**真正把它绑上去的那个钩子**——必须能在这一页加载的脚本里找到这个字面串。
+#: 判据不是「我写了一句解释」，而是「解释里指的那个钩子代码里真的有」。
+#:
+#: 为什么这批会被报成「没人绑」：`trace()` 拿**稳定身份里那个属性**去脚本里搜，
+#: 而 `_KEY_ATTRS` 挑身份时 `id` / `data-kind` / `data-label` / `data-jump` 都排在
+#: `data-action` 前面。于是身份取到了 `id=homeVoiceStart`，脚本里却只有
+#: `data-action="voice-start"`——两边说的是同一个按钮，用的是不同的名字。
+#: 这**不是**控件的缺陷，是「查得到」和「绑上了」之间的落差。
+_UNBOUND_BUT_EXPLAINED: dict[str, tuple[str, str]] = {
+    # ---- 属性委托：身份取了 id / data-kind / data-label，绑定走的是 data-action ----
+    "app/pages/home.html:id=homeVoiceStart": (
+        "voice-start",
+        "`<button id=\"homeVoiceStart\" data-action=\"voice-start\">`，由 app.js:361 "
+        "那个 `[data-action]` 全局委托接住，:364 是它的分支。身份用了 id，绑定用的是 "
+        "data-action —— 两个名字，同一个按钮。",
+    ),
+    "app/pages/certificate.html:data-label=完整凭证": (
+        "cert-detail",
+        "`<button data-action=\"cert-detail\" data-label=\"完整凭证\">`，同一个 "
+        "`[data-action]` 委托，分支在 app.js:452。`data-label` 只是给清单看的标签。",
+    ),
+    **{
+        f"app/pages/records.html:data-kind={kind}": (
+            "records-filter",
+            "记录页的四个筛选键都带 `data-action=\"records-filter\"`，"
+            "app.js:425-429 读的是 `el.dataset.kind`。脚本里从来不会出现 "
+            "`[data-kind]` 这个字面串，所以按属性名去搜必然搜不到。",
+        )
+        for kind in ("全部", "支付", "健康", "服务")
+    },
+    # ---- 属性 / class 委托：脚本按选择器绑，不经 id ----
+    "elder.html:id=openExtras": (
+        "data-sheet-open",
+        "sheet.js:30 `document.querySelectorAll('[data-sheet-open]')`。"
+        "这一条正是生成器自己那句提示里举的例子。",
+    ),
+    **{
+        f"stage.html:data-jump={n:02d}": (
+            "beat-jump",
+            "stage.js:532-548 在 document 上按 `.beat-jump` 这个 **class** 委托，"
+            "取值走 `btn.dataset.jump`。身份属性是 `data-jump`，绑定钩子是 class，"
+            "所以按属性名搜不到。",
+        )
+        for n in range(1, 8)
+    },
+    # ---- 原生行为：本来就不需要 JS ----
+    "stage.html:id=directorDeck/summary": (
+        "",
+        "`<details id=\"directorDeck\">` 的 `<summary>`。开合是 HTML 原生行为，"
+        "不需要任何脚本 —— 「没有脚本引用它」在这里是**正确**的状态。",
+    ),
+}
+
+#: 查不出解释的那些：**没有任何脚本绑它**。这不是白名单，是缺陷登记。
+#:
+#: 这一条不允许被读成「已解释」。它留在这里是为了让它**有名字**、并且让下一个
+#: 冒出来的死控件立刻变红，而不是混在 16 个「其实都绑着」里没人看得出来。
+_NOTHING_BINDS_THEM: dict[str, str] = {
+    "stage.html:id=directorToggle": (
+        "`<button class=\"stage-pick\" id=\"directorToggle\" aria-expanded=\"false\" "
+        "aria-controls=\"directorDeck\">导演台</button>`（stage.html:63）。"
+        "全仓库的 .js 里**没有任何一处**出现 `directorToggle`。它顶着 `.stage-pick`，"
+        "但 stage.js 的三处 `.stage-pick` 委托分别挂在 `#stageRoles` / `#stageSizes` / "
+        "`#stageLines` 上，而这个按钮住在 header 的 `.stage-depth` 里，一个都够不着；"
+        "另外两处 document 级委托认的是 `.beat-jump` 与 `[data-run]`，也都不是它。"
+        "严格 CSP 下没有内联 onclick，所以确实没有别的路。\n"
+        "  后果：点它什么都不发生，`aria-expanded=\"false\"` 是一句永远为假的承诺，"
+        "`aria-controls` 指着的 `<details id=\"directorDeck\">` 只能靠它自己的 "
+        "`<summary>` 打开——正因为 summary 能开，这一页看起来一点都不坏。\n"
+        "  修法（属于 stage.html / stage.js，不属于这份测试）：要么给它绑上开合并"
+        "同步 `aria-expanded`，要么删掉这个按钮、只留 `<summary>`。"
+    ),
+}
+
+
+def _unbound(controls: list[dict]) -> list[dict]:
+    """这一页加载的脚本里找不到对它的引用的控件。
+
+    `<a>` 不算：链接不需要脚本也能跳。这和生成器 `main()` 里那句
+    「另有 N 个控件……找不到对它的引用」算的是同一批。
+    """
+    return [c for c in controls if not c["handler_file"] and c["tag"] != "a"]
+
+
+def test_every_unbound_control_has_a_written_explanation() -> None:
+    """「没人绑」的每一个都要有名字和理由——包括「其实是缺陷」这个理由。
+
+    生成器打印这批的时候写着「这不一定是缺陷……但每一个都要有解释」。
+    那句话此前没有任何东西在执行：打印完就没了，多一个少一个都不会有人知道。
+    这条判据把它变成闸门。
+    """
+    named = set(_UNBOUND_BUT_EXPLAINED) | set(_NOTHING_BINDS_THEM)
+    unexplained = sorted(_where(c) for c in _unbound(_load()) if _where(c) not in named)
+    assert not unexplained, (
+        f"{len(unexplained)} 个控件在这一页加载的脚本里找不到对它的引用，"
+        "而且没有登记过：\n  "
+        + "\n  ".join(unexplained)
+        + "\n\n  逐个查清楚它到底被什么绑着——这个项目里最常见的答案是**属性委托**："
+        "\n  `[data-action]`（/app 全局分发表）、`[data-sheet-open]`（sheet.js）、"
+        "\n  `.beat-jump` / `[data-run]`（stage.js）、`.seg`（common.js 的 initSections）。"
+        "\n  查得到就写进 `_UNBOUND_BUT_EXPLAINED`（值是那个钩子的字面串，下一条判据会核）；"
+        "\n  真的什么都没绑，写进 `_NOTHING_BINDS_THEM` —— 那是一个死控件，要报出去。"
+    )
+
+
+@pytest.mark.parametrize("where", sorted(_UNBOUND_BUT_EXPLAINED))
+def test_the_explanation_points_at_a_hook_that_is_really_there(where: str) -> None:
+    """解释不能只是一句话，它指的那个钩子必须在这一页的脚本里找得到。
+
+    不核这一步的话，白名单就是「写一句话就能让门变绿」——那正是这一轮在治的病。
+    """
+    hook, _why = _UNBOUND_BUT_EXPLAINED[where]
+    page, _key = where.split(":", 1)
+    control = next((c for c in _load() if _where(c) == where), None)
+    assert control is not None, (
+        f"`{where}` 已经不在清单里了。白名单不许留幽灵条目——"
+        "控件没了就把这一行删掉。"
+    )
+    if not hook:
+        # 空钩子 = 「原生行为，本来就不需要 JS」。这个说法只对 `<summary>` 这类
+        # 天生可交互的标签成立，所以核的是标签而不是脚本。
+        assert control["tag"] in {"summary", "details"}, (
+            f"`{where}` 的解释是「原生行为不需要脚本」，但它是 <{control['tag']}>，"
+            "不是 <summary>。<button> 没有原生开合——没有脚本它就是死的。"
+        )
+        return
+    sources = [
+        (ROOT / "backend" / "static" / name).read_text(encoding="utf-8")
+        for name in _scripts_of(page)
+    ]
+    assert any(hook in text for text in sources), (
+        f"`{where}` 的解释说它由 `{hook}` 绑定，但 {page} 加载的脚本"
+        f"（{'、'.join(_scripts_of(page)) or '一个都没有'}）里找不到这个串。\n"
+        "  要么钩子改名了（改这张表），要么这个控件**真的**已经没人绑了"
+        "（那它该进 `_NOTHING_BINDS_THEM`）。"
+    )
+
+
+def test_the_dead_control_list_does_not_grow_silently() -> None:
+    """死控件只许变少。
+
+    `_NOTHING_BINDS_THEM` 是缺陷登记，不是豁免：新增一个要在这里写下它的名字，
+    这条判据本身不会因为「登记了」就变绿——上面那条覆盖判据才是门，这一条守的是
+    **不许在登记表里悄悄多一行**。
+    """
+    #: 查清楚的那一轮里，确认「什么都没绑」的只有这一个。
+    KNOWN = {"stage.html:id=directorToggle"}
+    added = sorted(set(_NOTHING_BINDS_THEM) - KNOWN)
+    assert not added, (
+        f"死控件登记表多了 {len(added)} 条：{added}。\n"
+        "  往这张表里加名字**不是**修好它。先确认它真的什么都没绑"
+        "（属性委托、class 委托、原生行为都排除掉），确认之后请把它报出去，"
+        "并同步更新这条判据里的 KNOWN。"
+    )
+
+
+def _why_there_is_no_edge(control: dict) -> str:
+    """一个没有端点的控件，为什么事实源里没有它那条边。
+
+    四个理由，判据全部是**结构性的**、从代码里算出来的，没有一个是手写的状态字段
+    ——这个项目在「按一个手工维护的字段分类，然后整类空过」上栽过。
+    """
+    if control["tag"] == "a":
+        # 换页面本身不打后端，目标页自己拉自己的数据。
+        # 这不是猜的：全清单 70 个没有端点的 `<a>`，有端点的 `<a>` 是 0 个。
+        return "navigate"
+    if not control["handler_file"]:
+        # 没有任何脚本引用它。逐个查过，见 `_UNBOUND_BUT_EXPLAINED` /
+        # `_NOTHING_BINDS_THEM`。
+        return "unbound"
+    if control["handler_file"] in _scripts_with_no_backend_call():
+        # 绑它的那份脚本里一处后端调用都没有 —— 它是**证得出来**的纯本地 UI。
+        # 现在落在这一类的是 elder-v6-a/b.js、family-v6-a/b.js、sheet.js：
+        # 换分区、开抽屉、把一句快捷话填进输入行。
+        return "local-only"
+    # 剩下的：绑它的脚本确实打后端，但端点在 handler **调用的下一层函数**里，
+    # 而 `function_body()` 只看 handler 自己那对花括号。
+    #     elder.js:1031  `#send` → `send()` → `postChat()` → `api('/v2/chat')`（:469）
+    #     judge.js:63    `#txnRefresh` → `onRefresh()` → `api('/v2/tasks?limit=100')`（:261）
+    #     app.js         `[data-action]` 分发表 → `YouhuoAPI.post(...)`，而 `_API_CALL`
+    #                    连 `YouhuoAPI.` 这种形态都不认（/app 的 35 处调用全在视野外）
+    # 这一类**不能**读成「没接后端」，只能读成「事实源里没有这条边」。
+    return "one-hop-away"
+
+
+#: 四个理由各自至少要覆盖到一个控件。
+#:
+#: 加这一条是因为「判据跑过了」和「判据管到了东西」是两回事：一条谁都不匹配的分支
+#: 是死作用域，它会安静地跟着整套判据一起变绿。
+_EVERY_REASON = ("navigate", "unbound", "local-only", "one-hop-away")
+
+
+def test_every_control_without_an_edge_has_a_structural_reason() -> None:
+    """没有端点的控件，每一个都要落进四个理由之一。
+
+    这张名单是**下限判据的配套说明**：它回答「为什么 `_REACHES_THE_BACKEND` 只有
+    8 条而不是 376 条」。
+
+    最要紧的一句写在这里：**`apis` 为空不等于「没接后端」**。
+    376 个控件里 367 个没有端点，而其中 253 个属于 `one-hop-away` ——
+    它们大多**接着后端**，只是抽取器跟不过去那一跳。拿这一列去数「还有多少没接」，
+    数出来的是抽取器的能力，不是产品的进度。
+
+    方向上和上限判据相反：接通一个控件，它就从这批里消失，这条判据不会红。
+    """
+    reasons = {_why_there_is_no_edge(c) for c in _load() if not _is_filled(c, "apis")}
+    unknown = sorted(reasons - set(_EVERY_REASON))
+    assert not unknown, f"出现了没登记过的理由：{unknown}"
+
+
+@pytest.mark.parametrize("reason", _EVERY_REASON)
+def test_no_reason_is_dead_scope(reason: str) -> None:
+    """每个理由都要真的匹配到控件。
+
+    判据算在**整份清单**上而不是只算在「没有端点」的那批上：否则谁把
+    `local-only` 里最后一个控件接上了后端，这一条就红——又是罚进步。
+    """
+    hits = sum(1 for c in _load() if _why_there_is_no_edge(c) == reason)
+    assert hits, (
+        f"`{reason}` 这个理由一个控件都没匹配到。一条谁都不匹配的分支是死作用域，"
+        "它跟着整套判据一起变绿，看不出来。先确认它还成立，不成立就删掉它。"
     )
 
 

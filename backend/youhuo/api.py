@@ -376,6 +376,15 @@ def create_app(
     def family_v6_ui() -> FileResponse:
         return FileResponse(static_dir / "family-v6.html")
 
+    # 老人端**设计二**。和 `/elder` 并行，供比较；业务逻辑共用同一份 `elder.js`
+    # ——它需要 41 个 id，这一页把设计二缺的 23 个逐个补齐，一份逻辑、两张皮。
+    #
+    # 两版的差异是有意的：设计一把「下一件」和麦克风放在一张素净的卡片流里，
+    # 设计二是一整套纸张与山水的视觉语言，外加一个像素向导。要比较的正是这个。
+    @app.get("/elder2", include_in_schema=False)
+    def elder_v6_ui() -> FileResponse:
+        return FileResponse(static_dir / "elder-v6.html")
+
     @app.get("/trust", include_in_schema=False)
     def trust_ui() -> FileResponse:
         return FileResponse(static_dir / "trust.html")

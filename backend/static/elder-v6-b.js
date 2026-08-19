@@ -1,3 +1,25 @@
+/* 老人端设计二的视觉层：像素向导「小优」。
+ *
+ * 这一份**只做视觉**——拖拽、看向鼠标、点到某个控件时讲一句它是干什么的。
+ * 一个 fetch 都没有；业务逻辑全部在仓库的 `elder.js` 里，两套皮共用那一份。
+ *
+ * 来源是 v6.0 包里的 `js/script-02.js`，改动逐条记在下面：
+ *
+ *   ① 「演示版」→「这一版」。`演示` 是被
+ *      `test_app_surface_speaks_no_engineering` 禁掉的词，而它出现在一句会被
+ *      当成用户文案扫描的中文字符串里。
+ *   ② 开场白里的「张爷爷」删掉。这个产品**不编人名**——`renderKin()` 那一整段
+ *      注释记着为什么（唯一一个人名「李晴」不在任何数据里，而系统自己承认这个
+ *      家庭有两位家人）。现在它只说「您好」。
+ *   ③ 三条讲解的选择器改成**真实会出现在屏幕上的类名**。包里写的是它自己那份
+ *      静态样例的类名（`.reminder-item` / `.record-bubble` / `.family-person`），
+ *      而这一页的这三处内容是 `elder.js` 建的，类名分别是 `.task` / `.log-item`
+ *      / `.kin-person`。不改的话这三条讲解**永远不会触发**，而"没触发"和
+ *      "没有这个功能"在屏幕上长得一模一样。
+ *   ④ 「听力辅助」从两句讲解里去掉。那一行控件已经从这一页删掉了：
+ *      `saveProfile()` 把 `hearing_support` 写死成 false，屏幕上放一个拨了
+ *      不算数的开关，比少一个设置严重。
+ */
 (function(){
 'use strict';
 
@@ -483,7 +505,22 @@ const reduceMotion=false;
   const AUTO_BAG=['toss','walk','run','happy'];
 
   function floorY(){return Math.max(0,innerHeight-FLOOR_MARGIN-CSS_H)}
-  function clampX(v){return Math.max(12,Math.min(v,innerWidth-CSS_W-12))}
+  // 小优的**禁入线**。
+  //
+  // 它盖住的第一个东西是「用打字说」——语音失败时唯一的退路（Firefox 没有
+  // Web Speech，权限被拒、没麦克风时语音一样用不了）。而它会走动，所以那不是
+  // "某一次刚好挡住"，是一条自己出现又消失的死路：同一个视口连测两次，
+  // 一次绿一次红。CDP 在 320×568 和 667×375 上抓到过。
+  //
+  // 手机框右边放得下它（112px 再加一点余量）时，它只能待在框外；
+  // 放不下的时候这条线让位，而那种宽度下样式表已经把它整个藏起来了。
+  function keepOutLeft(){
+    const frame=document.getElementById('elderPhone');
+    if(!frame) return 12;
+    const right=frame.getBoundingClientRect().right;
+    return (innerWidth-right>=CSS_W+24) ? right+12 : 12;
+  }
+  function clampX(v){return Math.max(keepOutLeft(),Math.min(v,innerWidth-CSS_W-12))}
   function clampY(v){return Math.max(8,Math.min(v,innerHeight-CSS_H-8))}
   function place(){
     x=clampX(x);
@@ -646,9 +683,6 @@ const reduceMotion=false;
     setTimeout(()=>{
       if(!ready) return;
       interruptToHold(4700);
-      // 这一句原先是「张爷爷，我是小优。……」——那是老人端的称呼，直接抄了过来。
-      // 这一页读它的是子女（页头写着「家人端 · 张敏」），冲着她叫「张爷爷」，
-      // 第一句话就说错了对面是谁。这里不再猜身份，只问好。
       say('您好，我是小优。您点哪里，我就看哪里；有需要的地方，我也可以给您讲一讲。',4300);
       // No autonomous talking on startup.
       // Enter the four-action pseudo-random cycle quickly.
@@ -665,20 +699,28 @@ const reduceMotion=false;
   setTimeout(waitForWorkspace,260);
 
   const intros = [
-    {selector:'[data-section="today"]', delay:220, text:'这里是「今天」。先看爸妈今天整体是否平稳，再看有没有需要家人点头的事情。'},
-    {selector:'[data-section="todo"]', delay:220, text:'这里是「待办」。家里要处理的提醒、日期和需要同步到老人手机的事项都在这里。'},
-    {selector:'[data-section="care"]', delay:220, text:'这里是「照护」。用药、身体、心情、安全和趋势会放到同一个照护档案里看。'},
-    {selector:'[data-section="mine"]', delay:220, text:'这里是「我的」。做过的事、可信记录和个人入口都会留在这里。'},
-    {selector:'#refresh', delay:0, text:'点这里重新读取今天的情况。刷新只更新信息，不会打断当前页面位置。'},
-    {selector:'#tasks', delay:0, text:'这里专门放需要家人确认的事项。没有需要您拍板的事时，会直接告诉您今天不用操心。'},
-    {selector:'#dailyReport', delay:0, text:'这是今天的生活摘要。先说结论，再用少量信息解释为什么是这个结论。'},
-    {selector:'.metric-row', delay:0, text:'这里是今天的三个关键数字：待您确认、进行中和今天到期。'},
-    {selector:'#reminderForm', delay:0, text:'这里可以给老人添一件事。时间和提醒规则会一起同步到老人端。'},
-    {selector:'.care-seg button', delay:0, text:'这是照护档案的二级分区。底栏告诉您在哪个大模块，这里只负责切换照护细节。'},
-    {selector:'#ovVerdict', delay:0, text:'这是照护概览的核心结论。先回答「最近怎么样」，再往下看各项细节。'},
-    {selector:'.care-row', delay:0, text:'点这一行可以进入对应的照护细节。每一类只保留一条清楚的入口。'},
-    {selector:'.record-flow', delay:0, text:'这里是做过的事和可信记录。重要操作会留下谁确认、什么时候完成的结果。'},
-    {selector:'.fam-link', delay:0, text:'这是其他入口。保持数量少、名称直白，避免家人端出现太多层菜单。'}
+    {selector:'[data-section="home"]', delay:240, text:'这里是「首页」。先看今天是否平稳、下一件要做什么，再直接用语音告诉我您需要什么。'},
+    {selector:'[data-section="log"]', delay:240, text:'这里是「记录」。办过的事、服药和身体记录会按时间放在一起，陪伴聊天不会记进这里。'},
+    {selector:'[data-section="kin"]', delay:240, text:'这里是「家人」。需要家人一起确认的事情、常用联系人和一键联系都在这里。'},
+    {selector:'[data-section="me"]', delay:240, text:'这里是「我的」。字号、语速、常用服务和优活怎么保护您，都在这一格里。'},
+
+    {selector:'#mic', delay:0, text:'这是语音入口。点一下开始说，再点一下结束，不需要一直按住。'},
+    {selector:'#typeInstead', delay:0, text:'如果今天不方便说话，可以从这里改成打字。这个入口一直留在首页。'},
+    {selector:'#nextItem', delay:0, text:'这是今天的「下一件」。首页只把最值得注意的一件事放大，不让您自己在很多事项里找。'},
+    {selector:'#nextOpen', delay:0, text:'点这里可以查看这件事的详细内容，再决定要不要继续。'},
+    {selector:'#toggleReminders', delay:0, text:'这里可以展开今天全部事项。默认只露出最重要的几件，避免信息太多。'},
+    {selector:'.task', delay:0, text:'这是今天的一件事。时间、状态和可以做的两个动作放在一起，看完不用再到别处找。'},
+
+    {selector:'.log-item', delay:0, text:'这是最近的一条记录。点开可以看这件事的经过：谁确认的、最后办成什么样。'},
+    {selector:'.kin-person', delay:0, text:'这是一位家人。需要的时候可以直接联系，要紧的事仍会先问您本人。'},
+    {selector:'.contact-primary', delay:0, text:'这是最直接的联系家人入口。需要帮忙时可以从这里一键联系。'},
+    {selector:'.habit-row', delay:0, text:'这里可以调字号和说话速度。改完记得按下面那个保存按钮。'},
+    {selector:'.service-entry', delay:0, text:'这是常用入口。这一页只保留最常用、最容易理解的几个。'},
+    {selector:'.trust-strip', delay:0, text:'这里说明优活怎么保护您：重要操作会先确认，结果以真实状态为准，也不会把陪伴聊天内容交给别人。'},
+
+    {selector:'#focusBack', delay:0, text:'点这里回到首页。当前这次对话不会把您困在一个没有出口的页面里。'},
+    {selector:'[data-text]', delay:0, text:'这是一个常说的话。点一下就会把这句话交给优活，适合不知道怎么开口的时候。'},
+    {selector:'#send', delay:0, text:'这是发送按钮。打完字后点这里，我会在当前对话里继续帮助您。'}
   ];
 
   function matchIntro(target){

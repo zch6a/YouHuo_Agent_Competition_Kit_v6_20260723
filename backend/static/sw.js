@@ -36,7 +36,11 @@
 //: 我装完 v8 之后忘了这一步，用户打开看到的是旧页面，而服务器上明明是新的。
 //: 装任何一次前端包，「改文件」和「让浏览器拿到」是两件事。
 //: v13 → v14：家人端设计二上线（/family2），多出四个文件。
-const VERSION = 'youhuo-shell-v14';
+//: v14 → v15：老人端设计二上线（/elder2），多出四个文件。
+//: 这一页的业务逻辑是 `elder.js`（已在册），它是 `type="module"`——漏缓存
+//: 它 import 的任何一个模块都是整页白屏，不是降级。那几个也早就在册了，
+//: 这里多的只是这一版自己的版式和两份视觉脚本。
+const VERSION = 'youhuo-shell-v15';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -72,6 +76,13 @@ const SHELL = [
   '/static/family-v6.css',
   '/static/family-v6-a.js',
   '/static/family-v6-b.js',
+  // 老人端设计二（/elder2）。同样只多出它自己的版式和两份视觉脚本——
+  // 业务逻辑走的是已经在册的 `elder.js` 那一整条 import 链。
+  '/elder2',
+  '/static/elder-v6.html',
+  '/static/elder-v6.css',
+  '/static/elder-v6-a.js',
+  '/static/elder-v6-b.js',
   '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：
