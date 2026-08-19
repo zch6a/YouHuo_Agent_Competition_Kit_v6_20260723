@@ -46,7 +46,16 @@ function friendlyTime(value) {
 const REMINDER_STATUS = {
   scheduled: ['待处理', 'todo'],
   notified: ['待确认', 'confirm'],
-  acknowledged: ['待处理', 'todo'],
+  // `acknowledged` 原先也写「待处理」，和 `scheduled` 一个字不差。
+  //
+  // 后果不是"用词不够精确"：老人按下「我知道了」之后，后端状态从 scheduled
+  // 变成 acknowledged，而这张卡上**没有任何东西变化**——连"她已经看见过这件事"
+  // 都读不出来。加上回执也看不见（见 `reminderAction`），整个动作在屏幕上
+  // 是完全静默的。
+  //
+  // 「知道了」而不是「已确认」：她按的按钮就写着「我知道了」，
+  // 状态词跟着她按的那个词走，不另起一套说法。
+  acknowledged: ['知道了', 'todo'],
   completed: ['已完成', 'done'],
   escalated: ['已请家人帮忙', 'relay'],
   cancelled: ['已取消', 'cancelled'],
@@ -957,7 +966,26 @@ async function reminderAction(id, action) {
       body: JSON.stringify({request_id: crypto.randomUUID()})
     });
     const adapted = await adaptAgentMessage(data.message, 2);
-    addBubble(adapted.visual_text || data.message, 'agent', '待办状态更新');
+    // 回执写**状态行**，不写对话气泡。
+    // ......................................................................
+    // `addBubble` 写的是 `#chat`，而 `#chat` 住在 `.elder-focus` 里、
+    // 默认 `display: none`。实测（430×932，Focus Mode 关着）：
+    //
+    //     #chat          盒子 [0,0]   被 div.elder-focus 藏着
+    //     #relianceHost  盒子 [0,0]   同上
+    //     #status        空的时候自己 display:none，一有文字就出现
+    //
+    // 所以老人按「我知道了」的实际体验是：请求发出去了、后端记下了，
+    // 而**屏幕上一个字都没变**。她会再按一次，再一次。
+    //
+    // 这和 `send()` 顶上那段注释记的是**同一个缺陷的另一半**：当时发现
+    // 语音那条路径没调 `setFocus(true)`，补上了；`reminderAction` 有同样的
+    // 毛病却没被一起修——因为那次是从"语音说完看不到确认卡"倒查的，
+    // 而按待办按钮的人根本不在对话里。
+    //
+    // 这里**不补 `setFocus(true)`**：她在勾一件事，不是在对话。
+    // 为了让回执可见而把整屏切成对话视图，是用一个更大的意外换一个小的。
+    setStatus(adapted.visual_text || data.message);
     if (data.ui?.speak) speak(adapted.speak_text || data.message, adapted.speech_rate);
     loadReminders();
     if (document.body.dataset.tab === 'log') loadActivity();
