@@ -74,7 +74,11 @@
 //: v20 → v21：设计三补上最后三条（措辞适配 `/v6/interaction/plan`、
 //: 一件事的经过 `/v2/tasks` + `task-detail.js`、优活给家人的消息
 //: `/v2/notifications`）。后两条也走动态 `import()`，两份模块都早在清单里。
-const VERSION = 'youhuo-shell-v21';
+//: v21 → v22：`judge.js`（失败不再印成绿的、不再印 `Failed to fetch`）和
+//: `family3.js`（照护屏那句概括真的换掉）都改了。不升这个字符串，
+//: 回访的人第一次打开拿到的还是缓存里的旧脚本——审计页照旧把失败印成绿的，
+//: 而我这边看新装的浏览器一切正常。
+const VERSION = 'youhuo-shell-v22';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
