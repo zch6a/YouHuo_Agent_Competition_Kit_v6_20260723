@@ -234,6 +234,34 @@ def test_viewing_a_payment_is_not_approving_it() -> None:
 
 # ---- ⑥ 「知道了」不是「办完了」 -------------------------------------------------
 
+def _sometime_today() -> str:
+    """今天的一个**确定**时刻，完整 ISO。
+
+    ## 为什么不能写 `{"time": "23:30"}`
+
+    `HH:MM` 走的是「已经过点就顺延到明天」那条规则——对老人是对的
+    （9 点设「8 点吃药」显然是指明天），但它让判据**跟着墙上时钟走**。
+    实测 23:44 跑这两条：23:30 被解析成 `2026-08-21T15:30Z`，
+    于是「新建的提醒不在今天的安排里」，判据红，而代码一个字没动过。
+
+        判据里写死的      time=23:30  落在 2026-08-21T15:30+00:00  在今天: False
+        现在往后 5 分钟   time=23:49  落在 2026-08-20T15:49+00:00  在今天: True
+
+    也就是说这两条判据**每天 23:30 到零点之间必红**。竞赛前一晚有人跑一遍
+    看到红，是最坏的时机。
+
+    完整 ISO 不走那条顺延规则（实测「一小时前」的 ISO 原样保留），
+    而今天的过点条目照样在 `/agenda` 的 `today` 里（种子里 11:00、14:00
+    那两条 23:44 时仍在）。所以固定取今天 09:00：和当前时刻无关。
+    """
+    from datetime import datetime, time as dtime
+    from zoneinfo import ZoneInfo
+
+    cn = ZoneInfo("Asia/Shanghai")
+    return datetime.combine(datetime.now(cn).date(), dtime(9, 0),
+                            tzinfo=cn).isoformat()
+
+
 def test_acknowledging_a_reminder_is_not_completing_it(client: TestClient) -> None:
     """老人按「我知道了」之后，日程上那一行**不许**写成「已完成」。
 
@@ -250,7 +278,8 @@ def test_acknowledging_a_reminder_is_not_completing_it(client: TestClient) -> No
     `done` 也要跟着分开：它决定「接下来」挑哪一件，而按过「知道了」的那件药
     还是没吃，它就该继续待在「接下来」里。
     """
-    made = client.post(f"{V1}/reminders", json={"title": "吃钙片", "time": "23:30"})
+    made = client.post(f"{V1}/reminders",
+                       json={"title": "吃钙片", "at": _sometime_today()})
     assert made.status_code == 200, made.text
     rid = made.json()["item"]["id"]
 
@@ -286,7 +315,9 @@ def test_the_three_reminder_words_are_all_different(client: TestClient) -> None:
     单独一条，因为上面那条可以被「把「知道了」也改成「待进行」」满足——
     那样她按完之后屏幕上一个字都不动，正是这一整轮在修的另一件事。
     """
-    made = client.post(f"{V1}/reminders", json={"title": "量血压", "time": "23:40"})
+    # 同上：不写 `HH:MM`，它会跟着墙上时钟走。见 `_sometime_today()`。
+    made = client.post(f"{V1}/reminders",
+                       json={"title": "量血压", "at": _sometime_today()})
     rid = made.json()["item"]["id"]
 
     def word():

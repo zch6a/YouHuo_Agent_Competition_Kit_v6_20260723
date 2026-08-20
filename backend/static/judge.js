@@ -24,6 +24,28 @@
 
 const statusEl = document.querySelector('#judgeStatus');
 
+/** 状态行：**文字和颜色一起换**。
+ *
+ * `judge.html:102` 上写死了 `class="notice good"`，而这一页的五处写入
+ * 只改 `textContent`。于是：
+ *
+ *     boot() 失败                    错误消息      印成**绿的**
+ *     run() 里任何一步失败            错误消息      印成**绿的**
+ *     整条家庭链自校验没通过          「没通过」    印成**绿的**
+ *
+ * 这是**审计页**——它存在的全部意义就是「不对的时候要看得出来」。
+ * 一句「没通过」配一条绿边，比不显示更糟：它把一个失败讲成了一个成功。
+ *
+ * 顺带：状态不只靠颜色。这三处的文字本身就说清了通过与否
+ * （「没通过」「取不到」），颜色是第二条通道，不是唯一那条。
+ */
+function setStatus(text, tone) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.classList.remove('good', 'bad', 'warning', 'info');
+  if (tone) statusEl.classList.add(tone);
+}
+
 /** 身份、登录、401 重放都在 common.js 里。
  *
  * 只要家属身份：审计链（`/v2/audit`）和运行指标（`/v5/metrics`）都只对绑定家属开放，
@@ -410,7 +432,7 @@ async function loadTransaction() {
   honourInitialHash = false;
   if (!id) throw new Error('还没有指定要看哪一笔事务，而这个家庭的清单也是空的');
 
-  statusEl.textContent = '正在调阅这一笔事务的链……';
+  setStatus('正在调阅这一笔事务的链……', 'info');
   // 换一笔就重新数：下面那句「这一次打开又多了几条」说的是**这一笔**。
   state.contextReads = 0;
   // 两处都对齐到同一个编号，免得输入框和选单各说各的。
@@ -435,8 +457,9 @@ async function loadTransaction() {
   pickStep(defaultStep());
   await loadContext(id);
 
-  statusEl.textContent = `这一笔在链上有 ${state.events.length} 条记录。`
-    + `整条家庭链的自校验：${state.chainValid ? '通过' : '没通过'}。`;
+  setStatus(`这一笔在链上有 ${state.events.length} 条记录。`
+    + `整条家庭链的自校验：${state.chainValid ? '通过' : '没通过'}。`,
+    state.chainValid ? 'good' : 'bad');
 }
 
 function renderHead() {
@@ -829,9 +852,14 @@ function beatOf(name) {
  * 于是「点了没反应」。
  */
 function report(error, outSelector) {
-  statusEl.textContent = error.message;
+  // `error.message` 直接印，实测（把 `/v2/audit` 掐掉再刷新）屏幕上是
+  // **「Failed to fetch」**——原始浏览器异常，英文，印在审计页上。
+  // `errorWords` 是这个仓库为这件事准备的那一层：它按 `.status` 分型，
+  // 说得清是「连不上」「服务器拒绝了」还是「这台服务上没开」。
+  const words = window.YouHuo.errorWords(error, '这一笔的记录').text;
+  setStatus(words, 'bad');
   const out = outSelector && document.querySelector(outSelector);
-  if (out) { out.replaceChildren(); out.textContent = error.message; }
+  if (out) { out.replaceChildren(); out.textContent = words; }
 }
 
 /** 取数期间把两个会重新发起请求的控件按住。
@@ -936,11 +964,13 @@ async function showTab(tabId) {
 async function boot() {
   IDS = await window.YouHuo.ready();
   await window.YouHuo.login('family');
-  statusEl.textContent = '正在读这个家庭的事务清单……';
+  setStatus('正在读这个家庭的事务清单……', 'info');
   await loadTaskList();
   await run('transaction');
   await showTab(currentTab());
 }
 
 bindControls();
-boot().catch((error) => { statusEl.textContent = error.message; });
+boot().catch((error) => {
+  setStatus(window.YouHuo.errorWords(error, '这个家庭的事务清单').text, 'bad');
+});

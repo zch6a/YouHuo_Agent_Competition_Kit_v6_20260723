@@ -588,7 +588,13 @@ def test_judge_steps_report_failures_where_the_user_clicked():
     # 失败要同时落在状态行和那一拍自己的输出区。
     report = re.search(r"function report\(error, outSelector\) \{(.*?)\n\}", body, re.S)
     assert report, "找不到统一的失败上报"
-    assert "statusEl.textContent" in report.group(1), "失败没有写进状态行"
+    #: 钉的是**性质**（失败要写进状态行），不是某一行的写法。
+    #: 原先写死 `statusEl.textContent`，而状态行后来收敛成 `setStatus(text, tone)`
+    #: ——文字和颜色必须一起换，否则错误消息会顶着上一次的绿边印出来。
+    #: 那次改动让这一条红了，而红的原因和用户看到什么无关：这条判据自己的
+    #: docstring 上面几行正好在讲同一件事（「钉实现的形状，不是钉性质」）。
+    assert re.search(r"setStatus\(|statusEl\.textContent", report.group(1)), \
+        "失败没有写进状态行"
     assert "out.textContent" in report.group(1), "失败没有写进这一拍自己的输出区"
 
 

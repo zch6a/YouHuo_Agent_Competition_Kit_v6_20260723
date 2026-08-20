@@ -347,13 +347,38 @@
     text($('.identity-island .hello', view), '照护中心');
 
     // 生活节律 / 今天
+    if (!dailyReport) {
+      /* 取不到就**说取不到**，不能把交付包写死的那一句留在屏幕上。
+       *
+       * 这个 `if (dailyReport)` 原先没有 else：`/api/v1/daily-report` 一失败，
+       * 这一格就一直挂着「今天和平常差不多 / 上午起得稍晚一些，没有需要
+       * 立刻处理的异常。」——**后端断了，屏幕上却是一句让人安心的具体断言**。
+       * 那比空着糟得多。
+       */
+      const note = $('.companion-note', view);
+      if (note) {
+        text($('strong', note), '今天的概括暂时取不到');
+        text($('span', note), '这一格等下会自己好；下面的记录不受影响。');
+      }
+    }
     if (dailyReport) {
       const word = dailyReport.todayWord;
       const careHead = $('.identity-island h1', view);
       text(careHead, word);
       fitOneLine(careHead, 30);
+      /* 这一格**两行都要换**。
+       *
+       * 原先只换了 `strong`，`span` 留着交付包写死的那一句：
+       * 「上午起得稍晚一些，没有需要立刻处理的异常。」——一句关于**今天早上**
+       * 的具体断言，编的。家人视图那一侧（`loadFamilyView`）两行都换，
+       * 这一侧漏了一行，于是同一个组件在两个视图里一个说真话一个说假话。
+       *
+       * 是驱动出来的：把静态 HTML 里的中文抽出来当候选，页面加载完之后看
+       * 屏幕上还剩哪些一字不差。这一句剩着。
+       */
       const note = $('.companion-note', view);
       text($('strong', note), word);
+      text($('span', note), dailyReport.familyWillSee || dailyReport.message || '');
       fillVein('today', '今天', word, dailyReport.established === false ? 'watch' : 'stable');
       const head = $('[data-care-page="today"] .substage-head');
       text($('h2', head), `今天，${word}`);

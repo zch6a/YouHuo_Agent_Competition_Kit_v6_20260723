@@ -99,7 +99,12 @@
            return 0`）。全仓 grep `judgeStatus`，脚本目录里一处都没有。
            id 照旧不改：`judge.js` 自己按它取状态行。但"有一道闸门盯着它"这句话
            是假的，留着会让下一个人不敢动一个其实没人管的名字。 -->
-      <p class="notice good care-status" id="judgeStatus" aria-live="polite">正在连上这台服务器……</p>
+      <!--: `good` 换成 `info`。写死 `good` 的后果：`judge.js` 那五处写入只改
+           `textContent`，于是启动失败的错误消息、任何一步的错误消息、以及
+           「整条家庭链的自校验：没通过。」**全都印成绿的**——在一张
+           存在意义就是「不对的时候要看得出来」的页上，把失败讲成了成功。
+           现在由 `judge.js::setStatus(text, tone)` 一起换文字和颜色。 -->
+      <p class="notice info care-status" id="judgeStatus" aria-live="polite">正在连上这台服务器……</p>
     </form>
 
     <!-- 第一屏只有四个字段。
