@@ -545,9 +545,13 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         events = []
         if v4_store is not None:
             try:
-
+                # 视角传**调用者的角色**。写死 `ELDER` 的话，
+                # `list_health_events` 那句 `if viewer_role == FAMILY: 滤掉 PRIVATE`
+                # 就永远不生效，家人读这一屏会读到老人标了私密的身体记录——
+                # 而这些数字下面还印着「记到了什么」，看起来完全正常。
+                # 同一个文件里 `/api/v1/memories` 犯的是同一个错，一并修了。
                 events = v4_store.list_health_events(
-                    ctx.family_id, _elder_of(ctx), ActorRole.ELDER
+                    ctx.family_id, _elder_of(ctx), ctx.role
                 )
             except Exception:
                 events = []
@@ -1530,6 +1534,13 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         # 实测连点两下「记血压」留下**两条一模一样的记录**。血压量两次是正常的，
         # 所以不能一律拒绝——但一分钟内同一项同一个读数，只可能是重复提交。
         # 这条线画在「值也相同」上：真的量了两次，第二次的数字几乎不会一模一样。
+        # 这一处的 `ELDER` 是**对的**，别照着上面两处一起改。
+        #
+        # 它不往外回任何东西，只用来判「一分钟内是不是同一个读数」。要去重就得
+        # 看到全部记录：按调用者视角滤掉 private 的话，家人就能在一条私密记录
+        # 旁边再写一条一模一样的，而去重恰恰是为了防这个。
+        # 「同一个函数、同一个参数」不等于「同一件事」——这里是内部判断，
+        # 上面两处是对外返回。
         try:
             recent = v4_store.list_health_events(
                 ctx.family_id, _elder_of(ctx), ActorRole.ELDER
@@ -2424,13 +2435,40 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             return {"items": [], "pending": [], "count": 0, "pendingCount": 0,
                     "message": "这台机器上没有开启记忆功能。"}
         elder = _elder_of(ctx)
+        # 视角是**调用者自己的角色**，不是写死的 "elder"。
+        #
+        # ## 写死会漏什么
+        #
+        # `list_visible` 的规则是：`viewer_role == "elder"` 给全部，否则只给
+        # `family_summary` / `family_shared`。这一行原先写死 `"elder"`，
+        # 而 `_elder_of(ctx)` 又会把家人令牌解析成「她家那位老人」——
+        # 于是**家人读到老人所有 `private` 的长期记忆，连正文一起**。
+        #
+        # 实测（老人自己记的一条 `scope=private`「老伴的忌日 / 十月初三，
+        # 那天她不想被打扰」）：
+        #
+        #     老人 GET /api/v1/memories   老伴的忌日  只有我看得到  十月初三，…
+        #     女儿 GET /api/v1/memories   老伴的忌日  只有我看得到  十月初三，…   ← 泄露
+        #     女儿 GET /v3/memories/{id}  （空）                              ← 这一层是对的
+        #
+        # 屏幕上那一格写着**「只有我看得到」**，而它正被别人看着。
+        # `api.py:786` 同一件事传的是 `viewer_role=actor.role.value`，
+        # 也就是说这一层照抄了调用、没照抄视角——和上一轮那五个「本人同意」
+        # 被绕过是同一个形状，同一个 `_elder_of()`。
+        viewer = "elder" if ctx.role is ActorRole.ELDER else ctx.role.value
         # 生效的走 vault：它顺带把过期的转成 expired 并落库。
         # 借这张表存的设置要滤掉——它不是「优活替她记下来的事」。
         active = [m for m in memory_vault.list_visible(
-            ctx.family_id, elder, viewer_role="elder") if not _is_internal(m)]
-        # 待确认的 vault 不返回（它只给 ACTIVE），直接查。
+            ctx.family_id, elder, viewer_role=viewer) if not _is_internal(m)]
+        # 待确认的 vault 不返回（它只给 ACTIVE），直接查——
+        # 所以 `list_visible` 那道范围过滤**够不到这一段**，得在这里再滤一次。
+        # 少了这一句，一条老人自己提的私密项在她点头之前是全家可见的，
+        # 点头之后反而藏起来了：越是没定的事越公开，正好反了。
         pending = [m for m in db.list_memories(ctx.family_id, elder)
                    if m.status == MemoryStatus.PROPOSED and not _is_internal(m)]
+        if ctx.role is not ActorRole.ELDER:
+            pending = [m for m in pending if m.scope in {
+                MemoryScope.FAMILY_SUMMARY, MemoryScope.FAMILY_SHARED}]
 
         items = [_memory_view(m) for m in active]
         pend = [_memory_view(m) for m in pending]
