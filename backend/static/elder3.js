@@ -459,8 +459,15 @@
     const page = ws('records');
     if (!page) return;
     let data;
+    let taskIds = new Set();
     try {
-      data = await api('/api/v1/records?limit=20');
+      // 两个一起取。第二个决定哪些行**真的**有经过可看——见下面 `entityId` 那一段。
+      const [records, tasks] = await Promise.all([
+        api('/api/v1/records?limit=20'),
+        api('/v2/tasks?limit=100').catch(() => []),
+      ]);
+      data = records;
+      taskIds = new Set((tasks || []).map((t) => t.id));
     } catch (e) { trouble(e, '办事记录'); return; }
 
     const events = $$('.record-event', page);
@@ -473,6 +480,23 @@
       if (small) {
         small.textContent = [r.time, r.kind, r.note].filter(Boolean).join(' · ');
       }
+      /* 只有**真的是一件事**的行才挂主体号。
+       *
+       * 主体号是 `entityId`，不是 `id`（`id` 是这一行审计记录自己的号）。
+       * 但光有 `entityId` 不够：审计里「登录了优活」这类事件的 entity 是
+       * **一个人**（`elder-vc9b…` / `daughter-vc9b…`），不是任务。实测四行里
+       * 三行是这样，而它们照样长出了「看看这件事的经过」，点下去得到
+       * 「没有找到这件事的记录。」——一个走到死胡同的动作。
+       *
+       * 设计一二没有这个问题，因为它读的 `/v2/elder/activity` 由**后端**
+       * 把非任务事件的 `about_id` 置空了；`/api/v1/records` 给的是原始 entity。
+       * 所以这里拿 `/v2/tasks` 的 id 集合对一遍：**按查得到，不按前缀猜**。
+       *
+       * `elder.js:1225` 那句话说的就是这件事：「一个看起来能按、按了没反应的
+       * 控件比一行纯文字糟——它让人以为是坏的。」
+       */
+      if (r.entityId && taskIds.has(r.entityId)) el.dataset.taskId = r.entityId;
+      else delete el.dataset.taskId;
     });
 
     fillTimeline(page, data.items.slice(0, 3).map((r) => ({
@@ -636,6 +660,31 @@
     }
   }
 
+  /** 让这一句按她的档案说出来。
+   *
+   * 设计一二每收到一句 agent 的话都过一遍 `/v6/interaction/plan`：由后端按
+   * 风险等级、她最近重试了几次、这件事可不可逆，决定**屏幕上写什么、
+   * 念出来念什么、用多快的语速**。设计三此前一次都没调过，
+   * 于是高风险那句话和闲聊用同一个语速、同一种措辞。
+   *
+   * 取不到就原样说。这一层是**加工**，不是通路：它失败不该让她听不到回话。
+   */
+  async function adapt(message, riskLevel) {
+    try {
+      const ids = await YH.ready();
+      return await api('/v6/interaction/plan', {
+        method: 'POST',
+        body: JSON.stringify({
+          elder_id: ids.elderId, message, options: [],
+          risk_level: Number(riskLevel || 1), asr_confidence: 1.0,
+          recent_retries: 0, reversible: Number(riskLevel || 1) < 4,
+        }),
+      });
+    } catch (_) {
+      return {visual_text: message, speak_text: message, speech_rate: speechRate};
+    }
+  }
+
   async function send(text) {
     const what = String(text || '').trim();
     if (!what) return;
@@ -645,9 +694,16 @@
         method: 'POST',
         body: JSON.stringify({session_id: await ensureSession(), text: what}),
       });
-      say(data.message, YH.toneOf(data));
-      lastSpoken = data.message;
-      if (data.ui && data.ui.speak) speakOut(data.message);
+      // 高风险的那几句要慢下来、要换说法——由后端决定，不在这里另写一套。
+      const plan = await adapt(data.message, (data.ui && data.ui.risk_level) || 1);
+      say(plan.visual_text || data.message, YH.toneOf(data));
+      lastSpoken = plan.visual_text || data.message;
+      if (data.ui && data.ui.speak) {
+        const was = speechRate;
+        if (plan.speech_rate) speechRate = Number(plan.speech_rate);
+        speakOut(plan.speak_text || data.message);
+        speechRate = was;      // 只影响这一句，不改她存的设置
+      }
       showGlassBox(what, data);
       // 办完一件事，今天那一屏就该跟着变。
       loadToday();
@@ -665,6 +721,37 @@
     const fresh = el.cloneNode(true);
     el.replaceWith(fresh);
     return fresh;
+  }
+
+  /** 摊开一件事的经过。
+   *
+   * 读的是 `/v2/tasks`（`TaskView`），**不是 `/v2/audit`**——这是那条
+   * 「取证与叙事是两个模型」的落地：审计链留给 `/judge`，消费者面读任务本身。
+   * 服务端已按调用者把列表收窄到她自己的任务，所以在客户端按 id 找是安全的。
+   *
+   * 视图模型和渲染都用 `task-detail.js` 那一份，不另写：同一件事两套说法，
+   * 是这个项目栽过的那件事。
+   */
+  async function showTaskDetail(taskId) {
+    const host = ensureReliance();
+    if (!host) return;
+    try {
+      const tasks = await api('/v2/tasks?limit=100');
+      const task = (tasks || []).find((t) => t.id === taskId);
+      const {renderTaskDetail, taskDetailViewModel} =
+        await import('/static/task-detail.js');
+      renderTaskDetail(host, task ? taskDetailViewModel(task) : null);
+      host.hidden = false;
+      offer([{label: '收起来', run: async () => {
+        host.replaceChildren();
+        host.hidden = true;
+        offer([]);
+      }}]);
+    } catch (e) {
+      host.replaceChildren();
+      host.hidden = true;
+      trouble(e, '这件事的经过');
+    }
   }
 
   /* 待办气泡：先问，再做。
@@ -715,6 +802,13 @@
       }
       offer([]);
       if (spoken) { say(spoken); speakOut(spoken); lastSpoken = spoken; }
+      // 记录行还带着这件事的主体号时，多给一个「看看经过」。
+      // 念一遍只回答「这条写的是什么」，回答不了「这件事后来怎么样了」——
+      // 设计一二点一条记录会摊开整段经过（`task-detail.js`），设计三此前没有。
+      if (node.dataset.taskId) {
+        const tid = node.dataset.taskId;
+        offer([{label: '看看这件事的经过', run: () => showTaskDetail(tid)}]);
+      }
     });
 
     // 常用说法：按钮上写什么就说什么，不另建一张映射表。

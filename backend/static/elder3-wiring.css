@@ -202,6 +202,46 @@
   font: 400 calc(13px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
 }
 
+/* ---- 一件事的经过 ------------------------------------------------------------
+ *
+ * 和玻璃盒共用 `#e3Reliance` 那个位置——两者都是「摊开一件事」，
+ * 一次只该有一个。渲染用 `task-detail.js` 那一份，这里只补它发的类名，
+ * 因为那些规则住在设计一二的全局表里。 */
+
+.e3-reliance .detail-head { margin-bottom: 10px; }
+.e3-reliance .detail-subject {
+  margin: 0;
+  font: 700 calc(17px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.e3-reliance .detail-amount {
+  margin: 4px 0 0;
+  font: 700 calc(20px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8c3b2e;
+}
+/* 状态不只靠颜色：文字和颜色同时给。 */
+.e3-reliance .detail-status {
+  margin: 6px 0 0;
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  background: rgba(120, 105, 88, .1);
+  color: #6a5b49;
+}
+.e3-reliance .detail-status.good { background: rgba(73, 111, 96, .12); color: #3d5e4e; }
+.e3-reliance .detail-status.warning { background: rgba(168, 118, 45, .14); color: #8d6224; }
+.e3-reliance .detail-status.bad { background: rgba(167, 78, 64, .12); color: #8c3b2e; }
+.e3-reliance .detail-rows {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 6px 10px;
+  margin: 10px 0 0;
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .detail-rows dt { color: #8a7a63; }
+.e3-reliance .detail-rows dd { margin: 0; color: #5b5044; }
+
 /* ---- 「我的数据」四条 --------------------------------------------------------
  *
  * 设计一二的「我的」屏上有这四项（日报 / 心情 / 隐私导出 / 两步删除），

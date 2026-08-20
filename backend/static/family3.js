@@ -828,6 +828,77 @@
     mountMedicationComposer();
     mountDoseActions();
     mountBodyComposer();
+    mountNotices();
+  }
+
+  /** 优活发给家人的消息。
+   *
+   * `/v2/notifications` 是家人端一的一整格（`#notices`），设计三**一次都不调**。
+   * 缺的不是「一个列表」：`approval_required` / `additional_approval_required` /
+   * `reminder_escalated` 这几条正是**要子女动手**的那些——超时没办的待办、
+   * 还差一位家属确认的接力。不接，这一版的家人永远不知道有人在等他。
+   *
+   * 标题表照抄家人端一那一份（`family.js::NOTICE_TITLE`），
+   * 兜底也一样不是原始事件码：兜底成枚举名等于这层翻译在遇到没登记过的类型时
+   * 自动失效，而那正是它该起作用的时候。
+   */
+  const NOTICE_TITLE = {
+    approval_required: '需要您接力确认',
+    additional_approval_required: '还需要另一位家属确认',
+    task_rejected: '已按您的意见取消',
+    task_completed: '任务已完成',
+    family_reminder_created: '待办已同步到老人端',
+    reminder_due: '待办到期提醒',
+    reminder_advance_notice: '已提前提醒老人',
+    reminder_escalated: '超时未完成，请接力',
+  };
+
+  function mountNotices() {
+    const host = $('#familyFlow');
+    if (!host || $('#f3Notices')) return;
+    const box = document.createElement('section');
+    box.id = 'f3Notices';
+    box.className = 'f3-notices';
+    box.hidden = true;
+    host.insertAdjacentElement('afterend', box);
+    loadNotices();
+  }
+
+  async function loadNotices() {
+    const box = $('#f3Notices');
+    if (!box) return;
+    let rows;
+    try {
+      rows = await api('/v2/notifications?limit=50', {}, FAMILY);
+    } catch (e) {
+      // 安静地不显示。它是**额外**的一格，让它的失败盖掉今天那一屏不划算。
+      box.hidden = true;
+      return;
+    }
+    const items = Array.isArray(rows) ? rows : (rows.items || []);
+    box.replaceChildren();
+    if (!items.length) {
+      box.hidden = true;      // 空的时候不占位，而不是留一格「暂无通知」
+      return;
+    }
+    const head = document.createElement('h3');
+    head.textContent = `优活给您的消息（${items.length} 条）`;
+    box.append(head);
+    items.slice(0, 6).forEach((n) => {
+      const row = document.createElement('div');
+      row.className = 'f3-notice-row';
+      const title = document.createElement('b');
+      title.textContent = NOTICE_TITLE[n.event_type] || '来自优活的消息';
+      const body = document.createElement('span');
+      body.textContent = n.message || '';
+      const when = document.createElement('time');
+      when.dateTime = n.created_at || '';
+      when.textContent = n.created_at
+        ? new Date(n.created_at).toLocaleString('zh-CN', {hour12: false}) : '';
+      row.append(title, body, when);
+      box.append(row);
+    });
+    box.hidden = false;
   }
 
   /** 「记一次已吃 / 这次没吃」。

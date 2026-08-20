@@ -283,6 +283,102 @@ def test_skipping_a_dose_does_not_move_the_stock(client: TestClient) -> None:
     assert stock() == before, f"「没吃」把库存也扣了：{before} → {stock()}"
 
 
+# ---- ④ 措辞适配 / 一件事的经过 / 优活给家人的消息 --------------------------------
+
+def test_the_agent_message_goes_through_the_interaction_plan() -> None:
+    """每一句 agent 的话都要过一遍 `/v6/interaction/plan`。
+
+    由后端按风险等级、最近重试次数、这件事可不可逆，决定屏幕上写什么、
+    念出来念什么、用多快的语速。设计三此前一次都没调过——高风险那句话
+    和闲聊用同一个语速、同一种措辞。
+    """
+    js = _src("elder3.js")
+    assert "/v6/interaction/plan" in js, "`elder3.js` 不调交互计划"
+    block = re.search(r"async function send\(text\).*?\n  \}", js, re.S)
+    assert block, "elder3.js 里找不到 send()"
+    body = block.group(0)
+    assert "adapt(" in body, "`send()` 没有过这一层加工"
+    for field in ("visual_text", "speak_text"):
+        assert field in body, f"没有用 `{field}`——加工完了不用等于没加工"
+    #: 只影响这一句。改掉她存的语速设置，等于一次高风险对话之后
+    #: 整个应用都慢下来了，而她从没改过那个设置。
+    assert re.search(r"speechRate = was", body), (
+        "临时语速没有还回去——一次高风险对话会把她存的设置改掉")
+
+
+def test_only_a_real_task_gets_the_detail_action() -> None:
+    """「看看这件事的经过」只许出现在**真的是一件事**的记录行上。
+
+    实测：`/api/v1/records` 的 `entityId` 对「登录了优活」这类事件给的是
+    **一个人**（`elder-vc9b…`），不是任务。四行里三行是这样，而它们照样长出了
+    这个动作，点下去得到「没有找到这件事的记录。」——一个走到死胡同的动作。
+
+    设计一二没有这个问题：它读的 `/v2/elder/activity` 由后端把非任务事件的
+    `about_id` 置空了。这里的修法是拿 `/v2/tasks` 的 id 集合对一遍——
+    **按查得到，不按前缀猜**。前缀判断在换一种 id 形状之后会安静地失效。
+    """
+    js = _src("elder3.js")
+    block = re.search(r"async function loadRecords\(\).*?\n  \}", js, re.S)
+    assert block, "elder3.js 里找不到 loadRecords"
+    body = block.group(0)
+    assert "/v2/tasks" in body, "没有去问哪些主体号真的是任务"
+    assert "taskIds.has(" in body, (
+        "没有用任务 id 集合过滤——非任务的行会长出一个走到死胡同的动作")
+    assert not re.search(r"startsWith\(\s*['\"]task-", body), (
+        "在用 id 前缀猜——换一种 id 形状之后这条判断会安静地失效")
+
+
+def test_the_task_detail_uses_the_same_renderer() -> None:
+    js = _src("elder3.js")
+    assert "import('/static/task-detail.js')" in js, (
+        "设计三在自己画一份经过——同一件事两套说法")
+    assert "taskDetailViewModel" in js and "renderTaskDetail" in js
+
+
+def test_the_task_detail_script_is_precached() -> None:
+    sw = io.open(STATIC / "sw.js", encoding="utf-8").read()
+    sw = re.sub(r"^\s*//.*$", " ", sw, flags=re.M)
+    assert "'/static/task-detail.js'" in sw, "`task-detail.js` 不在预缓存清单里"
+
+
+def test_the_family_notice_titles_do_not_fork_from_design_one() -> None:
+    """通知标题表两处必须一致。
+
+    同一个事件码在两个壳里译成两句话，是这个项目栽过的那件事
+    （字号语速和 SOS 各有两套实现，两边各自往返都绿，跨子系统才红）。
+    """
+    def table(name: str) -> dict[str, str]:
+        js = _src(name)
+        block = re.search(r"NOTICE_TITLE = \{(.*?)\}", js, re.S)
+        assert block, f"{name} 里找不到 NOTICE_TITLE"
+        return dict(re.findall(r"(\w+):\s*'([^']+)'", block.group(1)))
+
+    one, three = table("family.js"), table("family3.js")
+    assert one, "家人端一那张表是空的——这条判据在空转"
+    assert three == one, (
+        "两个壳的通知标题对不上：\n"
+        f"  只在家人端一：{sorted(set(one) - set(three))}\n"
+        f"  只在家人端三：{sorted(set(three) - set(one))}\n"
+        f"  同键不同译：{sorted(k for k in set(one) & set(three) if one[k] != three[k])}")
+
+
+def test_the_notice_fallback_is_not_the_raw_event_code() -> None:
+    """兜底成枚举名，等于这层翻译在遇到没登记过的类型时自动失效——
+    而那正是它该起作用的时候。界面上也不许出现英文枚举值。"""
+    js = _src("family3.js")
+    assert re.search(r"NOTICE_TITLE\[n\.event_type\]\s*\|\|\s*'[^']*[一-鿿]",
+                     js), "通知标题的兜底不是一句中文"
+    assert not re.search(r"NOTICE_TITLE\[n\.event_type\]\s*\|\|\s*n\.event_type", js), (
+        "兜底直接印原始事件码了")
+
+
+def test_the_family_notifications_endpoint_answers(client: TestClient) -> None:
+    r = client.post("/v2/auth/demo", json={"actor_id": "daughter-demo"})
+    token = {"Authorization": "Bearer " + r.json()["access_token"]}
+    got = client.get("/v2/notifications?limit=50", headers=token)
+    assert got.status_code == 200, got.text
+
+
 def test_recording_a_body_reading_keeps_it_a_string(client: TestClient) -> None:
     """血压是「128/82」，不是一个数。拆成两个数字字段就记不了它。"""
     headers = _elder(client)

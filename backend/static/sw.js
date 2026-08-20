@@ -71,7 +71,10 @@
 //: 玻璃盒走的是**动态 `import('/static/glassbox.js')`**，那份也早在清单里，
 //: 漏了它不是「少张卡」：弱网下 import 直接 reject，走进 catch 把卡收掉，
 //: 屏幕上什么都不会少，只是那张卡再也不出现。
-const VERSION = 'youhuo-shell-v20';
+//: v20 → v21：设计三补上最后三条（措辞适配 `/v6/interaction/plan`、
+//: 一件事的经过 `/v2/tasks` + `task-detail.js`、优活给家人的消息
+//: `/v2/notifications`）。后两条也走动态 `import()`，两份模块都早在清单里。
+const VERSION = 'youhuo-shell-v21';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:

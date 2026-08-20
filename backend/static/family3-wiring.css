@@ -135,6 +135,38 @@
 .f3-med-form button:hover { background: rgba(73, 111, 96, .15); }
 .f3-med-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
 
+/* ---- 优活给家人的消息 --------------------------------------------------------
+ *
+ * `/v2/notifications` 是家人端一的一整格，设计三一次都不调。缺的不是
+ * 「一个列表」：`approval_required` / `reminder_escalated` 这几条正是
+ * **要子女动手**的那些——不接，这一版的家人永远不知道有人在等他。
+ *
+ * 空的时候整格不占位（`hidden`），而不是留一句「暂无通知」。 */
+
+.f3-notices {
+  margin: 14px 0 0;
+  padding: 14px 18px;
+  border: 1px solid rgba(168, 118, 45, .28);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .88);
+}
+.f3-notices h3 {
+  margin: 0 0 8px;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #5e4324;
+}
+.f3-notice-row {
+  display: grid;
+  gap: 2px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(120, 105, 88, .14);
+  font-family: "KaiTi", "STKaiti", "Kaiti SC", serif;
+}
+.f3-notice-row:first-of-type { border-top: 0; }
+.f3-notice-row b { font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif; color: #5b5044; }
+.f3-notice-row span { font: 400 14px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif; color: #6a5b49; }
+.f3-notice-row time { font: 400 12px "KaiTi", "STKaiti", "Kaiti SC", serif; color: #9c8d78; }
+
 /* ---- 记一次已吃 / 这次没吃 ---------------------------------------------------
  *
  * `/care` 有这两个动作，设计三的照护屏一个都没有——能看到「在吃什么药」，
