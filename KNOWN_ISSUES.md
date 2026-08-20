@@ -94,6 +94,40 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_heavy.ps1
 
 ---
 
+## 当前红灯二：`verify_all.ps1` 的 `page_runtime_v6` 这一级是红的
+
+上面那一节说的是 pytest。**浏览器闸门这一侧另有一条红，而它此前没有记在这份
+文件里**——`verify_heavy.ps1` 不跑 `check_page_runtime.py`（它跑的是 mass_audit /
+chaos / load / http_smoke / artifacts 五级），所以「verify_heavy 全绿」这句话
+从来就不覆盖它。它在 `verify_all.ps1` 里，那一级叫 `page_runtime_v6`。
+
+实测（2026-08-20，七页全跑）：
+
+```
+FAIL page_runtime: 6 项
+```
+
+**这 6 条与本轮改动无关。** 用 `git worktree add D:\yh_baseline 19396ba` 在
+未改动的 HEAD 上跑同一支脚本，得到的是一字不差的同 6 条。所以它是既存红灯，
+不是这一轮引入的——但它也确实意味着 `verify_all.ps1` 现在跑不到底。
+
+| 那 6 条 | 对应 | 已记在哪 |
+|---|---|---|
+| `/care` 记一次已吃 / 这次没吃 各 2 行（HTTP 409） | 种子数据里今天那一格已经记过 | 本文 P2 §4（那一条讲的就是这个 409） |
+| `/elder` Focus Mode 各块高度之和 495 > 容器 321 | 玻璃盒卡是否出现取决于账单幂等状态 | 本文 P1-B 附近第 153 行 |
+| `/stage` 26 个控件没有被按到 | 它们在抽屉/分区里，遍历没能真的打开 | **此前没有记** |
+
+最后一条是这次才看清的：`/stage` 上 `#baselineDemo` `#sosDemo` `#memoryApprove`
+等 26 个控件，点击遍历**够不着**。它和「死控件巡检报 0 死」不矛盾——
+巡检那一轮在 `/stage` 上只看见 9 个可见控件，剩下 26 个当时也不可见。
+两支脚本都诚实地报告了自己够不着的部分，而**没有人把这两个「够不着」加起来看**。
+
+不修的理由是这一条不是产品缺陷，是仪器覆盖缺口；修它要给遍历加一套
+「先打开每个抽屉」的导航，那是另一件事。记在这里，是因为
+**「verify_all 跑不到底」这件事本身不该只活在某一次会话的终端里**。
+
+---
+
 ## P1
 
 ### A. `/app` 是 consumer 侧的第三套 App Shell，而它和 `/elder` 服务同一批人
@@ -204,7 +238,55 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_heavy.ps1
 **核对过**：`GET /static/app/index.html` → **200，2065 字节**，标题
 「优活老人端前端参考包」，正文里确实有 `CLAUDE_HANDOFF.md` 这个链接。
 
-### E. 九个 `/api/v1` 端点没有任何页面在调
+### E.（2026-08-20 重测）`/api/v1` 五十条路由里，**三十一条**没有任何客户端在调
+
+下面那份「九个」的清单**已经过期**，而且过期的方向有两个，都值得说：
+
+**① 那九个里有五个这一轮接上了。** `privacy/data`、`privacy/erase/preview`、
+`privacy/erase` 在 `elder.js:558/580/596`，`emotions/review` 在 `elder.js:501` 与
+`family3.js:493`，`daily-report` 在 `elder.js:531` 与 `family3.js:175/684`。
+剩下四个（`memories` 的 list / approve / decline / forget）仍然没有入口。
+
+**② 真实的数字比九大得多。** 按接口逐条核（把 `static/**` 下 81 个 .js/.html 里
+`api(<字面量>` 的路径全抽出来，模板字面量和三元都展开，再和 `app.routes` 比对）：
+
+```
+/api/v1 共 50 条路由 · 有人调 19 条 · 没人调 31 条
+```
+
+**关键的一条：鸿蒙那一端也不调它。** `harmonyos/.../ApiClient.ets` 打的全是
+`/v2/*`（`/v2/auth/visitor`、`/v2/chat`、`/v2/tasks`、`/v2/family/approve`……），
+`/api/v1` 在整个 ArkTS 工程里**一次都没出现**。所以不能用「那层是给 App 用的」
+解释掉——这一层此刻没有任何客户端。
+
+没人调的 31 条，按组：
+
+| 组 | 条数 | 说明 |
+|---|---|---|
+| `payments`（prepare / execute / family-approve / teach-back） | 4 | 网页端走的是 `/v2/chat` 那条语音链路 |
+| `reminders`（GET / POST / PATCH / done） | 4 | 页面用 `/v2/reminders`；只有 `cancel` 走了 `/api/v1` |
+| `routines`（GET / POST / pause / resume） | 4 | 例程生成器，界面上没有任何入口 |
+| `memories`（GET / approve / decline / forget） | 4 | 见 ① |
+| `bills`（列表 / 水费 / 单张） | 3 | 页面用 `/v2` |
+| `appointments`（GET / POST / cancel） | 3 | 就医安排，界面上没有入口 |
+| `notifications`（GET / read） | 2 | 页面用 `/v2/notifications` |
+| `speech`（POST / status） | 2 | |
+| 其余单条 | 5 | `medications` GET、`health-summary`、`emergency/call`、`contacts/{id}/phone`、`voice/sessions` |
+
+**怎么读这个数** 不是「31 个功能缺失」——多数能力在 `/v2` `/v4` 上有等价入口且
+确实接通了。它说的是：**`/api/v1` 这个翻译层比任何客户端实际需要的大出一倍**，
+而每一条没人走的路径都是没被任何真实调用验证过的代码。这一轮补的
+`medications/pending|approve|decline` 正是从这堆里挑出来的一条——它当时
+两头都没有入口，而**两边界面都正常、不报任何错**。
+
+判据：暂无。手工核一次要跑一支脚本，容易过期（这一条本身就过期了）。
+下一步该把它变成一道「孤儿集合必须恰好等于这一份清单」的判据——
+它在两个方向上都会红：新增孤儿会红，接通了却没更新清单也会红。
+
+<details>
+<summary>下面是过期的原始记录（保留，不静默删）</summary>
+
+### E（原文）. 九个 `/api/v1` 端点没有任何页面在调
 
 **在哪** `backend/youhuo/app_api.py`。这九个端点都真的注册了、都在 `/openapi.json` 里
 （实测 145 个路径 / 153 个操作，逐条 200），**但整个 `backend/static/` 里一处调用都没有**。
@@ -237,6 +319,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\verify_heavy.ps1
 缺的只是前端入口。
 
 **为什么没修** 是代码。这一轮我只拥有文档，而且前端正有五个 agent 在改。
+
+</details>
 
 ### F. `/family2` 不是一个可安装的页面，也不注册 service worker
 
