@@ -356,6 +356,40 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             status_code=status.HTTP_404_NOT_FOUND, detail="这个家庭里还没有登记老人。"
         )
 
+    def _only_the_elder(ctx: AuthContext, what: str) -> None:
+        """这一类决定**只能由老人本人做**。
+
+        ## 这道守卫为什么必须写在这一层
+
+        底层两处早就有它：
+
+            /v3/memories/decide      `actor.role != ELDER → 403 只有老人本人可以批准长期记忆。`
+            /v4/medications/decide   `actor.role != ELDER → 403 只有老人本人可以激活家属补充的用药计划。`
+
+        而这一层的 `_decide_memory` / `_decide_plan` 照抄了调用、**没有照抄守卫**，
+        并且传的是 `_elder_of(ctx)`——家人令牌会被解析成「她家那位老人」，
+        于是底层那句「只有本人」的校验，被一个不属于调用者的 id 满足了。
+
+        实测（女儿的令牌）：
+
+            /v3/memories/decide          403  只有老人本人可以批准长期记忆。
+            /api/v1/memories/{id}/approve 200  好，我记住「早上散步的时间」了
+            /api/v1/memories/{id}/forget  200  好，「早上散步的时间」我不再记着了
+            /api/v1/medications/{id}/approve 200  好，钙片从今天开始按计划吃。
+
+        同一个控制，一层有一层没有。而这五个决定恰恰是这个产品的立身之本：
+        「同意记忆」要她点头才记，家属补的药要她点头才吃。家人能替她点，
+        这两句话就都不成立了——**而两边界面都正常，审计里还老老实实记着是女儿干的**。
+
+        `_elder_of()` 存在是对的（家人看老人的日程和账单，那是只读）。
+        它不该被用在**代替她做决定**的路径上，这是那个函数与这个守卫的分界。
+        """
+        if ctx.role is not ActorRole.ELDER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"只有老人本人可以{what}。",
+            )
+
     def _approver_of(ctx: AuthContext) -> AuthContext:
         """谁来点这个头。
 
@@ -2426,9 +2460,11 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
         from .memory_vault import MemoryDecision
 
+        _only_the_elder(ctx, "决定要不要记住这一条")
         _refuse_internal(ctx, memory_id)
         try:
-            item = memory_vault.decide(ctx.family_id, _elder_of(ctx),
+            # 同上：传本人的 id，让 vault 自己那道身份校验真的合上。
+            item = memory_vault.decide(ctx.family_id, ctx.actor_id,
                                        MemoryDecision(memory_id=memory_id, approve=approve))
         except PermissionError:
             raise HTTPException(status_code=404, detail="没有找到这一条。")
@@ -2467,9 +2503,12 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         """
         if memory_vault is None:
             raise HTTPException(status_code=404, detail="这台机器上没有开启记忆功能。")
+        # 「可撤回」是「同意」成立的前提，所以撤回也只能是本人。
+        # 家人能替她忘掉，等于这份同意从来就不属于她。
+        _only_the_elder(ctx, "决定不再记住这一条")
         _refuse_internal(ctx, memory_id)
         try:
-            item = memory_vault.revoke(ctx.family_id, _elder_of(ctx), memory_id)
+            item = memory_vault.revoke(ctx.family_id, ctx.actor_id, memory_id)
         except PermissionError:
             raise HTTPException(status_code=404, detail="没有找到这一条。")
         db.append_audit(
@@ -2510,6 +2549,10 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
         }
 
     def _decide_plan(ctx: AuthContext, plan_id: str, approve: bool) -> dict[str, Any]:
+        # 家属补的药要她本人点头才算数——这条流程的全部意义就在这里。
+        # 上面那段注释引的正是这条规则（`v4_api.py:342`），而这个函数原先
+        # 没有执行它：家人令牌经 `_elder_of()` 解析成老人的 id，底层校验就过了。
+        _only_the_elder(ctx, "决定要不要吃这份药")
         plan = v4_store.get_medication_plan(plan_id)
         if plan is None or plan.family_id != ctx.family_id or plan.elder_id != _elder_of(ctx):
             raise HTTPException(status_code=404, detail="没有找到这份用药计划。")
@@ -2518,7 +2561,15 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
             return {"ok": True, "id": plan_id, "name": plan.display_name,
                     "active": True, "message": f"{plan.display_name}之前已经确认过了。"}
         try:
-            after = v4_store.approve_medication_plan(ctx.family_id, _elder_of(ctx), plan_id, approve)
+            # 传**调用者本人**的 id，不是 `_elder_of(ctx)`。
+            #
+            # 底层 `approve_medication_plan` 自己有一道身份校验，而门面原先
+            # 递给它的是「她家那位老人」的 id——于是那道锁被一个不属于调用者的
+            # 钥匙打开了。上面的 `_only_the_elder` 已经挡住了家人，这里改成
+            # 本人 id 是让**第二道锁也真的合上**：万一哪天上面那道被绕过，
+            # 这一层不会自己把钥匙递过去。
+            after = v4_store.approve_medication_plan(
+                ctx.family_id, ctx.actor_id, plan_id, approve)
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         db.append_audit(
