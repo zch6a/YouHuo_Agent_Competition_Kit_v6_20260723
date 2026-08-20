@@ -1104,7 +1104,14 @@ async function loadReminders() {
   } catch (e) {
     // 原先是 `待办加载失败：${e.message}`——`e.message` 可能是
     // `Failed to fetch`，而这一行会被念给老人听。见 common.js 的 errorWords。
-    remindersEl.textContent = window.YouHuo.window.YouHuo.errorWords(e, '待办').text;
+    //: 这里原先是 `window.YouHuo.window.YouHuo.errorWords(...)`——
+    //: `window.YouHuo.window` 是 undefined，再取 `.YouHuo` 当场 TypeError。
+    //: 也就是说**后端一断，这段处理自己先崩**，她屏幕上一个字都不会出现。
+    //: 看形状是某次批量加 `window.YouHuo.` 前缀时，在已经有前缀的行上又替了一次。
+    //: 全仓三处，全在 catch 里（待办 / 记录 / 事件经过）——它们只在请求失败时
+    //: 执行，所以语法检查、截图、点击遍历一个都看不见。判据见
+    //: `test_the_error_path_can_run.py`。
+    remindersEl.textContent = window.YouHuo.errorWords(e, '待办').text;
   }
 }
 
@@ -1153,7 +1160,7 @@ async function loadActivity() {
       );
     }
   } catch (e) {
-    activityLogEl.textContent = window.YouHuo.window.YouHuo.errorWords(e, '记录').text;
+    activityLogEl.textContent = window.YouHuo.errorWords(e, '记录').text;
   }
 }
 
@@ -1222,7 +1229,7 @@ async function openTaskDetail(aboutId) {
     renderTaskDetail(detailBody, taskDetailViewModel(task));
   } catch (e) {
     detailBody.replaceChildren();
-    detailBody.textContent = window.YouHuo.window.YouHuo.errorWords(e, '这件事的经过').text;
+    detailBody.textContent = window.YouHuo.errorWords(e, '这件事的经过').text;
   }
 }
 
