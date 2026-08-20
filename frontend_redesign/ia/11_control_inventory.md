@@ -3,9 +3,9 @@
 由 `backend/scripts/build_control_inventory.py` 从代码生成。
 **这份文件替代 `08_click_map.md` 成为控件层面的事实源**——那一份只覆盖 41 / 119 个控件，且是手写、单向、缺文件时 skip 的。
 
-| 总数 | 479 |
+| 总数 | 483 |
 |---|---|
-| 有 id | 479 |
+| 有 id | 483 |
 | 无 id（匿名控件，无法被矩阵追踪） | 0 |
 | 未分类 | 0 |
 | 追不到 handler（非 `<a>`） | 20 |
@@ -131,6 +131,10 @@
 | `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
 | `#` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
 | `#savePref` | elder-v3 | — | button | click | elder3/page-motion-and-ui.js:setMode | — | consumer | elder | shell | primary |
+| `#e3DayReport` | elder-v3 | — | button | click | elder3.js:wireDataTools | — | consumer | elder | shell | primary |
+| `#e3MoodReview` | elder-v3 | — | button | click | elder3.js:wireDataTools | — | consumer | elder | shell | primary |
+| `#e3MyData` | elder-v3 | — | button | click | elder3.js:wireDataTools | — | consumer | elder | shell | primary |
+| `#e3EraseStart` | elder-v3 | — | button | click | elder3.js:wireDataTools | — | consumer | elder | shell | primary |
 | `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
 | `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |
 | `#` | elder-v3 | — | button | — | elder3/page-motion-and-ui.js:fillName | — | consumer | elder | shell | primary |

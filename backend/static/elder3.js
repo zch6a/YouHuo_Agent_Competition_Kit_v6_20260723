@@ -280,6 +280,177 @@
     if (head && !rows.length && emptyWord) head.textContent = emptyWord;
   }
 
+  /* ---- 「我的数据」四条 -------------------------------------------------------
+   *
+   * 设计一二的「我的」屏有这四项，设计三的交付包里**一项都没有**：
+   * 端点齐全（`/api/v1/daily-report`、`/api/v1/emotions/review`、
+   * `/api/v1/privacy/data`、`/api/v1/privacy/erase{,/preview}`），
+   * 而 `elder3.js` 一处都不调。也就是说这一版的老人**看不到优活替她记了什么，
+   * 也删不掉**——那正是这个产品对隐私那几句承诺的兑现处。
+   *
+   * 端点和读的字段都照 `elder.js` **一字不差**地来。这个项目已经因为
+   * 「两套实现各自往返都绿、跨子系统才红」栽过一次（字号语速和 SOS），
+   * 所以 `test_design_three_has_the_data_tools.py` 钉住两处不许分叉。
+   */
+
+  function dataOut() {
+    return $('#e3DataOut');
+  }
+
+  function outText(host, words) {
+    host.replaceChildren();
+    const p = document.createElement('p');
+    p.textContent = words || '';
+    host.appendChild(p);
+    host.hidden = !words;
+  }
+
+  /** 「名称 数量」一行一条。只印后端给的中文名。 */
+  function outCounts(host, rows, lead) {
+    host.replaceChildren();
+    if (lead) {
+      const p = document.createElement('p');
+      p.textContent = lead;
+      host.appendChild(p);
+    }
+    const list = document.createElement('ul');
+    // 数量为 0 的不印。「就医单据 0 条」对老人没有信息量，
+    // 只是让这张单子长一倍——而她要回答的问题是「优活都记了我什么」。
+    (rows || []).filter((r) => Number(r.count) > 0).forEach((r) => {
+      const li = document.createElement('li');
+      li.textContent = `${r.name}　${r.count} 条`;
+      list.appendChild(li);
+    });
+    host.appendChild(list);
+    host.hidden = false;
+  }
+
+  async function showDayReport() {
+    const host = dataOut();
+    try {
+      const data = await api('/api/v1/daily-report');
+      host.replaceChildren();
+      const line = document.createElement('p');
+      line.textContent = data.message || '';
+      host.appendChild(line);
+      // 五个通道逐条说，但**只说有结论的**。`word` 是「现在还说不准」的那几条
+      // 照样印——那不是缺数据，是一个诚实的回答。
+      const list = document.createElement('ul');
+      (data.channels || []).forEach((c) => {
+        const li = document.createElement('li');
+        li.textContent = c.today
+          ? `${c.name}　${c.today}（平常 ${c.usual || '还没算出来'}）　${c.word}`
+          : `${c.name}　${c.word}`;
+        list.appendChild(li);
+      });
+      host.appendChild(list);
+      host.hidden = false;
+      speakOut(data.message);
+    } catch (e) { outText(host, errorWords(e, '今天的情况').text); }
+  }
+
+  async function showMoodReview() {
+    const host = dataOut();
+    try {
+      const data = await api('/api/v1/emotions/review?days=14');
+      host.replaceChildren();
+      const line = document.createElement('p');
+      line.textContent = data.message || '';
+      host.appendChild(line);
+      // 建议是后端按真实记录给的，不是这里编的。没有就不印这一段。
+      (data.suggestions || []).forEach((s) => {
+        const p = document.createElement('p');
+        p.className = 'meta';
+        p.textContent = s;
+        host.appendChild(p);
+      });
+      // 这句承诺必须跟着显示：这一页别处写着「和无忧伴聊天的内容不会记在这里」，
+      // 而这一块正是最容易让人怀疑那句话的地方。
+      if (data.privacyNote) {
+        const note = document.createElement('p');
+        note.className = 'meta';
+        note.textContent = data.privacyNote;
+        host.appendChild(note);
+      }
+      host.hidden = false;
+      speakOut(data.message);
+    } catch (e) { outText(host, errorWords(e, '心情记录').text); }
+  }
+
+  async function showMyData() {
+    const host = dataOut();
+    try {
+      const data = await api('/api/v1/privacy/data');
+      outCounts(host, data.buckets, data.message || `一共 ${data.total} 条。`);
+    } catch (e) { outText(host, errorWords(e, '您的数据').text); }
+  }
+
+  /** 删除第一步：告诉她要删什么，然后**才**给出第二个按钮。
+   *
+   * 第二步的按钮**一开始不存在于 DOM 里**，不是 disabled 也不是 hidden。
+   * 一个看得见的「确认删除」按钮会让人以为「点两下就没了」；而它在看到清单
+   * 之前根本不该存在。这一条和设计一二是同一个规矩。
+   *
+   * `confirmToken` 是驼峰，和 preview 返回的字段名一致；写成下划线后端读不到，
+   * 会正确地走 400。它保证的不是防伪造，而是**她确认的对象和她看到的那一份
+   * 是同一份**——回执写「删掉 7 条」实际删了 9 条，两边都不报错。
+   */
+  async function startErase() {
+    const host = dataOut();
+    try {
+      const preview = await api('/api/v1/privacy/erase/preview',
+                                {method: 'POST', body: '{}'});
+      outCounts(host, preview.willDelete, preview.message);
+
+      const keep = document.createElement('p');
+      keep.className = 'meta';
+      keep.textContent = '这些会留下来：' + (preview.preserved || []).join('、');
+      host.appendChild(keep);
+
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = 'danger';
+      confirm.textContent = `确认删掉这 ${preview.total} 条`;
+      confirm.addEventListener('click', () => once(confirm, async () => {
+        try {
+          const done = await api('/api/v1/privacy/erase', {
+            method: 'POST',
+            body: JSON.stringify({confirmToken: preview.confirmToken}),
+          });
+          outText(host, done.message || '删好了。');
+          speakOut(done.message);
+        } catch (e) {
+          // 令牌过期（条数在这中间变了）走 409，后端那句话说得比这里清楚。
+          outText(host, errorWords(e, '删除').text);
+        }
+      }));
+      host.appendChild(confirm);
+
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'secondary';
+      cancel.textContent = '先不删';
+      cancel.addEventListener('click', () => {
+        host.replaceChildren();
+        host.hidden = true;
+      });
+      host.appendChild(cancel);
+    } catch (e) { outText(host, errorWords(e, '要删的东西').text); }
+  }
+
+  function wireDataTools() {
+    // 四个都往返后端，慢网络下连点两次的第二次会拿一个用过的令牌去删一份
+    // 已经不存在的数据——后端会正确地拒绝，而屏幕上会闪一句错误，
+    // 让人以为第一次没成功。所以一律包在 `once()` 里。
+    [['#e3DayReport', showDayReport],
+     ['#e3MoodReview', showMoodReview],
+     ['#e3MyData', showMyData],
+     ['#e3EraseStart', startErase]].forEach(([sel, run]) => {
+      const btn = $(sel);
+      if (btn) btn.addEventListener('click', () => once(btn, run));
+    });
+  }
+
   /* ---- 记录 --------------------------------------------------------------- */
 
   let lastSpoken = '';
@@ -414,6 +585,57 @@
     return sessionId;
   }
 
+  /* ---- 玻璃盒：她说的那件事，到底要动什么 --------------------------------------
+   *
+   * 这是这个项目三项核心创新之一，而设计三**整个没有**。此前她说「帮我交水费」，
+   * 屏幕上只有一句回话；要办的是哪一笔、多少钱、谁来决定、能不能撤销、
+   * 会用到她哪些信息——一个字都没有。设计一二那一屏有一整张卡（`glassbox.js`），
+   * 走的是 `POST /v6/tasks/{id}/glass-box`，而这一版一次都没调过。
+   *
+   * 「先复述金额再执行」那一步不用另接：她复述的那句话仍然走 `send()` →
+   * `/v2/chat`，后端自己判。缺的从来只是**把这张卡摆出来**。
+   *
+   * 用动态 `import()`：`glassbox.js` 是 ES 模块，而这份接线是 IIFE，
+   * 顶层 `import` 用不了。渲染函数**不重写一份**——同一张卡两套画法，
+   * 正是这个项目栽过的那件事。
+   */
+  function ensureReliance() {
+    let host = $('#e3Reliance');
+    if (host) return host;
+    const anchor = $('#e3Actions') || ensureStatus();
+    if (!anchor) return null;
+    host = document.createElement('div');
+    host.id = 'e3Reliance';
+    host.className = 'e3-reliance';
+    host.hidden = true;
+    anchor.insertAdjacentElement('afterend', host);
+    return host;
+  }
+
+  async function showGlassBox(heard, data) {
+    const host = ensureReliance();
+    if (!host) return;
+    // 没有任务就把上一张收掉。留着的话，她说完下一句还看着上一件事的卡。
+    if (!data || !data.task_id) {
+      host.replaceChildren();
+      host.hidden = true;
+      return;
+    }
+    try {
+      const box = await api(
+        `/v6/tasks/${encodeURIComponent(data.task_id)}/glass-box`,
+        {method: 'POST', body: JSON.stringify({heard_text: heard})});
+      const {renderGlassBox} = await import('/static/glassbox.js');
+      renderGlassBox(host, box.card, box.preview);
+      host.hidden = false;
+    } catch (_) {
+      // 取不到就不摆。**空着**比摆一张半张的卡好：这张卡的全部价值在于
+      // 它说的每一行都是真的。
+      host.replaceChildren();
+      host.hidden = true;
+    }
+  }
+
   async function send(text) {
     const what = String(text || '').trim();
     if (!what) return;
@@ -426,6 +648,7 @@
       say(data.message, YH.toneOf(data));
       lastSpoken = data.message;
       if (data.ui && data.ui.speak) speakOut(data.message);
+      showGlassBox(what, data);
       // 办完一件事，今天那一屏就该跟着变。
       loadToday();
       loadRecords();
@@ -681,6 +904,8 @@
         }
       }));
     }
+
+    wireDataTools();
 
     // 字号选一下就立刻看得到，不用等保存——但保存前不写库。
     const fontSeg = $('.segmented[data-seg="font"]', ws('mine'));

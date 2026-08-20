@@ -120,6 +120,166 @@
   outline-offset: 2px;
 }
 
+/* ---- 玻璃盒 ------------------------------------------------------------------
+ *
+ * 卡片由 `glassbox.js` 渲染（**同一个渲染函数**，不另写一份），它发的是
+ * `.reliance-card` / `.reliance-row` / `.notice` / `.preview-details`
+ * 这几个类名——那些样式住在设计一二的全局表里，设计三不加载。
+ * 不补这一段，卡会以浏览器默认样式堆在页面上：能读，但和这一屏毫无关系。
+ *
+ * 只写这一页够得着的选择器（`.e3-reliance` 之内），不动全局表。 */
+
+.e3-reliance {
+  margin: 12px auto 0;
+  max-width: 46ch;
+}
+.e3-reliance .reliance-card {
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .32);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+  color: #5b5044;
+  font-family: var(--kai, serif);
+  text-align: left;
+}
+.e3-reliance .reliance-card h3 {
+  margin: 0 0 10px;
+  font: 700 calc(17px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.e3-reliance .reliance-row {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(120, 105, 88, .14);
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .reliance-row:first-of-type { border-top: 0; }
+.e3-reliance .reliance-row strong { color: #8a7a63; font-weight: 400; }
+.e3-reliance .notice {
+  margin-top: 10px;
+  padding: 9px 13px;
+  border-left: 2px solid var(--jade, #496f60);
+  border-radius: 3px;
+  background: rgba(73, 111, 96, .06);
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .notice.warning { border-left-color: var(--gold, #a8762d); }
+.e3-reliance .notice.bad,
+.e3-reliance .notice.danger { border-left-color: var(--red, #a74e40); color: #7a3f34; }
+.e3-reliance .preview-details { margin-top: 10px; }
+.e3-reliance .preview-details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #6a5b49;
+}
+.e3-reliance .preview-details > summary:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 2px;
+}
+.e3-reliance .preview-columns {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+}
+.e3-reliance .preview-columns section {
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: rgba(120, 105, 88, .05);
+}
+.e3-reliance .preview-columns h4 {
+  margin: 0 0 5px;
+  font: 700 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8a7a63;
+}
+.e3-reliance .preview-columns ul { margin: 0; padding-left: 1.2em; }
+.e3-reliance .preview-columns li {
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+
+/* ---- 「我的数据」四条 --------------------------------------------------------
+ *
+ * 设计一二的「我的」屏上有这四项（日报 / 心情 / 隐私导出 / 两步删除），
+ * 设计三的交付包里**一项都没有**。端点齐全、接线一处不调，
+ * 于是「优活替我记了些什么」和「删掉这些」在这一版根本不存在——
+ * 而这两件事恰恰是这个产品对隐私那几句承诺的兑现处。
+ *
+ * 长得和 `.service-row` 一致（同一屏上同一类东西同一个样子），
+ * 但它们是真 `<button>`：这四个会往返后端，不是标签。 */
+
+.data-entries { display: grid; gap: 10px; margin-top: 4px; }
+.data-entry {
+  display: block;
+  width: 100%;
+  min-height: 56px;                 /* 关键动作 ≥56px */
+  padding: 12px 16px;
+  border: 1px solid rgba(120, 105, 88, .26);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .82);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.data-entry b {
+  display: block;
+  font: 700 calc(16px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+}
+.data-entry span {
+  display: block;
+  margin-top: 3px;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8a7a63;
+}
+.data-entry:hover { background: #fff; border-color: var(--jade, #496f60); }
+.data-entry:focus-visible { outline: 2px solid var(--jade, #496f60); outline-offset: 3px; }
+/* 删除那一条单独着色：这一屏上只有它是不可逆的。 */
+.data-entry.danger { border-color: rgba(167, 78, 64, .38); }
+.data-entry.danger b { color: #8c3b2e; }
+.data-entry.danger:hover { border-color: #a74e40; background: rgba(167, 78, 64, .06); }
+
+.e3-data-out {
+  margin-top: 12px;
+  padding: 12px 15px;
+  border-left: 2px solid var(--jade, #496f60);
+  border-radius: 3px;
+  background: rgba(255, 253, 247, .9);
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.75 var(--kai, serif);
+  color: #5b5044;
+}
+.e3-data-out:empty { display: none; }
+.e3-data-out p { margin: 0 0 6px; }
+.e3-data-out ul { margin: 6px 0 0; padding-left: 1.3em; }
+.e3-data-out li { margin: 3px 0; }
+.e3-data-out .meta { color: #8a7a63; font-size: .92em; }
+/* 第二步那个按钮**一开始不在 DOM 里**（见接线里的说明）。它出现的时候
+ * 必须一眼看出和上面那些不是一类东西。 */
+.e3-data-out button {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  margin-top: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+}
+.e3-data-out button.danger {
+  border: 1px solid rgba(167, 78, 64, .5);
+  background: rgba(167, 78, 64, .08);
+  color: #8c3b2e;
+}
+.e3-data-out button.secondary {
+  border: 1px solid rgba(120, 105, 88, .32);
+  background: transparent;
+  color: #6a5b49;
+}
+.e3-data-out button:focus-visible { outline: 2px solid #a74e40; outline-offset: 2px; }
+
 /* 「常用服务」那四行交付包里是 div，看起来能点、实际不能。
  * 接线给它们补了 role/tabindex，这里补上键盘可见的焦点圈和手型。 */
 .service-row[role="button"] { cursor: pointer; }

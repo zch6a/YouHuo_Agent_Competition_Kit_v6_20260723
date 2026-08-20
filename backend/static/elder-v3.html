@@ -55,7 +55,20 @@
 
   <section class="workspace" data-workspace="mine">
     <div class="page-grid"><div class="left-column"><section class="identity-island"><svg class="identity-grow" viewBox="0 0 70 300"><path class="main" d="M18 288 C24 231 15 200 31 158 C44 122 40 80 60 41 C64 32 69 23 69 18"/><path class="side" d="M31 164 C49 151 58 138 63 121 M42 112 C24 96 16 78 12 60"/><ellipse cx="63" cy="121" rx="8" ry="4"/><ellipse cx="12" cy="60" rx="7" ry="3.5"/></svg><div class="identity-kicker">我的习惯</div><h1>调成您舒服的样子。</h1><p>语速、文字大小、常用服务和保护方式都放在这里，不藏起来。</p><div class="identity-meta">设置会自动记住</div></section><section class="left-story"><div class="story-head"><b>优活怎么保护您</b></div><div class="story-canvas"><div class="guard-row"><b>一次只问一件事</b><span>不连续追问</span></div><div class="guard-row"><b>要紧的事请您念一遍</b><span>先听准再继续</span></div><div class="guard-row"><b>不会自动扣钱</b><span>付款前一定确认</span></div></div></section></div>
-      <main class="right-stage"><div class="stage-art" style="background-image:var(--scene-water)"></div><div class="stage-accent"></div><div class="stage-copy"><div class="stage-kicker">使用习惯</div><h2>按您的习惯来。</h2><p>只留常用设置。选一次，优活就记住。</p></div><div class="settings-grid"><div><div class="setting-block"><h3>语速</h3><p>选「慢」的时候，优活会一字一句地说。</p><div class="segmented" data-seg="speed"><button class="seg-btn">慢</button><button class="seg-btn active">舒适</button><button class="seg-btn">正常</button></div></div><div class="setting-block"><h3>文字大小</h3><p>屏幕上的字会变大，按钮也跟着变大。</p><div class="segmented" data-seg="font"><button class="seg-btn active">较大</button><button class="seg-btn">大</button><button class="seg-btn">特大</button></div></div><button class="save-pref" id="savePref">保存我的习惯</button></div><div><div class="setting-block"><h3>常用服务</h3><p>常用的，就放在手边。</p><div class="service-row"><b>找无忧伴聊聊</b><span>只聊天</span></div><div class="service-row"><b>今天吃药了吗</b><span>只念记录</span></div><div class="service-row"><b>药还够吃吗</b><span>查看余量记录</span></div><div class="service-row"><b>上次的血压</b><span>只念记录</span></div></div></div></div></main>
+      <main class="right-stage"><div class="stage-art" style="background-image:var(--scene-water)"></div><div class="stage-accent"></div><div class="stage-copy"><div class="stage-kicker">使用习惯</div><h2>按您的习惯来。</h2><p>只留常用设置。选一次，优活就记住。</p></div><div class="settings-grid"><div><div class="setting-block"><h3>语速</h3><p>选「慢」的时候，优活会一字一句地说。</p><div class="segmented" data-seg="speed"><button class="seg-btn">慢</button><button class="seg-btn active">舒适</button><button class="seg-btn">正常</button></div></div><div class="setting-block"><h3>文字大小</h3><p>屏幕上的字会变大，按钮也跟着变大。</p><div class="segmented" data-seg="font"><button class="seg-btn active">较大</button><button class="seg-btn">大</button><button class="seg-btn">特大</button></div></div><button class="save-pref" id="savePref">保存我的习惯</button></div><div><div class="setting-block"><h3>常用服务</h3><p>常用的，就放在手边。</p><div class="service-row"><b>找无忧伴聊聊</b><span>只聊天</span></div><div class="service-row"><b>今天吃药了吗</b><span>只念记录</span></div><div class="service-row"><b>药还够吃吗</b><span>查看余量记录</span></div><div class="service-row"><b>上次的血压</b><span>只念记录</span></div></div></div>
+        <!-- 「我的数据」。设计一二那一屏有这四项，设计三交付包里一项都没有——
+             端点齐全、接线里一处不调，于是隐私导出和两步删除在这一版**不存在**。
+             四条走的是和 `elder.html` **完全相同**的端点与字段，
+             `test_design_three_has_the_data_tools.py` 钉住两处不许分叉。 -->
+        <div class="setting-block"><h3>我的数据</h3><p>优活替您记下的东西，您随时能看，也能删掉。</p>
+          <div class="data-entries">
+            <button type="button" class="data-entry" id="e3DayReport"><b>我今天怎么样</b><span>和您自己平常比，不和别人比</span></button>
+            <button type="button" class="data-entry" id="e3MoodReview"><b>看看这两周的心情</b><span>只说趋势，不替您下结论</span></button>
+            <button type="button" class="data-entry" id="e3MyData"><b>优活替我记了些什么</b><span>这一份是您自己的</span></button>
+            <button type="button" class="data-entry danger" id="e3EraseStart"><b>删掉优活记下的这些</b><span>先告诉您要删什么，再问一次</span></button>
+          </div>
+          <div class="e3-data-out" id="e3DataOut" hidden></div>
+        </div></div></main>
     </div>
   </section>
 

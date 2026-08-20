@@ -65,7 +65,13 @@
 //: 缓存里的旧接线：家人端那个加药入口根本不存在，老人端也不会问她要不要吃，
 //: 而**页面看起来完全正常**。这个项目已经为同一件事栽过两次（37px 那一版、
 //: `/api/v1` 的旧响应），这是第三次写同一条注释。
-const VERSION = 'youhuo-shell-v19';
+//: v19 → v20：设计三补齐了「我的数据」四条、玻璃盒、记一次已吃/没吃、
+//: 记一次身体数据。动到 `elder-v3.html` `elder3.js` `elder3-wiring.css`
+//: `family3.js` `family3-wiring.css`——五份全在下面的清单里。
+//: 玻璃盒走的是**动态 `import('/static/glassbox.js')`**，那份也早在清单里，
+//: 漏了它不是「少张卡」：弱网下 import 直接 reject，走进 catch 把卡收掉，
+//: 屏幕上什么都不会少，只是那张卡再也不出现。
+const VERSION = 'youhuo-shell-v20';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:

@@ -135,6 +135,118 @@
 .f3-med-form button:hover { background: rgba(73, 111, 96, .15); }
 .f3-med-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
 
+/* ---- 记一次已吃 / 这次没吃 ---------------------------------------------------
+ *
+ * `/care` 有这两个动作，设计三的照护屏一个都没有——能看到「在吃什么药」，
+ * 却记不了「今天这一顿吃没吃」，而扣库存和余量预警全挂在这条动作上。
+ *
+ * 不塞进 `.medicine-seal`：那两张卡的位置由 CSS 的 `med-a` / `med-b` 定死。 */
+
+.f3-dose { margin: 16px 0 0; display: grid; gap: 8px; }
+.f3-dose-head {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-dose-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid rgba(120, 105, 88, .22);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .8);
+}
+.f3-dose-row b {
+  flex: 1 1 7em;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #5b5044;
+}
+.f3-dose-row button {
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1px solid rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+}
+.f3-dose-row button.f3-dose-skip {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-dose-row button:hover { background: rgba(73, 111, 96, .16); }
+.f3-dose-row button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 记一次身体数据 ----------------------------------------------------------
+ * 身体那一屏此前只读：拉出来列一列，没有任何入口能新增一条。 */
+
+.f3-body-add {
+  margin: 14px 0 0;
+  padding: 12px 18px;
+  border: 1px dashed rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .7);
+  color: #46604f;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-body-add:hover { background: #fff; border-style: solid; }
+.f3-body-add:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-body-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .3);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .92);
+}
+.f3-body-form label {
+  display: grid;
+  gap: 5px;
+  font: 400 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-body-form input {
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 105, 88, .38);
+  border-radius: 3px;
+  background: #fffdf7;
+  font: 400 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #4a4137;
+  min-height: 48px;
+}
+.f3-body-form input:focus-visible { outline: 2px solid #496f60; outline-offset: 1px; }
+.f3-body-form .f3-body-hint {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-body-form .f3-body-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.f3-body-form button {
+  padding: 12px 22px;
+  border: 1px solid rgba(73, 111, 96, .5);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-body-form button.f3-body-cancel {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-body-form button:hover { background: rgba(73, 111, 96, .15); }
+.f3-body-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
 /* 接线会把用不上的节点 `hidden`。这份 CSS 里有 `.medicine-seal{opacity:1}`
  * 这类"最终态必须可见"的规则，它们会盖掉 `[hidden]` 的默认 `display:none`——
  * 那样「隐藏多余的卡片」就变成了「留下一张写着别人事情的卡片」。 */

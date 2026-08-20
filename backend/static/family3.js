@@ -439,6 +439,7 @@
       }
       // 「2 种长期用药，今日记录完整。」是写死的。实测五脉说 1 种、这一句说 2 种，
       // 同一屏两个数字对不上——而这一句躲过了第一轮驱动，因为它读起来很正常。
+      fillDoseActions(plans);
       const medHead = $('[data-care-page="med"] .substage-head p');
       // 卡位只有两个（`.med-a` `.med-b`，位置由 CSS 定死，克隆出来的第三张会叠
       // 在别人身上）。加药入口装上之后第三份药是随手就能有的事，而屏幕上
@@ -825,6 +826,153 @@
     });
 
     mountMedicationComposer();
+    mountDoseActions();
+    mountBodyComposer();
+  }
+
+  /** 「记一次已吃 / 这次没吃」。
+   *
+   * `/care` 那一屏有这两个动作（`care.js` 打 `/api/v1/medications/{id}/taken`
+   * 与 `/skipped`），设计三的照护屏**一个都没有**——它只把用药计划列出来看。
+   * 于是这一版的家人能看到「在吃什么药」，却记不了「今天这一顿吃没吃」，
+   * 而扣库存、余量预警全都挂在这条动作上：不记，「还够吃几天」永远不动。
+   *
+   * 不塞进 `.medicine-seal` 里：那两张卡的位置由 CSS 的 `med-a` / `med-b` 定死，
+   * 往里加按钮会把它们撑出画面。改成卷轴下面一行一条，药名写在动作旁边——
+   * 两份药各自一行，不会点错。
+   */
+  function mountDoseActions() {
+    const stage = $('[data-care-page="med"] .medicine-stage');
+    if (!stage || $('.f3-dose', stage)) return;
+    const box = document.createElement('div');
+    box.className = 'f3-dose';
+    box.hidden = true;
+    stage.append(box);
+  }
+
+  function fillDoseActions(plans) {
+    const box = $('[data-care-page="med"] .f3-dose');
+    if (!box) return;
+    // 只给**已经生效**的计划记。待老人确认的那些还没开始吃，
+    // 给它们一个「记一次已吃」就是在替她把那一步跳过去。
+    const live = (plans || []).filter((p) => p.active !== false);
+    box.replaceChildren();
+    box.hidden = !live.length;
+    if (!live.length) return;
+
+    const head = document.createElement('p');
+    head.className = 'f3-dose-head';
+    head.textContent = '这一顿吃了没有？记一笔，余量才算得准。';
+    box.append(head);
+
+    live.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'f3-dose-row';
+      const name = document.createElement('b');
+      name.textContent = p.display_name || '这份药';
+      const took = document.createElement('button');
+      took.type = 'button';
+      took.textContent = '记一次已吃';
+      const missed = document.createElement('button');
+      missed.type = 'button';
+      missed.className = 'f3-dose-skip';
+      missed.textContent = '这次没吃';
+      const hit = (what) => once(what === 'taken' ? took : missed, async () => {
+        try {
+          const data = await api(
+            `/api/v1/medications/${encodeURIComponent(p.id)}/${what === 'taken' ? 'taken' : 'skipped'}`,
+            {method: 'POST', body: JSON.stringify({})}, FAMILY);
+          say(data.message || '记下了。', YH.toneOf(data));
+          loadCare();
+        } catch (e) {
+          // 同一格重复记会走 409，后端那句话（「今天该吃的都记过了」）
+          // 比这里能写的清楚，照原样给出去。
+          trouble(e, '这一次用药');
+        }
+      });
+      took.addEventListener('click', () => hit('taken'));
+      missed.addEventListener('click', () => hit('skipped'));
+      row.append(name, took, missed);
+      box.append(row);
+    });
+  }
+
+  /** 「记一次身体数据」。
+   *
+   * 身体那一屏此前**只读**：`/v4/health/events` 拉出来列一列，没有任何入口
+   * 能新增一条。而它下面那句写着「老人端量过血压、体温之后，这里会出现记录」——
+   * 老人端确实能记，但家人陪着量完想替他记一笔时无处可记，`/care` 那一屏是有的。
+   */
+  function mountBodyComposer() {
+    const stage = $('[data-care-page="body"] .body-stage');
+    if (!stage || $('.f3-body-add', stage)) return;
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'f3-body-add';
+    open.textContent = '记一次身体数据';
+
+    const form = document.createElement('form');
+    form.className = 'f3-body-form';
+    form.hidden = true;
+    const field = (nm, label, ph) => {
+      const wrap = document.createElement('label');
+      const span = document.createElement('span');
+      span.textContent = label;
+      const input = document.createElement('input');
+      input.name = nm;
+      input.type = 'text';
+      input.placeholder = ph;
+      input.required = true;
+      wrap.append(span, input);
+      return wrap;
+    };
+    const hint = document.createElement('p');
+    hint.className = 'f3-body-hint';
+    // 值保持字符串：血压是「128/82」，不是一个数。
+    hint.textContent = '血压这类写成「128/82」就行，不用拆成两个数。';
+    const row = document.createElement('div');
+    row.className = 'f3-body-row';
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.textContent = '记下';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'f3-body-cancel';
+    cancel.textContent = '先不记';
+    row.append(submit, cancel);
+    form.append(field('label', '记什么', '例如：血压'),
+                field('value', '数值', '例如：128/82'), hint, row);
+    stage.append(open, form);
+
+    open.addEventListener('click', () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) $('input', form).focus();
+    });
+    cancel.addEventListener('click', () => { form.hidden = true; });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const label = String(fd.get('label') || '').trim();
+      const value = String(fd.get('value') || '').trim();
+      if (!label || !value) { say('记什么、多少，两样都要填。', 'warning'); return; }
+      once(submit, async () => {
+        try {
+          const data = await api('/api/v1/health/events', {
+            method: 'POST',
+            body: JSON.stringify({type: label, value}),
+          }, FAMILY);
+          form.reset();
+          form.hidden = true;
+          say(data.message || '记下了。', YH.toneOf(data));
+          loadCare();
+        } catch (err) {
+          // 一分钟内同一项同一个读数会被当成手抖挡下来（409）。
+          trouble(err, '这一条记录');
+        }
+      });
+    });
   }
 
   /** 「给老人加一份药」。
