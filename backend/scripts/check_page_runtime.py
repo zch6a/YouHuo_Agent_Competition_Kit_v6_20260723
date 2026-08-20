@@ -53,6 +53,16 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 PAGES = ["/", "/elder", "/family", "/care", "/trust", "/judge", "/stage"]
 
+#: 只跑其中几页：`YOUHUO_RUNTIME_PAGES=/elder,/family`。
+#: 给变异测试用——一个变体跑全套七页要几分钟，而变异要跑很多轮。
+#: 平时不设，跑全套；**这个开关只缩小范围，不放宽任何一条判据**。
+if os.environ.get("YOUHUO_RUNTIME_PAGES"):
+    _want = [p.strip() for p in os.environ["YOUHUO_RUNTIME_PAGES"].split(",") if p.strip()]
+    _unknown = [p for p in _want if p not in PAGES]
+    if _unknown:
+        raise SystemExit(f"YOUHUO_RUNTIME_PAGES 里有不认识的页面：{_unknown}；可选：{PAGES}")
+    PAGES = _want
+
 #: 页面加载后等多久再收网。首屏之后还有 `bootstrap()` 的登录、identity 的 provision
 #: 和几个 GET，抛错往往发生在这一段而不是解析期。
 SETTLE_SECONDS = 4.0
@@ -1164,6 +1174,254 @@ FOCUS_AFTER_SPEAKING = r"""
 """
 
 
+#: 家人加的药，摆到老人眼前之后**她真的看得见**。
+#:
+#: 这一条不是"渲染函数被调到了"，是"那张卡在屏幕上有像素、按钮有 48px"。
+#: 两者差得很远：第一版接线渲染完全正确，而 `#reminders` 住在
+#: `section.today-block` 里，那一块由 `renderTodayBlock()` 按**待办条数**收放。
+#: 一户「今天没有待办、家人刚加了一份药」的人家——也就是这条流程最典型的样子——
+#: 整块 `display: none`。卡片在 DOM 里、`textContent` 读得到、脚本点得着，
+#: 屏幕上一个像素都没有。实测 430×932 和 1280×900 两个视口都是 `[0, 0]`。
+#:
+#: 所以判据必须落在几何上，不能落在"节点存在"上。
+#: 第一步：**把被测场景造出来**，再以家人身份加一份药。
+#:
+#: 「造出来」这三个字是这道检查最要紧的部分。缺陷只在**今天没有待办**时出现：
+#: `renderTodayBlock()` 按未完成待办的条数收放整块，一条都没有就 `display: none`，
+#: 而待确认的药正渲染在那一块里面。只要这户人家碰巧还有一条没办完的事，
+#: 整块是展开的，卡片看得见，**判据全绿而缺陷原封不动**。
+#:
+#: 变异测过：把修好的那一行改回原样（`block.hidden = open.length === 0`），
+#: 这道检查**没有变红**——因为跑的时候那户人家有待办。一道在缺陷面前不变红的
+#: 检查，和没有这道检查是一回事。所以这里先把待办清空，再断言真的清空了。
+#:
+#: 身份先换一户：`localStorage.clear()` + 重载会新开一个访客家庭，
+#: 于是下面取消待办这种破坏性动作落在一户用完就扔的人家身上，
+#: 不动这一轮其他检查看的那一户。
+PENDING_MED_SETUP = r"""
+(async () => {
+  const YH = window.YouHuo;
+  if (!YH || !YH.api) return {skip: '这一页没有 window.YouHuo'};
+  if (!document.querySelector('#reminders')) return {skip: '这一页没有 #reminders'};
+  const ids = await YH.ready();
+
+  // ① 把今天清空——这就是被测场景。
+  let open;
+  try {
+    const list = await YH.api('/v2/reminders?limit=50');
+    open = list.filter(r => !['completed', 'cancelled'].includes(r.status));
+    for (const r of open) {
+      await YH.api(`/api/v1/reminders/${encodeURIComponent(r.id)}/cancel`,
+                   {method: 'POST', body: JSON.stringify({})});
+    }
+    const again = await YH.api('/v2/reminders?limit=50');
+    const left = again.filter(r => !['completed', 'cancelled'].includes(r.status));
+    if (left.length) {
+      return {fail: `没造出被测场景：清完还剩 ${left.length} 条没办完的事`};
+    }
+  } catch (e) { return {fail: '清不掉今天的待办：' + (e && e.message)}; }
+
+  // ② 家人加一份药。
+  const NAME = '闸门用钙片';
+  let plan;
+  try {
+    plan = await YH.api('/v4/medications', {method: 'POST', body: JSON.stringify({
+      elder_id: ids.elderId, display_name: NAME, normalized_name: NAME,
+      dose_text: '一次一片', times_local: ['08:30'],
+      start_date: new Date().toISOString().slice(0, 10), source: 'gate',
+    })}, 'family');
+  } catch (e) { return {fail: '家人加不上这份药：' + (e && e.message)}; }
+  if (!plan || !plan.id) return {fail: '加完没拿到计划号'};
+  // 家人建的计划必须是「未激活」——否则这条流程从根上就不成立，
+  // 而下面量到的"看得见"会是一个毫无意义的绿。
+  if (plan.active) return {fail: '家人建的计划直接就是激活的，这条流程不成立'};
+  return {planId: plan.id, cancelled: open.length};
+})()
+"""
+
+#: 第二步：重载之后量。判据落在**几何**上，不是"节点存在"。
+#: 两者差得很远：第一版接线渲染完全正确，而 `#reminders` 住在
+#: `section.today-block` 里，那一块由 `renderTodayBlock()` 按**待办条数**收放。
+#: 一户「今天没有待办、家人刚加了一份药」的人家——也就是这条流程最典型的样子——
+#: 整块 `display: none`。卡片在 DOM 里、`textContent` 读得到、脚本点得着，
+#: 屏幕上一个像素都没有。实测 430×932 和 1280×900 两个视口都是 `[0, 0]`。
+PENDING_MED_MEASURE = r"""
+(() => {
+  const NAME = '闸门用钙片';
+  // Focus Mode 开着时 CSS 会把「今天」整块藏起来（那是对的：她在对话）。
+  if (document.body.dataset.focus === 'on') return {skip: 'Focus Mode 开着'};
+  const host = document.querySelector('#reminders');
+  if (!host) return {skip: '这一页没有 #reminders'};
+  const card = [...host.children].find(c => c.textContent.includes(NAME));
+  if (!card) return {fail: '重载之后老人端首屏没有这张卡'};
+  const r = card.getBoundingClientRect();
+  const out = {
+    cardH: Math.round(r.height), cardTop: Math.round(r.top),
+    isFirst: card === host.firstElementChild,
+    chip: (card.querySelector('.status-chip') || {}).textContent || '',
+    todayLine: (document.querySelector('#todayLine') || {}).textContent || '',
+    buttons: [...card.querySelectorAll('button')].map(b => ({
+      t: b.textContent, h: Math.round(b.getBoundingClientRect().height)})),
+  };
+  for (let el = card; el && el !== document.documentElement; el = el.parentElement) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden'
+        || Number(cs.opacity) < 0.05 || el.hasAttribute('hidden')) {
+      out.hiddenBy = el.tagName + (el.id ? '#' + el.id : '')
+        + (typeof el.className === 'string' && el.className
+           ? '.' + el.className.trim().split(/\s+/)[0] : '');
+      break;
+    }
+  }
+  return out;
+})()
+"""
+
+#: 第三步：现场恢复。回绝会把计划删掉，库回到进来时的样子——不恢复的话，
+#: 后面每一道检查看到的都是一屏多出来的卡（这个项目的巡检就栽过：
+#: 一次没恢复的点击污染了它后面 14 个读数）。
+PENDING_MED_RESTORE = r"""
+(async () => {
+  try {
+    const r = await window.YouHuo.api('/api/v1/medications/pending');
+    for (const it of (r.items || [])) {
+      if (it.name !== '闸门用钙片') continue;
+      await window.YouHuo.api(
+        `/api/v1/medications/${encodeURIComponent(it.id)}/decline`,
+        {method: 'POST', body: JSON.stringify({})});
+    }
+    const after = await window.YouHuo.api('/api/v1/medications/pending');
+    return (after.items || []).some(i => i.name === '闸门用钙片')
+      ? '撤不掉，还在待确认里' : null;
+  } catch (e) { return '没能撤掉：' + (e && e.message); }
+})()
+"""
+
+
+#: 访客身份存在这个键里（`identity.js` 的 `STORAGE_KEY`）。
+#: 换成别的键名，下面那段"换一户再换回来"会静默变成"换一户就不回来了"——
+#: 恢复不了的话它不报错，只是后面的点击遍历少按一批控件，而汇总里看不出来。
+IDENTITY_KEY = "youhuo_visitor_identity_v1"
+
+#: 恢复的是**整个 localStorage 快照**，不是身份那一个键。
+#:
+#: 只还身份键是我写的第一版，实测让 `/v2/chat` 变成 403：`youhuo_session_v2`
+#: 也住在 localStorage 里，清空之后第二户往里写了自己的会话号，而我只把身份
+#: 换了回来——于是身份说甲家、会话号指着乙家。`elder.js:669` 的注释逐字写着
+#: 这个形态（「换身份之后就是这个形态……漏了会话这一半」），而它**已经修好了**：
+#: `postChat` 收到 403 会丢掉旧会话重来。所以屏幕上一切正常，
+#: 只有这道检查的请求收集器看见了那一发 403。
+#:
+#: 也就是说：那一发 403 是我的仪器自己造出来的，不是产品缺陷。
+#: 修法不是给它开豁免，是让"换回去"真的换得干净。
+SNAPSHOT_LOCAL = "JSON.stringify(Object.entries(localStorage))"
+
+
+def check_pending_medication_is_visible(tab: "CDP", page: str, failures: list[str]) -> None:
+    """「家人加的药等老人点头」——那张卡她真的看得见。见 PENDING_MED_MEASURE。"""
+    if page != "/elder":
+        return
+    # 换一户用完就扔的人家。下一步要取消它**全部**待办，那是破坏性的——
+    # 落在这一轮其他检查看的那一户身上，后面每一条读数都不可信。
+    #
+    # 换完要换回来。不换回来的话这一页后面的点击遍历跑在一户"今天什么都没有"
+    # 的人家上：待办卡一张都不剩，那几个「我知道了」「已完成」按钮根本不存在，
+    # **少按一批控件而汇总里只是数字小了一点**——这正是这个项目栽过的那种
+    # "没测到被记成通过"。
+    snapshot = tab.send("Runtime.evaluate", returnByValue=True, expression=(
+        f"try {{ {SNAPSHOT_LOCAL} }} catch (e) {{ null }}"
+    ))["result"].get("value")
+    identity = None
+    for key, value in json.loads(snapshot or "[]"):
+        if key == IDENTITY_KEY:
+            identity = value
+    if not identity:
+        failures.append(
+            f"{page} 待确认用药：读不到访客身份（`{IDENTITY_KEY}` 不在 localStorage 里）——"
+            "这一页应该已经开通过一户人家了")
+        return
+
+    tab.send("Runtime.evaluate", expression=(
+        "try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}"))
+    tab.send("Page.navigate", url=BASE + page)
+    tab.drain(SETTLE_SECONDS)
+
+    def put_the_family_back() -> None:
+        tab.send("Runtime.evaluate", expression=(
+            "try { localStorage.clear(); sessionStorage.clear();"
+            "  for (const [k, v] of JSON.parse(%s)) localStorage.setItem(k, v);"
+            "} catch (e) {}" % json.dumps(snapshot)))
+        tab.send("Page.navigate", url=BASE + page)
+        tab.drain(SETTLE_SECONDS)
+        back = tab.send("Runtime.evaluate", returnByValue=True, awaitPromise=True,
+                        expression="window.YouHuoIdentity.ready().then(i => i.familyId)"
+                        )["result"].get("value")
+        want = json.loads(identity).get("familyId")
+        if back != want:
+            failures.append(
+                f"{page} 待确认用药：换回原来那户人家失败（现在是 {back}，本该是 {want}）"
+                "——后面的检查跑在别人家里，读数不可信")
+
+    added = tab.send(
+        "Runtime.evaluate", expression=PENDING_MED_SETUP,
+        awaitPromise=True, returnByValue=True,
+    )["result"].get("value") or {}
+    if added.get("skip") or added.get("fail"):
+        failures.append(
+            f"{page} 待确认用药：{added.get('skip') or added.get('fail')}"
+            + ("——这一页应该测得到" if added.get("skip") else ""))
+        put_the_family_back()
+        return
+
+    tab.send("Page.navigate", url=BASE + page)
+    tab.drain(SETTLE_SECONDS)
+    try:
+        result = tab.send(
+            "Runtime.evaluate", expression=PENDING_MED_MEASURE, returnByValue=True,
+        )["result"].get("value") or {}
+    finally:
+        left = tab.send(
+            "Runtime.evaluate", expression=PENDING_MED_RESTORE,
+            awaitPromise=True, returnByValue=True,
+        )["result"].get("value")
+        if left:
+            failures.append(f"{page} 待确认用药：{left}（现场没恢复，后面的检查不可信）")
+        put_the_family_back()
+    #: 「没测到」不是通过。这一页应该测得到，跳过了就是别的东西坏了。
+    if result.get("skip"):
+        failures.append(f"{page} 待确认用药检查跳过了：{result['skip']}——这一页应该测得到")
+        return
+    if result.get("fail"):
+        failures.append(f"{page} 待确认用药：{result['fail']}")
+        return
+    if result.get("hiddenBy"):
+        failures.append(
+            f"{page} 待确认用药：卡片被 {result['hiddenBy']} 藏起来了——"
+            "节点在、脚本点得着，屏幕上没有")
+        return
+    if result.get("cardH", 0) < 40:
+        failures.append(
+            f"{page} 待确认用药：卡片高 {result.get('cardH')}px（top={result.get('cardTop')}）"
+            "——不足以显示一张待办卡")
+    if not result.get("isFirst"):
+        failures.append(f"{page} 待确认用药：它没排在待办最上面——等她决定的事应该先说")
+    if result.get("chip") != "等您点头":
+        failures.append(
+            f"{page} 待确认用药：状态词是「{result.get('chip')}」，应该是「等您点头」")
+    words = [b["t"] for b in result.get("buttons", [])]
+    if words != ["开始吃", "先不吃"]:
+        failures.append(f"{page} 待确认用药：两个动作应该是「开始吃 / 先不吃」，实际是 {words}")
+    short = [b for b in result.get("buttons", []) if b["h"] < 48]
+    if short:
+        failures.append(f"{page} 待确认用药：触控目标不足 48px：{short}")
+    #: 「今天没有要办的事」配着一张要她点头的卡，是同一屏上两处互相打架。
+    line = result.get("todayLine") or ""
+    if line == "今天没有要办的事。":
+        failures.append(
+            f"{page} 待确认用药：「今天」那一行还写着「{line}」，"
+            "而下面正摆着一张要她点头的卡")
+
+
 def check_focus_mode_after_speaking(tab: "CDP", page: str, failures: list[str]) -> None:
     """说完一句话之后，她还看得见、还够得到。见 FOCUS_AFTER_SPEAKING 的说明。"""
     if page != "/elder":
@@ -1362,6 +1620,12 @@ def main() -> int:
                 check_no_raw_js_values(tab, page, failures)
                 check_sprite_icons(tab, page, failures)
                 check_no_horizontal_overflow(tab, page, failures)
+                # **必须在点击遍历之前**：遍历会把界面按到各种状态（包括开 Focus
+                # Mode，而那会用 CSS 把「今天」整块藏起来），这道检查要的是首屏。
+                tab.events.clear()
+                if not os.environ.get("YOUHUO_SKIP_PENDING_MED"):
+                    check_pending_medication_is_visible(tab, page, failures)
+                    failures.extend(collect(tab.events, f"{page} 待确认用药"))
                 tab.events.clear()
                 check_glass_box(tab, page, failures)
                 failures.extend(collect(tab.events, f"{page} 玻璃盒"))

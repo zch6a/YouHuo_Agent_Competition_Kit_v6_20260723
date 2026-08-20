@@ -432,13 +432,21 @@
         const stock = plans.filter((p) => typeof p.stock_units === 'number');
         text($('span', sum), stock.length
           ? `余量最少的还有 ${Math.min(...stock.map((p) => p.stock_units))} 份`
-          : (plans.length ? '到点会提醒老人' : '可以在老人端或这里添加'));
+          // 原先写的是「可以在老人端或这里添加」——**两边都不能**。全仓没有任何
+          // 界面能建一份用药计划。现在这一屏底下真的有那个入口了，所以这句话
+          // 只说「这里」：老人端仍然只能对家人加的药点头或回绝，不能自己加。
+          : (plans.length ? '到点会提醒老人' : '可以在下面加一份'));
       }
       // 「2 种长期用药，今日记录完整。」是写死的。实测五脉说 1 种、这一句说 2 种，
       // 同一屏两个数字对不上——而这一句躲过了第一轮驱动，因为它读起来很正常。
       const medHead = $('[data-care-page="med"] .substage-head p');
+      // 卡位只有两个（`.med-a` `.med-b`，位置由 CSS 定死，克隆出来的第三张会叠
+      // 在别人身上）。加药入口装上之后第三份药是随手就能有的事，而屏幕上
+      // 「一共 3 种」配着两张卡，看起来像是丢了一条记录。**说出来**，不假装。
+      const shown = Math.min(plans.length, seals.length);
       text(medHead, plans.length
-        ? `${plans.length} 种长期用药，明细见下。`
+        ? `${plans.length} 种长期用药`
+          + (plans.length > shown ? `，下面列出最近 ${shown} 种。` : '，明细见下。')
         : '还没有登记长期用药。');
     } catch (e) {
       fillVein('med', '在吃什么药', '暂时取不到用药记录', 'watch');
@@ -813,6 +821,108 @@
       node.addEventListener('click', () => {
         const go = window.showYouHuoCarePage;
         if (go) go(node.dataset.veinNode);
+      });
+    });
+
+    mountMedicationComposer();
+  }
+
+  /** 「给老人加一份药」。
+   *
+   * ## 为什么必须有这个入口
+   *
+   * `create_medication_plan` 对 FAMILY 建的计划是 `active=False`，激活**只允许
+   * 老人本人**。老人那一端的入口这一轮补上了（`elder.js` / `elder3.js`），
+   * 但**全仓没有任何界面能建一份计划**——`POST /v4/medications` 只有测试在调。
+   * 也就是说那条流程的两头，此前一头都没有。
+   *
+   * 而这一屏的小结里一直写着「可以在老人端或这里添加」：一句两边都不成立的话。
+   *
+   * ## 表单上那句提示不是装饰
+   *
+   * 家人按完「加上」，屏幕上如果只说「加好了」，她会以为药已经开始提醒了。
+   * 实际上在老人点头之前**什么都不会发生**。所以按钮旁边和回执里各说一次。
+   */
+  function mountMedicationComposer() {
+    const stage = $('[data-care-page="med"] .medicine-stage');
+    if (!stage || $('.f3-med-add', stage)) return;
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'f3-med-add';
+    open.textContent = '给老人加一份药';
+
+    const form = document.createElement('form');
+    form.className = 'f3-med-form';
+    form.hidden = true;
+    const field = (name, label, type, placeholder) => {
+      const wrap = document.createElement('label');
+      const span = document.createElement('span');
+      span.textContent = label;
+      const input = document.createElement('input');
+      input.name = name;
+      input.type = type;
+      if (placeholder) input.placeholder = placeholder;
+      input.required = true;
+      wrap.append(span, input);
+      return wrap;
+    };
+    const hint = document.createElement('p');
+    hint.className = 'f3-med-hint';
+    hint.textContent = '加上之后不会立刻提醒——要等老人自己在他那一端点「开始吃」。';
+    const row = document.createElement('div');
+    row.className = 'f3-med-row';
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.textContent = '加上';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'f3-med-cancel';
+    cancel.textContent = '先不加';
+    row.append(submit, cancel);
+    form.append(
+      field('name', '药名', 'text', '例如：钙片'),
+      field('dose', '每次吃多少', 'text', '例如：一次一片'),
+      field('time', '什么时候吃', 'time'),
+      hint, row);
+
+    stage.append(open, form);
+
+    open.addEventListener('click', () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) $('input', form).focus();
+    });
+    cancel.addEventListener('click', () => { form.hidden = true; });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const name = String(fd.get('name') || '').trim();
+      const dose = String(fd.get('dose') || '').trim();
+      const time = String(fd.get('time') || '').trim();
+      if (!name || !dose || !time) { say('药名、剂量和时间都要填。', 'warning'); return; }
+      once(submit, async () => {
+        const today = new Date();
+        try {
+          await api('/v4/medications', {
+            method: 'POST',
+            body: JSON.stringify({
+              elder_id: ELDER_ID,
+              display_name: name,
+              normalized_name: name,
+              dose_text: dose,
+              times_local: [time],
+              start_date: `${today.getFullYear()}-${pad(today.getMonth() + 1)}-`
+                          + `${pad(today.getDate())}`,
+              source: 'family',
+            }),
+          }, FAMILY);
+          form.reset();
+          form.hidden = true;
+          // 「加好了」三个字单独说是**误导**：在老人点头之前它不提醒任何人。
+          say(`${name}加上了，等老人在他那一端点「开始吃」之后才会开始提醒。`, 'warning');
+          loadCare();
+        } catch (err) { trouble(err, '这份药'); }
       });
     });
   }

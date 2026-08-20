@@ -1034,7 +1034,7 @@ function isToday(iso) {
     && at.getDate() === now.getDate();
 }
 
-function renderTodayLine(reminders) {
+function renderTodayLine(reminders, pendingCount = 0) {
   const line = document.getElementById('todayLine');
   if (!line) return;
   const open = reminders
@@ -1055,18 +1055,112 @@ function renderTodayLine(reminders) {
     line.hidden = false;
     return;
   }
-  line.textContent = '今天没有要办的事。';
+  //: 一件都没有、但下面摆着一张要她点头的卡片时，这一行不能说「没有事」。
+  //: 这一屏的设计意图是「一次只说一件事」，而它的反面不是"多说一句"，
+  //: 是**同一屏上两处互相打架**——上面写着没有事，下面问她要不要开始吃药。
+  line.textContent = pendingCount
+    ? '今天没有要办的事，只有一件要您点个头。'
+    : '今天没有要办的事。';
   line.hidden = false;
+}
+
+/** 家人加的药，等她点头。
+ *
+ * ## 这条流程此前是断的
+ *
+ * `create_medication_plan` 对 FAMILY 角色建的计划是 `active=False`，
+ * 而激活**只允许老人本人**做（`v4_api.py:342`）。也就是说这条流程按设计
+ * 必须在老人这一端完成——而老人这一端**没有入口**：女儿在家属端加了一份钙片，
+ * 它就永远停在待确认，老人看不见、也点不了同意，**两边界面都不报任何错**。
+ *
+ * `/api/v1/medications/pending|approve|decline` 三个端点是上一轮补的，
+ * 补完之后全仓**没有任何前端调它们**——端点齐了，流程还是断的。这里接上。
+ *
+ * ## 为什么摆在「今天」的最上面
+ *
+ * 它不是「我的数据」，是一件**等她决定**的事。放进设置页等于埋掉。
+ * 卡片用和待办一样的 `.task` 形状：同一类东西在同一个位置长同一个样子，
+ * 她不需要学第二套。
+ */
+async function pendingMedications() {
+  try {
+    return await api('/api/v1/medications/pending');
+  } catch (e) {
+    // 取不到就安静地当成没有。它是**额外**的一块，
+    // 让它的失败挡住整屏待办是不划算的——待办本身有自己的错误分支。
+    return {count: 0, items: []};
+  }
+}
+
+function renderPendingMedications(data) {
+  if (!remindersEl || !data.count) return;
+
+  const decide = async (plan, approve) => {
+    try {
+      const said = await api(
+        `/api/v1/medications/${encodeURIComponent(plan.id)}/${approve ? 'approve' : 'decline'}`,
+        {method: 'POST', body: JSON.stringify({})});
+      // 回执写状态行。理由同 `reminderAction`：`#chat` 在 Focus Mode 里，
+      // 而她按这个按钮时 Focus Mode 是关着的。
+      setStatus(said.message);
+      speak(said.message);
+      loadReminders();
+    } catch (e) {
+      setStatus(window.YouHuo.errorWords(e, '这份药').text);
+    }
+  };
+
+  // 在待办之前 append，所以它们整体排在最上面。
+  data.items.forEach(plan => {
+    const div = document.createElement('div');
+    div.className = 'task';
+    const title = document.createElement('strong');
+    title.textContent = plan.name;
+    const who = document.createElement('div');
+    who.textContent = '家里人给您加的';
+    const how = document.createElement('div');
+    how.textContent = [plan.doseText, (plan.times || []).join('、')]
+      .filter(Boolean).join(' · ');
+    const statusLine = document.createElement('div');
+    const chip = document.createElement('span');
+    // 用 `confirm` 这一档：家人端的 `notified` 也是这个色，
+    // 两边对「等一个人点头」用同一种视觉，不另起一套。
+    chip.className = 'status-chip confirm';
+    chip.textContent = '等您点头';
+    statusLine.append('状态：', chip);
+    div.append(title, who, how, statusLine);
+
+    const yes = document.createElement('button');
+    yes.textContent = '开始吃';
+    const no = document.createElement('button');
+    no.textContent = '先不吃';
+    no.className = 'secondary';
+    // 包在 `once()` 里：这一下要往返后端，而慢网络下连点两次的第二次
+    // 会拿一个已经处理过的计划去决定，后端会正确地拒绝，
+    // 但屏幕上会闪一句错误，让人以为第一次没成功。
+    yes.addEventListener('click', () => window.YouHuo.once(yes, () => decide(plan, true)));
+    no.addEventListener('click', () => window.YouHuo.once(no, () => decide(plan, false)));
+    div.append(yes, document.createTextNode(' '), no);
+
+    remindersEl.appendChild(div);
+  });
 }
 
 async function loadReminders() {
   if (!remindersEl) return;
   try {
-    const reminders = await api('/v2/reminders?limit=50');
-    renderTodayLine(reminders);
+    // 两个一起取。待确认的药是**另一条流程**（家人加、她点头），
+    // 和 `/v2/reminders` 没有先后依赖，串行只是白等一个往返。
+    const [reminders, pending] = await Promise.all([
+      api('/v2/reminders?limit=50'),
+      pendingMedications(),
+    ]);
+    renderTodayLine(reminders, pending.count);
     renderNextItem(reminders);
-    renderTodayBlock(reminders);
+    renderTodayBlock(reminders, pending.count);
     remindersEl.replaceChildren();
+    // 先放它，所以它排在待办上面：这是**等她决定**的事，待办只是到点提醒。
+    renderPendingMedications(pending);
     const visible = rankReminders(reminders);
     visible.forEach(r => {
       const div = document.createElement('div');
@@ -1090,7 +1184,10 @@ async function loadReminders() {
       }
       remindersEl.appendChild(div);
     });
-    if (!visible.length) {
+    // `!pending.count` 这一半是必须的：`emptyState` 会 replaceChildren，
+    // 没有它的话「现在没有待办」会把刚放上去的待确认卡片整个抹掉——
+    // 而屏幕上同时说着「没有待办」和摆着一张要她点头的卡，本身也是自相矛盾。
+    if (!visible.length && !pending.count) {
       emptyState(
         remindersEl,
         ['M8 3.4v3.2M16 3.4v3.2', 'M4.4 9.4h15.2', 'M5.4 5h13.2a1.6 1.6 0 0 1 1.6 1.6v12a1.6 1.6 0 0 1-1.6 1.6H5.4a1.6 1.6 0 0 1-1.6-1.6v-12A1.6 1.6 0 0 1 5.4 5z'],
@@ -1483,12 +1580,24 @@ document.addEventListener('keydown', event => {
  * `#todayLine` 已经写着「今天没有要办的事。」——一屏内容里有两处在说同一件事，
  * 而这一屏的全部设计意图就是"一次只说一件事"。
  */
-function renderTodayBlock(reminders) {
+function renderTodayBlock(reminders, pendingCount = 0) {
   const block = document.querySelector('.today-block');
   if (!block) return;
   const open = (reminders || []).filter(
     item => !['completed', 'cancelled'].includes(item.status));
-  block.hidden = open.length === 0;
+  //: `pendingCount` 这一半是驱动出来的，不是想出来的。
+  //:
+  //: 待确认的药渲染进 `#reminders`，而 `#reminders` 就住在这一块里面。
+  //: 没有这一半时，一户「今天没有待办、但家人刚加了一份药」的人家——
+  //: 也就是**这条流程最典型的样子**——整块 `display:none`，那张卡片
+  //: 在 DOM 里、按钮也能被脚本点着，屏幕上什么都没有。
+  //:
+  //: 实测（430×932 和 1280×900 两个视口都是）：
+  //:     DIV#reminders        display=grid   box=[0, 0]
+  //:     SECTION.today-block  display=none   ← 这里
+  //: 我在同一次改动里已经想到了 `emptyState` 会 replaceChildren 那一处，
+  //: 却漏了这一处：**两处都是「没有待办」的判断，而它们不在同一个函数里**。
+  block.hidden = open.length === 0 && !pendingCount;
 }
 
 function renderNextItem(reminders) {

@@ -306,51 +306,15 @@ def test_the_three_reminder_words_are_all_different(client: TestClient) -> None:
         "相同就等于「什么都没发生」。")
 
 
-def test_every_endpoint_the_wiring_calls_really_exists(client: TestClient) -> None:
-    """两份接线里写死的每一条接口路径，`app.routes` 上都要有。
-
-    这一条是从我自己刚犯的一个错来的：「已经办好了」调的是
-    `/v2/reminders/{id}/done`，而真正的动作名是 `complete`——**按下去 404**。
-    死控件巡检抓不到它：那一轮只点了气泡（第一步），第二步的按钮根本没被点到。
-    「这一屏没有死控件」和「这一屏每个动作都成立」是两件事。
-
-    判的是**字面量里的固定前缀**，模板变量部分用通配。够抓住写错动作名、
-    写错版本号、写错拼写这三类，而它们都是「看起来完全正常」的错。
-    """
-    routes = [r.path for r in client.app.routes if getattr(r, "path", "")]
-
-    def known(path: str) -> bool:
-        want = [p for p in path.strip("/").split("/") if p]
-        for r in routes:
-            have = [p for p in r.strip("/").split("/") if p]
-            if len(have) != len(want):
-                continue
-            if all(h.startswith("{") or h == w for h, w in zip(have, want)):
-                return True
-        return False
-
-    bad: list[str] = []
-    for name in ("elder3.js", "family3.js"):
-        js = _src(name)
-        # 动作名是变量的那一处（`/v2/reminders/${id}/${action}`）单独展开。
-        # 不展开的话，**恰恰是写错动作名这一类**逃得掉——而那正是这条判据
-        # 存在的理由：`done` 不存在，真名叫 `complete`。
-        actions = set(re.findall(r"reminderAction\([^,]+,\s*'(\w+)'", js))
-        for raw in re.findall(r"""api\(\s*[`'"](/[^`'"]+)[`'"]""", js):
-            paths = [re.sub(r"\$\{[^}]*\}", "X", raw).split("?")[0]]
-            if raw.rstrip("`'\"").endswith("${action}") and actions:
-                paths = [re.sub(r"\$\{action\}", a, re.sub(r"\$\{(?!action\})[^}]*\}",
-                                                           "X", raw)).split("?")[0]
-                         for a in sorted(actions)]
-            for path in paths:
-                if not known(path):
-                    bad.append(f"{name}: {path}"
-                               + (f"（来自 {raw}）" if path != raw else ""))
-        if name == "elder3.js":
-            assert actions, "一个 `reminderAction(id, '…')` 都没数到——展开这一段在空转"
-    assert not bad, (
-        "接线里这些路径在 `app.routes` 上不存在：\n  " + "\n  ".join(bad))
-    assert routes, "一条路由都没数到——这条判据在空转"
+# `test_every_endpoint_the_wiring_calls_really_exists` 挪到了
+# `test_every_wired_endpoint_exists.py`。挪的原因有两个：
+#
+#   · 它只扫 `elder3.js` / `family3.js`。同样的错在 `elder.js`（设计一二共用，
+#     全仓最大的一份接线）里一样会发生，而它不在范围内。新的那份扫 `static/*.js`
+#     全部，不列文件名——按文件名手工维护的范围是这个项目栽过的坑。
+#   · 它的抽取器用一条 ``[^`\'"]+`` 通吃三种引号，遇到模板字面量里合法的单引号
+#     （``${approve ? 'approve' : 'decline'}``）会在第一个 `\'` 处截断，
+#     把半截路径拿去比对，然后把一个**完全正确**的写法报成缺陷。
 
 
 def test_tapping_a_reminder_bubble_does_not_change_it(client: TestClient) -> None:

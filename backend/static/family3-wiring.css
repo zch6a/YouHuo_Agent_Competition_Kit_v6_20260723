@@ -61,6 +61,80 @@
 .v3-home:hover { color: #5e4324; }
 .v3-home:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
 
+/* ---- 加一份药 --------------------------------------------------------------
+ *
+ * 「用药」那一屏原先只读，而它的小结里写着「可以在老人端或这里添加」——
+ * 两边都不能。全仓没有任何界面能建一份用药计划，`POST /v4/medications`
+ * 只有测试在调。这段样式给的是那个真的能加的入口。
+ *
+ * 表单默认收起：这一屏是给人「看今天的药有没有吃」的，加药是偶尔一次的事，
+ * 摊开来会把主要内容挤下去。 */
+
+.f3-med-add {
+  margin: 14px 0 0;
+  padding: 12px 18px;
+  border: 1px dashed rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .7);
+  color: #46604f;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-med-add:hover { background: #fff; border-style: solid; }
+.f3-med-add:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-med-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .3);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .92);
+}
+.f3-med-form label {
+  display: grid;
+  gap: 5px;
+  font: 400 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-med-form input {
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 105, 88, .38);
+  border-radius: 3px;
+  background: #fffdf7;
+  font: 400 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #4a4137;
+  min-height: 48px;
+}
+.f3-med-form input:focus-visible { outline: 2px solid #496f60; outline-offset: 1px; }
+/* 这一句不是装饰：家人按下「加上」之后**什么都不会发生**，直到老人点头。
+ * 不写在按钮旁边，她会以为药已经开始提醒了。 */
+.f3-med-form .f3-med-hint {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-med-form .f3-med-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.f3-med-form button {
+  padding: 12px 22px;
+  border: 1px solid rgba(73, 111, 96, .5);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-med-form button.f3-med-cancel {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-med-form button:hover { background: rgba(73, 111, 96, .15); }
+.f3-med-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
 /* 接线会把用不上的节点 `hidden`。这份 CSS 里有 `.medicine-seal{opacity:1}`
  * 这类"最终态必须可见"的规则，它们会盖掉 `[hidden]` 的默认 `display:none`——
  * 那样「隐藏多余的卡片」就变成了「留下一张写着别人事情的卡片」。 */

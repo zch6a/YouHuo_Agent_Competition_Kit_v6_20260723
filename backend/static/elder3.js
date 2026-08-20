@@ -210,6 +210,51 @@
       t: it.time, n: it.title, s: it.status,
       done: it.done, id: it.id,
     })), '今天没有要办的事');
+
+    askAboutPendingMedication();
+  }
+
+  /** 家人加的药，等她点头。
+   *
+   * 设计一那边渲染成待办列表里的一张卡；这一版的今天页只有三个位置固定的
+   * `.story-node`（位置由 CSS 的 n1/n2/n3 决定，动画脚本还持有它们），
+   * 塞不进第四条。所以走**状态行 + 动作行**——那正是 `offer()` 的用途，
+   * 也是她按完麦克风眼睛所在的位置。
+   *
+   * 一次只问一件。三份待确认的药摆六个按钮，就不是「问一句」了。
+   */
+  async function askAboutPendingMedication() {
+    let data;
+    try {
+      data = await api('/api/v1/medications/pending');
+    } catch (e) {
+      // 安静地跳过。这是**额外**的一块，让它的失败盖掉今天的安排不划算。
+      return;
+    }
+    if (!data.count) return;
+
+    const plan = data.items[0];
+    const more = data.count > 1 ? `（还有 ${data.count - 1} 份，一件一件来）` : '';
+    say(`${data.message}${more}`, 'warning');
+
+    const decide = async (approve) => {
+      try {
+        const said = await api(
+          `/api/v1/medications/${encodeURIComponent(plan.id)}/${approve ? 'approve' : 'decline'}`,
+          {method: 'POST', body: JSON.stringify({})});
+        say(said.message, 'good');
+        speakOut(said.message);
+        offer([]);
+        loadToday();          // 还有下一份的话，它会自己接着问
+      } catch (e) {
+        trouble(e, '这份药');
+        offer([]);
+      }
+    };
+    offer([
+      {label: '开始吃', run: () => decide(true)},
+      {label: '先不吃', run: () => decide(false)},
+    ]);
   }
 
   /* 三个 story-node 原地改文字，多的隐藏。位置靠 CSS 的 n1/n2/n3，不能重建。 */
