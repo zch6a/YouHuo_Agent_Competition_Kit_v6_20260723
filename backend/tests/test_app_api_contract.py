@@ -763,12 +763,19 @@ def test_double_tapping_a_reading_records_it_once(client: TestClient) -> None:
     血压量两次是正常的，所以不能一律拒绝——但一分钟内同一项同一个**读数**，
     只可能是重复提交：真的量了两次，第二次的数字几乎不会一模一样。
     """
+    # 数**增量**，不数绝对值。
+    #
+    # 原先写的是 `== 1` / `== 2`，前提是这个家庭一开始一条身体记录都没有。
+    # 那个前提是两条播种路径不一致造成的：访客沙箱有 3 条、`-demo` 有 0 条，
+    # 而这个夹具用的是后者。对齐之后 `-demo` 也有 3 条，绝对值就不成立了——
+    # 而这条测试真正要说的从来都是「重复提交只算一次」，那是一个差值。
+    base = client.get(f"{V1}/health-summary").json()["recorded"]
     client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
     client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
-    assert client.get(f"{V1}/health-summary").json()["recorded"] == 1
+    assert client.get(f"{V1}/health-summary").json()["recorded"] == base + 1
     # 值不同 = 真的又量了一次，必须记下来。
     client.post(f"{V1}/health/events", json={"type": "血压", "value": "131/85"})
-    assert client.get(f"{V1}/health-summary").json()["recorded"] == 2
+    assert client.get(f"{V1}/health-summary").json()["recorded"] == base + 2
 
 
 def test_the_first_emergency_call_always_notifies(client: TestClient) -> None:
@@ -1169,12 +1176,25 @@ def test_the_audit_never_stores_the_phone_number_itself(client: TestClient) -> N
 
 # ---- 身体数据：此前只能读，没有任何地方能写 --------------------------------
 
-def test_health_summary_starts_empty_and_says_so(client: TestClient) -> None:
+@pytest.fixture()
+def blank(tmp_path):
+    """一个**没有演示历史**的实例。
+
+    「空的时候屏幕上说什么」只能在真的空的家庭上测。上面那个 `client`
+    带演示历史（`seed_baseline_history=True`），而演示历史现在包含身体记录
+    ——那是对的：照护中心的「身体」一屏不该是白板。两件事要两个夹具。
+    """
+    app = create_app(tmp_path / "blank.db", demo_mode=True, seed_baseline_history=False)
+    with TestClient(app) as c:
+        yield c
+
+
+def test_health_summary_starts_empty_and_says_so(blank: TestClient) -> None:
     """**阳性对照**：先证明它一开始确实是空的。
 
     不先证明这一点，下面「记了一条之后就有了」可能只是因为它本来就有。
     """
-    got = client.get(f"{V1}/health-summary").json()
+    got = blank.get(f"{V1}/health-summary").json()
     assert got["metrics"] == []
     assert got["recorded"] == 0
     assert got["note"], "空的时候要说一句话，不能只留白"
@@ -1182,13 +1202,16 @@ def test_health_summary_starts_empty_and_says_so(client: TestClient) -> None:
 
 
 def test_recording_a_vital_makes_it_show_up(client: TestClient) -> None:
+    # 同样数增量：这条测试说的是「记进去的读得出来」，不是「库里只有这一条」。
+    base = client.get(f"{V1}/health-summary").json()["recorded"]
     r = client.post(f"{V1}/health/events", json={"type": "血压", "value": "128/82"})
     assert r.status_code == 200, r.text
     assert r.json()["unit"] == "mmHg", "血压的默认单位没带上"
 
     after = client.get(f"{V1}/health-summary").json()
-    assert after["recorded"] == 1
+    assert after["recorded"] == base + 1
     assert after["metrics"], "记进去了却读不出来"
+    # 最新的排在最前。刚记的那一条要在这里，而不是「列表里某处有一条血压」。
     m = after["metrics"][0]
     assert m["label"] == "血压" and m["value"] == "128/82" and m["unit"] == "mmHg"
     assert after["note"] is None, "有数据了就不该再说「还没有记到」"

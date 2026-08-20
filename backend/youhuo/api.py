@@ -126,6 +126,21 @@ def create_app(
         # 不属于如常。两个状态的语义差别本来就该体现在这种地方，而不只是基线曲线。
         if demo_state == "attention":
             db.seed_demo_scenario(demo_ids, "awaiting_family_approval")
+        # 身体记录与心情历史。**两个播种点必须一样。**
+        #
+        # 这一行原先只在 `/v2/auth/visitor` 那一侧有（见那里第 485 行的注释）。
+        # 后果是 `-demo` 家庭和访客家庭看到的不是同一个演示：
+        #
+        #                elder-demo   访客沙箱
+        #     身体数据          0          3
+        #     心情回顾          0          7
+        #
+        # 而 `-demo` 正是测试、启动播种和一切脚本用的那个家庭。所以「照护页的
+        # 身体和心情是空的」这句话，在脚本里量出来是真的、在浏览器里看是假的。
+        #
+        # 这正是这个文件第 478 行那段注释警告过的事——「两个播种点，改一个
+        # 等于没改」。那一次漏的是访客侧，这一次漏的是这一侧，方向反了而已。
+        v4_store.seed_demo_content("demo")
     # Optional offline neural voice; absent package or model simply means the
     # elder client keeps using the browser's own speech synthesis.
     neural_voice = NeuralVoice(Path(__file__).resolve().parents[2])
