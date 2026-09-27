@@ -12,6 +12,8 @@ dependencies = [
   "uvicorn[standard]==0.48.0",
   "pydantic==2.13.4",
   "httpx==0.28.1",
+  "sherpa-onnx==1.12.40",
+  "numpy==2.3.5",
 ]
 
 [project.optional-dependencies]

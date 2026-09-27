@@ -10,3 +10,7 @@ PyYAML==6.0.3
 # for Asia/Shanghai routine scheduling.
 tzdata==2026.1; platform_system == "Windows"
 websocket-client
+
+# Server-side Chinese speech recognition for web and Android recordings.
+sherpa-onnx==1.12.40
+numpy==2.3.5
