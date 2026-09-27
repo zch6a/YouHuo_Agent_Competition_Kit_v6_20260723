@@ -482,6 +482,40 @@
               "default": 100,
               "title": "Limit"
             }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
           }
         ],
         "responses": {
@@ -1089,6 +1123,2443 @@
         }
       }
     },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Profile",
+        "operationId": "profile_api_v1_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppProfile"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agenda": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Agenda",
+        "description": "首页那两张卡（「接下来」和「今日安排」）的真实数据源。\n\n原稿这两张卡是写死的——「14:00 心内科复诊 · 和睦家医院 2号楼3层」「08:00\n吃降压药」。那是稿子，不是这位老人的事。这里改成读真实提醒表。\n\n`place` 只在这一件确实是一次**就医安排**时才有值（见 `_appointment_place`）。\n别的提醒后端真没有地点字段，那时仍然回 null——宁可不显示，也不编一个医院。",
+        "operationId": "agenda_api_v1_agenda_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppAgenda"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/health-summary": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Health Summary",
+        "description": "「我的」页那一排健康数字的真实来源。\n\n原稿这里写死了「今日健康 良好 / 心率 72 次每分 / 血压 120/78 / 睡眠 7.5 小时」。\n后端的实情是：有一张 `health_events_v4` 事件表（真的记了什么就有什么），\n**没有**体征快照，也**完全没有**睡眠这一项。\n\n所以这里回的是「记到了什么」，不是「他现在怎么样」——这两件事差得很远，\n而把后者编出来正是这个产品最不该做的。取不到的一律 null。",
+        "operationId": "health_summary_api_v1_health_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppHealthSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/bills/water/current": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Current Water Bill",
+        "description": "当前这一笔水费。**读真表，不再返回源码里那个字典。**\n\n原先这里返回硬编码的 `_WATER_BILL`，`paidAt` 则去扫「任意一笔已完成的\n缴费事务」取时间。两个缺陷都是实测出来的：\n\n① **两个端点报的不是同一张账单。** 这里回 `water-current`，而 `/bills`\n   回的是真 id `bill-water-2026-07-demo`。客户端拿前者去\n   `GET /bills/{id}` 当场 404——两条路说的是同一件事，id 却对不上。\n\n② **付之前 `paidAt` 就已经有值了。** 那个扫描不区分是哪一张账单，\n   而演示种子里本来就有一笔已完成的缴费（`task-seed-bill-demo`）。\n   于是一张没付的账单，显示着另一笔交易的支付时间——\n   和凭证页写死「交易成功」是同一类错误：宣称一件没发生的事。\n\n现在 `paidAt` 取这张账单**自己的** `paid_at`。",
+        "operationId": "current_water_bill_api_v1_bills_water_current_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppWaterBill"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/bills": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "List Bills",
+        "description": "这个家庭的**全部**账单。\n\n原先 `/api/v1` 只暴露一张写死的水费，而库里躺着三张（水费 68.40、\n电费 126.50、燃气费 52.30）。于是前端那张「我的账单」永远只有一件事可办，\n而演示里最容易被问到的一句话正是「除了水费还能干什么」。",
+        "operationId": "list_bills_api_v1_bills_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppBillList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/bills/{bill_id}": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "One Bill",
+        "operationId": "one_bill_api_v1_bills__bill_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "bill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Bill Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppBill"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "List Appointments",
+        "description": "挂号/复诊。`appointments` 表和 `insert_appointment` 一直都在，\n**没有任何地方读它**——所以「就医安排」那一页此前只能拿提醒凑。",
+        "operationId": "list_appointments_api_v1_appointments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppAppointmentList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Create Appointment",
+        "description": "记一次就医安排，并**同时建一条到点提醒**。\n\n只写 `appointments` 表是不够的：那张表没有任何东西会到点提醒老人，\n而「记下来」和「到时候会叫我」在老人那里是同一件事。所以两张表一起写——\n提醒的标题带上医院和科室，于是它也会被 `_kind_of` 归进「就医」，\n「今日安排」里按就医筛得到。",
+        "operationId": "create_appointment_api_v1_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppAppointmentCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Read Notification",
+        "description": "标成已读。没有这一步，通知只会越堆越多，红点永远下不去。\n\n**只标得动发给自己的那些**——`recipient_role` 见\n`Database.mark_notification_read` 的说明。",
+        "operationId": "read_notification_api_v1_notifications__notification_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotificationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voice/sessions": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Open Voice Session",
+        "description": "开一个真实会话；带了 `utterance` 就真的过一遍语义引擎。",
+        "operationId": "open_voice_session_api_v1_voice_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVoiceSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payments/prepare": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Prepare Payment",
+        "description": "建一件**真的**缴费事务，并把复述提示词一并给前端。\n\n风险取 HIGH：`TeachBackVerifier.requires_teach_back` 只在 `BILL_PAYMENT`\n且 risk >= 3 时要求复述——这正是这一版演示要展示的那条线。",
+        "operationId": "prepare_payment_api_v1_payments_prepare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPaymentPrepared"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payments/{payment_id}/teach-back": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Teach Back",
+        "description": "真的核对老人念出来的金额。念错就停——这一条是整个产品的支点。\n\n支点就得由**她本人**踩。此前这里没有 `_only_the_elder`：女儿拿自己的\n令牌就能把金额念一遍拿到 `verified`，再 `execute`、再自己 `family-approve`，\n一个人走完三道门把钱付掉。引擎那一侧本来是关着的\n（`POST /v2/sessions` 对家属 403），只有这个门面漏了——\n和 `_only_the_elder` 文档里记的那三处是同一个形状：**照抄了调用，\n没有照抄守卫**。当时补了记忆两处、用药一处，漏了这一处。\n\n而复述通过会把 `elder_confirmed` 落进槽位（见下面），\n所以家属念一遍，等于替她按下了同意。",
+        "operationId": "teach_back_api_v1_payments__payment_id__teach_back_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Payment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppTeachBackResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{payment_id}/execute": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Execute Payment",
+        "description": "推进这件事。\n\n**不会因为前端调了就直接扣钱。** 高风险缴费要家人点头，所以这里把状态推到\n「等家人确认」并写审计。前端拿到 `awaiting_family` 就该照实显示。",
+        "operationId": "execute_payment_api_v1_payments__payment_id__execute_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Payment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPaymentMoved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{payment_id}/family-approve": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Family Approve",
+        "description": "家人点头，这一笔才真的走完。\n\n没有这一步，链条就停在 `awaiting_family` 永远不动——凭证页会一直显示\n「等家人点头」，而演示里没有任何办法把它推完。那不是\"安全\"，那是断掉。\n\n**这是家人的动作，不是老人的。** 所以身份取家人，写进审计的也是家人的\n`actor_id`——凭证上「谁点的头」必须是真的。老人自己点不动这一步。",
+        "operationId": "family_approve_api_v1_payments__payment_id__family_approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Payment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPaymentMoved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/records": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Records",
+        "description": "真实审计流水，翻成人话之后再给前端。\n\n**分页在筛选之后做。** 反过来（先切 80 条再按类别筛）会得到一个\n随类别变化的、看起来像 bug 的结果：选「支付」只剩两条，而库里有二十条，\n因为前 80 条审计里恰好只有两条是支付。老人不会理解这件事，\n而它在界面上和「真的只有两条」长得一模一样。\n\n所以先取一批足够大的（`limit+offset` 之上再留一截给筛选损耗），\n翻译、筛完之后再切页。`total` 是**筛完的总数**，不是这一页的条数——\n没有它，调用方无法判断还有没有下一页。",
+        "operationId": "records_api_v1_records_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 80,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRecordList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{payment_id}/certificate": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Certificate",
+        "description": "一件事的**完整**审计链。\n\n`list_audit` 带 `entity_id` 走 SQL 过滤，拿到的是这一件事从头到尾的每一步，\n而不是最近 200 条里恰好属于它的那几条。凭证的全部价值就是「每一步都在」。",
+        "operationId": "certificate_api_v1_payments__payment_id__certificate_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "payment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Payment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppCertificate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/speech/status": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Speech Status",
+        "description": "能不能本地合成，以及**这位老人**的语速是多少。\n\n客户端拿它决定走本地合成还是浏览器合成——两条路的语速要一致，\n所以速度也在这里给，不让调用方自己去 `/settings` 拼。",
+        "operationId": "speech_status_api_v1_speech_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSpeechStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/speech": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Speak",
+        "description": "把一句话念出来，**用这位老人自己存的语速**。\n\n`speed` 可以显式传（试听时要能不改设置就听不同档），不传就读他的偏好——\n那才是「语速这个设置真的生效了」的意思。\n\n模型不在时回 503 并说清楚回落到哪里，不假装念了。\n（这台机器上就是这样：`sherpa-onnx` 装着，但 `data/tts/` 下没有模型，\n它不进交付包。）",
+        "operationId": "speak_api_v1_speech_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "audio/wav": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/listen/status": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Listen Status",
+        "description": "这台服务能不能听。板子开采之前先问这个。",
+        "operationId": "listen_status_api_v1_listen_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppListenStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/listen": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Listen",
+        "description": "把一段音频认成文字。\n\n请求体是**裸的音频字节**，不是 JSON：\n\n    Content-Type: audio/wav              带头的 16 位 WAV\n    Content-Type: application/octet-stream + ?rate=16000\n                                         裸 PCM（板子上最省事的那种）\n\n采样率必须是 16000。服务端不替你重采样——不带低通的降采样会混叠，\n识别率掉了以后第一个被怀疑的是麦克风，不是这里。\n\n没有模型时回 503。**不回一个空字符串**：认出一句空话和根本没认，\n在调用方那里长得一样，而两者该做的事相反。",
+        "operationId": "listen_api_v1_listen_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 48000,
+                  "minimum": 8000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppListenResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/events": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Record Health Event",
+        "description": "记一次身体数据。\n\n`value` 保持**字符串**：血压是「128/82」，不是一个数。\n强行拆成两个数字字段，会让「128/82」和「体重 62.5」没法用同一条路径记，\n而老人念出来的就是这两种形状。",
+        "operationId": "record_health_event_api_v1_health_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppHealthRecorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/emergency/call": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Emergency Call",
+        "description": "记一次真实的紧急呼叫。不会真的拨号——那要电话能力，这里只留证据。",
+        "operationId": "emergency_call_api_v1_emergency_call_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppEmergencyResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/reminders": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Reminders",
+        "description": "用药提醒 / 就医安排 / 今日事项 三个界面共用的真实数据源。\n\n`kind` 取「用药」「就医」「其他」，不传就是全部。传一个不认识的值回空表，\n不报错——界面上一个筛选按钮点出 500 比点出空列表糟得多。",
+        "operationId": "reminders_api_v1_reminders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Create Reminder",
+        "description": "老人自己加一条提醒。**真的写进提醒表**，不是回一个 ok 就算了。\n\n时间用 `HH:MM`（今天）或完整 ISO 串。给的时间已经过点就顺延到明天——\n对一位老人来说「设 8 点吃药」在 9 点设，意思显然是明天 8 点，\n而不是一条建出来就已经过期的提醒。",
+        "operationId": "create_reminder_api_v1_reminders_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reminders/{reminder_id}/done": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Complete Reminder",
+        "description": "办完了。写的是真状态，记录页当场就能看到这一条。",
+        "operationId": "complete_reminder_api_v1_reminders__reminder_id__done_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reminders/{reminder_id}/cancel": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Cancel Reminder",
+        "operationId": "cancel_reminder_api_v1_reminders__reminder_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reminders/{reminder_id}": {
+      "patch": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Reschedule Reminder",
+        "description": "改时间或改名字。\n\n此前这一层只能**建、办好、取消**——想把「八点吃药」挪到九点，唯一的办法是\n取消再建一条。那会在记录里留下「取消了一条提醒 + 加了一条提醒」两行，\n而实际发生的是一件事。审计链要能说清真正发生了什么。\n\n已经办好或取消的不许改：那是已经结束的事，改它等于篡改记录。",
+        "operationId": "reschedule_reminder_api_v1_reminders__reminder_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Medications Today",
+        "description": "今天该吃什么、吃了没、还能吃几天。\n\n`summary` 那句话是照 `care_voice.answer_medication_today` 的口径写的，\n包括最后那半句「我只能看到记录」——**没有记录不等于没吃**，\n这一层不许把「查不到」说成「您没吃」。",
+        "operationId": "medications_today_api_v1_medications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMedicationToday"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/medications/{plan_id}/taken": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Record Taken",
+        "description": "记一次「吃了」。会扣库存。",
+        "operationId": "record_taken_api_v1_medications__plan_id__taken_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppDoseRecorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/{plan_id}/skipped": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Record Skipped",
+        "description": "记一次「没吃」。**不扣库存**——药还在。",
+        "operationId": "record_skipped_api_v1_medications__plan_id__skipped_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppDoseRecorded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/routines": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "List Routines",
+        "description": "我的固定安排。每天/每周/每月要做的那些事。",
+        "operationId": "list_routines_api_v1_routines_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRoutineList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Create Routine",
+        "description": "加一件固定安排，并把最近一周该发生的排成提醒。",
+        "operationId": "create_routine_api_v1_routines_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRoutineChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/routines/{routine_id}/pause": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Pause Routine",
+        "description": "先不提醒了。不删——已经排出去的提醒原样留着。",
+        "operationId": "pause_routine_api_v1_routines__routine_id__pause_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Routine Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRoutineChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/routines/{routine_id}/resume": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Resume Routine",
+        "description": "继续提醒。",
+        "operationId": "resume_routine_api_v1_routines__routine_id__resume_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "routine_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Routine Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppRoutineChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memories": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "List Memories",
+        "description": "系统记住了您什么，以及有没有等您点头的。\n\n分两段：**已经生效的**和**家人提了在等您的**。\n混在一起的话，「它已经记住了」和「它想记住」看起来是同一件事——\n而后者还没有得到同意。",
+        "operationId": "list_memories_api_v1_memories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMemoryList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/memories/{memory_id}/approve": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Approve Memory",
+        "description": "同意让优活记住这一条。",
+        "operationId": "approve_memory_api_v1_memories__memory_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMemoryDecided"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memories/{memory_id}/decline": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Decline Memory",
+        "description": "不让它记。",
+        "operationId": "decline_memory_api_v1_memories__memory_id__decline_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMemoryDecided"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memories/{memory_id}/forget": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Forget Memory",
+        "description": "撤回一条已经生效的记忆。\n\n**这是这套机制的关键动作**——「可撤回」是「同意」成立的前提。\n撤回之后 `list_visible` 不再返回它，读它的地方拿到的是空。",
+        "operationId": "forget_memory_api_v1_memories__memory_id__forget_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMemoryDecided"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/pending": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Pending Medications",
+        "description": "家人加了、还等着您点头的用药计划。",
+        "operationId": "pending_medications_api_v1_medications_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPendingMedicationList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/medications/{plan_id}/approve": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Approve Medication",
+        "description": "同意开始吃这份药。",
+        "operationId": "approve_medication_api_v1_medications__plan_id__approve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMedicationDecided"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medications/{plan_id}/decline": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Decline Medication",
+        "description": "先不吃。计划会被删掉，家人可以重新加。",
+        "operationId": "decline_medication_api_v1_medications__plan_id__decline_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppMedicationDecided"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointment_id}/cancel": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Cancel Appointment",
+        "description": "取消一次就医安排，并把它带出来的那条提醒一起取消。\n\n只取消 `appointments` 那一行是不够的：建安排时**同时**建了一条到点提醒\n（不建的话没有任何东西会叫老人）。只取消一半，老人到点还是会被提醒\n去一个已经取消了的门诊——那比不提醒更糟。",
+        "operationId": "cancel_appointment_api_v1_appointments__appointment_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Appointment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppReminderChanged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/contacts": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Contacts",
+        "description": "紧急联系人。真的读家庭成员表，不是三行写死的卡片。\n\n`phone` 此前恒为 `null`，因为 `actors` 表根本没有那一列。现在有了\n（见 `Database._migrate`），但**演示数据里一个号码都不种**——\n编一个出来，老人真按下去会拨错人。真实部署用 `PUT` 那个端点填。\n\n## 社区那一类也在这份名单里\n\n紧急呼叫的回话说的是「家人要是没接，**社区网格员也在名单上**」，\n而这份名单此前只有 `actors` 表里的家人。实测：那句话说了「社区网格员」，\n而这里回的是 `['儿子','女儿','优活系统']`——**她去紧急联系人页核对，\n找不到那个人**。社区联系人只活在紧急响应的 `escalation` 里，\n那是按下呼叫之后才看得到的东西。\n\n一句关于紧急路径的话不成立，比别处的不一致重：她真需要的时候，\n以为有人兜底。所以这里把 `safety_contacts_v4` 一起读出来，\n让那份名单和那句话说的是同一件事。\n\n`phone` 仍然是 null：库里那一列是**已经打过码**的（`***-***-8899`），\n拨不出去，而这一格在界面上是可拨的样子。谁在名单上是她要知道的，\n号码不是。",
+        "operationId": "contacts_api_v1_contacts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppContactList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/contacts/{contact_id}/phone": {
+      "put": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Set Contact Phone",
+        "description": "给一位家人登记电话。传空串或 null 表示清掉。\n\n**只允许家人身份来改。** 紧急联系人的号码是紧急时真会被拨出去的东西；\n让老人端自己改它，等于把这个产品最后一道人工兜底交给最容易被诱导的一方\n（这个产品的整条设计线就是「高风险动作要第二个人点头」）。\n\n校验刻意宽松：这一版只做长度和字符集，不做归属地/运营商判断——\n座机、分机、境外号码都要能填，而一个填不进去的紧急联系人比没有更糟。",
+        "operationId": "set_contact_phone_api_v1_contacts__contact_id__phone_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Contact Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppContact"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Put Settings",
+        "description": "改字号 / 语速。**真的存下来**，换一页、重开都还在。",
+        "operationId": "put_settings_api_v1_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Notifications",
+        "description": "通知。默认是**发给老人自己**的那些。\n\n`role=家人` 取发给家人的那一批——按了紧急呼叫之后，老人那一屏要能回答\n「到底通知到人了没有」，而那条通知按设计是发给家人的（不是发给他自己：\n「王爷爷按下了紧急呼叫」这句话给他本人看没有意义）。\n\n这里原先还写着「没有这个参数的话，这个端点在演示里永远是空的」。\n那句话曾经是真的，但成因是**种子的缺陷**而不是设计：种子只写了\n「已创建通知」那一拍审计，从没真的建过通知行。补上之后，\n演示家庭里老人这一侧有一条「账单已经由家人确认支付。」。",
+        "operationId": "notifications_api_v1_notifications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppNotificationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/privacy/data": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Export My Data",
+        "description": "「把优活替我存的东西导出来」。\n\n**这是一个纯读端点。** 它不写审计、不落库、不碰任何一笔事务。",
+        "operationId": "export_my_data_api_v1_privacy_data_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPrivacyExport"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/privacy/erase/preview": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Preview Erase",
+        "description": "删除的**第一步**：先看一眼要删掉什么。这一步什么都不删。\n\n「重要的事两边都同意才办」是这个产品的核心主张。删除没有第二个人可以\n点头（按设计只有本人能删），所以两次同意都由本人给：看一眼，再确认。",
+        "operationId": "preview_erase_api_v1_privacy_erase_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPrivacyErasePreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/privacy/erase": {
+      "post": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Erase My Data",
+        "description": "删除的**第二步**：真的删。要带上第一步给的 `confirmToken`。",
+        "operationId": "erase_my_data_api_v1_privacy_erase_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppPrivacyErased"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/emotions/review": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "Emotion Review",
+        "description": "「我这段时间心情怎么样」。",
+        "operationId": "emotion_review_api_v1_emotions_review_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 31,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppEmotionReview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/daily-report": {
+      "get": {
+        "tags": [
+          "elder-app"
+        ],
+        "summary": "My Daily Report",
+        "description": "「我这几天怎么样」——他自己的常态，和今天差在哪儿。\n\n给的是**结构化的值**（平常几点 / 今天几点 / 一句中文判断），不是底层那几句\n`explanation`。那几句是写给子女的：「比**他**平常晚了 1 小时 40 分」——\n照搬到老人自己这一屏上人称就错了，而在这里改写人称同样不行\n（`其他` 会被改成 `其您`）。",
+        "operationId": "my_daily_report_api_v1_daily_report_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "默认今天（老人所在时区）",
+              "title": "Day"
+            },
+            "description": "默认今天（老人所在时区）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppDailyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v4/routines": {
       "post": {
         "tags": [
@@ -1340,7 +3811,7 @@
           "YouHuo v4 care platform"
         ],
         "summary": "Analyze Emotion",
-        "operationId": "analyze_emotion_v4_emotions_analyze_post",
+        "operationId": "analyzeEmotion",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1838,7 +4309,7 @@
           "YouHuo v4 care platform"
         ],
         "summary": "Analyze Medical Report",
-        "operationId": "analyze_medical_report_v4_medical_reports_analyze_post",
+        "operationId": "analyzeMedicalReport",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1876,6 +4347,108 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/v4/medical-documents": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Medical Documents",
+        "description": "这位老人已经整理过的就医单据。本人或本家庭。",
+        "operationId": "list_medical_documents_v4_medical_documents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MedicalDocumentRecord"
+                  },
+                  "title": "Response List Medical Documents V4 Medical Documents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v4/medical-documents/{document_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "Get Medical Document",
+        "description": "按 `analyze` 回的那个 `document_id` 把单据取回来。\n\n`/v4/medical-reports/analyze` 一直把 `document_id` 交给客户端，而这张表在\n此之前没有任何取回路径——实测四条候选路径全 404，那个 id 是悬空的，而库里\n的 `simplified_json` 装着可用的摘要正文。\n\n## 两道隐私闸门，顺序是有讲究的\n\n先按 `id + family_id` 取（跨家庭直接当不存在，回 404 而不是 403——403 会\n把「这个 id 存在」说出去），再用 `ensure_target` 判本人/家属。这样同一个\n家庭里老人 A 拿 B 的 id，得到的是 403「只能访问自己的数据。」，与仓库其余\n地方一致；而外人拿到的是 404。\n\n家属可读，是因为创建它的 `/v4/medical-reports/analyze` 走的就是\n`ensure_target`——家属替老人拍单据是真实场景。让创建得到、取回拿不到，\n会逼着前端自己把内容存一份，那才是真的漏。\n\n## 不绕过删除\n\n读的是 `medical_documents_v4` 本表。`/v5/privacy` 把 `medical_documents`\n列为可删类别，`privacy_erase` 是真的 DELETE；删完这条路由就是 404。",
+        "operationId": "get_medical_document_v4_medical_documents__document_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalDocumentRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v4/health/events": {
@@ -2230,6 +4803,7 @@
           "YouHuo v4 care platform"
         ],
         "summary": "Medication Inventory",
+        "description": "这份药还能吃几天，**以及该说的那句话**。\n\n`message` / `should_highlight` / `whole_days_remaining` 是后端算好的结论，\n前端直接用。加它们的原因：`backend/static/care.js` 的 `daysLeft()` 用 JS\n把天数重算了一遍，红字阈值自己定成 `days <= 3`，而后端 warning 的线是\n7 天。实测同一份计划（11 片、每天 2 片）：后端 `alert_level` 是 warning、\n发了家属通知，屏幕上却是普通灰字「还够 5 天」——家属手机响了，老人这边\n看不出任何异常。阈值现在只在 `InventoryService` 里有一份。\n\ncare.js 那一侧还要有人去接：把 `daysLeft()` 和 `days <= 3` 删掉，改读这\n三个字段。那个文件不在这次的改动范围里。",
         "operationId": "medication_inventory_v4_medications__plan_id__inventory_get",
         "security": [
           {
@@ -2277,7 +4851,7 @@
           "YouHuo v4 care platform"
         ],
         "summary": "Check Interactions",
-        "operationId": "check_interactions_v4_medications_interactions_check_post",
+        "operationId": "checkMedicationInteractions",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2569,7 +5143,7 @@
           "YouHuo v4 care platform"
         ],
         "summary": "Location Ping",
-        "operationId": "location_ping_v4_location_ping_post",
+        "operationId": "evaluateLocationSafety",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2847,13 +5421,65 @@
         ]
       }
     },
+    "/v4/assistance/{elder_id}": {
+      "get": {
+        "tags": [
+          "YouHuo v4 care platform"
+        ],
+        "summary": "List Assistance",
+        "description": "这户人家的远程协助请求，老人和绑定家属都能查。\n\n在这条路由之前，`assistance_requests_v4` 是一张只写表：唯一的读取是\n`decide_assistance` 自己那句 `WHERE id=?`。实测 `GET /v4/assistance` 是\n405、`GET /v4/assistance/{id}` 是 404，零 UI 消费方。两个后果：老人点完\n同意查不到自己同意了什么，以及 `expires_at` 永远不生效（把一条 approved\n的到期时间拨到 2020 年，status 照旧是 approved）。\n\n这里按 `elder_id` 取而不是按 `request_id`：`request_id` 只有刚发过请求的\n那一端知道，而需要「我同意过什么」这份清单的是老人。过期在\n`list_assistance_requests` 里落库。",
+        "operationId": "list_assistance_v4_assistance__elder_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "elder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Elder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssistanceRequestRecord"
+                  },
+                  "title": "Response List Assistance V4 Assistance  Elder Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v4/reports/monthly": {
       "post": {
         "tags": [
           "YouHuo v4 care platform"
         ],
         "summary": "Monthly Report",
-        "operationId": "monthly_report_v4_reports_monthly_post",
+        "operationId": "generateMonthlyReport",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2976,7 +5602,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Resolve Voice",
-        "operationId": "resolve_voice_v5_voice_resolve_post",
+        "operationId": "resolveVoice",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3022,7 +5648,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Authorize Action",
-        "operationId": "authorize_action_v5_actions_authorize_post",
+        "operationId": "authorizeAction",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3068,7 +5694,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Create Saga",
-        "operationId": "create_saga_v5_sagas_post",
+        "operationId": "createSaga",
         "security": [
           {
             "HTTPBearer": []
@@ -3275,7 +5901,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Apply Sync",
-        "operationId": "apply_sync_v5_sync_operations_post",
+        "operationId": "applySyncOperation",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3420,7 +6046,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Open Break Glass",
-        "operationId": "open_break_glass_v5_break_glass_post",
+        "operationId": "openBreakGlass",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3660,7 +6286,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Create Task Proof",
-        "operationId": "create_task_proof_v5_tasks__task_id__proof_post",
+        "operationId": "createTaskProof",
         "security": [
           {
             "HTTPBearer": []
@@ -3707,6 +6333,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Verify Proof",
+        "description": "校验一份凭据，**并且和服务器留存的那一份对一遍**。\n\n原先这里只传 `payload.bundle`，于是校验的每一项都是那份包自己跟自己对\n（见 `MerkleProofService.verify` 的 docstring）。`store_proof` 一直在写\n`proof_bundles_v5`，而没有任何地方读它——真正那一份就躺在库里，\n校验却从不看它。\n\n这条端点**故意不要令牌**（凭据要能被第三方核验，那是它的意义）。\n按 id 查留存记录只泄露「这个 id 存不存在、对不对得上」，不返回内容；\nid 是 `new_id(\"proof\")` 生成的，枚举不出来。",
         "operationId": "verify_proof_v5_proofs_verify_post",
         "requestBody": {
           "content": {
@@ -3840,6 +6467,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Add Trace",
+        "description": "记一条 span。**这一版刻意只写不读，下面是理由。**\n\n现状（实测）：`app.routes` 里路径含 `trace` 或 `span` 的路由只有这一条\n`POST /v5/traces`；写进 `trace_spans_v5` 的行，全仓唯一的读取是\n`V5FeatureStore.metrics()` 里一句 `COUNT(*) … WHERE status='error'`，\n也就是 `GET /v5/metrics` 的 `trace_errors`。发两条 span（一条 ok、一条\nerror）之后 `trace_errors` 是 1——两行里只有这一个整数出得来，span 树、\n父子关系、脱敏后的 `attributes` 没有任何读回路径。\n\n## 为什么不补一条读它的端点\n\n补 `GET /v5/traces/{trace_id}` 需要一个真实消费方，否则只是把「收下一个\n没人看的 blob」换成「后端有、前端没画」——同一个毛病换个位置。而这个项目\n**已经决定过**这件事：`ONBOARDING.md` 把 `/v5/…traces` 列在「明确不该上\n老人端的」里面。span 树是给工程排障用的，不是给老人或子女看的界面，\n老人端多一屏 span 列表对她没有任何意义。所以这一版保持只写。\n\n## 那「没人读」这件事怎么算说清了\n\n两点，都是行为不是措辞：\n\n一，`/v5/capability-truth` 把「隐私脱敏运行指标与Trace」列进\n`implemented_and_tested`。脱敏确实做了（`add_trace` 里\n`PrivacyRedactor.redact_value`），但**从外面验证不了**，所以那条声明只能\n靠读代码相信。`tests/test_nothing_is_accepted_and_dropped.py` 直接查库\n断言写进去的是脱敏后的值，把这条声明变成可复核的。\n\n二，只写的表没有下游读者，意味着**写入时没被挡住的坏数据此后永远不会被\n发现**。`V5FeatureStore.add_trace` 的 docstring 记着两个实测到的例子\n（span 编号撞车会静默删掉别人那一行；结构上不可能的父链一律 204），\n那两道检查现在是这张表唯一的读者。",
         "operationId": "add_trace_v5_traces_post",
         "requestBody": {
           "content": {
@@ -3905,6 +6533,7 @@
           "v5 trustworthy elder agent"
         ],
         "summary": "Capability Truth",
+        "description": "这一版真正做到了什么、哪些只是适配层。\n\n`version` 原先硬编码 `\"5.0.0\"`，而 `/v6/competition/evidence` 的\n`project_version` 是 `\"6.0.0\"`——**同一个产品两个版本号，而且两页都在评委\n面前**。权威来源是 `pyproject.toml` 的 `version = \"6.0.0\"`\n（`scripts/check_artifacts_v6.py` 就是按它检查的，`/health`、`/ping` 和\nFastAPI 的 `info.version` 也都是 6.0.0），所以 5.0.0 是错的那一个。\n\n这里读 `youhuo.__version__`，不再写第四个字面量：那个常量已经存在\n（`youhuo/__init__.py`，值就是 6.0.0），此前**一个消费者都没有**。\n用它等于少一处会各自漂移的字面量，不是新造一个来源。\n`pyproject.toml` 与它一致这件事由\n`tests/test_nothing_is_accepted_and_dropped.py` 钉住。",
         "operationId": "capability_truth_v5_capability_truth_get",
         "responses": {
           "200": {
@@ -3915,6 +6544,53 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Capability Truth V5 Capability Truth Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v6/decide": {
+      "post": {
+        "tags": [
+          "v6 age-inclusive agent and competition evidence"
+        ],
+        "summary": "Decide",
+        "description": "跑一遍决策链，把判断过程和依据一起交回来。\n\n**这是只读的**：不落库、不发外部请求、不改任何状态。\n它回答的是\"该怎么处理这句话\"，不是\"去办这件事\"。\n\n放在 `/v6` 而不是新开一个前缀，是因为它服务的正是这一版\n「适老交互」那条线——小优每次开口之前先过一遍这里。",
+        "operationId": "decide_v6_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecideResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -4473,7 +7149,7 @@
           "v6 age-inclusive agent and competition evidence"
         ],
         "summary": "Speech Voice",
-        "description": "Whether an offline neural voice is available; the client degrades if not.",
+        "description": "Whether a natural voice is available; the client degrades if not.\n\n`where` 说明声音从哪来：`cloud`（晓晓，要念的话会发到微软语音服务）、\n`local`（离线模型）、`none`（用手机自己的声音）。页面按它写那枚「怎么保护您」的小标签，\n不许在云端合成时还说「不出这台手机」。",
         "operationId": "speech_voice_v6_speech_voice_get",
         "responses": {
           "200": {
@@ -4496,13 +7172,33 @@
         ]
       }
     },
+    "/v6/speech/warm": {
+      "post": {
+        "tags": [
+          "v6 age-inclusive agent and competition evidence"
+        ],
+        "summary": "Speech Warm",
+        "description": "她按下麦克风 / 开始打字时页面调一下：服务器趁她说话的工夫把念话那条连接开好。\n\n连接闲 60 秒就会被服务端断，留不住；而从她开口到回答出来有好几秒。握手\n（实测国内 1.3 秒）放进这几秒里，第一句就不用再等。只开连接，不发任何文字。",
+        "operationId": "speech_warm_v6_speech_warm_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v6/speech/synthesize": {
       "post": {
         "tags": [
           "v6 age-inclusive agent and competition evidence"
         ],
         "summary": "Speech Synthesize",
-        "description": "Synthesize one already-normalised clause locally. Never leaves the machine.",
+        "description": "Synthesize one already-normalised sentence.\n\n先云端晓晓（MP3），再离线模型（WAV）。**Content-Type 按实际字节写**：\n原先写死 `audio/wav`，换成云端之后等于给 MP3 贴 WAV 的标签。",
         "operationId": "speech_synthesize_v6_speech_synthesize_post",
         "requestBody": {
           "content": {
@@ -4516,11 +7212,12 @@
         },
         "responses": {
           "200": {
-            "description": "16-bit PCM WAV",
+            "description": "云端晓晓回 MP3；离线模型回 16 位 PCM WAV",
             "content": {
               "application/json": {
                 "schema": {}
               },
+              "audio/mpeg": {},
               "audio/wav": {}
             }
           },
@@ -4968,11 +7665,6 @@
             "minLength": 1,
             "title": "Kind",
             "default": "interaction"
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Metadata"
           }
         },
         "additionalProperties": false,
@@ -4981,7 +7673,8 @@
           "elder_id",
           "occurred_at"
         ],
-        "title": "ActivityHeartbeatRequest"
+        "title": "ActivityHeartbeatRequest",
+        "description": "一条「她还在动」的心跳。\n\n## 这里**没有** `metadata`，是故意的\n\n原来有一个 `metadata: dict[str, Any]`。它落在\n`activity_events_v4.metadata_json`，而那一列**全仓零 SELECT**：\n`evaluate_inactivity` 只取 `occurred_at`。实测带 `{\"room\":\"客厅\"}` 的心跳\n入库了，`/v4/safety/inactivity/evaluate` 的响应里没有它，扫遍其余路由也\n没有第二个人读。\n\n删掉而不是「把它带出来」，是因为它没有生产者，也没有可诚实交付的消费者：\n\n- 全仓没有一个调用方送过它。`backend/scripts/device_probe.py`、\n  `backend/scripts/verify_features_v6.py`、`backend/static/proof-demos.js`、\n  现有全部判据，送的都是 `{elder_id, kind, occurred_at}`。\n  `HARDWARE.md` 给板子写的请求体也是这三个字段。\n- 「最后一次活动在哪个房间」这件事**这块板子给不出来**。\n  `HARDWARE.md` 上的存在雷达是 HLK-LD2410C-P，一块板一个位置，出的是\n  「有没有人 / 距离」。房间是多点部署才有的维度，现在没有第二个点。\n  为它留一个字段，等于把一个永远是 `{}` 的洞留在家属那一屏上。\n- 它是个无上界的口子。实测 40 KB 的 `metadata` 照收照存，任意深嵌套也收。\n  而心跳是老人端写、家属端读的：把这个 blob 端到家属面前，就是在这个\n  到处是 `ShareScope` 和本人同意的仓库里，开一条不带范围、不带同意的\n  明文通道（情绪那边正是为了这个只存 `text_digest`）。\n\n删掉之后 `extra=\"forbid\"` 会**把这件事说出来**：送 `metadata` 从「200，\n然后数据消失」变成 422。这个端点本来就是严的——实测多送一个\n`distance_cm` 今天就是 422，`metadata` 只是当时唯一那个「收下再扔掉」的口子。\n真要把雷达的距离读数接进来，该做的是加一个说得出名字、有人读的字段，\n不是往一个无人读的 blob 里塞。"
       },
       "ActorRole": {
         "type": "string",
@@ -5026,6 +7719,2733 @@
         ],
         "title": "AlertDecision",
         "description": "要不要现在就打扰子女。\n\n设计稿的要求：\"仅基线偏离 + 该办的事情临近预期才推送紧急提醒，大幅减少无效消息\"。\n\n这条规则的价值不在于它推送了什么，而在于它**不推**什么。一个每天推三条\"老人今天\n起晚了\"的 App，两周内就会被子女静音，然后真正要紧的那一条也一起消失了。"
+      },
+      "AppAgenda": {
+        "properties": {
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppAgendaNext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "today": {
+            "items": {
+              "$ref": "#/components/schemas/AppAgendaItem"
+            },
+            "type": "array",
+            "title": "Today"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "today",
+          "count"
+        ],
+        "title": "AppAgenda"
+      },
+      "AppAgendaItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "time",
+          "title",
+          "done",
+          "status",
+          "at"
+        ],
+        "title": "AppAgendaItem"
+      },
+      "AppAgendaNext": {
+        "properties": {
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "overdue": {
+            "type": "boolean",
+            "title": "Overdue"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "time",
+          "title",
+          "overdue"
+        ],
+        "title": "AppAgendaNext"
+      },
+      "AppAppointment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "hospital": {
+            "type": "string",
+            "title": "Hospital"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "doctor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reminds": {
+            "type": "boolean",
+            "title": "Reminds",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "hospital",
+          "date",
+          "time",
+          "status"
+        ],
+        "title": "AppAppointment"
+      },
+      "AppAppointmentCreated": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "reminderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminderid"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "message"
+        ],
+        "title": "AppAppointmentCreated"
+      },
+      "AppAppointmentList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppAppointment"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count"
+        ],
+        "title": "AppAppointmentList"
+      },
+      "AppBaselineChannel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "usual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usual"
+          },
+          "today": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Today"
+          },
+          "word": {
+            "type": "string",
+            "title": "Word"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "word"
+        ],
+        "title": "AppBaselineChannel",
+        "description": "一个通道上的「平常 vs 今天」。\n\n给的是**字段**而不是句子：底层那几句 `explanation` 是写给子女的\n（\"比**他**平常晚了 1 小时 40 分\"），照搬到老人自己这一屏上人称就错了。\n在这里改写人称同样不行——`其他` 会被改成 `其您`。所以只转述结构化的值。"
+      },
+      "AppBill": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "amountCents": {
+            "type": "integer",
+            "title": "Amountcents"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duedate"
+          },
+          "paid": {
+            "type": "boolean",
+            "title": "Paid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paidat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "amount",
+          "amountCents",
+          "month",
+          "period",
+          "paid",
+          "status"
+        ],
+        "title": "AppBill"
+      },
+      "AppBillList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppBill"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "unpaidCount": {
+            "type": "integer",
+            "title": "Unpaidcount"
+          },
+          "unpaidTotal": {
+            "type": "string",
+            "title": "Unpaidtotal"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "unpaidCount",
+          "unpaidTotal"
+        ],
+        "title": "AppBillList"
+      },
+      "AppCertElements": {
+        "properties": {
+          "voiceTeachBack": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voiceteachback"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AppCertElements"
+      },
+      "AppCertificate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "approvedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approvedby"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paidat"
+          },
+          "chainValid": {
+            "type": "boolean",
+            "title": "Chainvalid"
+          },
+          "chain": {
+            "items": {
+              "$ref": "#/components/schemas/AppChainStep"
+            },
+            "type": "array",
+            "title": "Chain"
+          },
+          "elements": {
+            "$ref": "#/components/schemas/AppCertElements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "chainValid",
+          "chain",
+          "elements"
+        ],
+        "title": "AppCertificate"
+      },
+      "AppChainStep": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "by"
+        ],
+        "title": "AppChainStep"
+      },
+      "AppContact": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "primary": {
+            "type": "boolean",
+            "title": "Primary"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "role",
+          "primary"
+        ],
+        "title": "AppContact"
+      },
+      "AppContactList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppContact"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count"
+        ],
+        "title": "AppContactList"
+      },
+      "AppDailyReport": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "todayWord": {
+            "type": "string",
+            "title": "Todayword"
+          },
+          "todayTone": {
+            "type": "string",
+            "title": "Todaytone"
+          },
+          "established": {
+            "type": "boolean",
+            "title": "Established"
+          },
+          "observedDays": {
+            "type": "integer",
+            "title": "Observeddays"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/AppBaselineChannel"
+            },
+            "type": "array",
+            "title": "Channels"
+          },
+          "errands": {
+            "$ref": "#/components/schemas/AppErrandDigest"
+          },
+          "familyWillSee": {
+            "type": "string",
+            "title": "Familywillsee"
+          },
+          "familyWillSeeBecause": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Familywillseebecause",
+            "default": []
+          },
+          "environmentNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environmentnote"
+          },
+          "privacyNote": {
+            "type": "string",
+            "title": "Privacynote"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "todayWord",
+          "todayTone",
+          "established",
+          "observedDays",
+          "channels",
+          "errands",
+          "familyWillSee",
+          "privacyNote",
+          "message"
+        ],
+        "title": "AppDailyReport",
+        "description": "老人端的「我这几天怎么样」。\n\n底层是 `/v7/daily-report` 与 `/v7/baseline`，两个都真的调——不在这一层\n重算一遍基线。日报本身是子女侧视图，但一份关于自己的报告不让本人看，\n与这个项目\"过程透明\"的立场相悖。"
+      },
+      "AppDose": {
+        "properties": {
+          "planId": {
+            "type": "string",
+            "title": "Planid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "doseText": {
+            "type": "string",
+            "title": "Dosetext"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "pending": {
+            "type": "boolean",
+            "title": "Pending"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "title": "Scheduledat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "planId",
+          "name",
+          "doseText",
+          "time",
+          "status",
+          "pending",
+          "scheduledAt"
+        ],
+        "title": "AppDose",
+        "description": "今天某一格：哪个药、几点、吃了没。"
+      },
+      "AppDoseRecorded": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "planId": {
+            "type": "string",
+            "title": "Planid"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "title": "Scheduledat"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "daysRemaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daysremaining"
+          },
+          "alreadyRecorded": {
+            "type": "boolean",
+            "title": "Alreadyrecorded",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "planId",
+          "scheduledAt",
+          "status",
+          "message"
+        ],
+        "title": "AppDoseRecorded"
+      },
+      "AppEmergencyResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "notified": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notified"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "escalation": {
+            "items": {
+              "$ref": "#/components/schemas/AppEscalationContact"
+            },
+            "type": "array",
+            "title": "Escalation",
+            "default": []
+          },
+          "communityPrepared": {
+            "type": "boolean",
+            "title": "Communityprepared",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "status",
+          "notified",
+          "message"
+        ],
+        "title": "AppEmergencyResult"
+      },
+      "AppEmotionReview": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "fromDate": {
+            "type": "string",
+            "title": "Fromdate"
+          },
+          "toDate": {
+            "type": "string",
+            "title": "Todate"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "moods": {
+            "items": {
+              "$ref": "#/components/schemas/AppMoodCount"
+            },
+            "type": "array",
+            "title": "Moods"
+          },
+          "trend": {
+            "type": "string",
+            "title": "Trend"
+          },
+          "suggestions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "privacyNote": {
+            "type": "string",
+            "title": "Privacynote"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "days",
+          "fromDate",
+          "toDate",
+          "count",
+          "moods",
+          "trend",
+          "suggestions",
+          "privacyNote",
+          "message"
+        ],
+        "title": "AppEmotionReview",
+        "description": "老人自己看得到的情绪回顾。\n\n**这里没有聊天原文，也没有它的指纹。** 底层 `/v4/reports/emotion` 给的就是\n汇总（类别计数 + 趋势 + 几句建议），这一层只翻译，不往里加东西——\n\"他和无忧伴聊过的话不会出现在这里\"是写在界面上的承诺。\n\n`trend` 是**底层算出来的那一个值的中文说法**，不是这一层看着计数编的。\n这个项目在情绪上栽过一次：上一版把一条编出来的\"情绪好转\"曲线写进了演示数据，\n死在它自己的变异测试上。结论归底层，门面只负责说人话。"
+      },
+      "AppErrandDigest": {
+        "properties": {
+          "dueToday": {
+            "type": "integer",
+            "title": "Duetoday"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "waitingFamily": {
+            "type": "integer",
+            "title": "Waitingfamily"
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dueToday",
+          "done",
+          "waitingFamily",
+          "overdue",
+          "lines"
+        ],
+        "title": "AppErrandDigest"
+      },
+      "AppEscalationContact": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "contact": {
+            "type": "string",
+            "title": "Contact"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "role",
+          "contact",
+          "priority"
+        ],
+        "title": "AppEscalationContact",
+        "description": "接力名单上的一个人。号码是**打码**的——这一屏不该把完整号码摆出来。"
+      },
+      "AppHealthMetric": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "title": "AppHealthMetric"
+      },
+      "AppHealthRecorded": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "label",
+          "value",
+          "at",
+          "message"
+        ],
+        "title": "AppHealthRecorded"
+      },
+      "AppHealthSummary": {
+        "properties": {
+          "overall": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/AppHealthMetric"
+            },
+            "type": "array",
+            "title": "Metrics"
+          },
+          "recorded": {
+            "type": "integer",
+            "title": "Recorded"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metrics",
+          "recorded"
+        ],
+        "title": "AppHealthSummary"
+      },
+      "AppListenResult": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "seconds": {
+            "type": "number",
+            "title": "Seconds"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "heard": {
+            "type": "boolean",
+            "title": "Heard"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "seconds",
+          "heard"
+        ],
+        "title": "AppListenResult"
+      },
+      "AppListenStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "rate": {
+            "type": "integer",
+            "title": "Rate"
+          },
+          "max_seconds": {
+            "type": "integer",
+            "title": "Max Seconds"
+          },
+          "fallback": {
+            "type": "string",
+            "title": "Fallback"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "available",
+          "rate",
+          "max_seconds",
+          "fallback"
+        ],
+        "title": "AppListenStatus",
+        "description": "这台服务能不能**听**。和 `AppSpeechStatus` 是对称的两半。\n\n网页端不需要它（浏览器自带识别），**板子需要**：ESP32 上没有浏览器，\n它得先问清楚有没有人接得住音频，再决定要不要采。"
+      },
+      "AppMedicationDecided": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "name",
+          "active",
+          "message"
+        ],
+        "title": "AppMedicationDecided"
+      },
+      "AppMedicationPlan": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "doseText": {
+            "type": "string",
+            "title": "Dosetext"
+          },
+          "times": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Times"
+          },
+          "daysRemaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daysremaining"
+          },
+          "depletionDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depletiondate"
+          },
+          "stockLabel": {
+            "type": "string",
+            "title": "Stocklabel"
+          },
+          "alertLevel": {
+            "type": "string",
+            "title": "Alertlevel"
+          },
+          "stockUnits": {
+            "type": "number",
+            "title": "Stockunits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "doseText",
+          "times",
+          "stockLabel",
+          "alertLevel",
+          "stockUnits"
+        ],
+        "title": "AppMedicationPlan"
+      },
+      "AppMedicationToday": {
+        "properties": {
+          "doses": {
+            "items": {
+              "$ref": "#/components/schemas/AppDose"
+            },
+            "type": "array",
+            "title": "Doses"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/AppMedicationPlan"
+            },
+            "type": "array",
+            "title": "Plans"
+          },
+          "plannedCount": {
+            "type": "integer",
+            "title": "Plannedcount"
+          },
+          "takenCount": {
+            "type": "integer",
+            "title": "Takencount"
+          },
+          "pendingCount": {
+            "type": "integer",
+            "title": "Pendingcount"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "stockWarning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stockwarning"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "doses",
+          "plans",
+          "plannedCount",
+          "takenCount",
+          "pendingCount",
+          "summary"
+        ],
+        "title": "AppMedicationToday"
+      },
+      "AppMemory": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "sensitivity": {
+            "type": "string",
+            "title": "Sensitivity"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          },
+          "daysLeft": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daysleft"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "detail",
+          "purpose",
+          "sensitivity",
+          "scope",
+          "since"
+        ],
+        "title": "AppMemory"
+      },
+      "AppMemoryDecided": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "key",
+          "status",
+          "message"
+        ],
+        "title": "AppMemoryDecided"
+      },
+      "AppMemoryList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppMemory"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pending": {
+            "items": {
+              "$ref": "#/components/schemas/AppMemory"
+            },
+            "type": "array",
+            "title": "Pending"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "pendingCount": {
+            "type": "integer",
+            "title": "Pendingcount"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "pending",
+          "count",
+          "pendingCount",
+          "message"
+        ],
+        "title": "AppMemoryList"
+      },
+      "AppMoodCount": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "count"
+        ],
+        "title": "AppMoodCount"
+      },
+      "AppNotification": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "eventType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventtype"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read",
+            "default": false
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "AppNotification"
+      },
+      "AppNotificationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppNotification"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count"
+        ],
+        "title": "AppNotificationList"
+      },
+      "AppNotificationRead": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "status"
+        ],
+        "title": "AppNotificationRead"
+      },
+      "AppPaymentMoved": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "certificateId": {
+            "type": "string",
+            "title": "Certificateid"
+          },
+          "approvedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approvedby"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "status",
+          "certificateId"
+        ],
+        "title": "AppPaymentMoved"
+      },
+      "AppPaymentPrepared": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "amount",
+          "prompt"
+        ],
+        "title": "AppPaymentPrepared"
+      },
+      "AppPendingMedication": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "doseText": {
+            "type": "string",
+            "title": "Dosetext"
+          },
+          "times": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Times"
+          },
+          "addedAt": {
+            "type": "string",
+            "title": "Addedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "doseText",
+          "times",
+          "addedAt"
+        ],
+        "title": "AppPendingMedication"
+      },
+      "AppPendingMedicationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppPendingMedication"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "message"
+        ],
+        "title": "AppPendingMedicationList"
+      },
+      "AppPrivacyBucket": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "count"
+        ],
+        "title": "AppPrivacyBucket",
+        "description": "一类数据，以及这一类下面有几条。"
+      },
+      "AppPrivacyErasePreview": {
+        "properties": {
+          "willDelete": {
+            "items": {
+              "$ref": "#/components/schemas/AppPrivacyBucket"
+            },
+            "type": "array",
+            "title": "Willdelete"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "preserved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preserved"
+          },
+          "confirmToken": {
+            "type": "string",
+            "title": "Confirmtoken"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "willDelete",
+          "total",
+          "preserved",
+          "confirmToken",
+          "message"
+        ],
+        "title": "AppPrivacyErasePreview",
+        "description": "删除的第一步：**先看一眼**。这一步不删任何东西。\n\n`confirmToken` 是把「您看到的那一份」和「您确认的那一次」绑在一起的东西：\n它由类别和**当时的条数**算出来，中间数据变了就对不上，第二步会请您重看一遍。"
+      },
+      "AppPrivacyErased": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "deleted": {
+            "items": {
+              "$ref": "#/components/schemas/AppPrivacyBucket"
+            },
+            "type": "array",
+            "title": "Deleted"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "preserved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preserved"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "deleted",
+          "total",
+          "preserved",
+          "message"
+        ],
+        "title": "AppPrivacyErased",
+        "description": "删除的第二步：真的删了。"
+      },
+      "AppPrivacyExport": {
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "title": "Generatedat"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/AppPrivacyBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          },
+          "records": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Records"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "generatedAt",
+          "buckets",
+          "total",
+          "digest",
+          "records",
+          "note",
+          "message"
+        ],
+        "title": "AppPrivacyExport",
+        "description": "「导出我的数据」。**这是一个纯读端点**，它不写任何东西。\n\n`records` 里是真实的行——一份不含数据的\"导出\"不是导出。键是中文类别名，\n行内容由 `PrivacyRedactor` 脱敏过（手机号、身份证号、密钥字段），\n那是**存着的数据本身**，不是界面文案。屏幕上要显示的是 `buckets` 和 `message`。"
+      },
+      "AppProfile": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "weather": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weather"
+          },
+          "air": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Air"
+          },
+          "comfort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comfort"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AppProfile"
+      },
+      "AppRecord": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entityid"
+          },
+          "who": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Who"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "kind",
+          "icon"
+        ],
+        "title": "AppRecord"
+      },
+      "AppRecordList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppRecord"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "title": "Hasmore",
+            "default": false
+          },
+          "machinery": {
+            "type": "integer",
+            "title": "Machinery",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "count"
+        ],
+        "title": "AppRecordList"
+      },
+      "AppReminder": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "cancelled": {
+            "type": "boolean",
+            "title": "Cancelled"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "overdue": {
+            "type": "boolean",
+            "title": "Overdue"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "time",
+          "date",
+          "at",
+          "done",
+          "cancelled",
+          "status",
+          "overdue"
+        ],
+        "title": "AppReminder"
+      },
+      "AppReminderChanged": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "status",
+          "message"
+        ],
+        "title": "AppReminderChanged"
+      },
+      "AppReminderCreated": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "item": {
+            "$ref": "#/components/schemas/AppReminder"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "item",
+          "message"
+        ],
+        "title": "AppReminderCreated"
+      },
+      "AppReminderList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppReminder"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "kinds"
+        ],
+        "title": "AppReminderList"
+      },
+      "AppRoutine": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "repeatText": {
+            "type": "string",
+            "title": "Repeattext"
+          },
+          "time": {
+            "type": "string",
+            "title": "Time"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "nextAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextat"
+          },
+          "nextText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nexttext"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "repeatText",
+          "time",
+          "category",
+          "status",
+          "active"
+        ],
+        "title": "AppRoutine"
+      },
+      "AppRoutineChanged": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "title",
+          "status",
+          "message"
+        ],
+        "title": "AppRoutineChanged"
+      },
+      "AppRoutineList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppRoutine"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "message"
+        ],
+        "title": "AppRoutineList"
+      },
+      "AppSettings": {
+        "properties": {
+          "fontScale": {
+            "type": "number",
+            "title": "Fontscale"
+          },
+          "voiceSpeed": {
+            "type": "number",
+            "title": "Voicespeed"
+          },
+          "voiceSpeaker": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voicespeaker"
+          },
+          "highContrast": {
+            "type": "boolean",
+            "title": "Highcontrast"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "savedByFamily": {
+            "type": "boolean",
+            "title": "Savedbyfamily"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fontScale",
+          "voiceSpeed",
+          "highContrast",
+          "saved",
+          "savedByFamily"
+        ],
+        "title": "AppSettings"
+      },
+      "AppSpeechStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "speed": {
+            "type": "number",
+            "title": "Speed"
+          },
+          "speakers": {
+            "type": "integer",
+            "title": "Speakers",
+            "default": 1
+          },
+          "speaker": {
+            "type": "integer",
+            "title": "Speaker",
+            "default": 0
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "fallback": {
+            "type": "string",
+            "title": "Fallback"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "available",
+          "speed",
+          "fallback"
+        ],
+        "title": "AppSpeechStatus"
+      },
+      "AppTeachBackResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "heard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heard"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "matched",
+          "outcome",
+          "message"
+        ],
+        "title": "AppTeachBackResult"
+      },
+      "AppUnderstood": {
+        "properties": {
+          "reply": {
+            "type": "string",
+            "title": "Reply"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taskid"
+          },
+          "taskStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taskstatus"
+          },
+          "taskType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasktype"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reply",
+          "code"
+        ],
+        "title": "AppUnderstood"
+      },
+      "AppVoiceSession": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "understood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppUnderstood"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "AppVoiceSession"
+      },
+      "AppWaterBill": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "accountTail": {
+            "type": "string",
+            "title": "Accounttail"
+          },
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paidat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "amount",
+          "company",
+          "accountTail",
+          "month"
+        ],
+        "title": "AppWaterBill",
+        "description": "老端点 `/bills/water/current` 的形状。\n\n和 `AppBill` **不一样**，而且不能合并：这个形状是前端先定稿、后端跟着补的，\n它有 `accountTail` 而没有 `paid`/`period`。合并会让那一页当场读不到字段。"
       },
       "AssistanceRequestCreate": {
         "properties": {
@@ -5124,7 +10544,8 @@
           "expires_at",
           "created_at"
         ],
-        "title": "AssistanceRequestRecord"
+        "title": "AssistanceRequestRecord",
+        "description": "一次「家人想帮我一下」的请求与老人的答复。\n\n## 这条记录**不驱动任何远程动作**，这一版做不到\n\n`requested_capabilities` 的四个名字（查看当前这一步 / 语音指导 /\n控件高亮 / 低风险表单提交）在全仓只出现在\n`create_assistance_request` 的白名单校验里。实测：家属请求、老人同意、\n`status` 变成 approved，然后什么都不会发生——**没有任何能力闸门读它**。\n\n判定是这一版交付不了，理由不是「没排上」，是三样东西都不在：\n\n1. **没有服务端到老人设备的通道。** 语音指导和控件高亮都要把一条指令推到\n   她那块屏上。全仓运行时没有 WebSocket、没有 SSE、没有推送（`websocket`\n   只出现在 CDP 巡检脚本里）。`devices_v4.push_capable` 写进去了，\n   全仓零 SELECT。`CapabilityMatrix` 自己就把 Push Kit 列成\n   `production_dependency`——也就是还没有。\n2. **「代为提交表单」是这个仓库特意禁止的方向。** 低风险表单提交等于家属\n   在老人名下动作。`/v4/medications/decide`、`/v4/routine-occurrences` 的\n   完成、复查日入日历，每一处都写着「只有老人本人可以」。为远程协助开一个\n   例外，是把已经修过一次的缺陷再做一遍。\n3. **「查看当前这一步」家属现在就能看，不需要授权。**\n   `GET /v4/care-graph/{elder_id}` 和 `GET /v4/routine-occurrences/{elder_id}`\n   对绑定家属是无条件开放的。把它挂到这条同意上，要么是授予一个已经有的\n   权限（装饰），要么是把现有访问收回去（回归）。两个都不是修。\n\n所以不发明一条远程控制通道。这条记录留下来的是它真正能承担的东西：**一次\n有范围、有期限、可查询的口头协助约定的留痕**。通知的措辞按这个改了\n（见 `v4_api.create_assistance`），`/v4/capabilities` 里也加了一条说明它\n到底做到哪一步（见 `CapabilityMatrix`）。\n\n## `status` 现在会真的到期\n\n在这之前 `expires_at` 是一列纯装饰：全仓对这张表的唯一读取是 decide 自己那\n句 `WHERE id=?`，所以一条 approved 会永远停在 approved。实测把\n`expires_at` 拨到 2020 年，`status` 照旧是 approved。\n`list_assistance_requests` 现在会把过期的 pending/approved 落成 expired，\n`GET /v4/assistance/{elder_id}` 是第一个读它的人。"
       },
       "AuthContext": {
         "properties": {
@@ -6038,7 +11459,8 @@
           "created_at",
           "updated_at"
         ],
-        "title": "ContactRecord"
+        "title": "ContactRecord",
+        "description": "一位亲友的档案。\n\n## 这里**故意**没有 `phone_digest`\n\n`contact_profiles_v4.phone_digest` 原先只写不读（写在 `seed_demo` 和\n`create_contact`，`_row_contact` 不取，全仓零 SELECT），而\n`UNIQUE(elder_id,display_name,relation)` 又只管名字和关系——于是同一个电话\n号码换个称呼就能再登记一遍，实测名单上出现两位「*******8111」。\n现在 `create_contact` 用它去重了（见 `V4FeatureStore._mask_phone` 的说明），\n它承重了。\n\n但它不上这条响应。手机号只有十一位、号段还是固定的，sha256 反查是毫秒级的\n事——把摘要发出去等于把号码发出去，`phone_masked` 那层掩码就白做了。\n它是一个只在服务端做等值比较的内部键，留在库里，不进接口。"
       },
       "DailyReport": {
         "properties": {
@@ -6197,6 +11619,170 @@
           3
         ],
         "title": "DataSensitivity"
+      },
+      "DecideRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "task_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Type"
+          },
+          "risk_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Level"
+          },
+          "has_errand_slot": {
+            "type": "boolean",
+            "title": "Has Errand Slot",
+            "default": false
+          },
+          "elder_said_not_to": {
+            "type": "boolean",
+            "title": "Elder Said Not To",
+            "default": false
+          },
+          "urgent": {
+            "type": "boolean",
+            "title": "Urgent",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "DecideRequest",
+        "description": "把老人的一句话交给决策链。**只问判断，不执行任何动作。**\n\n这个端点是只读的：它跑一遍四个决策器、按阈值路由出三态，\n然后把**完整的概率分布**和**用了哪根线**一起交回来。\n要不要真的去办，由调用方拿这个结果自己决定——\n决策器不碰数据库、不发请求、不改任何状态。"
+      },
+      "DecideResponse": {
+        "properties": {
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "intent": {
+            "type": "string",
+            "title": "Intent"
+          },
+          "intent_confidence": {
+            "type": "number",
+            "title": "Intent Confidence"
+          },
+          "intent_probabilities": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Intent Probabilities"
+          },
+          "risk": {
+            "type": "string",
+            "title": "Risk"
+          },
+          "risk_confidence": {
+            "type": "number",
+            "title": "Risk Confidence"
+          },
+          "risk_probabilities": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Risk Probabilities"
+          },
+          "grasp": {
+            "type": "number",
+            "title": "Grasp"
+          },
+          "interrupt": {
+            "type": "string",
+            "title": "Interrupt"
+          },
+          "interrupt_probabilities": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Interrupt Probabilities"
+          },
+          "action_key": {
+            "type": "string",
+            "title": "Action Key"
+          },
+          "triage": {
+            "type": "string",
+            "title": "Triage"
+          },
+          "thresholds": {
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Thresholds"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "headline",
+          "intent",
+          "intent_confidence",
+          "intent_probabilities",
+          "risk",
+          "risk_confidence",
+          "risk_probabilities",
+          "grasp",
+          "interrupt",
+          "interrupt_probabilities",
+          "action_key",
+          "triage",
+          "thresholds",
+          "notes"
+        ],
+        "title": "DecideResponse",
+        "description": "一条链的完整结果。**概率分布一起交出去**，不是只给一个结论。\n\nJev 文档里那句：\"完整概率都给你了，可以自己算\"——所以这里给的是\n`intent_probabilities` 这样的整张表，而不只是 `intent` 一个词。\n调用方想换一种 confidence 定义、或者想按自己的水位卡，都拿得到原料。"
       },
       "DelegationDecision": {
         "properties": {
@@ -7930,6 +13516,27 @@
           "alert_level": {
             "type": "string",
             "title": "Alert Level"
+          },
+          "whole_days_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whole Days Remaining"
+          },
+          "should_highlight": {
+            "type": "boolean",
+            "title": "Should Highlight",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -7942,7 +13549,8 @@
           "estimated_depletion_date",
           "alert_level"
         ],
-        "title": "InventoryForecast"
+        "title": "InventoryForecast",
+        "description": "还能吃几天，以及**该说的那句话**。\n\n## 后三个字段是为了让阈值只存在一处\n\n`alert_level` 的阈值在 `InventoryService.forecast` 里：不足 2 天 critical、\n不足 7 天 warning。`v4_api` 拿 critical/warning 去发家属通知。\n而 `backend/static/care.js` 的 `daysLeft()` 用 JS 把「还能吃几天」重算了一遍，\n红字阈值写的是 `days <= 3`。实测同一份计划（11 片、每天 2 片）：\n\n    后端 days_remaining=5.5、alert_level=warning  → 发了家属通知\n    care.js floor(11/2)=5、5 <= 3 为假           → 屏幕上是普通灰字\n\n也就是说家属手机上响了，老人屏幕上说「还够 5 天」，看不出任何异常。\n两个阈值各自都说得通，问题在于它们是两个。\n\n所以后端把**结论**发出来，前端不必再自己定阈值：\n\n- `whole_days_remaining`：该说出口的那个整数（向下取整，和 care.js 原来\n  算出的 5 一致——差的从来不是这个数，是阈值）。\n- `should_highlight`：屏幕上是否该标红。前端不要再自己写\n  `alert_level in {...}`；那个集合归后端。\n- `message`：该说的那句话。语音是这个产品的主界面，这句话同时给屏幕和播报。\n\n`alert_level` 保留原样：它是机器判断，已经有三个消费方\n（`v4_api` 的通知、`care_voice.answer_medication_stock`、\n`app_api._STOCK_WORDS`），不动。"
       },
       "ItemCategory": {
         "type": "string",
@@ -8198,11 +13806,17 @@
             "title": "Longitude"
           },
           "accuracy_m": {
-            "type": "number",
-            "maximum": 10000.0,
-            "minimum": 0.0,
-            "title": "Accuracy M",
-            "default": 50
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy M"
           },
           "occurred_at": {
             "type": "string",
@@ -8224,7 +13838,8 @@
           "longitude",
           "occurred_at"
         ],
-        "title": "LocationPingRequest"
+        "title": "LocationPingRequest",
+        "description": "一次位置上报。\n\n`accuracy_m` 是这次定位的精度，单位米。**不知道就不要填**（留空或传\n`null`），**不要补 0**：0 的意思是「精确到米」，不是「没有这个数」。\n\n留空时后端既不判断她在不在活动范围内、也不会自动报警，而是回一条精度\n告警交给家属去看——这是 `youhuo-location-safety` 的「边界不确定时不自动\n报警」。填了真实值才会正常判断；离围栏 100 米以上一定报警，与精度无关。\n\n这段话必须留在类的 docstring 里：它会随 `generate_openapi_v6.py` 进入\n小艺读的那份契约（判据\n`test_a_location_without_accuracy_does_not_raise_an_alarm.py` 直接检查\n生成出来的 JSON）。这个仓库全部 model 里 `Field(description=…)` 是 0 处，\n契约上的字段说明**只有**这条路。"
       },
       "MedicalDocumentKind": {
         "type": "string",
@@ -8235,6 +13850,104 @@
           "appointment_notice"
         ],
         "title": "MedicalDocumentKind"
+      },
+      "MedicalDocumentRecord": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "elder_id": {
+            "type": "string",
+            "title": "Elder Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MedicalDocumentKind"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name"
+          },
+          "source_digest": {
+            "type": "string",
+            "title": "Source Digest"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates"
+          },
+          "measurements": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Measurements"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "terms": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Terms"
+          },
+          "summary_for_elder": {
+            "type": "string",
+            "title": "Summary For Elder"
+          },
+          "caution_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Caution Flags"
+          },
+          "review_required": {
+            "type": "boolean",
+            "title": "Review Required"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "elder_id",
+          "kind",
+          "source_name",
+          "source_digest",
+          "dates",
+          "measurements",
+          "follow_up_date",
+          "terms",
+          "summary_for_elder",
+          "caution_flags",
+          "review_required",
+          "created_at"
+        ],
+        "title": "MedicalDocumentRecord",
+        "description": "一份已经整理好的就医单据，**按 `document_id` 取回来的样子**。\n\n`/v4/medical-reports/analyze` 一直把 `document_id` 回给客户端，而在这个模型\n出现之前，全仓对 `medical_documents_v4` 的唯一 SELECT 是去重用的\n`WHERE source_digest`——`extracted_json` 和 `simplified_json` 两列写进去就\n再没有人读。实测：拿着回来的 id 试 `/v4/medical-reports/{id}`、\n`/v4/medical-documents/{id}`、`/v4/documents/{id}` 全是 404，而库里那条\n`simplified_json` 装着可用的摘要正文。也就是说那个 id 是个悬空引用。\n\n## 这里**没有**原文\n\n只有 `source_digest`（摘要），没有 `text`。原文本来就没入库——\n`save_medical_document` 存的是解析结果，不是那张单据的字。这一点不要「补上」：\n就医单据的原文是这个仓库里最敏感的一类文本，而它现在连一次都不落盘。\n\n## 取回的范围\n\n路由那一侧走 `ensure_target`，也就是**本人或本家庭**，与创建它的\n`/v4/medical-reports/analyze` 同一把尺子（那个端点家属也能调——家属替老人\n拍单据是真实场景）。跨家庭一律 404 而不是 403：403 会把「这个 id 存在」\n说出去。\n\n## 不绕过删除\n\n读的就是 `medical_documents_v4` 本表，不做第二份缓存。`/v5/privacy` 把\n`medical_documents` 列成可删类别，`privacy_erase` 是真的\n`DELETE FROM medical_documents_v4`；实测删完这条 GET 就是 404。"
       },
       "MedicalReportAnalysis": {
         "properties": {
@@ -8636,6 +14349,11 @@
               }
             ],
             "title": "Consent Actor Id"
+          },
+          "content_withheld": {
+            "type": "boolean",
+            "title": "Content Withheld",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -9618,6 +15336,10 @@
           "status": {
             "$ref": "#/components/schemas/OccurrenceStatus"
           },
+          "positive_message": {
+            "type": "string",
+            "title": "Positive Message"
+          },
           "reminder_id": {
             "anyOf": [
               {
@@ -9656,9 +15378,11 @@
           "elder_id",
           "due_at",
           "status",
+          "positive_message",
           "created_at"
         ],
-        "title": "RoutineOccurrence"
+        "title": "RoutineOccurrence",
+        "description": "例程的一次发生。\n\n`positive_message` 是例程建的时候填的那句鼓励话，存在\n`recurring_routines` 上（一条例程一句）。它此前**到不了调用方**：\n`V4FeatureStore.complete_occurrence` 的 SQL 明明 `JOIN` 出了\n`r.positive_message`，函数里一次都没用，而这个模型也没有这个字段——于是\n老人做完一件事，那句本该说给她听的话在服务端被丢掉了。实测：把它设成一个\n含标记的串，完成响应、`/v2/reminders`、`/api/v1/agenda` 里都找不到那个标记，\n唯一能看到它的是 `GET /v4/routines/{elder}`（例程本身，不是发生）。\n\n不做成 `str | None`：`recurring_routines.positive_message` 是 `NOT NULL`，\n`routine_occurrences.routine_id` 是指向它的外键，`PRAGMA foreign_keys=ON`\n（见 `Database.__init__`），而且例程没有删除路径（`set_routine_status`\n只改状态，注释里写明了原因）。所以这句话一定在，可选类型只会让调用方\n以为它可能缺，然后写一个永远走不到的兜底。"
       },
       "RoutineRecord": {
         "properties": {

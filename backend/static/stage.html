@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+<link rel="stylesheet" href="/static/control-states.css">
 </head>
 <!-- 这一页刻意**不注册 service worker**：它是展示环境，不是要装到主屏的应用，
      而一个会缓存自己的舞台在反复改版时只会给出昨天的样子。 -->
@@ -79,7 +80,13 @@
         <p class="stage-note">七拍跟着<b>同一件事</b>走。中间那台手机里跑的是真实的应用本身
           ——不是录屏，也不是截图。她的两句话是真的填进输入框、真的按了发送。</p>
         <button type="button" id="playStory">从头演一遍（约 20 秒）</button>
-        <p class="notice good" id="proofStatus" aria-live="polite">正在准备三个角色的演示身份……</p>
+        <!--: `good` 换成 `info`。和 judge.html / trust.html 上是同一个缺陷。
+             实测（`Network.setBlockedURLs` 掐掉 `/v2/auth/demo` 再刷新）这一行是
+             「没能建立演示身份：Failed to fetch——下面的按钮会失败。」
+             ——原始浏览器异常、英文，配 rgb(184,113,10) 的琥珀。
+             而这一页是答辩时投在大屏上的那一页。
+             现在由 `proof-demos.js::setStatus(text, tone)` 一起换文字和颜色。 -->
+        <p class="notice info" id="proofStatus" aria-live="polite">正在准备三个角色的演示身份……</p>
         <p class="stage-note" id="storyStatus" role="status" aria-live="polite"></p>
       </section>
 
@@ -121,7 +128,11 @@
                     aria-label="第 4 拍，账单图片说 9999.99：把手机装到这一步">04</button>
             <div class="beat-body">
               <h3 class="beat-title">账单图片说 9999.99，优活不听它的</h3>
-              <p class="beat-say" id="say-04">图片里的金额和「直接支付」指令都被剥掉了，只有账单接口返回的数字进得了工具参数。</p>
+              <!-- 第二句原先是「只有账单接口返回的数字进得了工具参数」。那不是这一拍真
+                   会发生的事：可信金额与图片金额冲突时，后端**两个都不用**，回
+                   `decision: clarify` + `required_confirmations: ['补充必需信息']`——
+                   静默挑一个才是这个项目一直拒绝的做法。标题一个字没改。 -->
+              <p class="beat-say" id="say-04">图片里的金额和「直接支付」指令都被逐个剥掉，这一笔停下来要求重新核实，不会按图片里的数字去付。</p>
             </div>
           </article>
 
@@ -218,7 +229,12 @@
             让「需要关注」当场发生——偏离由后端拿他自己的常态算出来，不是界面演的。</p>
           <p class="stage-note"><a href="#baselineDemo">看他自己的常态与今天 →</a></p>
           <p class="stage-note"><a href="#coldRoomDemo">上报「屋里 13.5℃」看关怀语变化 →</a></p>
-          <p class="stage-note"><a href="#lateWakeDemo">模拟「今天 11:20 才起」看偏离 →</a></p>
+          <!--: 「今天 11:20 才起」这个**具体时刻**在半天里是假的。
+               `proof-demos.js::pastDeviationMoment()` 只在 11:20 已经过去时才用
+               11:20，没到就退到「两分钟前」（一条未来的心跳会被后端 422 拒掉）。
+               上午十点半答辩，屏幕上写着 11:20，写进库里的是 10:28。
+               标签不再钉一个它不一定用的时刻；真正用了哪一刻由那一拍自己报出来。 -->
+          <p class="stage-note"><a href="#lateWakeDemo">上报一个反常的起床时间，看偏离 →</a></p>
         </section>
 
         <section class="stage-group" aria-label="手机装哪一端">
@@ -460,7 +476,7 @@
             后两个按钮真的写一条环境采样和一条活动心跳，偏离由后端算出来。</p>
           <button id="baselineDemo"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="m19 9-5 5-4-4-3 3" /></svg><span>看他自己的常态与今天</span></button>
           <button id="coldRoomDemo" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20" /> <path d="M12 2v20" /> <path d="m20 16-4-4 4-4" /> <path d="m4 8 4 4-4 4" /> <path d="m16 4-4 4-4-4" /> <path d="m8 20 4-4 4 4" /></svg><span>上报「屋里 13.5℃」看关怀语变化</span></button>
-          <button id="lateWakeDemo" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <polyline points="12 6 12 12 16 14" /></svg><span>模拟「今天 11:20 才起」看偏离</span></button>
+          <button id="lateWakeDemo" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <polyline points="12 6 12 12 16 14" /></svg><span>上报一个反常的起床时间，看偏离</span></button>
           <div id="baselineOutput" aria-live="polite"></div>
         </article>
 
@@ -634,6 +650,27 @@
     <!-- 答辩模式下的唯一出口。两侧控制区整体 inert 之后，这个按钮必须还在。 -->
     <button type="button" class="stage-escape" id="stageEscape" hidden>显示控制</button>
   </main>
+
+  <!-- 五分钟节拍器。`?cue=1` 才显示。
+       ..........................................................................
+       它只回答一个问题：**我现在还在不在节奏上**。五分钟演示的评分项是"严格计时"，
+       而人在台上讲的时候对自己的语速是有系统性错觉的—— rehearsal 时觉得刚好，
+       正式讲的时候每一段都会多花十几秒。
+
+       这里**一个按钮都没有**，是刻意的：
+         ① 它是给讲的人看的，不是给观众按的；多一个按钮就多一个会被误触的东西。
+         ② `build_control_inventory.py` 与 `check_dead_controls.py` 按控件清点，
+            一个按下去什么都不发生的显示元素不该混进那张清单里。
+       所以：开页自走，空格键重来。键盘不进 DOM 清点。
+
+       段落边界照 `docs/31_V6_DEMO_SCRIPT.md` 抄——那份稿子和这一页必须是同一套
+       时间点，否则排练时对齐的是 A，答辩时说的是 B。 -->
+  <div id="cueDeck" class="cue-deck" hidden aria-hidden="true">
+    <span class="cue-clock" id="cueClock">0:00</span>
+    <span class="cue-seg" id="cueSeg">按空格开始</span>
+    <span class="cue-track"><i class="cue-fill" id="cueFill"></i></span>
+    <span class="cue-note" id="cueNote">共 5:00</span>
+  </div>
   <script src="/static/identity.js"></script>
   <script src="/static/common.js"></script>
   <script src="/static/stage.js" defer></script>

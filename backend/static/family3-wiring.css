@@ -1,0 +1,835 @@
+/* 家人端设计三（`/family3`）接线所需的样式。只加不改，排在 `style-01.css` 之后。
+ *
+ * 交付包里没有「刚才那一下成了没有」的位置，也没有「确认接力」这个按钮——
+ * 后者是有意新增的：原来的「查看并确认这件事」一次点击就该把钱付掉，
+ * 而本项目的 P0 不允许一次点击既是查看又是执行。查看和确认必须是两个动作。
+ */
+
+/* ---- 回执 / 状态 ---------------------------------------------------------- */
+
+.f3-notice {
+  margin: 0 0 12px;
+  padding: 11px 15px;
+  border-left: 2px solid #496f60;
+  background: rgba(255, 253, 247, .9);
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #5b5044;
+}
+.f3-notice:empty { display: none; }
+
+/* 照护中心那一屏的提示。
+ *
+ * `#f3Notice` 原先固定插在 `#familyMain` 前面，而照护屏显示时 `#familyView`
+ * 整棵子树是 `hidden`——那一侧按「×」、提交「生成」、加载失败，屏幕上一个字都没有。
+ * 现在 `ensureNotice()` 会把它搬到 `#careTabs` 前面，而 `.care-tabs` 是
+ * `position:absolute`（`style-01.css:139`），插在它前面不会把它顶下去，
+ * 所以这一态自己定位：和标签行同一条左右边界，压在它下面一行。 */
+/* 编辑器开着的时候把气泡抬到底栏之上。
+ *
+ * `.bubble-flow` 是 `position:absolute; z-index:7`（`style-01.css:1217`），
+ * 它自己就是一个层叠上下文——`.flow-editor` 的 `z-index:10` 只在气泡内部排序，
+ * 整个气泡连编辑器一起落在 `.dock`（`z-index:8`）之下。而编辑器 `bottom:-58px`
+ * 挂在气泡下沿之外，正好进了底栏那一条。1280×720 实测三个按钮的中心点：
+ *
+ *     elementFromPoint(「生成」)   -> SPAN.icon        底栏按钮里的图标
+ *     elementFromPoint(「取消」)   -> NAV.dock
+ *     elementFromPoint(「提给他」) -> BUTTON.clickable  底栏的按钮
+ *
+ * 交付包自带的那张「生成 / 取消」一样点不到，这是先前就在的缺陷。
+ * 闸门没看见是因为它用 `element.click()` 派事件，而合成点击**不做命中测试**。
+ *
+ * 9：刚好压过底栏的 8，低于 10 以上所有覆盖层（`.app-switch` 50、过场 999+）。 */
+.bubble-flow.flow-editing { z-index: 9; }
+
+.f3-notice-care {
+  position: absolute;
+  left: 35vw;
+  right: 4vw;
+  top: calc(4vh + 48px);
+  z-index: 9;
+  margin: 0;
+}
+.f3-notice[data-tone="warning"] { border-left-color: #a8762d; }
+.f3-notice[data-tone="bad"]     { border-left-color: #a74e40; color: #7a3f34; }
+
+/* ---- 第二步：确认接力 ------------------------------------------------------
+ *
+ * 和「查看并确认这件事」长得不一样是**故意**的：它是这一页唯一会真的动钱的
+ * 控件，不该和旁边那个只读的按钮看起来是同一类东西。 */
+
+.f3-approve {
+  margin-left: 10px;
+  padding: 12px 20px;
+  border: 1px solid rgba(167, 78, 64, .5);
+  border-radius: 4px;
+  background: rgba(167, 78, 64, .07);
+  color: #8c3b2e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  /* 触控目标 ≥48px：这是这一页最不该按错的按钮。 */
+  min-height: 48px;
+}
+.f3-approve:hover { background: rgba(167, 78, 64, .12); }
+.f3-approve:focus-visible { outline: 2px solid #a74e40; outline-offset: 2px; }
+
+/* ---- 出口 ------------------------------------------------------------------
+ * 这一页原先没有任何回首页的路：顶部只有「家人端 / 照护中心」两个页内切换，
+ * 底栏五格也全在页内。 */
+
+.v3-home {
+  margin-left: 12px;
+  align-self: center;
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(168, 118, 45, .28);
+  color: #6a5b49;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.v3-home:hover { color: #5e4324; }
+.v3-home:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 加一份药 --------------------------------------------------------------
+ *
+ * 「用药」那一屏原先只读，而它的小结里写着「可以在老人端或这里添加」——
+ * 两边都不能。全仓没有任何界面能建一份用药计划，`POST /v4/medications`
+ * 只有测试在调。这段样式给的是那个真的能加的入口。
+ *
+ * 表单默认收起：这一屏是给人「看今天的药有没有吃」的，加药是偶尔一次的事，
+ * 摊开来会把主要内容挤下去。 */
+
+.f3-med-add {
+  margin: 14px 0 0;
+  padding: 12px 18px;
+  border: 1px dashed rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .7);
+  color: #46604f;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-med-add:hover { background: #fff; border-style: solid; }
+.f3-med-add:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-med-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .3);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .92);
+}
+.f3-med-form label {
+  display: grid;
+  gap: 5px;
+  font: 400 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-med-form input {
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 105, 88, .38);
+  border-radius: 3px;
+  background: #fffdf7;
+  font: 400 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #4a4137;
+  min-height: 48px;
+}
+.f3-med-form input:focus-visible { outline: 2px solid #496f60; outline-offset: 1px; }
+/* 这一句不是装饰：家人按下「加上」之后**什么都不会发生**，直到老人点头。
+ * 不写在按钮旁边，她会以为药已经开始提醒了。 */
+.f3-med-form .f3-med-hint {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-med-form .f3-med-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.f3-med-form button {
+  padding: 12px 22px;
+  border: 1px solid rgba(73, 111, 96, .5);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-med-form button.f3-med-cancel {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-med-form button:hover { background: rgba(73, 111, 96, .15); }
+.f3-med-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 优活给家人的消息 --------------------------------------------------------
+ *
+ * `/v2/notifications` 是家人端一的一整格，设计三一次都不调。缺的不是
+ * 「一个列表」：`approval_required` / `reminder_escalated` 这几条正是
+ * **要子女动手**的那些——不接，这一版的家人永远不知道有人在等他。
+ *
+ * 空的时候整格不占位（`hidden`），而不是留一句「暂无通知」。
+ *
+ * ## 位置：它此前**压在身份岛上**
+ *
+ * 这一格是 `#familyFlow.insertAdjacentElement('afterend', …)` 插进去的，而
+ * `#familyFlow` 是绝对定位的——于是这个兄弟节点掉进 `.workspace` 的普通流，
+ * 从左上角 (0, 14) 开始铺满整幅宽度。实测 1440×900：它的盒子是
+ * `x=0 y=14 w=1440 h=131`，而身份岛从 `y=40`（4.5vh）开始——
+ * 「下午好 · 女儿」和主标题被整段消息压在下面，两层字叠在一起。
+ * 截图上看得很清楚。
+ *
+ * 挪到主舞台那一列的顶上：左边让开身份岛（35vw），右边让开
+ * 「返回首页 / 家人端 / 照护中心」（21vw），高度落在舞台标题（约 y=90）之上。
+ * 展开之后往下盖住舞台，那是按下去之后的事，给它不透明底色和 z-index。 */
+
+.f3-notices {
+  position: absolute;
+  left: 35vw;
+  /* 右边让开的量**不能只写比例**。
+   * ......................................................................
+   * `.app-switch`（「家人端 / 照护中心」+「返回首页」）是**固定 278px 宽**、
+   * 右对齐（实测 x：1024 上 720..998、1280 上 976..1254、1440 上 1136..1414）。
+   * 而这里原来写 `right:21vw`——比例是跟着视口缩的，视口一窄，
+   * 21vw 让出来的空间就**小于那个固定宽度**，两者开始重叠：
+   *
+   *     1024×768   f3-notices 358..809  vs  app-switch 720..998  → 重叠 89px
+   *     1280×800                448..1011            976..1254  → 重叠 35px
+   *     1440×900                504..1138           1136..1414  → 重叠  2px
+   *
+   * 后果是这一格右上角的「收起」按钮被「返回首页」压住：1024×768 上
+   * `elementFromPoint` 命中的是 `v3-home`，**点不到**
+   * （滚到视口中央之后仍然如此，不是滚动可达那一类）。
+   *
+   * 所以取 `max(21vw, 316px)`：316 = 278 宽 + 26 右距 + 12 余量。
+   *
+   * **只在上图那三档宽屏上这么做**。再往下（≤999px）这一格本来就和
+   * `.app-switch` 重叠着（760 上重叠 144px），可那一档从来没压到过控件——
+   * 而按 316 让会让这一格从 451px 挤到 178px，反而把「让他记住」挤坏
+   * （实测 760×812 上 `elementFromPoint` 命中 `SPAN`）。
+   * 修一处不能换来另一处，所以窄屏退回 `21vw`。见下面那条 media query。 */
+  right: max(21vw, 316px);
+  top: 8px;
+  z-index: 12;
+  padding: 10px 18px 12px;
+  border: 1px solid rgba(168, 118, 45, .28);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .96);
+  box-shadow: 0 10px 26px rgba(91, 66, 39, .07);
+}
+.f3-notices .f3-fold-body {
+  max-height: 56vh;
+  overflow: auto;
+}
+
+/* 窄屏上这一格**不许长过身份开关**。
+ *
+ * 上面那段注释里定的位置是「左边让开身份岛 35vw、右边让开 21vw、从 y=8 往下铺」，
+ * 那是按**两栏**的桌面画的。窄屏上身份岛仍是 390px 宽、铺满整幅（它有
+ * `min-width`，量出来 375/480/600/680/760 五个宽度上都是 390），
+ * 于是 35vw 这条线落在身份岛**里面**，而这一格从 y=8 一路铺下去：
+ *
+ *     375×812   这一格 [131,8,296,515]（内容换行，高 507）
+ *               身份开关「无忧伴」[128,194,205,242] —— 25 个取样点 **0** 个打得到自己
+ *               「＋」[226,367,274,415]              —— 25 个取样点 **0** 个打得到自己
+ *     480×812   开关 15/25，「＋」 0/25
+ *     600×812   这一格降到 348 高，两个都 25/25——**那是撞运气，不是设计**：
+ *               只要通知多两条，56vh 的上限照样把它铺过 y=367。
+ *
+ * 改法只做一件事：给这一格本身一个高度上限，让它在窄屏上**只能更矮**。
+ * 矮只会减少它盖住的面积，不可能盖出新的地方——这是选它而不是改 `left/right`
+ * 或改成静态定位的原因（那两种都会把落点挪到别处，等于换个地方压）。
+ *
+ * 172px 是这么来的：身份开关的上沿在 y≈188，这一格从 y=8 起，留 8px 空隙。 */
+
+/* 上面 `right: max(21vw, 316px)` 那条**只在宽屏上要**。
+ * ≤999px 时这一格按 316px 让会被挤成 178px 宽（760×812 实测），
+ * 反而把「让他记住」挤到点不到。那一档本来就没压到过控件，退回 21vw。 */
+@media (max-width: 999px) {
+  .f3-notices { right: 21vw; }
+}
+
+@media (max-width: 560px) {
+  .f3-notices {
+    max-height: 172px;
+    overflow: auto;
+  }
+  .f3-notices .f3-fold-body {
+    max-height: none;
+    overflow: visible;
+  }
+}
+.f3-notice-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid rgba(120, 105, 88, .14);
+  font-family: "KaiTi", "STKaiti", "Kaiti SC", serif;
+}
+.f3-notice-row:first-of-type { border-top: 0; }
+.f3-notice-row b { font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif; color: #5b5044; }
+.f3-notice-row span { font: 400 14px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif; color: #6a5b49; }
+.f3-notice-row time { font: 400 12px "KaiTi", "STKaiti", "Kaiti SC", serif; color: #9c8d78; }
+/* 标题、正文、时间占左列；「知道了」跨三行放在右边，不把行拆成两段。 */
+.f3-notice-row > b,
+.f3-notice-row > span,
+.f3-notice-row > time { grid-column: 1; }
+.f3-notice-row > button,
+.f3-notice-row > i { grid-column: 2; grid-row: 1 / -1; }
+.f3-notice-row[data-read="1"] b { color: #8a7a63; font-weight: 400; }
+.f3-notice-read {
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1px solid rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.f3-notice-read:hover { background: rgba(73, 111, 96, .16); }
+.f3-notice-read:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+.f3-notice-done {
+  font: 400 13px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #9c8d78;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* ---- 记一次已吃 / 这次没吃 ---------------------------------------------------
+ *
+ * `/care` 有这两个动作，设计三的照护屏一个都没有——能看到「在吃什么药」，
+ * 却记不了「今天这一顿吃没吃」，而扣库存和余量预警全挂在这条动作上。
+ *
+ * 不塞进 `.medicine-seal`：那两张卡的位置由 CSS 的 `med-a` / `med-b` 定死。 */
+
+.f3-dose { margin: 16px 0 0; display: grid; gap: 8px; }
+.f3-dose-head {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-dose-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid rgba(120, 105, 88, .22);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .8);
+}
+.f3-dose-row b {
+  flex: 1 1 7em;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #5b5044;
+}
+.f3-dose-row button {
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1px solid rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+}
+.f3-dose-row button.f3-dose-skip {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-dose-row button:hover { background: rgba(73, 111, 96, .16); }
+.f3-dose-row button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 记一次身体数据 ----------------------------------------------------------
+ * 身体那一屏此前只读：拉出来列一列，没有任何入口能新增一条。 */
+
+.f3-body-add {
+  margin: 14px 0 0;
+  padding: 12px 18px;
+  border: 1px dashed rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .7);
+  color: #46604f;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-body-add:hover { background: #fff; border-style: solid; }
+.f3-body-add:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-body-form {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .3);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .92);
+}
+.f3-body-form label {
+  display: grid;
+  gap: 5px;
+  font: 400 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-body-form input {
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 105, 88, .38);
+  border-radius: 3px;
+  background: #fffdf7;
+  font: 400 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #4a4137;
+  min-height: 48px;
+}
+.f3-body-form input:focus-visible { outline: 2px solid #496f60; outline-offset: 1px; }
+.f3-body-form .f3-body-hint {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-body-form .f3-body-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.f3-body-form button {
+  padding: 12px 22px;
+  border: 1px solid rgba(73, 111, 96, .5);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-body-form button.f3-body-cancel {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-body-form button:hover { background: rgba(73, 111, 96, .15); }
+.f3-body-form button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 照护屏上的折叠卡：固定安排 / 就医安排 -----------------------------------
+ *
+ * 七个子屏都是 `position:absolute; inset:0` 的**定高**盒子（实测 1440×900 下
+ * 907×738），里面的美术件——节律环、水纹图、药卷轴——也全是绝对定位的，
+ * 整屏没有滚动。往里塞一整张列表只能盖在美术件上，所以这两块默认折叠：
+ * 摊在外面的只有一行摘要，而那一行本身要能回答「有没有、有几件」。
+ *
+ * ## 先把在流里的那几块从标题下面挪开
+ *
+ * `.care-substage` 的 `padding-top` 是 68px，而 `.substage-head` 是
+ * `position:absolute; top:3%`，占到约 99px——绝对定位的兄弟不参与流，
+ * 于是流里的第一个孩子从 68px 开始，**直接压在标题的第三行上**。
+ * 实测 1440×900：`.f3-med-add` 的盒子是 `y=145..193`，`.substage-head` 是
+ * `y=85..162`，压掉 17px；截图上「1 种长期用药，明细见下。」和
+ * 「给老人加一份药」两行字叠在一起。
+ *
+ * 这件事此前没人看见，因为整个子屏的有效 opacity 是 0（见下一段）。
+ * padding 不挪绝对定位的孩子，所以把它加大只影响流里的那几块。 */
+
+#careView .care-substage { padding-top: 112px; }
+
+/* ## 流里的这几块要**画在美术件上面**
+ *
+ * `.rhythm-node` `.body-metric` `.medicine-seal` 都是绝对定位、而且都没写
+ * z-index——按层叠顺序，定位元素画在普通流块盒的上面，跟 DOM 里谁在前面无关。
+ * 实测（截图）：「起床」那颗气泡糊在固定安排那一行的「先不提醒」上，
+ * 「早晨量了血压:132/84」压在就医安排第一行的院名上。两处都是字叠字。
+ *
+ * `position:relative` + z-index 把它们提到定位元素这一层。9 是因为
+ * `.substage-head` 占了 8，而标题在这几块**上面**，不该被盖。 */
+#careView .f3-fold,
+#careView .f3-med-add,
+#careView .f3-med-form,
+#careView .f3-dose,
+#careView .f3-body-add,
+#careView .f3-body-form {
+  position: relative;
+  z-index: 9;
+}
+
+.f3-fold {
+  margin: 14px 0 0;
+  padding: 10px 16px 12px;
+  border: 1px solid rgba(168, 118, 45, .28);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+  box-shadow: 0 10px 26px rgba(91, 66, 39, .06);
+}
+.f3-fold-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.f3-fold-bar > b {
+  font: 700 17px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #5e4324;
+}
+.f3-fold-sum {
+  flex: 1 1 12em;
+  font: 400 14px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-fold-toggle {
+  min-height: 48px;
+  padding: 11px 20px;
+  border: 1px solid rgba(120, 105, 88, .35);
+  border-radius: 4px;
+  background: transparent;
+  color: #5b5044;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.f3-fold-toggle:hover { background: rgba(73, 111, 96, .1); }
+.f3-fold-toggle:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-fold-body {
+  /* 展开之后盖在美术件上——那是按下去之后的事。上限留在屏内，自己滚。 */
+  max-height: 44vh;
+  overflow: auto;
+  margin-top: 8px;
+}
+.f3-fold-rows { display: grid; gap: 8px; }
+.f3-fold-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid rgba(120, 105, 88, .22);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .86);
+}
+.f3-fold-row > b {
+  flex: 1 1 14em;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #5b5044;
+}
+.f3-fold-row > span {
+  flex: 1 1 100%;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+/* 已暂停 / 已结束的那几行**留在原地**，只是退到后面去：撤掉它们，
+ * 家人就看不出「我上周暂停过它」，而那正是她要找的东西。 */
+.f3-fold-row[data-paused="1"] { background: rgba(246, 242, 233, .7); }
+.f3-fold-row[data-paused="1"] > b { color: #8a7a63; }
+
+.f3-fold-act {
+  min-height: 48px;
+  padding: 11px 18px;
+  border: 1px solid rgba(120, 105, 88, .35);
+  border-radius: 4px;
+  background: transparent;
+  color: #5b5044;
+  font: 700 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.f3-fold-act:hover { background: rgba(73, 111, 96, .12); }
+.f3-fold-act:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+/* 「确认取消，连提醒一起撤」和它旁边那个只读的按钮长得不一样是**故意**的：
+ * 它是这一格唯一撤不回来的动作。关键动作 ≥56px。 */
+.f3-visit-sure {
+  min-height: 56px;
+  border-color: rgba(167, 78, 64, .5);
+  background: rgba(167, 78, 64, .07);
+  color: #8c3b2e;
+  font-size: 15px;
+}
+.f3-visit-sure:hover { background: rgba(167, 78, 64, .14); }
+.f3-visit-sure:focus-visible { outline: 2px solid #a74e40; outline-offset: 2px; }
+
+.f3-fold-add {
+  margin: 12px 0 0;
+  padding: 12px 18px;
+  border: 1px dashed rgba(73, 111, 96, .45);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .7);
+  color: #46604f;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-fold-add:hover { background: #fff; border-style: solid; }
+.f3-fold-add:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+.f3-fold-form {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .3);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+}
+.f3-fold-form label {
+  display: grid;
+  gap: 5px;
+  font: 400 14px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #6a5b49;
+}
+.f3-fold-form input,
+.f3-fold-form select {
+  padding: 11px 12px;
+  border: 1px solid rgba(120, 105, 88, .38);
+  border-radius: 3px;
+  background: #fffdf7;
+  font: 400 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #4a4137;
+  min-height: 48px;
+}
+.f3-fold-form input:focus-visible,
+.f3-fold-form select:focus-visible { outline: 2px solid #496f60; outline-offset: 1px; }
+.f3-fold-hint {
+  margin: 0;
+  font: 400 13px/1.7 "KaiTi", "STKaiti", "Kaiti SC", serif;
+  color: #8a7a63;
+}
+.f3-fold-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.f3-fold-buttons button {
+  padding: 12px 22px;
+  border: 1px solid rgba(73, 111, 96, .5);
+  border-radius: 4px;
+  background: rgba(73, 111, 96, .08);
+  color: #3d5e4e;
+  font: 700 15px "KaiTi", "STKaiti", "Kaiti SC", serif;
+  cursor: pointer;
+  min-height: 48px;
+}
+.f3-fold-buttons button.f3-fold-cancel {
+  border-color: rgba(120, 105, 88, .35);
+  background: transparent;
+  color: #6a5b49;
+}
+.f3-fold-buttons button:hover { background: rgba(73, 111, 96, .15); }
+.f3-fold-buttons button:focus-visible { outline: 2px solid #496f60; outline-offset: 2px; }
+
+/* ---- 照护中心的六个子屏此前**一个像素都没显示过** ---------------------------
+ *
+ * 交付包的 DOM 是这么嵌的（`family-v3.html`）：
+ *
+ *     <div class="care-panel care-panel-overview active" data-care-page="overview">
+ *       <div id="fiveVeinStage">…五脉…</div>
+ *       <div class="care-panel" data-care-page="today">…</div>     ← 在概览**里面**
+ *       <div class="care-panel" data-care-page="med">…</div>
+ *       …另外四块…
+ *     </div>
+ *
+ * 而 `script-09.js` 的 `showCarePage()` 是「给命中的那一块加 `.active`、
+ * 其余全部去掉」。点「用药」时概览失去 `.active` → `.care-panel{opacity:0}`
+ * 生效 → **它的子节点全部跟着没了**：opacity 不是继承属性，是合成属性，
+ * 子节点写多少个 `opacity:1` 都撤不回父节点那一层。
+ *
+ * 实测（1440×900，Chrome headless，沿父链把 opacity 连乘）：
+ *
+ *     概览这一屏          overview 有效 opacity 1
+ *     点「用药」之后      med 自己 opacity 1、visibility visible
+ *                        **有效 opacity 0**，被 `.care-panel-overview op=0` 压掉
+ *     `.medicine-seal`   有效 opacity 0，而 `elementFromPoint` 仍然命中它
+ *
+ * 最后那一行是最糟的组合：**看不见，但点得到**。`.f3-med-add`（给老人加一份药）、
+ * `.f3-dose`（记一次已吃）、`.f3-body-add`（记一次身体数据）三个入口
+ * 从装上那天起就在这一层下面，从来没有在屏幕上出现过——而每一道闸门都是绿的，
+ * 因为它们量的是元素自己的计算样式，不是沿父链的有效可见度。
+ *
+ * 不动 DOM 的修法：概览这一格本来就只是个容器，让它**始终**可见，
+ * 再在它自己没被选中的时候把它自己的内容（五脉那一大张图）收起来。
+ * 于是「谁被选中显示谁」这条语义没变，只是不再连坐它的兄弟。
+ */
+#careView .care-panel-overview { opacity: 1; visibility: visible; }
+#careView .care-panel-overview:not(.active) > .five-vein-stage {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 接线会把用不上的节点 `hidden`。这份 CSS 里有 `.medicine-seal{opacity:1}`
+ * 这类"最终态必须可见"的规则，它们会盖掉 `[hidden]` 的默认 `display:none`——
+ * 那样「隐藏多余的卡片」就变成了「留下一张写着别人事情的卡片」。 */
+.workspace [hidden] { display: none !important; }
+
+/* ---- 顶层那两个视图切换按钮要压在工作区上面 --------------------------------
+ *
+ * 实测（1440×900，真实 `Input.dispatchMouseEvent`）：家属打开 `/family3`
+ * 之后，用手指**点不动「家人端」和「照护中心」**——那是这一页仅有的两个
+ * 顶层入口，点不动就意味着整页只剩一半。
+ *
+ *     .app-switch   position:absolute  z-index:5   box 1136,20  278×44
+ *     #familyView   position:absolute  z-index:5   box    0,0  1440×900
+ *
+ * 两者 z-index 相同，**平手时按文档顺序决定**，而 `#familyView` 在 HTML 里
+ * 排在 `.app-switch` 后面——工作区画在按钮上面，整屏罩住。
+ * `elementsFromPoint` 在按钮中心拿到的第一个就是 `SECTION#familyView`，
+ * 真实点击到达按钮 **0 次**。
+ *
+ * 为什么四十多轮没发现：所有仪器都用 `element.click()`，
+ * 而合成事件不做命中测试——它直接派到目标上，盖在上面的东西一概不存在。
+ * 我自己这一轮也是靠 `.click()` 在两个视图之间切来切去的。
+ *
+ * 只抬 `.app-switch`，不动工作区：它是页面 chrome，本来就该在内容之上；
+ * 改工作区的层级会牵动它里面那一整套绝对定位的装饰。
+ *
+ * ## 为什么必须带 `!important`
+ *
+ * 交付包自己是这么写的（同一张 `style-01.css`，前后两条）：
+ *
+ *     .app-switch                              { z-index: 50 }
+ *     .workspace, .app-switch, .motion-replay  { z-index: 5 !important }
+ *
+ * 也就是说**它原本给了切换条 50**（在内容之上，那是对的），然后又用一条
+ * 通配的 `!important` 把三者一起拍到第 5 层。拍平之后谁在上面就只由
+ * 文档顺序决定，而工作区排在后面。
+ *
+ * 第一版我写的是普通 `z-index: 6`：CSSOM 里查得到这条规则，
+ * 计算值却仍然是 5——**规则写进去了不等于它赢了**。
+ * 只有同样带 `!important`、且加载在后面，才压得住。 */
+.app-switch { z-index: 6 !important; }
+
+/* 桌宠「小优」不再吃点击。理由与量到的数字见 `elder3-wiring.css` 同名那一段
+ * ——这一页上它的表现是把整宽控件的右侧约 56px 吃掉（家人端那一轮实测）。
+ * 一个装饰元素永远不该吃掉一次真实控件的点击。 */
+.youhuo-robot-mascot,
+.youhuo-robot-canvas { pointer-events: none !important; }
+
+
+/* ===== 待办 / 我的：右边那两块行区 =====================================
+ *
+ * 交付包 `family3/style-01.css:113-119` 给了 `.planner .date` 与 `.history .row`
+ * 的样式，也给了两个容器的绝对定位，但没给三件事：
+ *
+ *   1  能滚。`.mine-stage .history` 是 `overflow:hidden` 的定高盒子
+ *      （top:20% bottom:18%，1280×800 下约 490px，一行约 66px → 放得下 7 行）。
+ *      不给内层一个滚动区，第 8 条起就是**被裁掉而不是被折叠**——
+ *      屏幕上看不出还有更多。
+ *   2  `hidden` 真的不显示。两个容器的定位规则挂在 `.todo-stage` /
+ *      `.mine-stage` 上，`today` 那一屏没有那个祖先 class，它们会掉回常规流
+ *      压住 `.center-message`。UA 的 `[hidden]{display:none}` 够用，
+ *      但下面 `display:flex` 那条会盖掉它——所以显式写一条更高特指度的。
+ *   3 `.history` 的标题。交付包只有 `.planner h4`。
+ *
+ * `min-height:0` 不是多余的：flex 列里的子项默认 `min-height:auto`，
+ * 不写这一条它会顶开父盒子而不是自己滚——盒子有定高也一样。
+ */
+.todo-stage .planner,
+.mine-stage .history { display: flex; flex-direction: column; }
+.main-stage .planner[hidden],
+.main-stage .history[hidden] { display: none; }
+.main-stage .stage-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.history h4 { margin: 0 0 10px; color: var(--tea); font-size: 22px; }
+/* 末尾那句「另有 N 条」不是一条记录，不给它分隔线。 */
+.history .row.more,
+.planner .date.more { border-bottom: none; }
+.history .row.more span,
+.planner .date.more span { font-style: italic; }
+
+/* 待办那一屏：正文盒右边缘从 43% 收到 45%，让它和 `.planner` 不再重叠。
+ *
+ * 交付包的算术（相对 `.main-stage`，实测 787px 宽）：
+ *
+ *     .todo-stage .center-message   left:10% right:43%  ->  10% .. 57%
+ *     .todo-stage .planner          right:6% width:38%  ->  56% .. 94%   重叠 1%
+ *
+ *     .mine-stage .center-message   left:11% right:45%  ->  11% .. 55%
+ *     .mine-stage .history          right:6% width:39%  ->  55% .. 94%   正好接上
+ *
+ * 787px 的 1% 就是实测到的那 8px（正文右边缘 885，`.planner` 左边缘 877）。
+ * 「我的」那一组是对的，「待办」那一组差 1%。
+ *
+ * 这 8px 在 `.planner` 建出来之前**不可能被看见**——那一块不存在。所以它不是
+ * 这一轮改坏的，是这一轮才让它有后果：`.planner` 有 `border-left` 和
+ * `padding-left:26px`，正文最后一行会压在那条竖线上。
+ *
+ * 改正文而不改 `.planner`：后者的 `right/width` 和 `.history` 是配套的一对
+ * （6%/38% 对 6%/39%），动它会让两屏的竖线不在同一条竖直线上。
+ */
+.todo-stage .center-message { right: 45%; }
+
+
+/* 消息格里那一条「已经了结」的行。
+ *
+ * 为什么需要它：通知表只有 `read_at`，没有「已解决」。一笔「等家人确认」办完之后，
+ * 那条「需要您接力确认」原样留在收件箱里——标题、正文、按钮全都还像在等她动手。
+ * 实测演示态里两条一字不差、都未读，而其中一条的 `entity_id` 指着一笔
+ * `status=completed` 的事务。
+ *
+ * 压低对比而不是隐藏：它仍然是一条真实的历史记录（不许静默删内容），
+ * 只是不该再抢她的注意力。 */
+.f3-notice-row[data-settled="1"] { opacity: .72; }
+.f3-notice-row[data-settled="1"] > b { font-weight: 600; }
+.f3-notice-settled {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--jade, #356757);
+  white-space: nowrap;
+}
+
+
+/* 待办气泡里那个「×」，以及它问出来的两个按钮。
+   ==========================================================================
+   原先「×」是 11x11（`padding: 1px 6px`），点一下**直接**发
+   `POST /api/v1/reminders/{id}/cancel`——不问一句。而三条待办里有一条是
+   「下午四点吃降压药」：一次误点就是老人那天不会被提醒吃药。
+
+   同一屏上就医安排那一格的取消是两步，CSS 里还写着「关键动作 ≥56px」。
+   所以这里也改成两步，真正要点的那一下（「确认撤掉这条提醒」）走
+   `.f3-fold-act`，min-height 48px。
+
+   「×」本身提到 28px 就到头了：`.bubble-flow` 是紧凑的时间轴气泡，
+   塞不下 48px 的方块。**不假装它到了 48**——它现在只是「问一句」的入口，
+   不再是执行删除的那一下。 */
+.bubble-flow .flow-delete {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 6px;
+  line-height: 1;
+}
+.f3-flow-sure,
+.f3-flow-keep {
+  margin: 8px 6px 0 0;
+}
+.f3-flow-sure {
+  border-color: rgba(168, 90, 60, .55);
+  color: #8d4a2c;
+}
+
+/* ---- 触控目标的下限 ---------------------------------------------------------
+ *
+ * 实测（375×812 真手机视口）低于 48 的七个：
+ *
+ *     返回首页 44   家人端 44   照护中心 44
+ *     优活 35       无忧伴 35
+ *     ＋ 38         让他记住 38
+ *
+ * 对照 `/family2`：**0 个**。守规矩的是设计二那一对，不守的是设计三这一对
+ * （`/elder3` 那边同一批十二个，见 KNOWN_ISSUES 第 118 条）。
+ *
+ * 用 `min-height` 立一条硬地板，不靠加内边距——内边距会跟着字号缩放，
+ * 字号调小时又掉回 48 以下。
+ *
+ * `.app-switch` 那两个和 `.identity-island .mode` 那两个没有类名，
+ * 按容器定位；它们是**换整个应用**和**换整个身份**的开关，点错了代价不小。
+ */
+.v3-home,
+.app-switch > button,
+.identity-island .mode > button,
+.flow-add,
+.flow-remember {
+  min-height: 48px;
+}
+
+/* 「＋」是个图标按钮：高补够了，宽还是 38——高够宽不够，照样点不准。 */
+.flow-add {
+  min-width: 48px;
+}

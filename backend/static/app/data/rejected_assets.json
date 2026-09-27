@@ -1,0 +1,30 @@
+[
+  {
+    "id": "old_home_schedule_icons",
+    "reason": "旧裁片纵向坐标错误，圆形图标被截断；已按真实色块边界重扣"
+  },
+  {
+    "id": "old_recognition_steps",
+    "reason": "旧裁片混入“接下来会发生什么”文字；已下移到纯图标区域"
+  },
+  {
+    "id": "old_full_header_scenes",
+    "reason": "旧背景裁片包含品牌/标题/头像；正式包只保留无业务文字的山水碎片"
+  },
+  {
+    "id": "old_confirm_bottom_scene",
+    "reason": "旧裁片包含隐私提示文字；已改为页面最底部山河金线"
+  },
+  {
+    "id": "old_service_tile_scenes",
+    "reason": "旧裁片混入服务标题/箭头；已缩成卡片底部纯水墨条"
+  },
+  {
+    "id": "old_certificate_footer",
+    "reason": "旧裁片含底部提示与 Home Indicator；已重新裁纯山水段"
+  },
+  {
+    "id": "old_success_crane",
+    "reason": "旧鹤裁片顶部带 CTA 高光线；正式 alpha 已清掉顶部残留"
+  }
+]

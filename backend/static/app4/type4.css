@@ -1,0 +1,65 @@
+/* One type system across both modes, including embedded legacy controls. */
+:root { --app-font:'PingFang SC','HarmonyOS Sans SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif; }
+:is(.a4-elder,.a4-family,.app4-embedded) { --sans:var(--app-font); --kai:var(--app-font); }
+:is(.a4-elder,.a4-family,.app4-embedded) :is(h1,h2,h3,h4,p,span,small,strong,b,em,a,button,input,select,textarea,label,summary,li,dt,dd,div,section,time,output,code) { font-family:var(--app-font)!important; font-style:normal; letter-spacing:normal; }
+.a4-hero-name { font-size:28px; font-weight:600; line-height:1.45; }
+.a4-panel:not([data-panel='home']) > .a4-sec:first-child .a4-sec-head h2 { font-size:24px; font-weight:600; line-height:1.5; }
+.a4-sec-head h2,.a4-workspace h2,.a4-sheet-head strong { font-size:20px; font-weight:600; line-height:1.5; }
+.a4-card:has(#meName) strong { font-size:22px; font-weight:600; }
+.a4-loc h1 { font-size:22px; font-weight:600; }
+.a4-setting,.a4-family .a4-row .what,.a4-msg { font-size:16px; line-height:1.7; }
+.a4-elder .a4-setting,.a4-elder .a4-msg { font-size:18px; }
+.a4-slide strong,.a4-btn,.a4-row strong,.a4-grid button { font-weight:600; }
+.a4-setting small,.a4-row .what small,.a4-note { font-size:14px; line-height:1.7; }
+.a4-tabs button { font-size:14px; font-weight:500; }
+.a4-tabs button[aria-current='page'] { font-weight:600; }
+.app4-embedded body { font-size:16px; line-height:1.7; }
+.app4-embedded :is(h2,h3,.care-item-head,.care-block-head,.section-head h2,.receipt-title) { font-size:20px; font-weight:600; line-height:1.5; }
+.app4-embedded :is(.meta,.section-note,.receipt-proof,.receipt-foot-note,.habit-why,.care-period) { font-size:14px; line-height:1.7; }
+.app4-embedded :is(.care-lines,.care-empty,.notice,.notice-line,.receipt-step,.family-form label,.care-field,.data-out,.service-entry span) { font-size:16px; line-height:1.7; }
+.app4-embedded :is(button,input,select,textarea,summary) { font-size:16px; line-height:1.5; }
+.app4-embedded :is(strong,b) { font-weight:600; }
+.app4-embedded .care-reading { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+.a4-elder[data-font-tier='huge'] :is(.a4-setting,.a4-msg,.a4-row .what,.a4-empty) { font-size:24px; }
+.a4-elder[data-font-tier='huge'] :is(.a4-setting small,.a4-row .what small,.a4-note) { font-size:18px; }
+.app4-embedded body[data-font-tier='huge'] :is(.habit-text strong,.service-entry b,button,input,select,textarea,.data-out,.care-lines,.notice) { font-size:22px; }
+.app4-embedded body[data-font-tier='huge'] :is(.habit-why,.service-entry span,.meta) { font-size:18px; }
+/* Trust records: list first, one receipt at a time. */
+.trust-app * { box-sizing:border-box; }
+.trust-app .shell { padding:18px 16px 36px; }
+.trust-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.trust-toolbar p { margin:0; font-size:14px; color:#566672; }
+.trust-toolbar button,#trustBack { min-height:48px; border:1px solid #cbd9c4; border-radius:14px; padding:10px 14px; color:#28594f; background:#fffefa; }
+.trust-record { display:block; width:100%; padding:18px; margin:12px 0; border:1px solid #dcdacb; border-radius:23px; background:var(--surface-letter); text-align:left; color:#243c4b; box-shadow:0 3px 0 #e7e4d5; }
+.trust-record strong,.trust-record small { display:block; }
+.trust-record strong { margin:8px 0; font-size:18px; line-height:1.6; overflow-wrap:anywhere; }
+.trust-record small { color:#566672; font-size:14px; }
+.trust-record span { display:inline-block; padding:3px 9px; border-radius:8px; background:#ecf1e6; font-size:14px; }
+.trust-app .receipt-head { display:block; }
+.trust-app .receipt-title { margin:8px 0 16px; }
+.trust-app .receipt-eyebrow { color:#566672; margin:0; }
+.trust-app .receipt-offchain { font-size:14px; color:#566672; }
+.trust-app .receipt-steps { list-style:none; padding:0; margin:20px 0; }
+.trust-app .receipt-step { padding:14px 0; border-bottom:1px solid #e2e5db; }
+.trust-app .receipt-time { display:block; font-size:14px; color:#566672; margin-bottom:6px; }
+.trust-app .receipt-proof { margin:10px 0 0; }
+.trust-app .receipt-foot { display:flex; flex-direction:column; gap:12px; }
+.trust-app .pill { display:inline-block; border-radius:9px; padding:5px 10px; background:#edf2e6; }
+.trust-app .pill.bad { background:#fae9e3; color:#8c392d; }
+.trust-app .pill.warning { background:#fff0da; color:#785521; }
+.trust-app details > summary { min-height:48px; cursor:pointer; color:#28594f; padding:12px 0; }
+.trust-app .receipt-chain-row { overflow-wrap:anywhere; }
+.trust-app .receipt-chain code { font-size:13px; }
+.app4-embedded body[data-app-role='elder'] :is(.trust-record strong,.receipt-step,.habit-text strong,.service-entry b) { font-size:18px; }
+.app4-embedded body[data-app-role='elder'][data-font-tier='huge'] :is(.trust-record strong,.receipt-step,.habit-text strong,.service-entry b) { font-size:24px; }
+.app4-embedded body[data-app-role='elder'][data-font-tier='huge'] :is(.trust-record small,.trust-record span,.receipt-proof,.receipt-time,.receipt-foot-note) { font-size:18px; }
+/* Shared secondary text remains legible on pale cards in both roles. */
+:is(.a4-elder,.a4-family) :is(.a4-note,.a4-setting small,.a4-row .what small,.a4-hint,.a4-foot) {color:#465861;}
+.app4-embedded :is(.meta,.section-note,.habit-why,.receipt-proof,.receipt-foot-note,.care-period) {color:#465861;}
+/* Operation receipts have an explicit exit and do not cover small workspaces. */
+.dismissible-notice {display:flex;align-items:center;gap:8px;}
+.dismissible-notice[hidden] {display:none!important;}
+.dismissible-notice>span {flex:1;min-width:0;overflow-wrap:anywhere;}
+.dismissible-notice .notice-dismiss {flex:0 0 36px;width:36px;min-width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;cursor:pointer;}
+.dismissible-notice .notice-dismiss::before {content:'×';font-size:22px;}
+.app4-embedded .dismissible-notice {position:static!important;transform:none!important;inset:auto!important;width:auto!important;max-width:100%!important;margin:6px 0!important;padding:8px!important;box-sizing:border-box;box-shadow:none!important;}

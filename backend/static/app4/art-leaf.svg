@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
+  <!-- 轮播插画 · 吃药：一枚胶囊搁在两片叶子上，旁边一只小杯。 -->
+  <path d="M120 150 C120 100 150 70 200 64 C196 116 166 146 120 150 Z" fill="#fff" fill-opacity=".30"/>
+  <path d="M120 150 C150 110 176 90 200 64" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>
+  <path d="M126 152 C100 120 76 110 48 112 C58 144 90 158 126 152 Z" fill="#fff" fill-opacity=".22"/>
+  <g transform="rotate(-32 150 80)">
+    <rect x="118" y="66" width="72" height="28" rx="14" fill="#fff" fill-opacity=".92"/>
+    <path d="M154 66 h22 a14 14 0 0 1 0 28 h-22 z" fill="#fff" fill-opacity=".55"/>
+  </g>
+  <path d="M190 104 h26 l-4 40 a4 4 0 0 1 -4 4 h-10 a4 4 0 0 1 -4 -4 z" fill="#fff" fill-opacity=".6"/>
+  <path d="M192 118 h22" stroke="#fff" stroke-opacity=".9" stroke-width="2"/>
+</svg>

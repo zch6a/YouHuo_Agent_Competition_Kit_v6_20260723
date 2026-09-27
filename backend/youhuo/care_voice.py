@@ -98,7 +98,21 @@ _CUES: tuple[tuple[CareIntent, tuple[str, ...]], ...] = (
     (CareIntent.CONTACT_REACH, (
         r"(给|帮我给|帮我).{0,6}(打(个)?电话|联系|连线|通个话)",
         r"我要(找|联系).{0,4}(儿子|女儿|孙子|孙女|老伴|家人|家属)",
-        r"(儿子|女儿|孙子|孙女|家人)的?(电话|号码)是多少",
+        #: 原先只认「…的电话是多少」。实测「我儿子电话多少」（口语不带「的」「是」）认不出，
+        #: 没配大模型时回的是那段固定菜单。仍然要带一个问词（多少 / 几 / 啥 / 什么），
+        #: 「儿子电话打来了」这种讲事的话不许劫走。
+        r"(儿子|女儿|孙子|孙女|老伴|家人)的?(电话|手机|号码)(号码?|号)?(是)?(多少|几|啥|什么)",
+        # 光一句「联系家人」——**整句锚定**。
+        #
+        # 首页那排常说的话里，按钮上写的就是这四个字
+        # （`elder-v6.html`：`data-text="帮我联系家人"`，而**标签是「联系家人」**）。
+        # 按下去走的是 data-text，能用；对着麦克风照念按钮上的字，落到闲聊。
+        # 五个按钮里只有这一个照着说不管用。
+        #
+        # 不放宽上面第一条的引导词：`re.search` 是子串匹配，`(联系)` 一放开，
+        # 「我昨天联系家人了」也会被劫走、回她一串号码。所以这一条用 `^...$`
+        # 锁住整句，只认「联系家人」这种短命令。
+        r"^\s*(联系|找)(一下)?(家人|家属|儿子|女儿|孙子|孙女|老伴)\s*[。.!！]?\s*$",
     )),
     (CareIntent.CAPABILITY_HELP, (
         r"你(能|会|可以)(做什么|干什么|帮我做什么|干啥)",
@@ -116,10 +130,42 @@ _CUES: tuple[tuple[CareIntent, tuple[str, ...]], ...] = (
     # SafetyPolicy before we get here, so this is the non-urgent remainder.
     (CareIntent.SYMPTOM_MENTION, (
         r"(头|脑袋).{0,3}(晕|昏|沉|疼|痛)",
-        r"(腰|腿|胳膊|肩膀|脖子|后背|膝盖|关节|胃|嗓子).{0,3}(疼|痛|酸|麻|不舒服)",
+        #: ---- 这一组和 `companion` 的 BODY 那一组回答**同一个问题**，
+        #: 而决定那句回话的是**这一张**。第 312 条修的是另一张，
+        #: 于是同一个疼差一个字走三条路（实测，她的第一句话）：
+        #:
+        #:     我牙疼      -> 起一个**挂号任务**（`牙疼` 在挂号触发词里）
+        #:     我牙有点疼   -> 「我在听。您可以说「帮我挂号」…」**一张菜单**
+        #:     我腿有点疼   -> 「听着您不太舒服。我不能看病…」
+        #:
+        #: 中间那一条最糟：她说自己疼，回的是一张功能菜单，
+        #: **一个字都没提她不舒服这件事**。
+        #:
+        #: 这一轮把两张表对齐到**零例外**：companion BODY 那 26 条语料
+        #: 这边全认，而 companion 的阴性语料这边一条都不认。
+        #: 判据 `test_the_symptom_table_agrees_with_the_body_theme` 钉住它。
+        #:
+        #: 部位表补 `牙`；结果词补 `沉|僵|木`（BODY 那边早就有）。
+        #: 间隔从 `.{0,3}` 换成 `[^。！？，]{0,4}`——**放宽一格、同时收紧**：
+        #: 放宽是为了「腰这两天发沉」（腰 + 这两天发 + 沉，要四格）；
+        #: 收紧是因为 `.` 会吃掉逗号，跨逗号桥接会把「腿不疼，心里酸」
+        #: 读成身体，`companion.py` 为同一个理由写的就是 `[^。！？，]`。
+        #: 「牙膏」「牙刷」「买了个牙膏」不会命中（后面没有结果词）；
+        #: 「这门有点沉」「箱子有点沉」不会命中（门/箱子不是部位）。
+        r"(腰|腿|胳膊|肩膀|脖子|后背|膝盖|关节|胃|嗓子|牙)"
+        r"[^。！？，]{0,4}(疼|痛|酸|麻|不舒服|沉|僵|木)",
         r"咳嗽|发烧|发热",
-        r"没(有)?力气|浑身乏力|累得慌",
-        r"(胃口|食欲).{0,3}(不好|不行|差)",
+        #: `没劲` 原先不在（只有 `没力气`/`浑身乏力`），于是「浑身没劲」
+        #: 拿到那张菜单。**绑身体词**——「这电视剧没劲」「打牌没劲」
+        #: 是没意思，不是身体。`走不动`/`抬不起来`/`抬不动` 同样对齐 BODY。
+        r"没(有)?力气|浑身乏力|累得慌|走不动|"
+        r"抬不起来|抬不太起来|抬不动|"
+        r"(?:浑身|全身|身上|手脚).{0,3}没(?:劲|力)",
+        #: 结果那一侧插了字就不中：「胃口不太好」「胃口不怎么好」
+        #: 「胃口不大好」原先全不中。放成 `不.{0,2}好`——
+        #: 「胃口不错」「胃口挺好的」仍然放行（都没有「不…好」这个形）。
+        #: `不佳` 和 `没胃口` 也补上（BODY 那一组有 `没胃口`）。
+        r"(胃口|食欲).{0,3}(不.{0,2}好|不行|不佳|差)|没(有)?(胃口|食欲)",
         r"(睡不着|失眠).{0,4}(好几天|一直|老是)",
         r"(耳朵|眼睛).{0,3}(不舒服|难受|花|响)",
     )),
@@ -185,7 +231,7 @@ def answer_medication_today(
     if not plans:
         return CareAnswer(
             "您现在没有登记在册的用药计划，所以我这边查不到今天该吃什么药。"
-            "要登记的话，可以让家人在家属端添加。",
+            "要登记的话，可以让家人帮您添加。",
             "CARE_QUERY_MEDICATION_TODAY",
             {"plans": 0},
         )
@@ -323,6 +369,63 @@ def answer_medication_list(*, plans: list[Any]) -> CareAnswer:
     )
 
 
+#: payload 的键是**库里的列名**，不是人话。念给她听之前必须过这一关。
+#:
+#: 实测：家人端记一笔「血压 138/86 mmHg」，老人问「我最近血压怎么样」，
+#: 屏幕上回的是
+#:
+#:     最近一条记录是今天的「血压」,unit mmHg、value 138/86。
+#:
+#: `unit`、`value` 就是 `health_events_v4.payload` 的键。原来那段遍历 payload
+#: 直接 `f"{key} {value}"`，键是什么就念什么；那个字典变量叫 `readable`，
+#: 而它只筛了**值的类型**，从来没问过**键**是不是一句人话。
+#:
+#: 判据当时是绿的：`test_care_voice.py` 的 fixture 写的是中文键
+#: （`{"收缩压": 148, "舒张压": 86}`），而生产里唯一的写入方
+#: （`app_api.py` 的 `record_health_event`）写的是 `{"value", "unit"}`。
+_READING_KEYS = ("value", "unit")
+
+#: 最多念三项——她一次听得住的就这么多。原来那段也是 `[:3]`。
+_READING_MAX_FIELDS = 3
+
+
+def _is_plain_chinese(word: str) -> bool:
+    """这个键本身是不是一句中文（不含拉丁字母 / 下划线）。
+
+    不列白名单：白名单挡不住以后新加的英文键，而这条规则是结构性的——
+    内部字段名一律带拉丁字母，中文词一律不带。
+    """
+    return bool(word) and not re.search(r"[A-Za-z_]", word)
+
+
+def _reading_of(payload: dict[str, Any]) -> str:
+    """把一条健康记录念成人话。空字符串表示「没有可念的」。
+
+    逗号后面**必须接中文或 CJK 标点**：`restore_cjk_punctuation` 只在两侧都是
+    把全角「，」还原回来，而原来那一版右边是 `unit` 的 `u`，
+    于是屏幕上是个半角逗号。
+    """
+    def usable(value: Any) -> bool:
+        return (isinstance(value, (int, float, str))
+                and not isinstance(value, bool)
+                and str(value).strip() != "")
+
+    parts: list[str] = []
+    value = payload.get("value")
+    if usable(value):
+        unit = payload.get("unit")
+        parts.append(f"{value} {unit}".strip() if usable(unit) else f"{value}".strip())
+    for key, raw in payload.items():
+        if len(parts) >= _READING_MAX_FIELDS:
+            break
+        if key in _READING_KEYS or not usable(raw) or not _is_plain_chinese(key):
+            continue
+        parts.append(f"{key} {raw}")
+    if not parts:
+        return ""
+    return "，记的是" + "、".join(parts)
+
+
 def answer_health_recent(*, events: list[Any], now: datetime) -> CareAnswer:
     if not events:
         return CareAnswer(
@@ -332,20 +435,71 @@ def answer_health_recent(*, events: list[Any], now: datetime) -> CareAnswer:
         )
     latest = events[0]
     when = _day_phrase(_local_date(latest.event_at), _local_date(now))
-    detail = ""
-    readable = {
-        key: value
-        for key, value in latest.payload.items()
-        if isinstance(value, (int, float, str)) and not isinstance(value, bool)
-    }
-    if readable:
-        detail = "，" + "、".join(f"{key} {value}" for key, value in list(readable.items())[:3])
     return CareAnswer(
-        f"最近一条记录是{when}的「{latest.title}」{detail}。"
+        f"最近一条记录是{when}的「{latest.title}」{_reading_of(latest.payload)}。"
         f"我只是把记录念给您听，不做判断；身体上的事请以医生的说法为准。",
         "CARE_QUERY_HEALTH_RECENT",
         {"events": len(events), "latest_kind": latest.kind.value},
     )
+
+
+_PERIOD = re.compile(r"^(?:早上|上午|中午|下午|傍晚|晚上|夜里)")
+
+
+def _title_without_day(title: str, day: str) -> str:
+    """提醒标题开头已经说了**同一天**时，别再说一遍。
+
+    实测念出来是「明天11:00明天上午去社区量血压」：日子和钟点是这一句自己补的，
+    而标题（她设提醒时的原话）**自带**「明天上午」。只在标题开头的日子和补上去的
+    **是同一天**时才去掉（紧跟的「上午 / 下午……」一起去——前面的钟点已经说了），
+    标题里说的是别的日子就原样留着，那可能是她要记的内容。
+    """
+    text = str(title or "")
+    if day and text.startswith(day) and len(text) > len(day):
+        rest = _PERIOD.sub("", text[len(day):]).lstrip("，, ")
+        if rest:
+            return rest
+    return text
+
+
+_CN_DIGIT = {"零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+             "六": 6, "七": 7, "八": 8, "九": 9}
+_SPOKEN_CLOCK = re.compile(
+    r"^(早上|上午|中午|下午|傍晚|晚上|夜里)?([0-9]{1,2}|[一二两三四五六七八九十]{1,3})点"
+    r"(半|([0-9]{1,2}|[零一二三四五六七八九十]{1,3})分?)?")
+
+
+def _cn_number(text: str) -> int | None:
+    if text.isdigit():
+        return int(text)
+    if text == "十":
+        return 10
+    if "十" in text:
+        tens, _, ones = text.partition("十")
+        return (_CN_DIGIT.get(tens, 1) if tens else 1) * 10 + (_CN_DIGIT.get(ones, 0) if ones else 0)
+    return _CN_DIGIT.get(text) if len(text) == 1 else None
+
+
+def _title_without_clock(title: str, clock: str) -> str:
+    """标题开头又说了一遍**同一个钟点**（「下午四点吃降压药」前面已经念了 16:00），去掉。
+
+    09-26 跨角色走查念出来的是「今天16:00下午四点吃降压药」。只在那个钟点和前面补的
+    **是同一时刻**时才去——说的是别的时间（「下午五点吃药」配 16:00）那是数据对不上，
+    原样念出来比悄悄藏掉好。
+    """
+    m = _SPOKEN_CLOCK.match(title)
+    if not m:
+        return title
+    hour = _cn_number(m.group(2))
+    minute = 30 if m.group(3) == "半" else (_cn_number(m.group(4)) if m.group(4) else 0)
+    if hour is None or minute is None:
+        return title
+    if m.group(1) in ("下午", "傍晚", "晚上", "夜里") and hour < 12:
+        hour += 12
+    if m.group(1) == "中午" and hour < 3:
+        hour += 12
+    rest = title[m.end():].lstrip("，, ")
+    return rest if rest and f"{hour:02d}:{minute:02d}" == clock else title
 
 
 def answer_schedule_today(*, reminders: list[Any], now: datetime) -> CareAnswer:
@@ -355,11 +509,11 @@ def answer_schedule_today(*, reminders: list[Any], now: datetime) -> CareAnswer:
             "CARE_QUERY_SCHEDULE",
             {"count": 0},
         )
-    parts = [
-        f"{_day_phrase(_local_date(item.due_at), _local_date(now))}"
-            f"{_clock_time(item.due_at)}{item.title}"
-        for item in reminders
-    ]
+    parts = []
+    for item in reminders:
+        day = _day_phrase(_local_date(item.due_at), _local_date(now))
+        clock = _clock_time(item.due_at)
+        parts.append(f"{day}{clock}{_title_without_clock(_title_without_day(item.title, day), clock)}")
     return CareAnswer(
         f"接下来有{len(reminders)}件事：" + _join(parts) + "。",
         "CARE_QUERY_SCHEDULE",
@@ -383,6 +537,22 @@ def _spoken_phone(masked: str | None) -> str:
     return f"尾号{tail[-4:]}"
 
 
+def _who(contact: Any) -> str:
+    """怎么称呼这一位。名字和关系是同一个词时**不说两遍**。
+
+    种子数据里两位家人都是 `display_name == relation`（儿子/儿子、女儿/女儿），
+    而原来的写法是 `f"{name}（{relation}）"`——于是默认演示态下这句话一定是
+    「儿子（儿子）、女儿（女儿）」。
+    """
+    name = (getattr(contact, "display_name", "") or "").strip()
+    relation = (getattr(contact, "relation", "") or "").strip()
+    if not name:
+        return relation or "这一位"
+    if not relation or relation == name:
+        return name
+    return f"{name}（{relation}）"
+
+
 def answer_contact_reach(*, contacts: list[Any], text: str) -> CareAnswer:
     """We never place a call. Say who is reachable and hand it to the elder.
 
@@ -392,7 +562,7 @@ def answer_contact_reach(*, contacts: list[Any], text: str) -> CareAnswer:
     """
     if not contacts:
         return CareAnswer(
-            "我这边还没有存联系人。让家人在家属端添加之后，我就能告诉您找谁。",
+            "我这边还没有存联系人。让家人帮您添加之后，我就能告诉您找谁。",
             "CARE_QUERY_CONTACT",
             {"contacts": 0},
         )
@@ -401,14 +571,23 @@ def answer_contact_reach(*, contacts: list[Any], text: str) -> CareAnswer:
         wanted = next((c for c in contacts if c.display_name and c.display_name in text), None)
     if wanted is not None:
         return CareAnswer(
-            f"{wanted.display_name}（{wanted.relation}）的号码{_spoken_phone(wanted.phone_masked)}。"
+            f"{_who(wanted)}的号码{_spoken_phone(wanted.phone_masked)}。"
             "比赛演示版不能替您拨号，需要您自己拨，或者我给家人发条消息请他们回电。",
             "CARE_QUERY_CONTACT",
             {"matched": True},
         )
-    names = _join([f"{c.display_name}（{c.relation}）" for c in contacts])
+    names = _join([_who(c) for c in contacts])
+    #: 举例用**名单里第一位**的名字，她照着念就行。
+    #:
+    #: 上一版写的是「您说找谁，我把号码念给您」——照做（只说「儿子」）会掉到
+    #: 闲聊那一路：光一个称呼不会路由到联系人这一层，`answer_contact_reach`
+    #: 根本不会被调到。一句自己刚说出口的指令不成立，比不给指令更糟。
+    #:
+    #: 不去放宽分类器：让光秃秃的「儿子」全局命中，会把「我儿子昨天来过」
+    #: 这种话也劫走、回她一串号码。
+    sample = contacts[0].display_name or contacts[0].relation or "儿子"
     return CareAnswer(
-        f"您可以联系：{names}。您说找谁，我把号码念给您。",
+        f"您可以联系：{names}。您说「给{sample}打电话」，我把号码念给您。",
         "CARE_QUERY_CONTACT",
         {"matched": False, "contacts": len(contacts)},
     )

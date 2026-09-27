@@ -21,6 +21,10 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <!-- 美术卡片层。放在 pages.css **之后**：它要覆盖 `.panel` 那类通用白卡背景，
+       靠层叠顺序而不是 `!important`（交接包那份 pages.css 里累了 311 个）。 -->
+  <link rel="stylesheet" href="/static/art-cards-family.css" />
+<link rel="stylesheet" href="/static/control-states.css">
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -36,7 +40,14 @@
     然后访问 <b>http://127.0.0.1:8041/</b>
   </p>
   <main id="main" class="shell family-app">
-    <header class="fam-head">
+    <div class="phone-scroll">
+    <!-- 结论卡：整张卡的轮廓、纸张、山水就是 `art/shell/hero.svg` 本身，
+         HTML 只在它的留白区放那句结论。这是「SVG 参与 UI 结构」的落点——
+         不是白卡加圆角再往角上贴一朵花。
+
+         选 hero 卡壳给这里，是因为这一页第一屏只有一个结论要说；
+         整页最重的视觉分量应当落在唯一那句话上，而不是平摊给三张一样的白卡。 -->
+    <header class="fam-head art-framed" data-art-inlay="pine-crane" data-art-frame="primary" data-art-scene="crane">
       <div class="fam-head-text">
         <!-- 第一句话就是结论。
              这里原先是「家里今天」加一行「最后更新 08:14」——一个栏目名和一个时间戳，
@@ -105,8 +116,19 @@
       <div id="tasks"></div>
       <p class="section-note">缴费、身份认证和超时的事，会在这里等您点头。</p>
 
+      <!-- 日报那一段用锦鲤：两条鱼是「家里两个人」的关系意象，
+           对应工作单里「关系/家庭信息可使用花鸟或梅兰类局部元素」。
+           贴右下角（koi 是 246×207 的横构图），不压住 aria-live 的正文。 -->
       <h2 class="section-head">今天怎么样</h2>
-      <div id="dailyReport" aria-live="polite">正在生成……</div>
+      <!-- **用圆徽章，不用整幅竖画。**
+           这里原来是 `koi`。换高清素材之后 koi 从 246×207（wide）变成
+           941×1672（tall），让位规则跟着从「右下角 76px」变成「右侧 34%」——
+           而这一段的内容是 `family.js` 生成的，结构对不上
+           `.art-scene-host > :not(.art-scene)` 那条让位选择器。
+           实测：一整幅竖画贴在右边，把「今天还没过完，现在下结论太早」
+           从「太」字切断。
+           圆徽章是 56px 的定尺，不吃让位也不会切字。 -->
+      <div id="dailyReport" aria-live="polite" data-art-scene="lotus">正在生成……</div>
       <div class="metric-row">
         <div class="metric"><span class="metric-label">待您确认</span><strong id="mNeedYou">–</strong></div>
         <div class="metric"><span class="metric-label">进行中</span><strong id="mActive">–</strong></div>
@@ -127,13 +149,34 @@
       <h2 class="section-head">按日期</h2>
       <div id="calendar"></div>
       <h2 class="section-head">给他添一件事</h2>
-      <form id="reminderForm">
+      <!-- `novalidate` 是必需的，不是图省事。
+           下面两个字段都带 `required`，浏览器会在 submit 事件**之前**就拦下来，
+           于是 `createReminder()` 里那两句中文校验（「事项还没填。写一句他看得懂的话，
+           比如「复诊前准备病历」。」和「时间还没选。」）从来没机会运行——
+           驱动测试点「同步到他的手机」，结果是**什么都没发生**。
+
+           而浏览器自己弹的那个气泡是英文的（"Please fill out this field"），
+           这违反项目的硬约束：界面上不许出现英文。关掉原生校验，把话交回 JS。
+           `required` 保留：它还给读屏软件提供「这一项必填」的语义。 -->
+      <form id="reminderForm" novalidate>
         <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历" /></label>
         <label>时间<input id="reminderDue" type="datetime-local" required /></label>
         <label>到期后多少分钟没确认就通知我<input id="escalation" type="number" min="5" max="1440" value="30" /></label>
         <button type="submit"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13v8" /> <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" /> <path d="m8 17 4-4 4 4" /></svg><span>同步到他的手机</span></button>
       </form>
       <p class="section-note">添好之后，会在提前一天、提前半天和提前一小时各提醒他一次。</p>
+      <!-- 让优活记住一件事。**她本人点头之后才生效。**
+           在这一条之前 `/v3/memories/propose` 全仓零个前端消费者：老人端三个界面
+           都能点头、能不点、能逐条收回了，而没有任何界面能提出一条。
+           `novalidate` 与上面那个表单同一个理由：把话交回 JS，`required` 留给读屏。 -->
+      <h2 class="section-head">让优活记住一件事</h2>
+      <form id="memoryForm" novalidate>
+        <label>是什么<input id="memKey" required placeholder="例如：看电视的音量" /></label>
+        <label>具体内容<input id="memDetail" required placeholder="例如：晚上九点之后把声音调小" /></label>
+        <label>为什么<input id="memPurpose" required placeholder="例如：提醒时不影响邻居" /></label>
+        <button type="submit">问他要不要记住</button>
+      </form>
+      <p class="section-note">他会在自己那一页看到这一条；同意了优活才会用，半年之后自己忘掉。他随时可以收回。</p>
       <h2 class="section-head">通知</h2>
       <div id="notices"></div>
     </section>
@@ -146,8 +189,10 @@
       <p id="chain" class="notice"></p>
       <div id="audit"></div>
       <p class="section-note">这里是给家人看的说法。逐条记录和它们怎么被核对上的，在<a href="/trust" class="inline-tap">可信中心</a>。</p>
+      <!-- 「做过的事」用卷轴：这一段是审计记录，卷轴是它自己的语义，
+           不是随便找一张画贴上去。 -->
       <h2 class="section-head">其他</h2>
-      <div class="fam-links">
+      <div class="fam-links" data-art-scene="scroll-desk">
         <a href="/care" class="fam-link">照护档案</a>
         <a href="/trust" class="fam-link">可信中心</a>
         <!-- 「首页」从底部导航搬到这里，**不是删掉**。
@@ -164,6 +209,8 @@
     <!-- 四格，永远四格。清单在 `youhuo/surfaces.py:FAMILY_NAV`，闸门拿它核对三份
          markup 一致；每一格的 href 由 `href_from()` 算，`test_tabbar.py` 的
          `test_every_nav_cell_lands_somewhere_real` 保证它落在真实分区上。 -->
+    </div>
+
     <nav class="tabbar" aria-label="主要分区">
       <!-- 页内那三格带 `seg` + `data-section`，**不是可选的**。
            `initSections`（common.js）只更新 `.seg` 的 `is-current` / `aria-current`。
@@ -182,5 +229,9 @@
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/family.js"></script>
+    <!-- 排在业务 JS **之后**：`family.js` 会用 innerHTML 整块重写 `#tasks`
+         这些容器，先挂的图层会被冲掉。art-cards.js 自带 MutationObserver
+         补挂，但初次顺序对了能少一次重排。 -->
+    <script src="/static/art-cards.js"></script>
 </body>
 </html>

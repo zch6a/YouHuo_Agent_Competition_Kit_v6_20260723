@@ -82,7 +82,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-radius: 999px;
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-sm);
   color: color-mix(in srgb, var(--youhuo-blue-deep) 30%, var(--ink));
   background: color-mix(in srgb, var(--youhuo-blue) 15%, var(--surface));
@@ -109,7 +109,7 @@
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-3) var(--space-4); border-radius: var(--r-sm);
   background: var(--surface); border: 1px solid var(--line);
-  text-decoration: none; font-weight: 750; color: var(--ink-2);
+  text-decoration: none; font-weight: 700; color: var(--ink-2);
   box-shadow: var(--shadow-1);
   transition: transform .18s ease, border-color .18s ease;
 }
@@ -175,7 +175,7 @@ button {
   border: 1px solid transparent;
   border-radius: var(--r-md);
   padding: var(--space-3) var(--space-5);
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-base);
   line-height: var(--lh-snug);
   /* Chinese button labels are short and dense; a hair of tracking stops
@@ -224,7 +224,13 @@ button.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 14%, var(--danger-bg));
   border-color: var(--danger);
 }
-button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+/* 「按不了」那条搬到了 `control-states.css`，和「在办」放在一起。
+   这份文件只被 6 个页面加载，而 `disabled` 是 `once()` 在 10 个页面上都会设的——
+   写在这里的话，`/elder2` `/elder3` `/family2` `/family3` 上「按不了」看不见。 */
+
+/* 「正在办」那条样式**不在这个文件里**。
+   它搬到了 `busy-state.css`：`once()` 到达 10 个页面，而这个文件只到达 3 个（`/elder2` `/elder3` `/family2` `/family3` 各自只加载自己那份皮肤，
+   一处 `@import` 都没有）。写在这里的话，最要紧的四个界面上它根本不存在。 */
 
 label { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); font-weight: 700; color: var(--ink-2); font-size: var(--text-sm); }
 
@@ -378,7 +384,7 @@ pre {
   flex: 0 0 auto;
   padding: var(--space-2) var(--space-4);
   border-radius: 999px;
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-sm);
   /* 默认中性；下面按结论着色。颜色不是唯一通道——徽标里写的就是结论本身。 */
   background: var(--surface-3);
@@ -740,11 +746,28 @@ button.block { width: 100%; margin-top: var(--space-3); }
   font-size: var(--text-sm);
 }
 .empty-state svg { color: color-mix(in srgb, var(--role-accent) 55%, var(--ink-3)); }
-.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 750; }
+.empty-state strong { color: var(--ink-2); font-size: 16px; font-weight: 700; }
 
 /* --------------------------------------------------------------------------
    Design §4.4 — large central microphone
    -------------------------------------------------------------------------- */
+
+/* 桌宠「小优」不接点击。
+   ......................................................................
+   它是 `z-index: 1505` 的一块 canvas，沿屏幕底边漫游，**压住谁谁点不动**。
+   实测它在 `/elder3` 上挡住过「⌨ 用打字说」（Firefox 上唯一的输入通道），
+   在 `/family2` 上吃掉整宽控件右侧约 56px。画布 112×180，
+   而真正画了东西的只占 34.8%——近一半遮挡面积是全透明空白。
+
+   代价是「摸小优」和拖拽这两个交互没了，它变成纯装饰。**这是有意的取舍**：
+   一个装饰元素永远不该吃掉一次真实控件的点击。原来的规避办法
+   「先把它拖到左下角」在它不再挡任何东西之后也就不需要了。
+
+   放在这里而不是各页的接线表：`/elder` `/elder2` `/family` `/family2`
+   `/care` 都加载这一张，一处写完全覆盖。设计三那两个壳不加载全局表，
+   在它们自己的 `*-wiring.css` 里各有一份同样的规则。 */
+.youhuo-robot-mascot,
+.youhuo-robot-canvas { pointer-events: none !important; }
 
 .mic-stage { display: grid; place-items: center; gap: var(--space-3); margin: var(--space-6) 0 var(--space-2); }
 .mic-dial { position: relative; display: grid; place-items: center; width: 200px; height: 200px; }
@@ -756,6 +779,26 @@ button.block { width: 100%; margin-top: var(--space-3); }
   border: 2px solid color-mix(in srgb, var(--role-accent) 30%, transparent);
   inset: 12px;
   opacity: .55;
+  /* 这两个环**不接点击**。
+     ......................................................................
+     少了这一行的后果：真手指按不到麦克风。
+
+     它们是绝对定位的装饰，`::after` 又是最后一个子节点、`inset: 0` 让它的盒子
+     比按钮还大（200 vs 156），而 `#mic` 是 `z-index: auto`——环画在按钮上面，
+     整个把它罩住。
+
+     实测（真浏览器，三轮一致）：`#mic` 盒子里 15 个采样点 **15/15 命中
+     `div.mic-dial`**；正中心发一次真实的 `Input.dispatchMouseEvent`，
+     `#mic` 的 click 处理器触发 **0 次**，`data-activity` 停在 `idle`，
+     `#micHint` 一个字都没变。
+
+     语音是这个产品的主路径，而这一页没有第二个麦克风入口。
+
+     为什么四十多轮闸门一次都没红：全仓每个仪器（`check_page_runtime`、
+     `check_dead_controls`、各页判据）按控件都用 `element.click()`，
+     而**合成事件不做命中测试**——它直接在目标元素上派发，
+     盖在上面的东西一概不存在。这一整类缺陷对我们所有的仪器都是隐形的。 */
+  pointer-events: none;
   /* 状态通道不能用模式切换的令牌。
      ......................................................................
      `--mode-fade` 是 1000ms，为「优活 ↔ 无忧伴」那次身份 crossfade 定的（design §4.1
@@ -964,7 +1007,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 }
 .mic-big:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 22px 54px var(--role-glow), 0 2px 0 rgba(255,255,255,.42) inset; }
 .mic-big:active:not(:disabled) { transform: scale(.98); }
-.mic-hint { font-size: 17px; font-weight: 750; color: var(--ink-2); }
+.mic-hint { font-size: 17px; font-weight: 700; color: var(--ink-2); }
 .mic { min-width: 58px; font-size: 22px; }
 
 .home-entries { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
@@ -1045,7 +1088,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
      「不上网也听得懂」「不会自动扣钱」——是产品对老人做的承诺，正是最该看清的字。
      `.trust-line` 本来就是 `flex-wrap: wrap`，放大一档只会换行，不会挤坏。 */
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
 }
 /* Whether a language model is advising the semantic layer is a fact about the
    deployment, not a promise, so it gets a neutral rather than a green chip. */
@@ -1062,7 +1105,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
 .status-chip {
   display: inline-flex; align-items: center; gap: var(--space-2);
   padding: var(--space-1) var(--space-3); border-radius: 999px;
-  font-size: var(--text-sm); font-weight: 750;   /* 同上：14px 不在字阶里 */
+  font-size: var(--text-sm); font-weight: 700;   /* 同上：14px 不在字阶里 */
   border: 1px solid transparent;
   white-space: nowrap;
 }
@@ -1104,7 +1147,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   color: var(--ink);
 }
 .reliance-row:first-of-type { border-top: 0; }
-.reliance-row strong { color: var(--ink-3); font-weight: 750; font-size: var(--text-sm); }
+.reliance-row strong { color: var(--ink-3); font-weight: 700; font-size: var(--text-sm); }
 .reliance-card ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); line-height: 1.68; color: var(--ink-2); }
 .reliance-card .notice { margin-top: var(--space-3); }
 
@@ -1120,7 +1163,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   border: 1px solid var(--line-strong);
   background: var(--surface);
   font-size: var(--text-sm);
-  font-weight: 750;
+  font-weight: 700;
   color: var(--ink-2);
   min-height: 44px;
 }
@@ -1158,7 +1201,7 @@ body[data-activity="offline"] .mic-dial::after { opacity: .12; }
   color: var(--ink);
 }
 .log-item time { display: block; color: var(--ink-3); font-size: var(--text-xs); margin-top: var(--space-1); }
-.log-item .who { font-weight: 800; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
+.log-item .who { font-weight: 700; color: color-mix(in srgb, var(--role-accent-deep) 84%, var(--ink)); }
 
 /* 有主体的记录行是**真按钮**（点进去看这件事的经过），没有主体的仍是 div。
 
@@ -1265,7 +1308,7 @@ button.log-item:focus-visible {
   font-size: 16px;
 }
 .calendar-day .calendar-entry:first-of-type { border-top: 0; }
-.calendar-entry time { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.calendar-entry time { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* Family console overview strip. */
 .metric-row {
@@ -1286,7 +1329,7 @@ button.log-item:focus-visible {
 .metric-label { font-size: var(--text-xs); color: var(--ink-3); font-weight: 700; }
 .metric strong {
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
   color: var(--ink);
@@ -1308,7 +1351,7 @@ button.log-item:focus-visible {
   background: var(--surface);
 }
 .digest-row:nth-child(even) { background: var(--surface-2); }
-.digest-row strong { color: var(--ink-3); font-weight: 750; }
+.digest-row strong { color: var(--ink-3); font-weight: 700; }
 
 /* 做过的事：一行一条，谁做了什么在左、时间在右。原先是带左边框和渐变底的
    "迷你卡片"，里面套一个等宽字体的事件码——那既是装饰，也是在告诉家属这是
@@ -1325,3 +1368,46 @@ button.log-item:focus-visible {
 .audit-what { font-size: var(--text-sm); color: var(--ink); }
 .audit-row time { font-size: var(--text-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
+
+/* @dark-ink-appendix ======================================================
+   深色模式：老人端那两行「纸翻了、字没翻」的字
+   ==========================================================================
+   这两处的**纸**是令牌画的，所以深色下它本来就是深的：
+
+     .mic-hint     画布本身      tokens.css --bg        深色 #0f0e0c
+     .today-line   卡面          tokens.css --surface-2 深色 #211f1c
+
+   而**字**还是浅色模式的值：两条都取 `elder-family-v3.css` 的 `--ev3-ink` /
+   `--ev3-ink-2`，而那个文件从头到尾**一个 `prefers-color-scheme` 块都没有**
+   （`:root` 只声明一次，L6–L23）。实测 1.68 / 3.03，AA 要 4.5。
+
+   为什么改这两条规则，而不是给 `--ev3-*` 补一个深色块
+   ------------------------------------------------------------------------
+   因为 `--ev3-ink` 同时被压在深纸和**浅纸**上。老人端在深色模式下有一大片
+   区域仍然是浅色纸（`main.shell.app-frame` 那条渐变没有深色版），实测有 11 处
+   深绿字压在 rgb(248,245,238) 上、10.5:1，是好的。把 `--ev3-ink` 整体翻亮，
+   这两处修好，那 11 处立刻变成浅字压浅纸。所以只翻「纸确实已经是深色」的这两处；
+   「三层皮肤都缺深色模式」是另一件事，记在 KNOWN_ISSUES。
+
+   颜色取 `--ink-2` 本身，不新造值：它就是这一套配色在 tokens.css 深色块里的
+   次级墨水（#cfc8bb），而这两处的纸也正是同一个令牌族画的。
+
+   特异性写足，不靠源序
+   ------------------------------------------------------------------------
+   `elder-family-v3.css` 是老人端**最后**加载的一张表，而本文件排在它前面，
+   所以同分（0,1,0）的写法一定输。这两条都比它要压住的那条**严格更高**，
+   于是四张表怎么排都成立：
+
+     body .mic-hint    (0,1,2) > .mic-hint    (0,1,0)  本文件 L1004、elder-family-v3.css L285
+     body .today-line  (0,1,2) > .today-line  (0,1,0)  pages.css L119、elder-family-v3.css L211
+
+   判据：backend/tests/test_dark_mode_ink_is_readable.py。它开真浏览器读计算
+   样式，并且**按本文件里这个标记之后的行号**去找「这里加的规则」，再要求每一条
+   都真的赢在至少一个元素上——不维护选择器清单，清单会腐烂。
+   ========================================================================== */
+@media (prefers-color-scheme: dark) {
+  /* 麦克风下面那行提示，压在画布 --bg #0f0e0c 上：1.68 -> 11.61:1 */
+  body .mic-hint { color: var(--ink-2); }
+  /* 「今天没有要办的事。」压在 --surface-2 #211f1c 上：3.03 -> 9.89:1 */
+  body .today-line { color: var(--ink-2); }
+}

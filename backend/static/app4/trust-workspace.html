@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN" class="app4-embedded">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>可信记录 · 优活</title>
+<link rel="stylesheet" href="/static/app4/workspace4.css">
+<link rel="stylesheet" href="/static/app4/surfaces4.css">
+<link rel="stylesheet" href="/static/app4/type4.css">
+<script src="/static/identity.js"></script>
+<script src="/static/common.js"></script>
+<script defer src="/static/app4/workspace4.js"></script>
+<script defer src="/static/trust.js"></script>
+<link rel="stylesheet" href="/static/app4/journal4.css">
+<link rel="stylesheet" href="/static/app4/pet-art4.css">
+</head>
+<body class="trust-app">
+<main class="shell">
+  <header class="trust-toolbar"><p id="trustCaption">查看办事结果与确认过程</p><button id="trustRefresh" type="button">刷新</button></header>
+  <p id="status" class="notice" role="status">正在读取记录…</p>
+  <div id="trustRecords" aria-label="办事记录"></div>
+  <button id="trustBack" type="button" hidden>‹ 全部记录</button>
+  <article id="receipt" class="receipt art-receipt" aria-live="polite" hidden></article>
+</main>
+</body>
+</html>
+

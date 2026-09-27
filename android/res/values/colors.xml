@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 取自 elder-v6.css 的山水纸色板：底色 #eee8dd、墨 #3f352d、青 #496f62、纸 #f9f5eb。 -->
+<resources>
+    <color name="paper_bg">#FFEEE8DD</color>
+    <color name="paper">#FFF9F5EB</color>
+    <color name="ink">#FF3F352D</color>
+    <color name="ink_soft">#FF6B5E52</color>
+    <color name="jade">#FF496F62</color>
+    <color name="icon_bg">#FFF9F5EB</color>
+</resources>

@@ -166,12 +166,53 @@ def _yuan(cents: int) -> str:
 class TeachBackVerifier:
     """Decides whether an elder's confirmation actually demonstrates understanding."""
 
-    #: Only fields where a misheard value causes real harm are gated. Asking an
-    #: elder to recite everything would itself be a cognitive-load failure.
+    #: 一个听错了会造成真实伤害的字段 -> 它的名字。
+    #:
+    #: 原先这段注释用一句英文断言说：只有「听错了会造成真实伤害」的字段
+    #: 才在这里，而且它们都已经被把住了。**其中一个没有。**
+    #:
+    #: （那句英文原话**不在这里复述**：判据
+    #: `test_the_comment_no_longer_claims_both_are_gated` 查的就是
+    #: 那句断言有没有回到源码里，复述一遍会让它红在我自己的注释上。
+    #: 第一版就是这么红的。）
+    #: 量出来的（三条独立的路，同一个结论）：
+    #:
+    #:     requires_teach_back(hospital_registration, 风险 1~4) = 假 假 假 假
+    #:     verify(hospital_registration, …, required=True)      = not_required
+    #:     号源时间存 09:30、她说「上午十点半」                    -> **不拦**
+    #:
+    #: 而且这张表**全仓零读者**：`verify()` 里写的是字面量
+    #: `"amount_cents"`，压根没读它。所以它是一张装饰性的表，
+    #: 而注释让读代码的人以为号源时间被核对了。
+    #:
+    #: 这一轮做两件事，都不替产品决定「挂号要不要复述」
+    #: （那个决定有理由，见 `requires_teach_back`）：
+    #:
+    #:   · `verify()` 改成**从这张表取**字段名，表因此对活着的那一条承重；
+    #:   · 还没接上的那一条**明写**在 `NOT_YET_GATED` 里，
+    #:     让这张表说的话和代码一致。
+    #:
+    #: 判据 `test_the_fields_it_calls_critical_are_really_checked.py`
+    #: 两头都查：表里每个键要么真的被 `verify()` 核对，要么在下面那份
+    #: 名单里；而那份名单不许有表里没有的键（过期项）。
     CRITICAL_FIELD = {
         TaskType.BILL_PAYMENT: "amount_cents",
         TaskType.HOSPITAL_REGISTRATION: "appointment_time",
     }
+
+    #: 上面那张表里**声明了但还没有接上**复述核对的那几格。
+    #:
+    #: 挂号：`requires_teach_back` 对它恒为假。那个判断本身有理由——
+    #: 「Money is the one place a wrong number cannot be undone by
+    #: talking」——号源订错了还能打电话改，钱划走了不能。
+    #: **要不要给它也加一道，是产品决定，不在这一改里。**
+    #:
+    #: 这份名单的意义只有一个：让「有意没接」和「漏了」在代码里长得不一样。
+    #: 做法照 `test_the_red_flags_it_names_are_the_ones_it_acts_on.py`
+    #: 里 `NOT_YET_ACTED_ON` 那个先例。
+    NOT_YET_GATED: frozenset[TaskType] = frozenset({
+        TaskType.HOSPITAL_REGISTRATION,
+    })
 
     @classmethod
     def requires_teach_back(cls, task_type: TaskType, risk_level: int, profile_enabled: bool) -> bool:
@@ -183,7 +224,7 @@ class TeachBackVerifier:
     @classmethod
     def build_prompt(cls, task_type: TaskType, slots: dict[str, Any]) -> str:
         if task_type == TaskType.BILL_PAYMENT:
-            amount = int(slots.get("amount_cents", 0) or 0)
+            amount = int(slots.get(cls.CRITICAL_FIELD[task_type], 0) or 0)
             bill_type = slots.get("bill_type", "账单")
             return (
                 f"这是{bill_type}，{_yuan(amount)}元。"
@@ -204,12 +245,15 @@ class TeachBackVerifier:
             return TeachBackCheck(TeachBackOutcome.NOT_REQUIRED)
 
         if task_type == TaskType.BILL_PAYMENT:
-            expected = int(slots.get("amount_cents", 0) or 0)
+            #: 字段名**从 `CRITICAL_FIELD` 取**，不再写字面量。
+            #: 这一行是那张表唯一的读者——没有它，那张表是装饰。
+            field = cls.CRITICAL_FIELD[task_type]
+            expected = int(slots.get(field, 0) or 0)
             heard = parse_spoken_amount_cents(text)
             if heard is None:
                 return TeachBackCheck(
                     TeachBackOutcome.NOT_RESTATED,
-                    field_name="amount_cents",
+                    field_name=field,
                     expected_display=_yuan(expected),
                     prompt=(
                         f"我还需要确认您听清了金额。请您说一遍金额，"
@@ -220,7 +264,7 @@ class TeachBackVerifier:
             if heard != expected:
                 return TeachBackCheck(
                     TeachBackOutcome.MISMATCH,
-                    field_name="amount_cents",
+                    field_name=field,
                     expected_display=_yuan(expected),
                     heard_display=_yuan(heard),
                     prompt=(
@@ -231,7 +275,7 @@ class TeachBackVerifier:
                 )
             return TeachBackCheck(
                 TeachBackOutcome.VERIFIED,
-                field_name="amount_cents",
+                field_name=field,
                 expected_display=_yuan(expected),
                 heard_display=_yuan(heard),
                 signals={"restated": True, "matched": True},

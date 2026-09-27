@@ -53,11 +53,21 @@ _SLOT_MAP: dict[TaskType, dict[str, str]] = {
     TaskType.FORM_ASSISTANCE: {},
 }
 
+#: 这几个词会被插进**老人口吻**的模板里（`_clarification`）：
+#: 「您是想{label}还是{label}」「请您说一句「我要{label}」」。
+#:
+#: 所以它们必须是**她说得出口的话**。原先填表那一格写的是
+#: 「帮您填写」——系统口吻，代进模板就成了「我要帮您填写」，
+#: 一句没有人会说的话。它照样能触发（`填写` 是触发词），
+#: 所以没有任何判据会红。
+#:
+#: 判据 `test_the_words_it_puts_in_her_mouth_are_hers` 钉两条：
+#: 插在「我要」后面还能分流回它自己，且这个词不许自己称「您」。
 _TASK_LABEL: dict[TaskType, str] = {
     TaskType.HOSPITAL_REGISTRATION: "挂号",
     TaskType.BILL_PAYMENT: "缴费",
     TaskType.REMINDER: "设置提醒",
-    TaskType.FORM_ASSISTANCE: "帮您填写",
+    TaskType.FORM_ASSISTANCE: "填表",
 }
 
 

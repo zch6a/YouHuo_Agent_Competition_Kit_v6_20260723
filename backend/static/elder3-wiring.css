@@ -1,0 +1,871 @@
+/* 老人端设计三（`/elder3`）接线所需的样式。
+ *
+ * 只有两类内容，都**只加不改**：
+ *   ① 接线新增的两个元素（状态行、打字框）——交付包里没有它们
+ *   ② 字号设置真的作用在屏幕上所需的覆盖
+ *
+ * 必须排在 `app-01.css` 之后加载。同优先级靠源码顺序定胜负，这是唯一的依据。
+ *
+ * ## 为什么字号要逐条覆盖
+ *
+ * 设计一在自己的 CSS 里通篇写着 `calc(20px * var(--elder-font-scale) / 1.25)`，
+ * 所以它改一个变量就够了。设计三的 CSS（2.3 MB，非本项目撰写）里没有这个变量，
+ * 字号是写死的 px 和 `clamp(…vw…)`——**改根字号一个字都不会变**。
+ *
+ * 试过的另外两条路都不行：
+ *   · `zoom` 缩放 `#app`：`#app` 是 `position:fixed;inset:0;overflow:hidden`，
+ *     放大之后内容被裁；而且小优和飞鹤用的是视口坐标，缩放会让它们错位。
+ *   · `zoom` 缩放 `.page-grid`：它是 `34% 1fr` 的栅格，放大就溢出。
+ *
+ * 所以照设计一的做法来：一个变量 + 逐条 `calc`。基数写 1.25，
+ * 因为那是这个设置的默认值——`--e3-font-scale: 1.25` 时每一条都等于原值，
+ * 不动设置的人看到的和交付包一模一样。
+ */
+
+:root {
+  --e3-font-scale: 1.25;
+}
+
+/* ---- 字号：读的字 ---------------------------------------------------------- */
+
+.identity-island h1 { font-size: calc(clamp(31px, 3.15vw, 46px) * var(--e3-font-scale) / 1.25); }
+.identity-island p  { font-size: calc(14px * var(--e3-font-scale) / 1.25); }
+.identity-meta      { font-size: calc(12px * var(--e3-font-scale) / 1.25); }
+
+.story-head b       { font-size: calc(clamp(23px, 2.05vw, 29px) * var(--e3-font-scale) / 1.25); }
+.story-node .t      { font-size: calc(14px * var(--e3-font-scale) / 1.25); }
+.story-node .n      { font-size: calc(17px * var(--e3-font-scale) / 1.25); }
+/* 状态词同 `/elder2` 的 `.status-chip`：任何档位下不低于 12px。
+   原来 11px 基准，最小那一档（1.1）算下来是 9.68px。 */
+.story-node .s      { font-size: max(12px, calc(13px * var(--e3-font-scale) / 1.25)); }
+
+.stage-copy h2      { font-size: calc(clamp(34px, 4.8vw, 50px) * var(--e3-font-scale) / 1.25); }
+.stage-copy p       { font-size: calc(15px * var(--e3-font-scale) / 1.25); }
+
+.next-card strong   { font-size: calc(clamp(22px, 2.2vw, 29px) * var(--e3-font-scale) / 1.25); }
+.next-card .meta    { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+
+.record-event small { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+.voice-caption b    { font-size: calc(18px * var(--e3-font-scale) / 1.25); }
+.voice-caption span { font-size: calc(13px * var(--e3-font-scale) / 1.25); }
+
+.service-row b,
+.guard-row b        { font-size: calc(clamp(17px, 1.45vw, 20px) * var(--e3-font-scale) / 1.25); }
+
+/* ---- 字号：按钮也跟着变大 ---------------------------------------------------
+ *
+ * 设置页那句话写的是「屏幕上的字会变大，**按钮也跟着变大**」。
+ * 只放大字而按钮不变，那句话就是假的，而且触控目标不会随之变宽。 */
+
+.quick-chip {
+  font-size: calc(14px * var(--e3-font-scale) / 1.25);
+  padding: calc(11px * var(--e3-font-scale) / 1.25) calc(16px * var(--e3-font-scale) / 1.25);
+}
+.seg-btn {
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  padding: calc(11px * var(--e3-font-scale) / 1.25) calc(15px * var(--e3-font-scale) / 1.25);
+  min-width: calc(82px * var(--e3-font-scale) / 1.25);
+}
+.dock .txt { font-size: calc(15px * var(--e3-font-scale) / 1.25); }
+
+/* ---- 状态行 ----------------------------------------------------------------
+ *
+ * 这一页原先没有任何地方能说「刚才那一下怎么样了」：按下麦克风、保存设置、
+ * 联系家人，成功或失败都没有一句话。加在麦克风说明下面——那是她按完之后
+ * 眼睛所在的位置。
+ *
+ * 空的时候 `:empty` 自己不占位：留一条空线在那里，等于告诉她这里本来就该有东西。 */
+
+.e3-status {
+  margin: 10px auto 0;
+  max-width: 34ch;
+  padding: 10px 14px;
+  border-left: 2px solid var(--jade, #496f60);
+  background: rgba(255, 253, 247, .86);
+  border-radius: 3px;
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  line-height: 1.6;
+  color: #5b5044;
+  text-align: left;
+}
+.e3-status:empty { display: none; }
+
+/* 不是今天页时，状态行压在底栏上方。
+ *
+ * 它原先固定插在 `.voice-caption` 之后，而那一处在 `today` 那个 `.workspace`
+ * 里。四个 workspace 叠在一起、靠 `visibility` 切换
+ * （`app-01.css:35`：`position:absolute; inset:0; opacity:0; visibility:hidden`），
+ * 所以在其余三页上状态行是 `visibility:hidden` 的——闸门
+ * （`test_the_receipt_is_visible_in_every_panel`）在 1280×800 和 1440×900 上
+ * 都报「◇记录 / ○家人 / ⌁我的 看不见」，而 `say()` 是这一页对老人说
+ * 「现在怎么了」的唯一出口。
+ *
+ * 今天页那一处**不动**：上面那一大段记着它是量过四种改法之后选定的。
+ * 这一条只管其余三页：`ensureStatus()` 把它挂进**当前那个 workspace**，
+ * 再由这条规则定位。
+ *
+ * 跟着底栏走（`app-01.css:114`：`left/right:4.7%; bottom:2.1%;
+ * height:9.3%; min-height:66px; z-index:35`）。`z-index:36` 压过底栏，
+ * 不然长句子会被它盖住。
+ *
+ * `margin:0 auto` + `max-width`：基类是 `margin:10px auto 0; max-width:34ch`，
+ * 在绝对定位且左右都给的情况下那个 `auto` 会把它挤成窄条。 */
+/* away 态的盒子。定位在盒子上，里面两行正常流式排列。
+ *
+ * **放在顶部**，不放底部。量过三页的控件分布（y<260 的区间）：
+ * 记录页只有一个 y=249，家人页和我的页一个都没有——顶部是空的。
+ * 底部反过来很挤：记录页那一排工具（`.record-tools`，z-index:9）、
+ * 家人页的分支、我的页的长列表都在那儿。上一版放底部时实测：
+ *
+ *     #e3Actions  (415,578) 450×48 z=36
+ *     #repeatLast (496,576)  96×38 z=auto      重叠 96×36
+ *     elementFromPoint(#repeatLast 中心) -> button.（没有类名的按钮 = 动作键）
+ *
+ * 两排按钮在屏幕上真的叠在一起，不只是命中测试的事。
+ *
+ * `left:37%` 对齐右栏（`main.right-stage` 在 1280 宽下从 x=474 起），不压左边的身份岛。
+ *
+ * `top` 必须落在 `.page-grid` 那一带（`app-01.css` 给它 `top:11.5%`），不能更高——
+ * `header.topbar` 是 **workspace 的兄弟**、`z-index:30`，而这个盒子在workspace
+ * （`z-index:5`）里面：盒子自己的 36 只在 workspace 内部排序，整个 workspace
+ * 仍然输给 topbar。放在 `top:4%` 时闸门报的正是
+ * 「命中测试没拿到它自己（拿到 HEADER.topbar）」。
+ *
+ * 和 `/family3` 那个「气泡的 `z-index:10` 输给底栏」是同一个坑，这一轮撞第二次。 */
+.e3-away {
+  position: absolute;
+  left: 37%;
+  right: 4.7%;
+  top: calc(11.5% + 6px);
+  z-index: 36;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  pointer-events: none;      /* 空着的时候不挡任何东西 */
+}
+.e3-away > * { pointer-events: auto; }
+
+.e3-status-away {
+  margin: 0;
+  max-width: none;
+  background: rgba(255, 253, 247, .96);
+  box-shadow: 0 10px 26px rgba(74, 54, 34, .12);
+}
+
+/* 动作行在盒子里排在状态行下面，不再自己定位。
+ *
+ * 这里删掉了两版靠「猜上一行多高」的写法（`translateY(100%)`、
+ * `:has()` + 固定 68px）——盒子一装，高度耦合就没有了。 */
+.e3-away .e3-actions {
+  margin: 0;
+  max-width: none;
+}
+.e3-status[data-tone="warning"] { border-left-color: var(--gold, #a8762d); }
+.e3-status[data-tone="bad"]     { border-left-color: var(--red, #a74e40); color: #7a3f34; }
+
+/* ---- 状态行和动作行**被印花了** ------------------------------------------------
+ *
+ * 这两样是插进 `.voice-zone` 里的两个网格行，而那一格原本只放一颗麦克风：
+ * 交付包在同一格里还摆了两个**绝对定位**的装饰——`.voice-orbit`（那圈线）和
+ * `.voice-caption`（「按一下，然后慢慢说 / 正在等您 · 不会自动扣钱」两行字，
+ * `bottom:-2%`）。绝对定位的元素画在流内元素上面，于是它们盖住后插进来的这两行。
+ *
+ * 实测（1440×900，`elementFromPoint` 取五点，重叠按像素面积算）：
+ *
+ *     长问句（等她点头那一条）  `.voice-caption b` 压住状态行 3726px²、
+ *                              `span` 再压 2397px²——**问句的第二三行整段被印花**，
+ *                              而那两行写的正是「记下来谁看得见、记多久」
+ *     短回执（她点完之后）      `span` 压住「可以记住」和「不用记」各 1551px²，
+ *                              两个按钮的中心点 `elementFromPoint` 命中的是那个
+ *                              `<span>`，不是按钮自己
+ *
+ * 也就是说：她要点头的那句话读不全，她要按的两个键上印着别的字。
+ *
+ * 修法是让那两行**回到流里**排在麦克风下面，而不是浮在整格上：
+ *
+ *     `align-content: start`   四行从上往下排，不再把行拉开去填满这一格
+ *     `.voice-caption` 静态定位  它本来就该在麦克风正下方，位置几乎没动
+ *     状态行与动作行靠左        居中时动作行的右缘会压到「⌨ 用打字说」328px²
+ *
+ * 量过四种改法，只有这一种在长短两态下都是零重叠、零遮挡；把麦克风缩小让位
+ * 那一种更糟——`.voice-orbit` 的圈跟着缩，反而压到状态行上。 */
+
+.voice-zone { align-content: start; }
+.voice-caption { position: static; margin-top: 8px; }
+
+/* ---- 那圈线不该吃掉点击 ----------------------------------------------------
+ *
+ * `.voice-orbit` 是 `<div class="voice-orbit">`——纯装饰的一圈线
+ * （`app-01.css:82`：`position:absolute; inset:4%`，外加两个 `::before/::after`
+ * 同心圆）。它是麦克风按钮 `#voiceOrb` 的**兄弟**，自己不该收点击。
+ *
+ * 可它是绝对定位的，画在流内元素上面。实测（先把动画推到终态再量：33 条动画、
+ * `document.hidden === false`，所以不是「冻在第一帧」那种假象）：
+ *
+ *     680×812   「挂号」25 个取样点里 **0** 个打得到自己
+ *               「交水费」12/25、「上次的血压」15/25
+ *               命中的全是 `DIV.voice-orbit`
+ *     375×812   圈占 [67,722,308,1024]，而它自己的 `.voice-zone` 是
+ *               [31,779,344,966]——上下各溢出约 57px
+ *
+ * 也就是：那三颗快捷芯片上盖着一层看不见的圈，按上去什么都不会发生。
+ * 关掉它自己收点击的能力，落点就穿过去落到下面的按钮上。 `#voiceOrb`
+ * 不在它里面（是兄弟节点），不受影响。 */
+.voice-orbit,
+.voice-orbit::before,
+.voice-orbit::after { pointer-events: none; }
+
+/* ---- 窄屏上，「说话」那一块要排在最前面 -------------------------------------
+ *
+ * 760 以下 `.right-stage` 变成纵向堆叠（`app-01.css:1385` 已经是 flex column），
+ * 顺序是 DOM 顺序：今天的状态（`.stage-copy`）→ 快捷芯片（`.quick-row`）→
+ * **说话（`.voice-zone`）** → 下一步 → 打字。于是麦克风排在第四块：
+ *
+ *     375×812   麦克风 [135,787,240,892]，底栏 `fixed` [0,721,375,812]
+ *               → 25 个取样点里只有 5 个落在屏幕内、**5 个全在底栏底下**（0/5）
+ *     680×812   麦克风 [242,718,438,914]，底栏 [0,721,680,812]
+ *               → 只露出上面 3px（0/15）
+ *
+ * 这一页的主操作是「按一下开始说话」，首屏它整颗躲在固定底栏后面。
+ * 滚一下确实能翻上来（docH 1283、可滚 471px），可那是**让她去找**那颗键，
+ * 不是把键放在她眼前。
+ *
+ * 桌面两栏里它本来就在右侧靠上的位置（`top:12%`），所以窄屏把它排到最前面
+ * 不是另起一套设计，是把两栏的「它应该在第一眼」搬进单栏。
+ *
+ * **球的尺寸这里不动。** 同一份文件末尾 `@media(max-width:785px)` 那条
+ * `28vw` 是把球收进内容栏的既有修法（KNOWN_ISSUES 118，320/375/414/680/700
+ * 五个宽度量过，`elementFromPoint(球心)` 仍是球本人）。它在同文件里更靠后，
+ * 我在这儿再写一条尺寸只会是**死代码**——所以只重排，不碰尺寸。
+ *
+ * 改完实测：
+ *
+ *     375   球 [135,527,240,633]，底栏上沿 721 —— 整颗露出，还余 88px
+ *     680   球 [243,544,437,737]，底栏上沿 721 —— 露 174px，**下沿还探进 16px**
+ *
+ * 680 那 16px 是 28vw（190px）减不掉的余额，滚一点就全出来；跟原来
+ * 「只露出 3px」不是一个量级。要连这 16px 也抹掉，得去动 28vw 那条，
+ * 而那条是为另一件事（球溢出右边界）立的，不在这儿跟它打架。 */
+@media (max-width: 760px) {
+  .right-stage > .voice-zone { order: -1; }
+}
+.voice-zone .e3-status,
+.voice-zone .e3-actions {
+  justify-self: start;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* ---- 待办的两个动作 ---------------------------------------------------------
+ *
+ * 点一颗待办气泡之后长在状态行下面。**不是**点一下就把事情标记掉：
+ * 一整块椭圆点一下就改记录，手一抖就改了，而她看不出刚才发生过什么。
+ *
+ * 触控目标 ≥48px：这是老人真的会按的地方。 */
+
+.e3-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px auto 0;
+  max-width: 34ch;
+}
+.e3-actions button {
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 1px solid rgba(73, 111, 96, .32);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+  color: var(--tea, #5e4324);
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  cursor: pointer;
+}
+.e3-actions button:hover { background: #fff; border-color: var(--jade, #496f60); }
+.e3-actions button:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 2px;
+}
+
+/* ---- 玻璃盒 ------------------------------------------------------------------
+ *
+ * 卡片由 `glassbox.js` 渲染（**同一个渲染函数**，不另写一份），它发的是
+ * `.reliance-card` / `.reliance-row` / `.notice` / `.preview-details`
+ * 这几个类名——那些样式住在设计一二的全局表里，设计三不加载。
+ * 不补这一段，卡会以浏览器默认样式堆在页面上：能读，但和这一屏毫无关系。
+ *
+ * 只写这一页够得着的选择器（`.e3-reliance` 之内），不动全局表。 */
+
+.e3-reliance {
+  margin: 12px auto 0;
+  max-width: 46ch;
+}
+.e3-reliance .reliance-card {
+  padding: 16px 18px;
+  border: 1px solid rgba(168, 118, 45, .32);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .95);
+  color: #5b5044;
+  font-family: var(--kai, serif);
+  text-align: left;
+}
+.e3-reliance .reliance-card h3 {
+  margin: 0 0 10px;
+  font: 700 calc(17px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.e3-reliance .reliance-row {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(120, 105, 88, .14);
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .reliance-row:first-of-type { border-top: 0; }
+.e3-reliance .reliance-row strong { color: #8a7a63; font-weight: 400; }
+.e3-reliance .notice {
+  margin-top: 10px;
+  padding: 9px 13px;
+  border-left: 2px solid var(--jade, #496f60);
+  border-radius: 3px;
+  background: rgba(73, 111, 96, .06);
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .notice.warning { border-left-color: var(--gold, #a8762d); }
+.e3-reliance .notice.bad,
+.e3-reliance .notice.danger { border-left-color: var(--red, #a74e40); color: #7a3f34; }
+.e3-reliance .preview-details { margin-top: 10px; }
+.e3-reliance .preview-details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #6a5b49;
+}
+.e3-reliance .preview-details > summary:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 2px;
+}
+.e3-reliance .preview-columns {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+}
+.e3-reliance .preview-columns section {
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: rgba(120, 105, 88, .05);
+}
+.e3-reliance .preview-columns h4 {
+  margin: 0 0 5px;
+  font: 700 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8a7a63;
+}
+.e3-reliance .preview-columns ul { margin: 0; padding-left: 1.2em; }
+.e3-reliance .preview-columns li {
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+
+/* ---- 一件事的经过 ------------------------------------------------------------
+ *
+ * 和玻璃盒共用 `#e3Reliance` 那个位置——两者都是「摊开一件事」，
+ * 一次只该有一个。渲染用 `task-detail.js` 那一份，这里只补它发的类名，
+ * 因为那些规则住在设计一二的全局表里。 */
+
+.e3-reliance .detail-head { margin-bottom: 10px; }
+.e3-reliance .detail-subject {
+  margin: 0;
+  font: 700 calc(17px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.e3-reliance .detail-amount {
+  margin: 4px 0 0;
+  font: 700 calc(20px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8c3b2e;
+}
+/* 状态不只靠颜色：文字和颜色同时给。 */
+.e3-reliance .detail-status {
+  margin: 6px 0 0;
+  display: inline-block;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  background: rgba(120, 105, 88, .1);
+  color: #6a5b49;
+}
+.e3-reliance .detail-status.good { background: rgba(73, 111, 96, .12); color: #3d5e4e; }
+.e3-reliance .detail-status.warning { background: rgba(168, 118, 45, .14); color: #8d6224; }
+.e3-reliance .detail-status.bad { background: rgba(167, 78, 64, .12); color: #8c3b2e; }
+.e3-reliance .detail-rows {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 6px 10px;
+  margin: 10px 0 0;
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.7 var(--kai, serif);
+}
+.e3-reliance .detail-rows dt { color: #8a7a63; }
+.e3-reliance .detail-rows dd { margin: 0; color: #5b5044; }
+
+/* ---- 「我的数据」五条 --------------------------------------------------------
+ *
+ * 设计一二的「我的」屏上有这四项（日报 / 心情 / 隐私导出 / 两步删除），
+ * 设计三的交付包里**一项都没有**。端点齐全、接线一处不调，
+ * 于是「优活替我记了些什么」和「删掉这些」在这一版根本不存在——
+ * 而这两件事恰恰是这个产品对隐私那几句承诺的兑现处。
+ * 第五条是「我答应让优活记住的事」（逐条可收回）。
+ *
+ * 长得和 `.service-row` 一致（同一屏上同一类东西同一个样子），
+ * 但它们是真 `<button>`：这五个会往返后端，不是标签。 */
+
+/* ---- 这一整块此前**够不着** ---------------------------------------------------
+ *
+ * `.settings-grid` 是一个 `position:absolute; top:25vh; bottom:3%` 的两列网格，
+ * 交付包在 `app-01.css:1018` 又给它加了一条 `overflow:hidden`。而它有三个孩子：
+ * 左列（语速 / 文字大小 / 保存）、右列（常用服务）、以及**换行落到第二排的
+ * 「我的数据」**。实测 1440×900：
+ *
+ *     .settings-grid   y 330，高 420（到 750 为止）
+ *     第一排两列        y 330，高 358
+ *     「我的数据」      y 712  ← 只剩 38px，剩下的全被 `overflow:hidden` 裁掉
+ *     #e3Memories      y 1015（视口只有 900）
+ *
+ * 也就是说这五个按钮**一个都点不到**：不是被别的东西盖住，是根本没画出来。
+ * `getBoundingClientRect` 照样给一个漂亮的 387×62，`querySelector` 找得到，
+ * 静态判据也全绿——只有真的按一下才看得出来。
+ * （用 `scrollIntoView` 量能量到，那是脚本能滚，人不能：`overflow:hidden`
+ * 不给滚动条，滚轮也不动它。）
+ *
+ * 对这一块尤其致命：「可撤回」是「同意」成立的前提。收回的入口够不着，
+ * 那份同意就不是她的。
+ *
+ * 改成真的能滚。滚动条给粗一点——这一屏的用户是老人。 */
+.settings-grid {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.settings-grid::-webkit-scrollbar { width: 14px; }
+.settings-grid::-webkit-scrollbar-track { background: rgba(120, 105, 88, .07); }
+.settings-grid::-webkit-scrollbar-thumb {
+  background: rgba(120, 105, 88, .42);
+  border-radius: 7px;
+}
+
+.data-entries { display: grid; gap: 10px; margin-top: 4px; }
+.data-entry {
+  display: block;
+  width: 100%;
+  min-height: 56px;                 /* 关键动作 ≥56px */
+  padding: 12px 16px;
+  border: 1px solid rgba(120, 105, 88, .26);
+  border-radius: 4px;
+  background: rgba(255, 253, 247, .82);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.data-entry b {
+  display: block;
+  font: 700 calc(16px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+}
+.data-entry span {
+  display: block;
+  margin-top: 3px;
+  font: 400 calc(13px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #8a7a63;
+}
+.data-entry:hover { background: #fff; border-color: var(--jade, #496f60); }
+.data-entry:focus-visible { outline: 2px solid var(--jade, #496f60); outline-offset: 3px; }
+/* 删除那一条单独着色：这一屏上只有它是不可逆的。 */
+.data-entry.danger { border-color: rgba(167, 78, 64, .38); }
+.data-entry.danger b { color: #8c3b2e; }
+.data-entry.danger:hover { border-color: #a74e40; background: rgba(167, 78, 64, .06); }
+
+.e3-data-out {
+  margin-top: 12px;
+  padding: 12px 15px;
+  border-left: 2px solid var(--jade, #496f60);
+  border-radius: 3px;
+  background: rgba(255, 253, 247, .9);
+  font: 400 calc(14px * var(--e3-font-scale) / 1.25)/1.75 var(--kai, serif);
+  color: #5b5044;
+}
+.e3-data-out:empty { display: none; }
+/* 没成的时候**颜色也要跟着换**。
+ *
+ * 状态行那一侧一直有这一条（`.e3-status[data-tone="bad"]`），这一格没有：
+ * 实测断网之后点「我答应让优活记住的事」，格子里写的是
+ * 「优活记着的事暂时看不了：家里网不通。等一下我再试试」，
+ * 而左边那道竖线还是 `rgb(73,111,96)`——和「删好了」「一共 12 条」一个颜色。
+ * 一个失败的回答画成成功的样子，比不回答更糟：她会以为这就是答案。
+ * 色调由 `outTrouble()` 挂上，`dataOut()` 每次重新摊开时清掉。 */
+.e3-data-out[data-tone="bad"] {
+  border-left-color: var(--red, #a74e40);
+  color: #7a3f34;
+}
+.e3-data-out p { margin: 0 0 6px; }
+.e3-data-out ul { margin: 6px 0 0; padding-left: 1.3em; }
+.e3-data-out li { margin: 3px 0; }
+.e3-data-out .meta { color: #8a7a63; font-size: .92em; }
+/* 第二步那个按钮**一开始不在 DOM 里**（见接线里的说明）。它出现的时候
+ * 必须一眼看出和上面那些不是一类东西。 */
+.e3-data-out button {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  margin-top: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+}
+.e3-data-out button.danger {
+  border: 1px solid rgba(167, 78, 64, .5);
+  background: rgba(167, 78, 64, .08);
+  color: #8c3b2e;
+}
+.e3-data-out button.secondary {
+  border: 1px solid rgba(120, 105, 88, .32);
+  background: transparent;
+  color: #6a5b49;
+}
+.e3-data-out button:focus-visible { outline: 2px solid #a74e40; outline-offset: 2px; }
+
+/* ---- 她点过头的那些长期记忆 ----------------------------------------------------
+ *
+ * 一条一行：记的是什么、谁看得见、记多久、记它干什么，最后是收回的按钮。
+ * 用 `div` 不用 `li`：这不是一份清单里的条目，每一条自己带一个动作，
+ * 而 `.e3-data-out ul` 那条规则给的是项目符号和缩进——把可操作的东西
+ * 画成一行行的项目符号，看起来就只是「印出来给你看的」。
+ *
+ * 收回那个按钮走上面 `.e3-data-out button` 那一条（宽度撑满、≥56px）：
+ * 它是不可逆动作的第一步，触控目标不许比别处小。 */
+
+.e3-data-out .e3-memory-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(120, 105, 88, .16);
+}
+.e3-data-out .e3-memory-row:first-of-type { border-top: 0; padding-top: 0; }
+.e3-data-out .e3-memory-row b {
+  display: block;
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: var(--tea, #5e4324);
+}
+.e3-data-out .e3-memory-row p { margin: 3px 0 0; }
+
+/* 「常用服务」那四行交付包里是 div，看起来能点、实际不能。
+ * 接线给它们补了 role/tabindex，这里补上键盘可见的焦点圈和手型。 */
+.service-row[role="button"] { cursor: pointer; }
+.service-row[role="button"]:focus-visible {
+  outline: 2px solid var(--jade, #496f60);
+  outline-offset: 3px;
+}
+
+/* ---- 打字说 ----------------------------------------------------------------
+ *
+ * 「⌨ 用打字说」原先按下去什么都不会发生。Firefox 上没有 SpeechRecognition，
+ * 那里这是**唯一**的输入通道。 */
+
+/* 「用打字说」和打字框要压在语音区之上。
+ *
+ * 量出来的层叠链：
+ *
+ *     #keyboardEntry  position:absolute  z-index:**auto**   ┐ 都是 main.right-stage
+ *     .e3-composer    position:absolute  z-index:6          ┘ 的子节点
+ *     .voice-zone     position:absolute  z-index:**7**      ← 里面装着
+ *                                                             #e3Status / #e3Actions /
+ *                                                             #e3Reliance
+ *
+ * `6 < 7`、`auto < 7`，所以语音区里长出来的任何东西都画在这两个控件上面。
+ * 而语音区的内容会长：状态行 → 动作行 → 可信凭证卡。一轮对话办完之后，
+ * 凭证卡把这两个控件盖住，巡检报的是
+ *
+ *     点不着 #keyboardEntry ⌨ 用打字说 ← 盖着它的是 div.reliance-card
+ *     点不着 button 说给优活          ← 盖着它的是 div.reliance-row
+ *
+ * 「用打字说」是**语音失败时唯一的备用输入路径**（没有语音识别时这一页会
+ * 把光标送进它）。被盖住等于那条路在一轮对话之后消失。
+ *
+ * 8 > 7：它们是要用手按的，优先级高于装饰与回执。 */
+#keyboardEntry {
+  z-index: 8;      /* 它本来就是 absolute（`app-01.css`），这里只补层级 */
+}
+
+.e3-composer {
+  position: absolute;
+  right: 1.5%;
+  bottom: 11%;
+  z-index: 8;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(255, 253, 247, .95);
+  border: 1px solid rgba(168, 118, 45, .22);
+  border-radius: 6px;
+  box-shadow: 0 14px 34px rgba(70, 54, 36, .10);
+}
+.e3-composer input {
+  width: clamp(180px, 22vw, 300px);
+  padding: 10px 12px;
+  border: 1px solid rgba(112, 87, 51, .22);
+  border-radius: 4px;
+  background: #fff;
+  font-family: var(--sans);
+  font-size: calc(15px * var(--e3-font-scale) / 1.25);
+  color: var(--ink, #342b22);
+}
+.e3-composer button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(49, 94, 82, .3);
+  font: 700 calc(15px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  color: #315e52;
+}
+
+/* ---- 出口 ------------------------------------------------------------------
+ *
+ * 这一页原先**没有任何回首页的路**：进来之后只能靠浏览器后退。
+ * 底栏那五格全是页内切换，`.dock` 也不是全站那个 `.tabbar`。
+ * 对一位可能不熟悉浏览器手势的老人，"退不出去"是真的退不出去。 */
+
+.v3-home {
+  margin-left: 14px;
+  align-self: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(168, 118, 45, .28);
+  color: #6a5b49;
+  font: 700 calc(14px * var(--e3-font-scale) / 1.25) var(--kai, serif);
+  text-decoration: none;
+  white-space: nowrap;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.v3-home:hover { color: var(--tea, #5e4324); }
+.v3-home:focus-visible { outline: 2px solid var(--jade, #496f60); outline-offset: 2px; }
+
+/* 交付包 README 第 8 条：「UI 最终状态必须默认可见」。
+ * 接线会把用不上的节点 `hidden`，而这份 CSS 里有 `.record-event{opacity:1}`
+ * 这类带 `!important` 语义的最终态规则——`[hidden]` 的默认 `display:none`
+ * 会被 `display:` 声明覆盖掉。钉死它，否则「隐藏多余的卡片」会变成
+ * 「留下一张写着别人事情的卡片」。 */
+.workspace [hidden] { display: none !important; }
+
+/* ---- 桌宠「小优」不再吃点击 --------------------------------------------------
+ *
+ * 它是 `z-index: 1505` 的一块 canvas，沿屏幕底边漫游，**压住谁谁点不动**。
+ * 实测（真实 `Input.dispatchMouseEvent`，不是 `element.click()`）：
+ * 某一轮它正好停在「⌨ 用打字说」上，那一下点击到达按钮 **0 次**——
+ * 而那个按钮的注释写着「Firefox 上没有 SpeechRecognition，这里是**唯一**的
+ * 输入通道」。同一份代码连跑三轮：全通 / 88% 处被挡 / 五点全被挡。
+ *
+ * 量过它的画布：112×180 CSS 像素，而真正画了东西的只占 **34.8%**
+ * （精灵从 47.8% 高度才开始）——**近一半的遮挡面积是全透明的空白**。
+ *
+ * ## 这一行删掉了什么，为什么还是要删
+ *
+ * canvas 上挂着 `pointerdown/move/up` 做「摸小优」和拖拽。这一行之后
+ * 两个交互都没了，它变成纯装饰。**这是有意的取舍，不是疏漏**：
+ *
+ *   · 一个装饰元素永远不该吃掉一次真实控件的点击，这条线在适老化产品上
+ *     没有商量余地；
+ *   · 原来的规避办法是「先把小优拖到左下角」——而它不再挡任何东西之后，
+ *     那个规避本身也就不需要了。
+ *
+ * 剪一半（`clip-path` 去掉上方空白）能保住交互，但精灵自己那六成照样挡，
+ * 而且它有动画帧，剪多了会削到画面。改漫游范围要动交付包 27 KB 的
+ * `yoli-mascot.js`，而「哪里有控件」是动态的。
+ *
+ * 为什么四十多轮闸门没红：全仓每个仪器都用 `element.click()`，
+ * 而合成事件不做命中测试——盖在上面的东西一概不存在。 */
+.youhuo-robot-mascot,
+.youhuo-robot-canvas { pointer-events: none !important; }
+
+/* ---- 触控目标的下限 ---------------------------------------------------------
+ *
+ * 实测（375×812 真手机视口，`transform: none`，所以量到的就是布局高度）：
+ *
+ *     ⌨ 用打字说   41px      交水费/挂号/上次的血压  43px
+ *     返回首页     44px      慢/舒适/正常/较大/大/特大  44px
+ *     ☎ 联系家人   45px
+ *
+ * 十二个控件低于 48。对照设计二（`/elder2`）：`#typeInstead` 是 56×132，
+ * 整页**一个**低于 48 的控件都没有。同一条规矩，设计三没守。
+ *
+ * 用 `min-height` 而不是加内边距：上面那几条的 padding 跟着
+ * `--e3-font-scale` 缩放，字号调小的时候又会掉回 48 以下。下限得是硬地板。
+ *
+ * 两个给 56 的是**关键动作**：
+ *   `.keyboard-entry` —— 语音失败时唯一的入口（Firefox 上没有 Web Speech，
+ *                        权限被拒、没麦克风、网络不好时也都会失败）；
+ *   `.contact-family` —— 她够到家人的那一下。
+ */
+.keyboard-entry,
+.contact-family {
+  min-height: 56px;
+}
+.quick-chip,
+.seg-btn,
+.v3-home {
+  min-height: 48px;
+}
+/* ---- 麦克风有一小半在屏幕外 -------------------------------------------------
+ *
+ * 375×812（真手机竖屏）上，`#voiceOrb` 的布局位置是 256 → 476，而视口只有 375。
+ * **101px 在屏幕外，占它自己的 46%**。而且 `documentElement.scrollWidth` 就是
+ * 375——横向没得滚，那部分不是「划一下能看到」，是**永远够不着**。
+ *
+ * 这一页是语音优先的，麦克风是她要按的**那一个**键。
+ *
+ * 为什么会这样：**格子按百分比，里头的东西按像素。**
+ *
+ *     .voice-zone   position:absolute; right:2%; width:46%   —— 跟着右栏缩
+ *     .voice-orb    width:220px（`@media(max-width:1100px)`）—— 不缩
+ *
+ * 右栏在 375 上只有 218px 宽，`.voice-zone` 于是只剩 100px，而那颗 220px 的球
+ * 把网格轨道撑成 220px，从格子左缘一路溢出去。屏幕越窄溢得越多。
+ *
+ * 算出来：球的左缘 = 0.6826 × 视口宽（在 375 上正好 256，实测吻合）。
+ * 于是 220 > (1 − 0.6826) × 宽 时溢出，即**宽 < 693 就露不全**。
+ * 两边都量过：**680 上 R=684 溢出 4px；700 上 R=698 刚好进去**。
+ * 所以断点不能拍在 640——641…693 那一段照样是坏的。
+ *
+ * ## 试过一版更「像样」的改法，它更糟
+ *
+ * 把格子拉满右栏（left:0;right:0;width:100%）再把球缩到 40vw，
+ * 375 上确实进来了（165 → 338），可是在 **680…700** 上球被往左推了 118px，
+ * 正好推到快捷行底下：
+ *
+ *     elementFromPoint(球心) === BUTTON.quick-chip     （680）
+ *     elementFromPoint(球心) === DIV.quick-row         （700）
+ *
+ * 也就是**球在屏幕里了，但按不动**——比原来的缺陷还坏，而且只看「在不在屏幕里」
+ * 的判据根本看不见它。所以这里只缩不挪：球只会占它原来那块地方的一小块，
+ * 不可能新盖住谁，也不可能被谁新盖住。
+ *
+ * ## 为什么是 28vw 和 785px
+ *
+ * 28vw 不是凑的。整页的内容栏左右各留 3.8% 的天地，所以
+ * (1 − 0.6826 − 0.038) ≈ 0.28——**球的右缘正好落在内容栏的右缘上**，
+ * 跟这一页别的东西对齐。实测 320 / 375 / 414 / 680 / 700 五个宽度上
+ * 「球的右缘 − .page-grid 的右缘」都等于 0。
+ *
+ * 785 也不是拍的：28vw 等于 220px 的那个宽度就是 785.7。断点摆在两条公式
+ * 相交的地方，**接缝处不跳**——实测 785 上是 220px，786 上也是 220px。
+ * 断点在这里只是「别盖掉桌面端」的技术边界，不是一个设计选择。
+ *
+ * 实测（缩之后，左缘不动）：
+ *
+ *     320   90px   218 → 308     375  105px   256 → 361
+ *     414  116px   283 → 399     680  190px   464 → 654
+ *     700  196px   478 → 674     786+ 不变（220px，桌面端一点没动）
+ *
+ * 每一个宽度上 elementFromPoint(球心) 都还是 voiceOrb 本人，
+ * 而且球跟标题的重叠面积反而小了（375 上 11665px² → 8875px²）。 */
+@media (max-width: 785px) {
+  .voice-orb {
+    width: 28vw;
+    height: 28vw;
+  }
+}
+
+/* ---- 单列窄屏上球还得再矮一点：整颗露在固定底栏之上 -------------------------
+ *
+ * 上面那条 `order: -1` 把「说话」搬到了最前面，可球还是 28vw——**它跟着宽度长，
+ * 底栏不跟着长**。所以宽度一大，球的下沿又探回底栏里了：
+ *
+ *     540   球 549..700（151px），底栏上沿 721 —— 净空 21px
+ *     600   球 535..703（168px）                —— 18px
+ *     640   球 540..720（180px）                —— **1px**
+ *     680   球 545..736（191px）                —— -15px（探进去了）
+ *     700   球 548..744（196px）                —— -23px
+ *     720   球 550..753（202px）                —— -32px
+ *     740   球 553..761（208px）                —— -40px
+ *     760   球 556..769（213px）                —— -48px
+ *
+ * 25 点采样里最靠下那一点（0.9 处）在 700 以后也进了底栏：余量 4 / −4 / −11 /
+ * −19 / −26。而门禁只测到 680，680 上只差 4px 就翻车——**700/720/740/760
+ * 是门禁盖不住的真空档**。华为折叠屏合起来、平板分屏，正好落在这段里。
+ *
+ * 球的位置是上面几块（身份岛 + 两张时间线卡）顶下来的。`order:-1` 之后它的上沿
+ * 在 526（360 宽）到 556（760 宽）之间，几乎不动；底栏上沿固定 721。于是
+ * 「球能用的高度」在 165px（760 宽）到 195px（360 宽）之间。取 **140px** 做上限：
+ * 最窄的那一档也还剩 25px 净空。
+ *
+ * 用 `min()` 而不是写死一个数：28vw < 140px 的宽度（500px 以下，也就是 360 /
+ * 375 / 390 / 412 / 480 这些真手机）**一个数都不变**，只有平板、折叠屏这类
+ * 500~760 宽的设备才收。而且这一档本来就是为了「球别溢出右边界」立的
+ * （KNOWN_ISSUES 118），`min()` 只会让它更小，不可能重新溢出——方向是安全的。
+ *
+ * 改完实测（812 高，净空 = 底栏上沿 − 球下沿，负值=被压住；左边是改前，右边改后）：
+ *
+ *     360  101px  净空  94 →  94     375  105px   88 →  88
+ *     390  109px         82 →  82     412  115px   73 →  73
+ *     480  134px         45 →  45     540  151px   21 →  32
+ *     560  157px         34 →  51     600  168px   18 →  46
+ *     640  180px          1 →  41     680  191px  -15 →  35
+ *     700  196px        -23 →  33     720  202px  -32 →  30
+ *     740  208px        -40 →  28     760  213px  -48 →  25
+ *
+ * 500px 以下一个数没变（球的直径还是 28vw），500~760 全部转正，
+ * 最小余量从 −48px 变成 +25px。球的直径 140px 仍是全站点击下限 48px
+ * （`tokens.css:260`）的 2.9 倍。 */
+@media (max-width: 760px) {
+  .voice-orb {
+    width: min(28vw, 140px);
+    height: min(28vw, 140px);
+  }
+}
+
+/* ---- 矮屏上把时间线挪到主操作键后面 -----------------------------------------
+ *
+ * 上面两条只解决了「宽度」。**高度**还有一处，而且是更常见的机型：
+ *
+ *     375×667（iPhone SE 三代，2022 年还在卖）  球 512..617，底栏上沿 576
+ *                                               → 净空 **−41px**，整颗躲着
+ *     360×640（老安卓 720p）                    球 509..611，底栏上沿 549
+ *                                               → 净空 **−62px**
+ *
+ * 原因是麦克风上面那一叠跟高度没关系：顶栏 56 + 身份岛 191 + 两张时间线卡
+ * 78+10+78 ≈ 502，球的上沿在 509~512 之间**几乎不动**；矮屏只是把底栏上沿
+ * （= 视口高 − 91）压下来了。扫下来是这样（宽 375）：
+ *
+ *     640  −68   667  −41   690  −18   700   −8   710    2   720   12
+ *     730   22   740   32   750   42   760   52   780   56   800   76
+ *
+ * **733px 上下是分界**：矮过它就整颗躲进底栏，高过它也只是「勉强露出」。
+ *
+ * 这里不改内容，只改顺序：`.left-column` 用 `display:contents` 把自己的
+ * 两个孩子（`.identity-island`、`.left-story`）交给 `.page-grid` 排，然后
+ * 让「今天的事」排在 `.right-stage` 后面。于是矮屏第一屏变成
+ * **身份 → 说话 →（往下滚才是今天的事）**——一条记录都没少，只是顺序变了，
+ * 跟桌面两栏里「身份在左上、麦克风在右上、时间线在左下」的读法是一致的。
+ *
+ * `display:contents` 只在一个 `<div>` 上用，它自己没有语义也没有背景；
+ * 只在 **窄（≤760）且矮（≤740）** 时生效，平板和桌面一个数都不碰。
+ *
+ * 改完实测（净空 = 底栏上沿 − 球下沿）：
+ *
+ *     360×640   -62 →  +161        375×667   -41 →  +182
+ *     375×690   -18 →  +205        375×710     2 →  +225
+ *     375×740   32 →  +255        375×750   42 →   42（断点之上，原样）
+ *
+ * 最后那一行是**断点的另一边**：750 高不触发重排，净空 42px，是"没重排"这侧
+ * 最紧的一档。两侧都合格，所以断点摆在哪都行；把它也钉进判据，是为了以后有人
+ * 把身份岛调高时，这一档先红。
+ *
+ * 上面「−62 / −41」那两档是**门禁（只测 812 高）根本看不见的**。
+ * （两次探针之间同一档会差 ±1px，上面取的是连跑一次的那一组数。） */
+@media (max-width: 760px) and (max-height: 740px) {
+  .left-column { display: contents; }
+  .identity-island { order: 0; }
+  .right-stage { order: 1; }
+  .left-story { order: 2; }
+}

@@ -62,6 +62,12 @@ HUMID_PCT = 70.0
 #: 室内照度低于此值，正常活动（读报、走动）已经吃力。
 DARK_LUX = 50.0
 
+#: ③ 灯光建议的三档亮度。取名字而不是就地写数字，是为了判据能引它们来比较：一份把
+#: 45 / 70 手抄进去的判据，只会在有人改了这三个数之后才红，而那时它报的是错的那件事。
+LIGHT_SOOTHE_PCT = 45     # 显著偏离：压暗 + 慢呼吸
+LIGHT_COOL_PCT = 55       # 屋里热：只换色温，亮度略压
+LIGHT_BRIGHTEN_PCT = 70   # 屋里暗：提亮
+
 
 def _clock(minutes: float) -> str:
     total = int(round(minutes)) % 1440
@@ -94,6 +100,12 @@ class BaselineAnalyzer:
     #: 是今天早上的起床。上界把这种情况排除掉：过了六小时，看到的就是新的一天了。
     SLEEP_GRACE_MINUTES: float = 45.0
     SLEEP_WINDOW_MINUTES: float = 6 * 60
+
+    #: 时刻类通道（起床 / 就寝 / 服药）晚于平常多久之后，才把「今天一条记录都没有」
+    #: 算成「本该有却没有」（UNKNOWN），而不是「还没到时候」（PENDING）。
+    #:
+    #: 和就寝的宽限取同一个数：它们是同一类判断，没有理由各用一个数。
+    CLOCK_GRACE_MINUTES: float = 45.0
 
     @classmethod
     def snapshot(
@@ -134,6 +146,24 @@ class BaselineAnalyzer:
                     channel=channel, verdict=Verdict.PENDING, observed=None,
                     center=baseline.center, delta_minutes=None, sigma=None,
                     explanation=f"{label}：今天还没过完，现在下结论太早。",
+                )
+            elif (
+                observed is None
+                and now_minutes is not None
+                and baseline.established
+                and cls._too_early_with_no_data(channel, baseline.center, now_minutes)
+            ):
+                # 一条记录都还没有，而今天也还没走到该有记录的时候。
+                #
+                # 上面那一手只覆盖「有数值但被压住」（它要求 `today_values` 里有值），
+                # 于是凌晨这种一条都没有的正常情形落到了 UNKNOWN——而 UNKNOWN 在
+                # `overall_verdict` 里排在 TYPICAL 之上，日报头条就成了
+                # 「今天该有的记录还没出现……建议打个电话问一声」。
+                # 实测 2026-08-28 00:40，点名的通道是「起床」：那个时候他当然还没起。
+                deviation = ChannelDeviation(
+                    channel=channel, verdict=Verdict.PENDING, observed=None,
+                    center=baseline.center, delta_minutes=None, sigma=None,
+                    explanation=f"{label}：今天还没走到该有记录的时候。",
                 )
             raw_deviations.append(deviation)
 
@@ -198,6 +228,33 @@ class BaselineAnalyzer:
                 return None
             return observed
         return observed
+
+    @classmethod
+    def _too_early_with_no_data(
+        cls, channel: Channel, center: float, now_minutes: float
+    ) -> bool:
+        """今天**一条记录都还没有**时，该说「太早」还是该说「不知道」。
+
+        和 `_withhold_if_premature` 是一对，入口不同：那个管「有数值，但现在
+        还不能拿它下结论」，这个管「连一条记录都没有」。后者原先没有任何时刻规则
+        ——`_withhold_if_premature` 第一行就 `if observed is None: return None`，
+        而 `snapshot()` 里那一手 PENDING 改正要求 `today_values` 里有值。
+        于是凌晨的正常情形（今天才过了几十分钟，当然还没有记录）被判成了 UNKNOWN，
+        而 `overall_verdict` 把 UNKNOWN 排在 TYPICAL 之上，日报头条于是变成
+        「今天该有的记录还没出现……建议打个电话问一声」——每天午夜到起床之间都如此。
+        实测 00:40 就是这句话，点名的通道是「起床」。
+
+        **刻意不用圆周差。** 圆周差量的是「距**昨天**那个平常时刻过了多久」：
+        平常 21:30 就寝，00:40 时圆周差 190 分钟，正落在就寝判定窗口内，
+        可要判的是**今天**的就寝——那还有二十来个小时。这就是
+        `SLEEP_WINDOW_MINUTES` 那段注释里说的对跖点问题换了个入口。
+        一条记录都没有的时候，要问的是「今天走到那个点了吗」，
+        那是一个同日内的比较。
+        """
+        if channel in (Channel.OUTING, Channel.CONVERSATION):
+            # 计数类：一天没过完，次数当然还没攒够。和压制「偏少」用同一个刻度。
+            return now_minutes < cls.COUNT_CUTOFF_MINUTES
+        return now_minutes < center + cls.CLOCK_GRACE_MINUTES
 
     @staticmethod
     def _format(channel: Channel, value: float | None) -> str | None:
@@ -348,6 +405,13 @@ class CareComposer:
     ) -> CareAction:
         marked = [d for d in snapshot.deviations if d.verdict is Verdict.MARKED]
         notice = [d for d in snapshot.deviations if d.verdict is Verdict.NOTICE]
+        #: 「本该有记录却一条都没有」。**不能和上面两组一起进偏离循环**——那些话都是
+        #: 「比平常晚 / 比平常少」，而这一组的事实是「没有数」，没有可比的量。
+        unknown = [d for d in snapshot.deviations if d.verdict is Verdict.UNKNOWN]
+        #: 真的判成「和他平常一样」的通道。末尾那句安心话要靠它，而不是靠
+        #: 「没有偏离」——全是 PENDING（还没到能下结论的时候）也是没有偏离，
+        #: 可那时候说「各通道均在个人常态范围内」是假的。
+        typical = [d for d in snapshot.deviations if d.verdict is Verdict.TYPICAL]
         comforts = set(environment.comforts)
 
         spoken: list[str] = []
@@ -395,34 +459,105 @@ class CareComposer:
         if EnvironmentComfort.DRY in comforts:
             spoken.append("屋里比较干，多喝点水。")
             rationale.append("湿度低于 30%。")
+        elif EnvironmentComfort.HUMID in comforts:
+            # 湿度的两侧是一对，和 COLD/HOT 一样：`EnvironmentReader` 用同一个
+            # `if/elif` 判它们，所以这里也用 `elif`——两句话不可能同时成立。
+            #
+            # 原先这一支根本不存在：读数里湿度 95% 会被算成"潮"，`environment_note`
+            # 照实写着"湿度 95%"，而这里一句话都不说，于是走到末尾的兜底句，对老人
+            # 说出"今天一切都和平常一样"——系统知道屋里很潮，同一句话里还报了数，
+            # 却说一切正常。`EnvironmentReading.comforts` 不是任何端点的返回类型，
+            # 所以这一支当时彻底没有出口，从外面看不出来。
+            #
+            # 只说一句，不附带任何设备建议：`LightCue` 只描述灯，本项目没有除湿
+            # 设备可以联动，而假装能控制别人家的电器是这个项目一贯拒绝的做法。
+            # 措辞按"偏离不是指控"来——描述屋子，不评价住在屋里的人。
+            spoken.append("屋里有点潮，开窗透透气吧。")
+            rationale.append("湿度高于 70%。")
         if EnvironmentComfort.DARK in comforts:
             spoken.append("屋里有点暗，我把灯调亮一点好吗？")
             rationale.append("照度低于 50 lux，正常读报走动已经吃力。")
 
         # --- ③ 灯光与模式 ---
+        #
+        # 色温先算一次，下面每一支共用。「双色」的两个取值就在这一行：热的屋子给冷色，
+        # 其余（凉、适中、以及根本没读数）给暖色。刻意不写成 `COLD in comforts` 的正面
+        # 判断——「没有传感器」和「屋里凉」不是同一件事，而没有读数时的默认必须是暖光。
+        #
+        # 为什么要有冷色那一支：在这之前 `warm` 是一个只能取 True 的 bool。于是 34℃ 的
+        # 屋子遇上显著偏离时，同一个响应里 `spoken` 刚说完「屋里有点热」，`light` 紧接着
+        # 建议一盏**暖**光——两句话朝相反的方向。
+        #
+        # 这不降温，也不声称降温：`LightCue` 从头到尾只是建议（`applied` 恒为 False），
+        # 色温改变的是体感冷暖的方向。
+        warm = EnvironmentComfort.HOT not in comforts
         light: LightCue | None = None
         suggest_mode: str | None = None
         if marked:
             # 显著偏离时主动切到陪伴模式：这时老人需要的是有人说话，不是一个办事菜单。
             suggest_mode = "companion"
             light = LightCue(
-                brightness_pct=45,
-                warm=True,
+                brightness_pct=LIGHT_SOOTHE_PCT,
+                warm=warm,
                 breathing=True,
-                reason="作息显著偏离常态，切到暖光慢呼吸，配合无忧伴陪伴模式主动安抚。",
+                reason=(
+                    ("作息显著偏离常态，切到暖光慢呼吸，" if warm
+                     else "作息显著偏离常态，切到慢呼吸；屋里偏热，色温同时转冷，")
+                    + "配合无忧伴陪伴模式主动安抚。"
+                ),
             )
             rationale.append("显著偏离，建议切换陪伴模式。")
         elif EnvironmentComfort.DARK in comforts:
             light = LightCue(
-                brightness_pct=70,
-                warm=True,
+                brightness_pct=LIGHT_BRIGHTEN_PCT,
+                warm=warm,
                 breathing=False,
-                reason="室内照度过低，建议提高亮度。",
+                reason=("室内照度过低，建议提高亮度。" if warm
+                        else "室内照度过低，建议提高亮度；屋里偏热，色温转冷。"),
+            )
+        elif EnvironmentComfort.HOT in comforts:
+            # 不是偏离，也不暗，就是屋里热。在这之前这一档回 `light: null`——而它恰好是
+            # 冷色唯一能干活的一档：屋里不暗，没有任何提亮的理由，能调的只有色温。亮度
+            # 往下压一档而不是维持，是因为一盏更亮的灯本身就是一个「热」的视觉线索；不开
+            # 呼吸，因为呼吸对应的是安抚，而这一档没有人需要被安抚。
+            light = LightCue(
+                brightness_pct=LIGHT_COOL_PCT,
+                warm=False,
+                breathing=False,
+                reason="室温高于 30℃，建议转冷色并略压亮度。这只改变体感，不降温。",
             )
 
-        if not spoken:
+        if not spoken and unknown:
+            # 「不知道」不是「正常」。这一支原先不存在：`marked` 和 `notice` 都空，
+            # 就直接走下面那句「今天一切都和平常一样」——而 `overall_verdict` 早就
+            # 为这件事改过排序（它的注释：「四个通道 UNKNOWN、一个 TYPICAL，而原来的
+            # 顺序让那一个 TYPICAL 赢了，日报头条写『今天和他平常差不多』」），
+            # 兄弟函数没有跟上。
+            #
+            # 实测同一份 snapshot：家属那边的头条是「今天该有的记录还没出现……建议
+            # 打个电话问一声」，而这里对老人说「今天一切都和平常一样，您安心」。
+            #
+            # 措辞按「偏离不是指控」写：说的是**我这边没记到**，不是「您不正常」。
+            # 也不催他做什么——他可能正在睡觉。
+            names = "、".join(CHANNEL_LABELS[d.channel] for d in unknown)
+            spoken.append(f"今天我这边还没记到您的{names}。您方便的时候跟我说一声就好。")
+            rationale.append(
+                f"有通道今天该有记录而没有（{names}）——是「不知道」，不是「正常」。")
+        elif not spoken and typical:
             spoken.append("今天一切都和平常一样，您安心。")
             rationale.append("各通道均在个人常态范围内。")
+        elif not spoken:
+            # 一个通道都还没判出来（全是 PENDING）。原先这里照样说「一切都和平常
+            # 一样」，而 `rationale` 写的是「各通道均在个人常态范围内」——那句话在
+            # 没有任何通道下过结论时是假的。
+            #
+            # 实测 00:46（修好 UNKNOWN 那一支之后）：页头已经正确地说「今天还没过完，
+            # 还不到下结论的时候」，而这里对老人说「一切都和平常一样，您安心」。
+            # 同一份 snapshot 两句话对不上。
+            #
+            # 说法按「偏离不是指控」写，也不催他做任何事：这个时候通常是凌晨。
+            spoken.append("今天才刚开始，我先不急着说什么，有事我会喊您。")
+            rationale.append("今天还没走到能下结论的时候，不做任何偏离判断。")
 
         return CareAction(
             elder_id=snapshot.elder_id,
@@ -586,13 +721,27 @@ class FallbackAlerting:
                 baseline_deviated=True, errand_at_risk=False,
             )
         if at_risk:
+            # 这一句**只说决策，不替他断言状态**。
+            #
+            # 原先写的是「但他今天状态和平常一样」，而 `deviated` 只认 MARKED——
+            # NOTICE（轻度偏离）、UNKNOWN（该有记录而没有）、PENDING（还没到能下
+            # 结论的时候）三种都会走到这里，全被说成「和平常一样」。
+            # 实测 `/family2` 同一屏上：作息那一格写着「还不好说」，这一句写着
+            # 「和平常一样」。
+            #
+            # 状态本来就在同一屏上由 `headline` / 各通道说清楚了，这一句不必再说
+            # 一遍，更不该说错。同一条原则见
+            # `test_every_comfort_it_detects_gets_said`：报了数，就不许说一切照常。
             return AlertDecision(
                 push=False, channel="digest",
-                reason="有事情临期，但他今天状态和平常一样；先按既有提醒阶梯提醒他本人。",
+                reason="有事情临期，而今天的作息没到需要单独打扰您的程度；"
+                       "先按既有提醒阶梯提醒他本人。",
                 baseline_deviated=False, errand_at_risk=True,
             )
+        # 同上：这一支也不许说「一切照常」。它成立的条件只是「没有 MARKED、
+        # 也没有事情要误」——UNKNOWN 和 PENDING 都落在这里。
         return AlertDecision(
             push=False, channel="none",
-            reason="今天一切照常，不需要通知。",
+            reason="今天没有需要单独打扰您的事。",
             baseline_deviated=False, errand_at_risk=False,
         )

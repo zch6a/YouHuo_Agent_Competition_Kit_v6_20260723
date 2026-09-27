@@ -40,6 +40,27 @@ from .v5_models import (
 from .v5_services import MetricsCalculator, PrivacyRedactor, SagaCatalog, SyncConflictPolicy
 
 
+#: 紧急访问的四个范围，各配一句中文。
+#:
+#: 原来那句通知直接把范围名拼进去，于是她屏幕上是
+#: 「家属因紧急情况临时查看：**location**。」——`location` 是内部名。
+#: 和第 82 条那个 `unit` / `value` 是同一类：库里的字段名念给了老人听。
+#:
+#: 四个合法范围在 `create_break_glass` 里是写死的白名单，所以这张表能配全；
+#: 判据钉住「白名单里每一个都得有词」——漏一个在测试里红，不在她屏幕上红。
+_SCOPE_WORDS: dict[str, str] = {
+    "location": "位置",
+    "health_summary": "身体情况",
+    "emergency_contacts": "紧急联系人",
+    "active_tasks": "正在办的事",
+}
+
+
+def _scope_words(scopes) -> str:
+    """把范围名说成人话。配不上的说「其他资料」，不把内部名念给她听。"""
+    return "、".join(_SCOPE_WORDS.get(str(s), "其他资料") for s in scopes) or "一项资料"
+
+
 class V5FeatureStore:
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -618,6 +639,18 @@ class V5FeatureStore:
                 result_value = payload.value
             else:
                 current_value = json.loads(current["value_json"])
+                # 按哪个敏感度判：**库里那一列和这次报上来的，取更严的。**
+                #
+                # 原先下面传的是 `payload.sensitivity`，也就是由写入方自己声明
+                # 这条数据敏不敏感（而那个字段的默认值就是 `normal`）。
+                # 实测同一个操作只改自报的标签：诚实报 high → conflict，
+                # 自报 normal → applied，一个服药剂量从 5 静默变成 500。
+                #
+                # 算在整条 if 链**之前**：放在链中间要把 `elif` 改成 `if`，
+                # 那会让「内容一致」那一支不再短路，继续落到下面把 outcome 覆盖掉。
+                governing = SyncConflictPolicy.governing_sensitivity(
+                    current["sensitivity"], payload.sensitivity
+                )
                 if current_value == payload.value:
                     version = current["version"]
                     outcome = SyncOutcome.DUPLICATE
@@ -625,7 +658,7 @@ class V5FeatureStore:
                     message = "内容与云端一致，无需重复更新。"
                     result_value = current_value
                 elif payload.base_version == current["version"] or (
-                    SyncConflictPolicy.may_auto_merge(payload.sensitivity, payload.base_version, current["version"])
+                    SyncConflictPolicy.may_auto_merge(governing, payload.base_version, current["version"])
                     and payload.lamport_clock > current["lamport_clock"]
                 ):
                     version = current["version"] + 1
@@ -637,7 +670,10 @@ class V5FeatureStore:
                             version,
                             max(payload.lamport_clock, current["lamport_clock"] + 1),
                             payload.device_id,
-                            payload.sensitivity.value,
+                            # **不降级。** 原先这里写 `payload.sensitivity.value`，
+                            # 于是一次成功的降级会留存在库里，之后每一次写入
+                            # 都不再受保护——一次谎报换来永久的宽松。
+                            governing.value,
                             iso(now),
                             family_id,
                             payload.entity_type,
@@ -667,7 +703,10 @@ class V5FeatureStore:
                             incoming_json,
                             current["version"],
                             payload.base_version,
-                            payload.sensitivity.value,
+                            # 冲突记录上也记**判定用的那个**敏感度，不是写入方
+                            # 自报的那个。老人或家属看这条冲突时，看到的该是
+                            # 「这是高敏感数据」，而不是对方声称的等级。
+                            governing.value,
                             "open",
                             iso(now),
                         ),
@@ -841,7 +880,8 @@ class V5FeatureStore:
             family_id,
             ActorRole.ELDER,
             "BREAK_GLASS_OPENED",
-            f"家属因紧急情况临时查看：{'、'.join(record.scopes)}。访问将在{payload.duration_minutes}分钟后自动失效。",
+            f"家属因紧急情况临时查看：{_scope_words(record.scopes)}。"
+            f"访问将在{payload.duration_minutes}分钟后自动失效。",
             record.id,
         )
         self.db.add_notification(
@@ -932,6 +972,36 @@ class V5FeatureStore:
                 ),
             )
 
+    def recorded_proof_json(self, bundle_id: str) -> str | None:
+        """这份凭据在服务器上留存的**原文**；没有留存就 None。
+
+        ## 为什么需要这个方法
+
+        `store_proof` 一直在写 `proof_bundles_v5`，而**没有任何地方读它**
+        （扫过一遍：这张表写 1 读 0）。后果不是少一个功能，是
+        `POST /v5/proofs/verify` 的每一项检查都在拿提交上来的那份包
+        自己跟自己对——root 跟它自己声称的 root 比、digest 跟它自己声称的
+        digest 比，而 `audit_chain_claim` 干脆就是 `bundle.audit_chain_valid`，
+        包自己声明自己有效。
+
+        于是任何人都能凭空造一份自洽的包（事件随便编、两个哈希算对、
+        `audit_chain_valid` 填 true），校验就回「通过」。**而真正那一份就在
+        这张表里。** 这个产品的立身之本是「说到做到、每一步可核验」，
+        校验不看留存的那一份，「可核验」就只是「自洽」。
+
+        ## 为什么回字符串而不是重建成模型
+
+        比较要的是逐字节相同。`store_proof` 写进去的就是
+        `canonical_json(bundle.model_dump(mode="json"))`，直接比这个字符串，
+        `generated_at` 这种不参与 `proof_digest` 计算的字段也一样抓得到
+        ——倒签一份凭据的时间正是要防的事之一。
+        多一次「解析再序列化」，就多一个两边可能不一致的地方。
+        """
+        row = self.conn.execute(
+            "SELECT bundle_json FROM proof_bundles_v5 WHERE id=?", (bundle_id,)
+        ).fetchone()
+        return str(row["bundle_json"]) if row is not None else None
+
     # ----- privacy -----
     _PRIVACY_TABLES: dict[PrivacyCategory, tuple[str, str]] = {
         PrivacyCategory.EMOTION_EVENTS: ("emotion_events", "elder_id"),
@@ -973,6 +1043,51 @@ class V5FeatureStore:
             note="导出已隐藏常见手机号、身份证号、账号和秘密字段；审计链与法定留痕不包含在可删除数据中。",
         )
 
+    @staticmethod
+    def _erase_rows_derived_from_documents(
+        conn: Any, family_id: str, elder_id: str, doc_ids: list[str]
+    ) -> int:
+        """删就医单据时，连它**派生出来的那一行**一起删。
+
+        ## 缺陷
+
+        交一张检验报告时，`v4_api` 会同时做两件事：写 `medical_documents_v4`，
+        以及往 `health_events_v4` 写一条 `payload` 带
+        `{document_id, measurements, follow_up_date}` 的记录。而
+        `_PRIVACY_TABLES` 是一张「类别 → 一张表」的映射，删「就医单据」只删前者。
+
+        实测（交一张写着「空腹血糖 7.8 mmol/L」的报告，然后老人删掉就医单据）：
+
+            删除回话   「已经删掉：就医单据 1 条」
+            删除之后   GET /v4/health/events/{elder}（**家属可读**）里
+                       仍然有那条 payload：空腹血糖 7.8、document_id=medicaldoc-…
+            而那个     GET /v4/medical-documents/{那个 id} 已经 404
+
+        也就是说：她删了就医单据，系统说删了，**数值还在，而且家属看得见**。
+        那条回话同时列着「还留着」的三样（审计链、审批证据摘要、外部回执），
+        派生出来的体检数值不在那三样里——所以这不是「保留项」，是漏删。
+
+        ## 为什么按 document_id 精确删，不按类别整表删
+
+        `health_events_v4` 自己是另一个可删类别（「身体数据」）。她删「就医单据」
+        的时候不该顺手清掉她**手记**的血压体重。所以只删 payload 里引用了
+        这次被删掉的那几个 document_id 的行——那些行的存在完全来自那份单据。
+
+        比较用 `LIKE`：`payload_json` 是 `canonical_json` 出来的串，
+        id 形如 `medicaldoc-<hex>`，不会成为别的值的子串。
+        """
+        if not doc_ids:
+            return 0
+        removed = 0
+        for doc_id in doc_ids:
+            cursor = conn.execute(
+                "DELETE FROM health_events_v4 WHERE family_id=? AND elder_id=? "
+                "AND payload_json LIKE ?",
+                (family_id, elder_id, f'%"{doc_id}"%'),
+            )
+            removed += int(cursor.rowcount)
+        return removed
+
     def privacy_erase(
         self,
         family_id: str,
@@ -989,10 +1104,39 @@ class V5FeatureStore:
             with self.db.transaction() as conn:
                 for category in categories:
                     table, elder_column = self._PRIVACY_TABLES[category]
+                    # 就医单据要连它派生出来的那一行一起删。见下面那个方法。
+                    doc_ids: list[str] = []
+                    if category is PrivacyCategory.MEDICAL_DOCUMENTS:
+                        doc_ids = [
+                            str(r["id"]) for r in conn.execute(
+                                "SELECT id FROM medical_documents_v4 "
+                                "WHERE family_id=? AND elder_id=?",
+                                (family_id, elder_id)).fetchall()
+                        ]
                     cursor = conn.execute(
                         f"DELETE FROM {table} WHERE family_id=? AND {elder_column}=?", (family_id, elder_id)
                     )
                     affected[category.value] = int(cursor.rowcount)
+                    if doc_ids:
+                        self._erase_rows_derived_from_documents(
+                            conn, family_id, elder_id, doc_ids)
+                # 她自己的那些执行留痕，一并删掉。
+                #
+                # `trace_spans_v5` 记的是「谁在什么时候做了哪一步、花了多久、
+                # 成没成」。attributes 是脱敏过的，但**时间线本身就是个人数据**。
+                # 而它原先不在任何类别里：她删完之后那张表一行不少，
+                # 而删除回话里也没提过它。
+                #
+                # 不给它单独一个类别（见方法文档）。这里的语义是「删得更干净」，
+                # 所以只要她删了任何一类，就把她的留痕一起清掉。
+                # 只在真删到东西时才写进 `affected`——常年 0 行的一项
+                # 会在她的记录页上多出一句「操作留痕 0 条」。
+                spans = conn.execute(
+                    "DELETE FROM trace_spans_v5 WHERE family_id=? AND actor_id=?",
+                    (family_id, elder_id),
+                )
+                if spans.rowcount and int(spans.rowcount) > 0:
+                    affected["trace_spans_v5"] = int(spans.rowcount)
                 conn.execute(
                     """INSERT INTO privacy_actions_v5(
                         id,family_id,elder_id,actor_id,action,categories_json,affected_json,created_at
@@ -1017,6 +1161,17 @@ class V5FeatureStore:
                         (family_id, elder_id),
                     ).fetchone()[0]
                 )
+            # 预览必须和执行说同一件事。这两个分支各写一遍计数，是这个函数
+            # 本来就有的形状——漏掉这一段，她会看到「要删 3 条」然后被删掉 5 条。
+            spans = int(
+                self.conn.execute(
+                    "SELECT COUNT(*) FROM trace_spans_v5 "
+                    "WHERE family_id=? AND actor_id=?",
+                    (family_id, elder_id),
+                ).fetchone()[0]
+            )
+            if spans > 0:
+                affected["trace_spans_v5"] = spans
         return PrivacyEraseResult(
             executed=execute,
             elder_id=elder_id,
@@ -1028,11 +1183,70 @@ class V5FeatureStore:
 
     # ----- traces / metrics -----
     def add_trace(self, family_id: str, actor_id: str, payload: TraceSpanCreate) -> None:
+        """记一条 span。
+
+        `POST /v5/traces` 是**只写**端点，这一版刻意不给它读回的路径——理由记在
+        `v5_api.add_trace` 上面。但「没人读」不等于「可以随便收」：写进去之后
+        再也没有任何查询会碰这张表，所以任何在写入时没被挡住的坏数据，**此后
+        永远不会被任何东西发现**。这个方法里的三道检查就是这张表唯一的读者。
+
+        ## 一、`span_id` 是全表主键，`INSERT OR REPLACE` 会把别人的行删掉
+
+        建表语句（本文件 `trace_spans_v5` 的 DDL）写的是 `span_id TEXT PRIMARY
+        KEY`——**不是** `(trace_id, span_id)`。配上 `INSERT OR REPLACE`，两条
+        不同的 trace 用了同一个 span 名字，后写的那条会把先写的那行整行删掉。
+
+        实测（同一户人家，两个不同身份）：
+
+            老人   POST trace_id=trace-A span_id=shared-id  -> 204
+            → 表里：('trace-A', 'shared-id', 'fam-demo', 'elder-demo', …)
+            家属   POST trace_id=trace-B span_id=shared-id  -> 204
+            → 表里：('trace-B', 'shared-id', 'fam-demo', 'daughter-demo', …)
+
+        trace-A 那一行没了，两边都收到 204。`span_id` 由客户端自己起名，
+        `"root"` / `"1"` 这种名字撞上只是时间问题。
+
+        改成：同一个 `(trace_id, span_id, family_id)` 重放仍然幂等（重试、
+        断线重传都要能过），但撞到**另一条 trace 或另一户人家**的既有行时报错，
+        不再静默覆盖。
+
+        ## 二、`parent_span_id` 是这条端点里最纯粹的「收下然后没人读」
+
+        它被收下、写进表，而唯一的读取是 `metrics()` 里一句
+        `COUNT(*) … WHERE status='error'`——span 树、父子关系一次都没被用过。
+        实测三种结构上不可能的父链全部 204：
+
+            span_id=c1 parent_span_id=c1              自己当自己的父亲
+            span_id=c2 parent_span_id=does-not-exist  指向不存在的节点
+            span_id=c3 parent_span_id=shared-id       指向另一条 trace 的节点
+
+        这里挡掉其中**与到达顺序无关**的两种：自环，以及父节点已经存在但属于
+        另一条 trace。刻意**不**要求父节点必须先到——批量上报里子 span 先到是
+        正常的，这个端点从来没承诺过顺序，凭空加一条顺序要求会把合法流量拦掉。
+        """
         duration = (payload.ended_at - payload.started_at).total_seconds()
         if duration < 0 or duration > 86400:
             raise ValueError("trace时间范围无效。")
+        if payload.parent_span_id == payload.span_id:
+            raise ValueError("span不能把自己当作父节点。")
         attributes = PrivacyRedactor.redact_value(payload.attributes)
         with self.db.transaction() as conn:
+            existing = conn.execute(
+                "SELECT trace_id,family_id FROM trace_spans_v5 WHERE span_id=?",
+                (payload.span_id,),
+            ).fetchone()
+            if existing is not None and (
+                str(existing["trace_id"]) != payload.trace_id
+                or str(existing["family_id"]) != family_id
+            ):
+                raise ValueError("该span编号已被另一条trace占用，请换一个编号。")
+            if payload.parent_span_id is not None:
+                parent = conn.execute(
+                    "SELECT trace_id FROM trace_spans_v5 WHERE span_id=?",
+                    (payload.parent_span_id,),
+                ).fetchone()
+                if parent is not None and str(parent["trace_id"]) != payload.trace_id:
+                    raise ValueError("父节点属于另一条trace。")
             conn.execute(
                 """INSERT OR REPLACE INTO trace_spans_v5(
                     trace_id,span_id,family_id,actor_id,parent_span_id,name,started_at,ended_at,status,attributes_json

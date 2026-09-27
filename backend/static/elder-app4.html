@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="优活" />
+<link rel="manifest" href="/static/manifest-app4.webmanifest" />
+<link rel="apple-touch-icon" href="/static/icons/elder-apple-180.png" />
+<!-- 状态栏 = 这一页自己的画布色（app4.css 里 html,body 的底色）。 -->
+<meta name="theme-color" content="#fffdf6">
+<title>优活 · 老人端</title>
+<link rel="stylesheet" href="/static/app4/app4.css">
+<script src="/static/app-bridge.js"></script>
+<script src="/static/register-sw.js"></script>
+<script src="/static/identity.js"></script>
+<script src="/static/common.js"></script>
+<script type="module" src="/static/app4/elder4.js"></script>
+<link rel="stylesheet" href="/static/app4/pet4.css">
+<script type="module" src="/static/app4/pet4.js"></script>
+<script type="module" src="/static/app4/shell4.js"></script>
+<link rel="stylesheet" href="/static/app4/surfaces4.css">
+<link rel="stylesheet" href="/static/app4/type4.css">
+<link rel="stylesheet" href="/static/app4/journal4.css">
+<link rel="stylesheet" href="/static/app4/pet-art4.css">
+<link rel="stylesheet" href="/static/control-states.css">
+</head>
+<body class="a4-elder" data-surface="consumer" data-listening="off">
+<div class="a4-app">
+
+  <header class="a4-top">
+    <div class="a4-loc">
+      <img class="a4-logo" src="/static/app4/youhuo-logo.png" width="52" height="44" alt="">
+      <h1 id="hello">您好</h1>
+    </div>
+    <button class="a4-mode-label" type="button" data-goto="mine">老人模式<span aria-hidden="true">⌄</span></button>
+  </header>
+
+  <!-- ============ 首页 ============ -->
+  <main class="a4-panel" data-panel="home">
+    <section class="a4-hero">
+      <p class="a4-date" id="heroDate">今天</p>
+      <h2 class="a4-hero-name" id="heroName">您好</h2>
+      
+      <img class="a4-hero-art" src="/static/app4/life-elder.webp" width="1536" height="1024" fetchpriority="high" alt="">
+      <button class="a4-hero-action" type="button" data-open-chat>
+        <svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#chat"/></svg>
+        <span>找小优帮忙</span>
+        <svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#chevron"/></svg>
+      </button>
+    </section>
+    <section class="a4-banner" aria-label="今天的要紧事">
+      <div class="a4-slides" id="slides">
+        <div class="a4-slide"><span class="tag">今天</span><strong>正在看今天的安排</strong></div>
+      </div>
+      <div class="a4-dots" aria-hidden="true"></div>
+    </section>
+
+    <nav class="a4-grid" aria-label="常用">
+      <button type="button" data-say="帮我挂个号"><span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#hospital"/></svg></span>挂号</button>
+      <button type="button" data-say="帮我交水费"><span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#bill"/></svg></span>缴费</button>
+      <button type="button" data-say="提醒我明天上午量血压"><span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#bell"/></svg></span>提醒</button>
+      <button type="button" data-say="我今天吃药了吗"><span class="ico g"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#pill"/></svg></span>吃药了吗</button>
+      <button type="button" data-say="我今天有什么事"><span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#calendar"/></svg></span>今天的事</button>
+      <button type="button" data-say="给女儿打电话"><span class="ico g"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#phone"/></svg></span>联系家人</button>
+      <button type="button" data-say="陪我聊聊天"><span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#chat"/></svg></span>无忧伴</button>
+      <button type="button" data-say="我有点不舒服"><span class="ico r"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#sos"/></svg></span>不舒服</button>
+    </nav>
+
+    <section class="a4-sec">
+      <div class="a4-sec-head">
+        <h2>今天要做的事</h2>
+        <button class="a4-link" type="button" data-goto="record">全部<svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#chevron"/></svg></button>
+      </div>
+      <div class="a4-card" id="todayList"><p class="a4-empty">正在看今天的安排</p></div>
+    </section>
+
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>吃药</h2></div>
+      <div class="a4-card" id="medCard"><p class="a4-empty">正在看吃药的记录</p></div>
+    </section>
+
+    <section class="a4-sec">
+      <div class="a4-sec-head">
+        <h2>家人</h2>
+        <button class="a4-link" type="button" data-goto="family">更多<svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#chevron"/></svg></button>
+      </div>
+      <div class="a4-chips" id="familyChips"></div>
+    </section>
+  </main>
+
+  <!-- ============ 记录 ============ -->
+  <main class="a4-panel" data-panel="record" hidden>
+<section class="a4-sec a4-settings"><button type="button" class="a4-setting" data-feature="history"><span>办事进度与详情</span><span aria-hidden="true">›</span></button></section>
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>今天过得怎么样</h2></div>
+      <div class="a4-card"><p class="a4-empty" id="dayWord">正在看</p></div>
+    </section>
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>提醒</h2><button type="button" class="a4-link" data-feature="reminders">查看与确认 ›</button></div>
+      <div class="a4-card" id="allReminders"><p class="a4-empty">正在看</p></div>
+    </section>
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>收到的消息</h2></div>
+      <div class="a4-card" id="inbox"><p class="a4-empty">正在看</p></div>
+    </section>
+  </main>
+
+  <!-- ============ 家人 ============ -->
+  <main class="a4-panel" data-panel="family" hidden>
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>我的家人</h2></div>
+      <div class="a4-card" id="contactList"><p class="a4-empty">正在看</p></div>
+    </section>
+    <section class="a4-sec">
+      <div class="a4-sec-head"><h2>家人会知道什么</h2></div>
+      <div class="a4-card"><p class="a4-empty" id="familySees">正在看</p></div>
+    </section>
+  </main>
+
+  <!-- ============ 我的 ============ -->
+  <main class="a4-panel" data-panel="mine" hidden>
+    <section class="a4-sec">
+      <div class="a4-card">
+        <div class="a4-row">
+          <span class="ico"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#user"/></svg></span>
+          <div class="what"><strong id="meName">您</strong><small>在用优活</small></div>
+        </div>
+        <div class="a4-row">
+          <div class="what">朗读的声音<small id="voiceState">正在试</small></div>
+          <button class="a4-btn ghost" type="button" id="voiceTest">听一句</button>
+        </div>
+      </div>
+    </section>
+    <section class="a4-sec a4-settings" aria-label="设置"><button type="button" class="a4-setting" data-feature="habits"><span>字号与语速<small>按自己的习惯调整</small></span><span aria-hidden="true">›</span></button><button type="button" class="a4-setting" data-feature="privacy"><span>资料与记忆<small>查看、导出或删除自己的资料</small></span><span aria-hidden="true">›</span></button>
+      <button type="button" class="a4-setting" data-feature="trust"><span>可信记录</span><span aria-hidden="true">›</span></button>
+      <a class="a4-setting" href="/family4"><span>切换到家人模式<small>当前：老人模式</small></span><span aria-hidden="true">›</span></a>
+    </section>
+  </main>
+
+</div>
+
+<nav class="a4-tabs" aria-label="底部导航">
+  <button type="button" data-tab="home"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#home"/></svg>今天</button>
+  <button type="button" data-tab="record"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#record"/></svg>日程</button>
+  <button type="button" class="a4-nav-voice" id="talkFab" aria-label="按一下说话"><span class="orb"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#mic"/></svg></span>说话</button>
+  <button type="button" data-tab="family"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#family"/></svg>家人</button>
+  <button type="button" data-tab="mine"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#user"/></svg>设置</button>
+</nav>
+
+<section class="a4-sheet" id="sheet" hidden aria-label="和优活说话">
+  <div class="a4-sheet-head">
+    <strong>和小优聊聊</strong>
+    <button class="a4-icon-btn" type="button" id="sheetClose" aria-label="收起"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#close"/></svg></button>
+  </div>
+  <button type="button" class="a4-assistant-more" data-feature="assistant">办事详情、陪伴与我的同意 ›</button>
+  <div class="a4-msgs" id="msgs" aria-live="polite"></div>
+  <div class="a4-quick" id="quick">
+    <button type="button" data-say="我今天有什么事">今日安排</button>
+    <button type="button" data-say="我今天吃药了吗">服药记录</button>
+    <button type="button" data-say="帮我交水费">交水费</button>
+    <button type="button" data-say="给女儿打电话">找女儿</button>
+  </div>
+  <p class="a4-hint" id="hint"></p>
+  <form class="a4-compose" id="compose">
+    <button class="talk" type="button" id="talkBtn" aria-label="按一下说话"><svg class="i" aria-hidden="true"><use href="/static/app4/icons.svg#mic"/></svg></button>
+    <input id="say" type="text" autocomplete="off" placeholder="说说您想办的事" aria-label="想说的话">
+    <button class="send" type="submit">发送</button>
+  </form>
+</section>
+
+<div class="a4-toast" id="toast" role="status" hidden></div>
+</body>
+</html>
+

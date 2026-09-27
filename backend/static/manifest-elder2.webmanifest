@@ -1,0 +1,29 @@
+{
+  "id": "/elder2",
+  "name": "优活 · 老人端",
+  "short_name": "优活老人",
+  "description": "说一句话，优活帮您办事、提醒吃药、陪您聊天。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/elder2",
+  "scope": "/elder2",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#eee8dd",
+  "background_color": "#eee8dd",
+  "categories": ["lifestyle", "health"],
+  "icons": [
+    {"src": "/static/icons/elder-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/static/icons/elder-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/static/icons/elder-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/static/icons/elder-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {
+      "name": "找无忧伴聊聊",
+      "short_name": "聊聊",
+      "url": "/elder2?mode=companion",
+      "icons": [{"src": "/static/icons/elder-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
+  ]
+}

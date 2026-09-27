@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, time as dtime, timedelta
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Iterator
 
 from .models import (
@@ -27,11 +28,41 @@ from .models import (
     TaskStatus,
     TaskType,
 )
-from .utils import canonical_json
+from .utils import canonical_json, local_now, local_zone
 
 
 class IdempotencyConflict(RuntimeError):
-    pass
+    """同一个 `request_id` 被用在了两份不同的载荷上。
+
+    ## 这句话为什么必须是中文
+
+    原先两处 raise 带的都是
+    `"request_id was already used with a different payload"`。
+    而 `common.js:174` 把 HTTP 的 `data.detail` **原样**当成错误消息，
+    `errorKind()` 对任何非 404 的 4xx 返回 `'backend'`（= 用后端那句话）。
+    把发货的 `errorWords` 抠进 node 跑那个 409，结果就是那串英文——
+    **而老人端会把文案念出来**。
+
+    `common.js` 里还把这条假设写明了：「`detail` 是后端用中文写给人看的，
+    直接上屏没问题」。一条被写明的假设，被它所假设的代码违反了。
+
+    ## 为什么修在这里，不是给每条路加 catch
+
+    `app_api.py:291` 有一个 `except IdempotencyConflict` 把它翻成中文 409，
+    所以 `/api/v1` 一直是对的；而 `/v2` 那条路没有这个 catch，英文原样漏出去
+    （实测 `POST /v2/family/reminders` 同 id 改标题 -> 409 英文）。
+    一件事两条路只有一条翻了。**数副本别数层**——给每条路加 catch 就是把
+    同一个缺陷留下七个副本等着漏，所以消息本身就写成中文。
+
+    `WORDS` 定义在这一处，raise 点和 `app_api.py` 那个 409 都用它：
+    两处各写一份措辞，屏幕上迟早出现同一件事的两种说法。
+    """
+
+    #: 说给人听的那一句。措辞取自 `app_api.py` 原有的那个 409，不新造。
+    WORDS = "这个请求编号已经用过了，而且内容不一样。换一个编号。"
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or self.WORDS)
 
 
 @dataclass(frozen=True)
@@ -316,6 +347,34 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_approval_votes_task ON approval_votes(task_id,decision);
             """
         )
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """给已经存在的库补列。
+
+        **这是这个仓库第一次做迁移**，所以写清楚为什么不能只改上面的建表语句：
+        `CREATE TABLE IF NOT EXISTS` 对**已经存在**的表什么都不做。改了上面那段，
+        新建的库有新列，而任何一个已经跑过的库（开发机、演示部署、竞赛机上那份）
+        永远停在旧结构上——然后代码按新列去查，当场 `no such column`。
+        这种缺陷只在"升级"路径上出现，全新环境里测不出来。
+
+        用 `PRAGMA table_info` 判断，而不是 `try: ALTER except: pass`：
+        后者会把真正的错误（磁盘满、库损坏）一起吞掉，变成一次静默的半迁移。
+        """
+        wanted = [
+            # 紧急联系人的电话。此前 `actors` 只有 id/family_id/role/display_name，
+            # 于是 `/api/v1/contacts` 只能回 `phone: null`，界面上写「还没有留电话」。
+            # 号码是 PII：这一列**允许为空且默认为空**，不种任何演示号码——
+            # 编一个出来，老人真按下去会拨错人。
+            ("actors", "phone", "TEXT"),
+        ]
+        with self._lock:
+            for table, column, decl in wanted:
+                cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+                if column in cols:
+                    continue
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+            self._conn.commit()
 
     def seed_demo(self, suffix: str = "demo") -> DemoIdentities:
         """Seed one self-contained demo family.
@@ -333,7 +392,12 @@ class Database:
                 (ids.family_id, "优活示范家庭"),
             )
             for actor_id, role, name in (
-                (ids.elder_id, "elder", "王奶奶"),
+                # 名字跟着头像走。`app/art/png/avatar.png` 与
+                # `profile_avatar_large.png` 是同一位老先生，而演示里这个名字
+                # 会出现在「我的」「我的资料」和每一张凭证上——名字和照片对不上，
+                # 是评委第一眼就会看到的东西。这套素材只有这一张人像，
+                # 所以改名字，不是改图。
+                (ids.elder_id, "elder", "王爷爷"),
                 (ids.daughter_id, "family", "女儿"),
                 (ids.son_id, "family", "儿子"),
                 (ids.system_id, "system", "优活系统"),
@@ -386,57 +450,257 @@ class Database:
         (12422, "FAMILY_APPROVAL_RECORDED", "system", {"required": True}),
         (12458, "NOTIFICATION_CREATED", "system",
          {"recipient_role": "family", "event_type": "approval_required"}),
+        # `authority` 必须和 `BILL_COMPANY["水费"]` 是同一个字符串。
+        #
+        # 它原先写「北京自来水公司」，而这个名字**代码库里没有任何东西会产出**：
+        # 账单页、凭证、家人审批页读的都是 `示例自来水公司`。两个名字同时在屏幕上：
+        # 可信中心印「对方是北京自来水公司」（`trust.js:197` 读这个 payload 键），
+        # 凭证页印「示例自来水公司」。一笔钱，两个收款方。
         (12491, "FAMILY_APPROVED_AND_EXECUTED", "daughter",
-         {"amount_yuan": "68.40", "authority": "北京自来水公司"}),
+         {"amount_yuan": "68.40", "authority": "示例自来水公司"}),
         (12506, "NOTIFICATION_CREATED", "system",
          {"recipient_role": "elder", "event_type": "task_completed"}),
     )
+
+    #: 停在「等家属点头」的那一笔，取上面八拍的**前五拍**。
+    #:
+    #: 为什么必须有这个场景：家人端的核心主张是「重要的事两边都同意才办」，
+    #: 而演示数据里此前**从来没有过一件需要家属点头的事**——唯一那笔缴费
+    #: 一入库就是 completed。驱动测试的结果是 `/v2/tasks` 只有 1 条、
+    #: `#mNeedYou` 是 "0"、「今天」面板 0 个控件，永远显示
+    #: 「今天不用您操心，没有要您点头的事」。前端没错，它如实反映了后端。
+    #: 于是这个产品最想讲的那件事，在屏幕上一次都没出现过。
+    #:
+    #: 切在第五拍（NOTIFICATION_CREATED / approval_required）之后是准确的：
+    #: 那正好是「已经通知家属、正在等」的状态。再往后一拍
+    #: （FAMILY_APPROVED_AND_EXECUTED）就是已经办完了。
+    #:
+    #: 两笔要**错开一天**，见 `_SCENARIOS` 的 `day_offset`。
+    #:
+    #: 这里原先写的是「偏移整体 +1 天」，而**代码从来没有这么做过**：
+    #: `day_offset` 两处声明、零处读取，两笔的 `base` 完全相同。
+    #: 实测家人端通知区（430×932，把面板切过去读 textContent）：
+    #:
+    #:     需要您接力确认 老人请求办理：支付2026-07水费 68.40元。… 2026/8/19 19:27:38
+    #:     需要您接力确认 老人请求办理：支付2026-07水费 68.40元。… 2026/8/19 19:27:38
+    #:
+    #: 一字不差，连秒都一样——读起来就是一个重复推送的缺陷。
+    #: （在补上「已通知」那一拍的真通知行之前看不见：那时两边收件箱都是空的。）
+    #:
+    #: 方向和原注释相反：错开的是**已完成**那一笔（-1 天），不是悬着这一笔。
+    #: 给悬着这一笔 +1 天会把一件正在等人点头的事标成明天发生的。
+    _AWAITING_APPROVAL_SCENARIO = tuple(
+        (offset, event_type, who, payload)
+        for offset, event_type, who, payload in _BILL_SCENARIO[:5]
+    )
+
+    #: 「已通知」那一拍要落的真通知行：`event_type` → (收件人, 正文)。
+    #:
+    #: 措辞照抄真实路径，不另写一套：
+    #:   approval_required  `engine.py:906` 的 `f"老人请求办理：{_summary(task)}。请您核对之后确认。"`
+    #:                      而 `_summary`（`engine.py:1719`）对缴费给的是
+    #:                      `f"支付{period}{bill_type} {amount:.2f}元"`
+    #:   task_completed     `engine.py:1162` 送的是 `result.user_message`，
+    #:                      即 `BillingService.settle` 的「账单已经由家人确认支付。」
+    _SEED_NOTICES: dict[str, tuple[ActorRole, str]] = {
+        #: 正文里的 `{summary}` 由 `seed_demo_scenario` 照真实路径算出来填。
+        #:
+        #: 原先这里写死「支付2026-07水费 68.40元」——一句硬编码的话
+        #: 断言了它并不知道的事（是哪一笔、哪个月）。两个场景共用这一句，
+        #: 于是办完的那一笔和等着办的那一笔在家人收件箱里一字不差。
+        "approval_required": (
+            ActorRole.FAMILY,
+            "老人请求办理：{summary}。请您核对之后确认。",
+        ),
+        "task_completed": (ActorRole.ELDER, "账单已经由家人确认支付。"),
+    }
+
+    #: 场景表。任务 id、状态、结果、播哪几拍，一处定义。
+    #:
+    #: 原先这个方法硬编码只认 `completed_bill_payment`，其余一律 raise。
+    #: 加第二个场景时如果照抄那段 INSERT，两份就会分叉——而它们必须保持
+    #: 「载荷形状和真实引擎一样」这条性质（`attempts` 那一条注释解释了为什么）。
+    _SCENARIOS: dict[str, dict[str, Any]] = {
+        "completed_bill_payment": {
+            "task_suffix": "bill",
+            "status": "completed",
+            "beats": "_BILL_SCENARIO",
+            # 同上：收款方只有一个名字。
+            "result": {"paid": True, "authority": "示例自来水公司", "amount_yuan": "68.40"},
+            # 昨天办完的。
+            #
+            # 这两笔原先是**同一张 2026-07 水费**（一笔办完、一笔在等），
+            # 而那张水费在账单表上 `paid=0`、还挂在列表里等着缴。
+            # 数据自己在打架，后果不是「看起来怪」：驱动一遍
+            # 「我要交水费」→ 复述 68.40 → 家人点头，同一张水费**付了第二次**。
+            # 两道门都够不着——`BILL_ALREADY_PAID` 读 `bills.paid`（0），
+            # `find_duplicate` 比语义键（种子写字面量，和引擎算的对不上）。
+            #
+            # 把种子那一笔的键对齐到引擎那个哈希是行不通的（第 157 条的乙）：
+            # `find_duplicate` 会在**第一次**尝试上就命中，因为种子那一笔
+            # 本身就是「第一次」，于是「我要交水费」当场回 duplicate_blocked。
+            #
+            # 所以搬期号：办完的是**上个月**那张，等着办的还是这个月。
+            # 账单表一个字节不动（这一笔本来就没有 `bill_id` 槽位），
+            # `/bills` 的行数和 `unpaidCount=3 / 247.20` 都不变。
+            "period": "2026-06",
+            "day_offset": -1,
+        },
+        "awaiting_family_approval": {
+            "task_suffix": "await",
+            "status": "awaiting_family_approval",
+            "beats": "_AWAITING_APPROVAL_SCENARIO",
+            # 还没执行，所以结果是空的。写 `{"paid": False}` 都是错的——
+            # 那是在断言「试过、没成功」，而真实情况是「还没试」。
+            "result": {},
+            #: 这一笔就是账单列表里那张没缴的 2026-07 水费，`bill_id` 指着它。
+            "period": "2026-07",
+            "day_offset": 0,
+        },
+    }
 
     def seed_demo_scenario(self, ids: DemoIdentities, scenario: str) -> int:
         """按**语义**播一个场景，不是撒十几条散落的 INSERT。
 
         `normal` 状态那笔「已完成缴费」如果只写一行 `tasks.status='completed'`，
         到了 Audit 页就会出现「UI 看起来完成了，但证据链残缺」——而那一页的全部价值
-        就是证据链。所以一次播完：任务记录 + 八拍审计事件，时间戳带真实间隔。
+        就是证据链。所以一次播完：任务记录 + 若干拍审计事件，时间戳带真实间隔。
 
         幂等：任务 id 是确定的，已存在就直接返回 0。
         """
-        if scenario != "completed_bill_payment":
-            raise ValueError(f"没有这个场景：{scenario}")
+        spec = self._SCENARIOS.get(scenario)
+        if spec is None:
+            raise ValueError(f"没有这个场景：{scenario}，只有 {sorted(self._SCENARIOS)}")
+        beats = getattr(self, spec["beats"])
 
-        task_id = f"task-seed-bill-{ids.suffix}"
+        task_id = f"task-seed-{spec['task_suffix']}-{ids.suffix}"
         with self.transaction() as conn:
             exists = conn.execute("SELECT 1 FROM tasks WHERE id=?", (task_id,)).fetchone()
         if exists:
             return 0
 
+        # 局部导入：database 是底层，services 反过来依赖它，模块级导入会成环。
+        # 文件里 `SafetyPolicy` 已经是这个写法。
+        from .services import BILL_COMPANY
+
         now = utcnow()
-        base = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
-        slots = {"bill_type": "水费", "period": "2026-07", "amount_cents": 6840}
+        # `day_offset` 此前是**声明了从不读**的死字段（两处 0，零处引用），
+        # 而 `_AWAITING_APPROVAL_SCENARIO` 上的注释在描述它本该做到的错开。
+        # 一个不承重的配置项加一段描述它的注释，看起来和真的做了完全一样。
+        base = (datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+                + timedelta(days=int(spec["day_offset"])))
+        # `company` 不是可选的，和上面 `attempts` 那一条是同一类：**真实引擎写它**
+        # （`billing.lookup` 的 data 进 `task.slots`），种子漏了。
+        #
+        # 后果是凭证上「向谁交的钱」那一格是空的——而演示家庭里唯一那笔办完的钱
+        # 就是它。同一格在家人审批页上显示成「还没有取到」。
+        # 实测三条路径：种子 None、按钮 示例供电公司、语音 None。
+        slots = {"bill_type": "水费", "period": spec["period"], "amount_cents": 6840,
+                 "company": BILL_COMPANY["水费"]}
+        # 停在等家属点头的那一笔要能**真的执行下去**，所以 slots 必须带 `bill_id`。
+        #
+        # 没有它的后果不是「少个字段」：家属点「核对后确认接力」→ 摘要校验通过 →
+        # 任务进入 executing → 执行缴费时 KeyError('bill_id') → 400，
+        # 而任务**卡在 executing 回不去**。屏幕上是一句光秃秃的 'bill_id'。
+        #
+        # 已完成那一笔不加：它的 slots 早就落库，改了会动到它的 semantic_key 之外的
+        # 存量数据，而它本来就不会再走执行路径。
+        if spec["status"] == "awaiting_family_approval":
+            slots = {**slots, "bill_id": f"bill-water-2026-07-{ids.suffix}"}
+        # 已经办完的那一笔：家人点过头了，就要留下**引擎会留的那三个槽位**
+        # （`engine.py:1125-1127`）。
+        #
+        # 缺它们的后果不是少三个字段：凭证上「谁点的头」是空的。
+        # 那一格读 `payload["approved_by"]`（山水版那条批准路径写的），读不到就退回
+        # `slots["family_approver"]`（引擎那条写的）——种子两条都没写，于是这笔
+        # 链上明明有一条「女儿 · 批准并执行」的事务，凭证却说不出是谁批的。
+        #
+        # 这三个键都在 `SafetyPolicy.approval_digest` 的**排除名单**里
+        # （`security.py:382`），所以加它们不会改变审批摘要，防篡改控制不受影响。
+        if spec["status"] == "completed":
+            slots = {**slots, "family_approved": True,
+                     "family_approver": ids.daughter_id,
+                     "family_approval_count": 1}
+        # `updated_at` 取**这个场景最后一拍**的时间，不是固定的 12506。
+        # 停在等家属点头的那一笔如果也写 12506，任务的更新时间会晚于它
+        # 最后一条审计事件——而可信中心讲的就是「每一条都对得上」。
+        first_offset = beats[0][0]
+        last_offset = beats[-1][0]
+        # 语义键要区分两笔，否则第二笔会被去重逻辑当成同一件事。
+        #: 期号进了键，所以两笔现在**本来就**不是同一件事——
+        #: 下面那个后缀是历史包袱，留着是为了让等点头那一笔的键一个字节不变。
+        semantic = f"bill_payment:水费:{spec['period']}"
+        # 摘要种子里**不能**加后缀给已有那一笔——它的 approval_digest 已经落库、
+        # 可能被闸门钉着。只给新场景加，老场景一个字节都不变。
+        digest_seed = f"seed|{ids.suffix}|68.40"
+        if scenario != "completed_bill_payment":
+            semantic = f"{semantic}:{spec['task_suffix']}"
+            digest_seed = f"seed|{ids.suffix}|{spec['task_suffix']}|68.40"
         with self.transaction() as conn:
             conn.execute(
                 """INSERT INTO tasks(id,family_id,elder_id,task_type,status,risk_level,
                        slots_json,semantic_key,version,approval_digest,created_at,updated_at,
                        deferred_topics_json,result_json)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (task_id, ids.family_id, ids.elder_id, "bill_payment", "completed", 3,
-                 canonical_json(slots), f"bill_payment:水费:2026-07", 1,
-                 self._event_hash(f"seed|{ids.suffix}|68.40")[:40],
-                 iso(base + timedelta(seconds=12364)),
-                 iso(base + timedelta(seconds=12506)),
+                (task_id, ids.family_id, ids.elder_id, "bill_payment", spec["status"], 3,
+                 canonical_json(slots), semantic, 1,
+                 self._event_hash(digest_seed)[:40],
+                 iso(base + timedelta(seconds=first_offset)),
+                 iso(base + timedelta(seconds=last_offset)),
                  canonical_json([]),
-                 canonical_json({"paid": True, "authority": "北京自来水公司",
-                                 "amount_yuan": "68.40"})),
+                 canonical_json(spec["result"])),
             )
 
+        # 停在等家属点头的那一笔，`approval_digest` 必须是**引擎会算出来的那个值**。
+        #
+        # 我第一版种的是 `self._event_hash(...)` 的任意哈希，结果是：按钮出现了、
+        # 点下去 403「审批摘要与当前任务不一致，任务内容可能已变化，请刷新后重试。」
+        # 那不是缺陷，是防篡改控制在正确工作——`approve_task` 拿请求里的摘要和
+        # `SafetyPolicy.approval_digest(task)` 现算的比对，对不上就拒绝执行。
+        # 错的是种子：它伪造了一个签名。
+        #
+        # 已完成那一笔不走这条路（它的摘要早就落库、可能被闸门钉着），所以只改新场景。
+        if spec["status"] == "awaiting_family_approval":
+            from .security import SafetyPolicy      # 局部导入：database 是底层，避免环
+            task = self.get_task(task_id)
+            if task is not None:
+                task.approval_digest = SafetyPolicy.approval_digest(task)
+                self.update_task(task, bump_version=False)
+
+        # 通知正文照真实路径算：`_summary`（`engine.py:1719`）对缴费给的是
+        # `f"支付{period}{bill_type} {amount:.2f}元"`，`engine.py:906` 再包一层
+        # 「老人请求办理：…。请您核对之后确认。」。种子照抄结果，不另写一套。
+        summary = (f"支付{slots['period']}{slots['bill_type']} "
+                   f"{slots['amount_cents'] / 100:.2f}元")
         actors = {"elder": ids.elder_id, "daughter": ids.daughter_id, "system": ids.system_id}
-        for offset, event_type, who, payload in self._BILL_SCENARIO:
+        for offset, event_type, who, payload in beats:
+            at = base + timedelta(seconds=offset)
+            payload = {**payload, "task_id": task_id}
+            # 「已通知」这一拍要**真的发一条通知**。
+            #
+            # 真实路径 `NotificationService.send`（`services.py:334`）做的是两件事：
+            # 先 `add_notification` 落一条通知行，再写审计并把 `notification_id`
+            # 带进载荷。种子原先只做了后一半，后果是：链上写着「已通知家属」
+            # 「已通知老人」，而老人端和家人端的消息列表**一条都没有**
+            # （实测 `/api/v1/notifications` count=0）。
+            #
+            # 屏幕上这是一个自相矛盾：凭证说通知发过了，收件箱里没有。
+            # 而它躲过了每一道闸门——两边都没报错，两边看起来都很正常。
+            if event_type == "NOTIFICATION_CREATED":
+                notice = self._SEED_NOTICES.get(payload.get("event_type", ""))
+                if notice is not None:
+                    role, message = notice
+                    message = message.format(summary=summary)
+                    record = self.add_notification(
+                        ids.family_id, role, str(payload["event_type"]),
+                        message, task_id, created_at=at,
+                    )
+                    payload = {**payload, "notification_id": record.id}
             self.append_audit(
-                ids.family_id, actors[who], event_type, task_id,
-                {**payload, "task_id": task_id},
-                created_at=base + timedelta(seconds=offset),
+                ids.family_id, actors[who], event_type, task_id, payload,
+                created_at=at,
             )
-        return len(self._BILL_SCENARIO)
+        return len(beats)
 
     def seed_demo_reminders(self, ids: DemoIdentities) -> int:
         """给演示家庭放三条待办，由女儿建立。
@@ -453,17 +717,31 @@ class Database:
         这和 `api.py` 给作息历史做回填的理由是同一条：演示家庭需要一段过去，
         才看得出产品在做什么。
 
-        锚在「今天 08:00 UTC」而不是 `now`：同一天里反复调用要落在同一个 `due_at` 上，
+        锚在「今天当地 08:00」而不是 `now`：同一天里反复调用要落在同一个 `due_at` 上，
         否则表上的 `UNIQUE(elder_id,title,due_at)` 挡不住重复，刷几次就堆出十几条。
         用相对偏移而不是绝对日期，是为了它在比赛当天不会变成过去时——那样首页又空了，
         只是这次以一种更难发现的方式。
+
+        **当地**而不是 UTC：原先锚在 08:00 UTC，配上同样不换算的显示端，
+        界面上看起来是对的（存 11:00 显示 11:00），但存下来的是 11:00 UTC——
+        东八区的晚上七点。这一层内部自洽，跨出去就错：循环例程排出来的提醒
+        存的是真实时刻，「每天早上八点」于是显示成 00:00。
+        现在两端都按当地时区处理，**界面上的字符串和原来完全一样**，
+        变的是它们背后指向的时刻。
         """
         now = utcnow()
-        midnight = datetime.combine(now.date(), dtime(8, 0), tzinfo=UTC)
+        midnight = datetime.combine(local_now(now).date(), dtime(8, 0), tzinfo=local_zone())
         made = 0
         with self.transaction() as conn:
+            # 偏移是**相对当地 08:00** 的小时数，所以「下午四点」是 8 而不是 6。
+            #
+            # 原先写的是 6，落在 14:00——而标题说的是十六点。设计三把时刻和标题
+            # 放在两列里，屏幕上就成了「14:00　下午四点吃降压药」，一条吃药提醒
+            # 上两个数对不上。判据在
+            # `test_a_reminder_title_agrees_with_its_time.py`，它用
+            # `youhuo.utils.parse_time_text` 读标题里的钟点，不另写一套解析。
             for offset_h, title in ((3, "复诊前准备病历"),
-                                    (6, "下午四点吃降压药"),
+                                    (8, "下午四点吃降压药"),
                                     (27, "明天上午去社区量血压")):
                 cursor = conn.execute(
                     "INSERT OR IGNORE INTO reminders"
@@ -489,6 +767,142 @@ class Database:
         return AuthContext(
             actor_id=row["id"], family_id=row["family_id"], role=ActorRole(row["role"]), display_name=row["display_name"]
         )
+
+    def list_bills(self, family_id: str) -> list[sqlite3.Row]:
+        """这个家庭的全部账单。
+
+        原先没有这个方法，于是 `/api/v1` 只能暴露**一张写死的水费**
+        （`app_api._WATER_BILL`）——而库里其实躺着三张（水费 68.40、电费 126.50、
+        燃气费 52.30）。前端那张「我的账单」于是永远只有一件事可办。
+        未付的排前面，同组按到期日——快到期的先看到。
+        """
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM bills WHERE family_id=? ORDER BY paid ASC, due_date ASC",
+                (family_id,),
+            ).fetchall()
+
+    def get_bill(self, bill_id: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute("SELECT * FROM bills WHERE id=?", (bill_id,)).fetchone()
+
+    def list_appointments(self, family_id: str, elder_id: str | None = None) -> list[sqlite3.Row]:
+        """就医安排。表和 `insert_appointment` 一直都在，**没有任何地方读它**。"""
+        sql = "SELECT * FROM appointments WHERE family_id=?"
+        args: list[Any] = [family_id]
+        if elder_id:
+            sql += " AND elder_id=?"
+            args.append(elder_id)
+        sql += " ORDER BY appointment_date ASC, appointment_time ASC"
+        with self._lock:
+            return self._conn.execute(sql, tuple(args)).fetchall()
+
+    def mark_notification_read(
+        self, notification_id: str, family_id: str, when: datetime,
+        *, recipient_role: ActorRole,
+    ) -> bool:
+        """把一条通知标成已读。**只有收件人本人标得动。**
+
+        `recipient_role` 进 `WHERE`：原先这里只按 `family_id` 过滤，于是同一个
+        家庭里任何人都能把**别人的**通知标掉。实测（家人加一份药，那份药会给
+        老人发一条「请您核对后确认」）：
+
+            FAMILY POST /api/v1/notifications/3/read -> 200
+            老人自己的收件箱：id=3 已读=True
+
+        也就是加药的人自己把「叫她确认」那条提示消了音。反方向同样成立
+        （老人也标得动家人那条），所以这不是单向的漏，是**根本没有收件人这一关**。
+        隔壁 `list_notifications` 一直是按 `recipient_role` 取的——读得到的范围
+        和标得动的范围不一致，这一行把两者对齐。
+
+        `recipient_role` 是**必填的关键字参数，不给默认值**：一个
+        `None = 不过滤` 的默认值等于把这个洞留在原地等下一个调用方踩，
+        而漏传的人不会收到任何提示。
+        """
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE notifications SET read_at=? "
+                "WHERE id=? AND family_id=? AND recipient_role=? AND read_at IS NULL",
+                (iso(when), notification_id, family_id, recipient_role.value),
+            )
+            return cur.rowcount > 0
+
+    def first_audit_at(self, family_id: str) -> datetime | None:
+        """这个家庭最早那条审计的时间——「优活陪伴您 N 天」的**真实**依据。
+
+        `families` 表没有建档日期，所以此前 `/profile` 的 `days` 只能回 null。
+        审计链的第一条就是这份记录的开端，那是真数据，不是编的。
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT MIN(created_at) FROM audit_events WHERE family_id=?", (family_id,)
+            ).fetchone()
+        if not row or not row[0]:
+            return None
+        try:
+            return datetime.fromisoformat(str(row[0]).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    def list_actors(self, family_id: str) -> list[sqlite3.Row]:
+        """一个家庭里的所有成员。
+
+        原先只有按 id 单取的 `actor()`，于是「紧急联系人」这类要**列出家人**的界面
+        无处取数，只能把 `elder-demo` / `daughter-demo` / `son-demo` 这几个 id
+        写死在调用方——那等于把演示数据焊进产品代码，换一个家庭就全空。
+        排序把老人自己放最后：这张表是给老人看的联系人，他不需要联系自己。
+        """
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM actors WHERE family_id=? "
+                "ORDER BY CASE role WHEN 'family' THEN 0 WHEN 'system' THEN 1 ELSE 2 END, display_name",
+                (family_id,),
+            ).fetchall()
+
+    def update_reminder_fields(
+        self, reminder_id: str, family_id: str, title: str, due_at: datetime
+    ) -> bool:
+        """改一条提醒的名字和时间。
+
+        为什么不能「取消旧的再建一条」：`reminders` 上有
+        `UNIQUE(elder_id,title,due_at)`，同名同时间会撞唯一键；而且那样会在审计里
+        留下「取消 + 新建」两行，而实际发生的是**一件事**——把八点挪到九点。
+        """
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE reminders SET title=?,due_at=? WHERE id=? AND family_id=? "
+                "AND status='scheduled'",
+                (title, iso(due_at), reminder_id, family_id),
+            )
+            return cur.rowcount > 0
+
+    def get_appointment(self, appointment_id: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM appointments WHERE id=?", (appointment_id,)
+            ).fetchone()
+
+    def cancel_appointment(self, appointment_id: str, family_id: str) -> bool:
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE appointments SET status='cancelled' "
+                "WHERE id=? AND family_id=? AND status!='cancelled'",
+                (appointment_id, family_id),
+            )
+            return cur.rowcount > 0
+
+    def set_actor_phone(self, actor_id: str, family_id: str, phone: str | None) -> bool:
+        """给家庭成员登记电话。`None` / 空串表示清掉。
+
+        带上 `family_id` 一起匹配，不是只按 actor_id 改——跨家庭写入是这类
+        「按主键改一行」的方法最容易出的洞，而这里改的是**紧急时会被拨出去的号码**。
+        """
+        with self.transaction() as conn:
+            cur = conn.execute(
+                "UPDATE actors SET phone=? WHERE id=? AND family_id=?",
+                (phone or None, actor_id, family_id),
+            )
+            return cur.rowcount > 0
 
     def actor_in_family(self, actor_id: str, family_id: str, required_role: str | None = None) -> bool:
         row = self.actor(actor_id)
@@ -667,7 +1081,7 @@ class Database:
         if not row:
             return None
         if not hmac.compare_digest(row["request_fingerprint"], fingerprint):
-            raise IdempotencyConflict("request_id was already used with a different payload")
+            raise IdempotencyConflict()
         return json.loads(row["response_json"])
 
     def save_idempotent_response(
@@ -683,7 +1097,7 @@ class Database:
             ).fetchone()
             if existing:
                 if not hmac.compare_digest(existing["request_fingerprint"], fingerprint):
-                    raise IdempotencyConflict("request_id was already used with a different payload")
+                    raise IdempotencyConflict()
                 return
             conn.execute(
                 "INSERT INTO idempotency(scope,request_id,request_fingerprint,response_json,created_at) VALUES (?,?,?,?,?)",
@@ -746,7 +1160,11 @@ class Database:
             return int(self._conn.execute("SELECT COUNT(*) FROM audit_events WHERE family_id=?", (family_id,)).fetchone()[0])
 
     def list_audit(
-        self, family_id: str, limit: int = 200, entity_id: str | None = None
+        self,
+        family_id: str,
+        limit: int = 200,
+        entity_id: str | None = None,
+        event_types: Sequence[str] | None = None,
     ) -> list[AuditEvent]:
         """审计事件，按时间正序。给了 `entity_id` 就只取那一件事的。
 
@@ -757,12 +1175,32 @@ class Database:
 
         过滤放在 SQL 里而不是取完再筛：limit 要作用在**这一件事的事件**上，
         不是作用在整个家庭的流水上。
+
+        `event_types` 是同一条道理的第二个用法，给老人那一屏用。她那一屏认得的
+        事件类型只有几十种，而链上绝大多数不是——原先的做法是「取最近 300 条
+        家庭流水，再在 Python 里按白名单筛」。实测家庭链到 **312 条**时，
+        那 300 条里一条她认得的都没有，`/elder2` 的记录页变成 0 行，
+        屏幕上写着「还没有记录」——而她那天刚按过一次紧急呼叫。
+        limit 必须作用在**她的那些事件**上，不是作用在整个家庭的流水上。
         """
         sql = "SELECT * FROM audit_events WHERE family_id=?"
         params: list[Any] = [family_id]
         if entity_id is not None:
             sql += " AND entity_id=?"
             params.append(entity_id)
+        if event_types is not None:
+            #: 条件写的是 `is not None`，**不是** `if event_types:`。
+            #: 后者会把空集合当成「不过滤」，于是一个本该更严的边界
+            #: （一种都不认）变成最宽的那个（整条家庭流水原样交出去）。
+            kinds = tuple(event_types)
+            #: 下面这一句在 SQLite 上是冗余的——`IN ()` 对所有行为假，
+            #: 拿掉它行为一个字都不变（变异验证过）。留着是因为它把
+            #: 「空集合 = 一条都不要」写成了代码里看得见的一句，
+            #: 而不是依赖某个数据库对空 `IN` 列表的处理。
+            if not kinds:
+                return []
+            sql += " AND event_type IN (%s)" % ",".join("?" * len(kinds))
+            params.extend(kinds)
         sql += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
         with self._lock:
@@ -907,9 +1345,86 @@ class Database:
         row = self._conn.execute("SELECT * FROM reminders WHERE id=?", (reminder_id,)).fetchone()
         return self._row_to_reminder(row) if row else None
 
-    def list_reminders(self, family_id: str, limit: int = 100) -> list[ReminderRecord]:
+    def list_reminders(
+        self,
+        family_id: str,
+        limit: int = 100,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        elder_id: str | None = None,
+        statuses: Sequence[ReminderStatus] | None = None,
+        reminder_ids: Sequence[str] | None = None,
+    ) -> list[ReminderRecord]:
+        """这个家庭的提醒，按时间升序。给了 `since`/`until` 就只取那一段。
+
+        **为什么需要那个时间窗。** 这条 SQL 是 `ORDER BY due_at ASC LIMIT ?`，
+        没有日期过滤——留下的是**最老的** N 条。`/api/v1/agenda` 原先按
+        `limit=60` 取，然后在 Python 里筛「今天」。历史一攒多，今天的行
+        就被挤出窗口，她首页那张「今天要做什么」的卡**永久**变成
+        「今天没有安排」。实测剂量曲线（每一条都确认落库）：
+
+            过去 30 条 -> agenda 9 条    过去 59 条 -> 7 条
+            过去 62 条 -> 4 条           过去 80 条 -> **0 条**
+
+        而同一时刻 `/api/v1/reminders` 里今天那两条都在。触发条件只是
+        时间流逝：一条每天的例程约两个月就攒够。
+
+        边界比较用字符串：`due_at` 存的是 ISO 8601，同一种
+        `YYYY-MM-DDTHH:MM:SS` 前缀，所以按字典序比就是按时间比
+        （后缀 `Z` / `+00:00` / 小数秒都排在秒之后，不影响前缀比较）。
+        """
+        clauses = ["family_id=?"]
+        args: list[Any] = [family_id]
+        if since is not None:
+            clauses.append("due_at >= ?")
+            args.append(since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"))
+        if until is not None:
+            clauses.append("due_at < ?")
+            args.append(until.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S"))
+        #: `elder_id` / `statuses` / `reminder_ids` 和 `list_audit` 的
+        #: `entity_id=` / `event_types=` 是同一条道理：**limit 要作用在你要的
+        #: 那个子集上，不是整个家庭的那张表上。**
+        #:
+        #: 原先语音那条路取整个家庭最老的 100 条再在 Python 里筛「她的 +
+        #: 待办的」，`/v2/reminders` 同样取最老的 N 条再按 `elder_id` 筛。
+        #: 于是历史一攒多，她的待办就被挤出窗口——和上面 agenda 那段讲的是
+        #: 同一个坑，只是换了几张屏。实测（两个探针，各带阳性对照）：
+        #:
+        #:     垫 120 条历史之后「取消提醒」-> 「您现在没有待办提醒」，
+        #:                                     而库里有 2 条待办
+        #:     她说「量血压」-> 通用新手菜单（名字在窗口外，对不上）
+        #:     点名取消      -> 「这条提醒已经不在待办里了」，
+        #:                                     而 status 还是 scheduled
+        #:     /v2/reminders?limit=50 -> 回来的是 2025-11-22..2026-01-10，
+        #:                                     老人首页那行「今天有 N 件事」
+        #:                                     直接不显示
+        if elder_id is not None:
+            clauses.append("elder_id=?")
+            args.append(elder_id)
+        if statuses is not None:
+            #: 照 `list_audit` 写：`is not None` 而**不是** `if statuses:`。
+            #: 后者会把空集合当成「不筛」，于是一个本该更严的边界
+            #: （一种状态都不要）变成最宽的那个（整张表原样交出去）。
+            kinds = tuple(str(s) for s in statuses)
+            if not kinds:
+                return []
+            clauses.append("status IN (%s)" % ",".join("?" * len(kinds)))
+            args.extend(kinds)
+        if reminder_ids is not None:
+            #: 同一条道理，第三种用法：调用方手里已经有**明确的一小撮 id**
+            #: （`_pick_reminder_from` 拿的是上一轮念给她听的那几条）。
+            #: 按 id 取就没有任何窗口挡得住它——limit 不再是取样口径。
+            wants = tuple(reminder_ids)
+            if not wants:
+                return []
+            clauses.append("id IN (%s)" % ",".join("?" * len(wants)))
+            args.extend(wants)
+        args.append(limit)
         rows = self._conn.execute(
-            "SELECT * FROM reminders WHERE family_id=? ORDER BY due_at ASC LIMIT ?", (family_id, limit)
+            f"SELECT * FROM reminders WHERE {' AND '.join(clauses)} "
+            "ORDER BY due_at ASC LIMIT ?",
+            tuple(args),
         ).fetchall()
         return [self._row_to_reminder(row) for row in rows]
 
@@ -942,12 +1457,47 @@ class Database:
             return cursor.rowcount == 1
 
     def update_reminder_status(self, reminder_id: str, status: ReminderStatus, timestamp_field: str, when: datetime) -> bool:
+        """推进一条提醒的状态。**已经结束的推不动。**
+
+        ## 为什么守卫放在这里，而不是放在每个调用方
+
+        原先这条 UPDATE 没有任何状态条件，于是**一条已取消的提醒可以被标成
+        办完了，而且它自己解除了取消**。实测：
+
+            取消后        status='已取消'  cancelled=True   done=False
+            按「办完了」   200            「已经记成办好了」
+            之后          status='已完成'  cancelled=False  done=True
+            审计链         created → cancelled → completed
+
+        也就是说系统记下她办完了一件已经取消的事。她取消了钙片，之后在一个
+        没刷新的屏幕上误点一下「办完了」，记录里就多出一次服药，日报也会把它
+        算成完成。
+
+        五个调用方里各自的守卫是不齐的：
+
+            engine.py  acknowledge  挡了 COMPLETED 和 CANCELLED     ✓
+            engine.py  complete     **只挡了 COMPLETED**            ← 同一个洞
+            v4_store   例程完成      只挡了 COMPLETED
+            services   notified / escalated  靠上游的状态筛选，安全
+            app_api    /done        **什么都没挡**                  ← 就是它
+
+        逐个补的失败方式是漏掉一个而没有任何东西提醒——这一层已经为
+        「幂等做在路由层」写过同样的理由。放在 SQL 里，新加的调用方自动就有。
+
+        ## 为什么两个终态都排除
+
+        `cancelled`：取消了的事没有被办。
+        `completed`：重复按下不该再写一次时间戳、也不该让调用方再记一条审计
+        （实测原先连按两次「办完了」，两次都回 200 并各写一条）。
+        调用方拿到 `False` 之后自己决定说什么。
+        """
         allowed = {"notified_at", "acknowledged_at", "completed_at", "escalated_at"}
         if timestamp_field not in allowed:
             raise ValueError("invalid reminder timestamp field")
         with self.transaction() as conn:
             cursor = conn.execute(
-                f"UPDATE reminders SET status=?,{timestamp_field}=? WHERE id=?",
+                f"""UPDATE reminders SET status=?,{timestamp_field}=? WHERE id=?
+                    AND status NOT IN ('cancelled','completed')""",
                 (status.value, iso(when), reminder_id),
             )
             return cursor.rowcount == 1
@@ -1080,9 +1630,13 @@ class Database:
         )
 
     def add_notification(
-        self, family_id: str, recipient_role: ActorRole, event_type: str, message: str, entity_id: str | None = None
+        self, family_id: str, recipient_role: ActorRole, event_type: str, message: str,
+        entity_id: str | None = None, created_at: datetime | None = None
     ) -> NotificationRecord:
-        created_at = utcnow()
+        # `created_at` 可传：演示种子要按**那一拍的时刻**落，不是播种的时刻。
+        # `append_audit` 早就为同一个理由带了这个参数——通知和审计是同一件事的
+        # 两半，时刻对不上的话，可信中心把它们排在一起就会自相矛盾。
+        created_at = created_at or utcnow()
         with self.transaction() as conn:
             cursor = conn.execute(
                 """INSERT INTO notifications(family_id,recipient_role,event_type,entity_id,message,created_at,read_at)

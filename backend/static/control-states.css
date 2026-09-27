@@ -1,0 +1,190 @@
+/* 控件的两个状态：「正在办」和「按不了」。两个都要看得见，而且要和常态、和彼此分得开。
+ * ==========================================================================
+ * `common.js::once(trigger, run)` 在动作开始时同步设三样：`disabled`、
+ * `aria-busy="true"`、`data-in-flight="1"`，办完在 `finally` 里撤掉。
+ * 它挡住了重复点击、也向读屏播报了忙——但在这一条之前，全仓 CSS 里
+ * `aria-busy` 与 `in-flight` 各 0 条规则。屏幕上唯一的变化是
+ * `button:disabled { opacity: .55 }`，于是「在办」和「按不了」长得一模一样：
+ * 她按完看不出是在办还是坏了，而这个产品的用户是老人。
+ *
+ * 为什么单独一份文件
+ * --------------------------------------------------------------------------
+ * 这条规则第一版写在 `components.css` 里。而 `once()` 到达 **10 个**页面，
+ * `components.css` 只到达 3 个——四个设计二三的界面
+ * （`/elder2` `/elder3` `/family2` `/family3`）各自只加载自己那份皮肤，
+ * 一处 `@import` 都没有。也就是说那一版在最要紧的四个界面上根本不存在，
+ * 而判据只断言了「`components.css` 里有这条规则」，一路绿着。
+ *
+ * 所以搬到这里，十一个页面各链一次，并且由
+ * `test_pressing_it_looks_like_something_happened.py` 钉住
+ * 「加载 `common.js` 或 `components.css` 的页面，都必须加载 `control-states.css`，
+ * 且排在最后」。（第十一个是 `index.html`：它有 `components.css` 而没有 `common.js`。）
+ * 不复制到四份皮肤里（那是五份事实源），也不靠 JS 注入 `<style>`——
+ * 响应头是 `style-src 'self'`，注入的 `<style>` 会被 CSP 拦掉。
+ *
+ * **这一份必须排在每一页样式表的最后。** `elder3-wiring.css` 里的
+ * `.service-row[role="button"]{cursor:pointer}` 权重是 (0,2,0)，
+ * 和下面 `[role="button"][aria-busy="true"]` 一样——同权重靠顺序定胜负。
+ *
+ * 为什么不用伪元素做转圈
+ * --------------------------------------------------------------------------
+ * `::after` 在三处被占（含 `art-cards-family.css` 的 `button:not(.seg)::after`），
+ * `::before` 被两端底部导航占；而且大量按钮是 `display:flex`，插伪元素会成为
+ * flex 子项把内容挤动——那是一次布局位移，`check_layout_stability.py` 正盯着它。
+ *
+ * 所以只用三样原先没人在按钮上用的：`cursor`、`animation`，
+ * 以及被动画接管的 `opacity`。办完 `once()` 撤掉属性，一切自动回落。 */
+
+
+/* 顶部那段说明之后，**先 `:disabled`，再「在办」**。
+   `once()` 同时设 `disabled` 和 `aria-busy`，两条规则的权重都是 (0,1,1)——
+   同权重靠顺序定胜负。把 `:disabled` 写在后面的那一版在真浏览器里量到的是
+   「在办」的 cursor 也是 `not-allowed`——而文本层面的判据看不见这一点，
+   它只比了两条规则里的值。现在那条判据也同时钉住顺序。 */
+/* 「按不了」。**全仓只有这一条**。
+   ==========================================================================
+   它原来住在 `components.css`（第 227 行）。而那份文件只被 6 个页面加载，
+   四个设计二三的界面一个都不在里面——于是在 `/elder2` `/elder3` `/family2`
+   `/family3` 上，一个按不了的按钮和一个正常按钮长得一模一样。
+
+   搬到这里和上面那条放在一起，是因为这份判据要求「常态 / 在办 / 按不了」
+   **两两不同**：把它们放在两个文件里，意味着「不同」这件事只能在同时加载了
+   两份文件的页面上成立——而那正好排除了最要紧的四页。
+
+   查过全仓 8 处 `disabled = true` 都是真的「现在按不了」，
+   没有一处把它当「当前页签」用，所以给它上样式是纯收益。 */
+button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+button[aria-busy="true"],
+/* `.service-row`（老人端三的三个服务入口）是 `<div role="button">`：交付包写成了
+   div，`elder3.js` 给它补了 role + tabindex。`once()` 在它身上设得上 `aria-busy`，
+   但 `el.disabled = true` 在 div 上是无操作，所以这条选择器不放宽的话，
+   那三行按下去仍然一动不动。
+   放宽是安全的：全仓 `aria-busy` 只有 `common.js::once()` 一处设置点，
+   从来没有落在容器上，不会出现「刷新列表时整块面板脉动」。 */
+[role="button"][aria-busy="true"] {
+  cursor: progress;                     /* 不是 not-allowed：这是「在办」不是「按不了」 */
+  animation: yh-busy-breathe 1.1s ease-in-out infinite;
+  opacity: .7;                          /* 动画接管之前的落点，也是不支持动画时的回退 */
+}
+
+@keyframes yh-busy-breathe {
+  0%, 100% { opacity: .55; }            /* 与 `:disabled` 同一个起点，不跳变 */
+  50%      { opacity: .85; }
+}
+
+/* 不动的时候也要分得开：静态 .7 既不同于 `:disabled` 的 .55，也不同于常态 1。
+   只把动画关掉、让它退回 .55，等于在这种偏好下把这条信息删掉。 */
+@media (prefers-reduced-motion: reduce) {
+  button[aria-busy="true"],
+  [role="button"][aria-busy="true"] { animation: none; opacity: .7; }
+}
+
+
+/* 第三种状态：**按下去**。
+ * ==========================================================================
+ * 上面两种是「在办」和「按不了」，第三种同样要看得见——而它在这四个界面上
+ * **一处都没有**。
+ *
+ * 手机上**没有 hover**。实测（390×844，`YOUHUO_DEMO_STATE=normal`）
+ * 四个「手机 App 壳」上所有看得见的可点控件：
+ *
+ *     /elder2   13 个    有按下态  0    只有 hover  0    两种都没有 13
+ *     /elder3   16 个    有按下态  0    只有 hover  5    两种都没有 11
+ *     /family2   6 个    有按下态  0    只有 hover  1    两种都没有  5
+ *     /family3  16 个    有按下态  0    只有 hover 10    两种都没有  6
+ *
+ * 合计 51 个控件、**0 个有按下态**。手指按下去屏幕上纹丝不动，她分不清
+ * 「按到了」还是「没按到」。这是「完全不像一个 App」里最硬的一条——
+ * 前两种状态是"系统在处理"，这一种是"我这一下生效了"，缺了它，
+ * 前面所有关于反馈的讲究都接不上。
+ *
+ * 为什么也住在这份文件里
+ * --------------------------------------------------------------------------
+ * 和上面两条同一个理由：这份文件被十一个页面各链一次、且**排在最后**。
+ * 那四个界面各自只加载自己那份皮肤，一处 `@import` 都没有——
+ * 写在任何一份皮肤里，都只到得了四分之一。（`components.css` 里那条
+ * `button:active` 就只到得到 6 个页面，四个壳一个都不在里面。）
+ *
+ * 为什么用 `scale` 属性，不用 `transform`
+ * --------------------------------------------------------------------------
+ * `transform` 是**一个**属性，写上去就是把别人那条整个换掉。而全仓已经
+ * 有 8 处自己的按下 `transform`（`.mic-big` 的 `.98`、`.tab` 的 `.94`、
+ * `.back-link` 的 `.96`……），其中 `components.css` 那条还是
+ * `translateY(0)`——**让 hover 时抬起的那 1px 落回原位**，语义完全不同。
+ * 我覆盖它，那些按钮按下去就"浮着不落下"了。
+ *
+ * `scale` 是**独立属性**，和 `transform` 各管一段、相乘叠加：
+ * 于是 `.mic-big` 按下是 `.98 × .97`，`components.css` 那条仍然落回原位。
+ * 谁都不丢，方向还一致（都是"按下去缩一点"）。
+ *
+ * 为什么不管 `prefers-reduced-motion`
+ * --------------------------------------------------------------------------
+ * 这个值**不是动画**：没有 `@keyframes`、没有 `transition`，按下就是按下，
+ * 松手就是松手，中间没有运动过程。诱发前庭不适的是运动，不是两个静止状态
+ * 之间的直接切换——跟上面那条"只关动画、保留静态 .7"是同一个道理，
+ * 只不过这条连动画都没有。 */
+button:active:not(:disabled):not([aria-busy="true"]),
+[role="button"]:active:not([aria-busy="true"]),
+a[href]:active {
+  scale: .97;
+}
+
+/* 主导航压过优活精灵
+ * ==========================================================================
+ * 精灵（`.youhuo-robot-mascot`）是浮在内容之上的装饰：静止 `z-index:1505`、
+ * 拖动时 `9999`，而且 `pointer-events:auto`——它是要能拖的。盖卡片可以，
+ * **盖底栏不行**。
+ *
+ * 实测 360×640 的 `/family2`：精灵走到 y 368..548，底栏上沿在 558，只差
+ * 10px；它再往下走一点，「我的」那一格的落点就不是那一格了，是
+ * `youhuo-robot-canvas`。它的 `clampY()` 只按视口高夹（`innerHeight − 180
+ * − 8`），根本不知道底栏在哪儿——所以这不是偶发，是**它随时可以压上去**。
+ *
+ * 底栏是 chrome，chrome 永远压过装饰。用 10000 是为了同时压过 1505 和
+ * 9999 这两个数，不是随手挑的整数（全站再没有比 9999 更高的层）。
+ *
+ * 这一条写在 `control-states.css` 里是因为四个 App 壳（elder-v6 / family-v6 /
+ * elder-v3 / family-v3）各自带一份 `.dock`，而这个文件是它们**共同且最后**
+ * 引入的样式表——写一份就够，也不用去动那四份皮肤各自的层号。 */
+.dock { z-index: 10000; }
+
+/* 按钮就是按钮：长按不弹「复制 / 查词」、不选中按钮上的字、不闪系统的蓝色点按框
+ * ==========================================================================
+ * 手机浏览器把一切都当文字：老人的手指在「帮我联系家人」上多停半秒，
+ * 弹出来的是「复制｜全选｜搜索」和一片蓝色选区——在她眼里那是「按坏了」。
+ * 真 App 里的按钮不会这样。按下去的反馈由上面那条 `scale: .97` 给，
+ * 所以系统那层半透明点按框可以关掉，不会让「按到了没有」变得更难看出来。
+ *
+ * 只作用于控件。正文、电话号码、提醒内容照样能长按选中复制——那是她真会用的。
+ * `touch-action: manipulation` 去掉双击放大的等待，连点两下不会把页面放大。 */
+button,
+[role="button"],
+.dock a {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 装到手机上以后（主屏图标打开，或者在安卓 App 外壳里）：
+ * 拉到头不再整页弹一下、不再露出页面后面的浏览器底色。
+ * 在普通浏览器标签页里不动它——那里下拉刷新是她熟悉的操作。 */
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+}
+html[data-shell="app"],
+html[data-shell="app"] body { overscroll-behavior-y: none; }
+
+/* 家人端左上角那个「← 返回首页」回的是**网站的门厅**（两道门：老人端 / 家人端）。
+ * 在浏览器里它有用；装成 App 以后，点它会从「优活家人」里跳进一张网站首页——
+ * 模拟器上实测就是这样。App 里不需要门厅，收起来。只认指向 `/` 的那一个。 */
+@media (display-mode: standalone) {
+  a.back-link[href="/"] { display: none; }
+}
+html[data-shell="app"] a.back-link[href="/"] { display: none; }
+/* Shared receipt dismissal is also usable in the original business pages. */
+.dismissible-notice[hidden] {display:none!important;}
+.dismissible-notice .notice-dismiss {min-width:48px;min-height:48px;padding:0 8px;border:0;background:transparent;color:inherit;cursor:pointer;}
+.dismissible-notice .notice-dismiss::before {content:'×';font-size:22px;}

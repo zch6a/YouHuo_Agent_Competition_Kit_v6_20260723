@@ -21,9 +21,12 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <link rel="stylesheet" href="/static/art-cards.css" />
+  <link rel="stylesheet" href="/static/elder-family-v3.css" />
+<link rel="stylesheet" href="/static/control-states.css">
   <script src="/static/register-sw.js"></script>
 </head>
-<body data-mode="youhuo" data-activity="idle" data-surface="consumer" data-focus="off" data-tab="home">
+<body data-mode="youhuo" data-activity="idle" data-surface="consumer" data-nav="tabbar" data-focus="off" data-tab="home">
   <!-- 直接双击 HTML 打开时唯一会说话的东西。
        这一段平时被 base.css 的 `.needs-server { display: none }` 藏着。而
        `file://` 下四个样式表全部 404（它们是 `/static/...` 绝对路径），于是这一段
@@ -61,6 +64,28 @@
     <div class="elder-layout">
       <section class="panel stage">
 
+        <!-- 状态通道属于老人端外壳，不属于 Focus Mode。
+             保存字号、刷新记录、首页待办失败都发生在 Focus Mode 之外；如果把它放进
+             `.elder-focus`，这些操作的反馈会写进一个默认隐藏的节点，用户一个字也看不到。
+             它保留 aria-live，所有状态仍从 elder.js 的 setStatus() 统一发出。
+
+             **它必须是这一段的第一个子节点。** 上面那半条是上一次的修法，
+             只解决了「写进隐藏节点」，没解决「写进看不到的位置」：它原先夹在
+             首页那一屏和「记录」之间，而首页那一屏有 1806px 高，滚动容器只有
+             572px。实测（1280×720）——
+
+                 分区   状态行 y      结果
+                 首页   1870         折叠线以下 1300px，elementFromPoint 回 null
+                 记录   64           看得见
+                 家人   64           看得见
+                 我的   64           看得见
+
+             三个分区上它已经在顶上（它们上面那几屏都是 hidden、高度 0），
+             只有首页不是。而「首页待办失败」正好发生在首页：一次加载失败，
+             屏幕上什么都没有。挪到最前面之后四个分区一致。
+             （排除了动画假象：整条祖先链 `transform: none`、`getAnimations()` 全空。） -->
+        <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
+
         <!-- ═══════════════════════════════════════════════════════════════════
              ① 首页
              ═══════════════════════════════════════════════════════════════════
@@ -89,6 +114,10 @@
 
           <!-- 下一件最重要的事。只显示一件。
                原先这里是「今日全部事项」，而一位老人不需要在首屏做排序。 -->
+          <!-- 「下一件」用**可拉伸描边框**，不是有构图的卡壳。
+               老人端字号能调到 1.6 倍，这张卡的高度跟着变；有构图的画（hero/wide）
+               一拉就变形，而描边框只拉边、四角原样。
+               月窗是「下一件事」的意象：一扇窗，看出去是接下来要办的事。 -->
           <article id="nextItem" class="next-item" hidden>
             <p class="next-label">下一件</p>
             <p class="next-time" id="nextTime"></p>
@@ -102,7 +131,7 @@
           <div class="mic-stage">
             <div class="mic-dial">
               <button id="mic" class="mic-big" title="按一下开始说话" aria-label="按一下开始说话">
-                <svg viewBox="0 0 24 24" width="62" height="62" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19v3" /> <path d="M19 10v2a7 7 0 0 1-14 0v-2" /> <rect x="9" y="2" width="6" height="13" rx="3" /></svg>
+                <img src="/static/art/elder-mic.webp" alt="" aria-hidden="true" />
               </button>
             </div>
             <div id="micHint" class="mic-hint" role="status" aria-live="polite">按一下，然后慢慢说</div>
@@ -117,11 +146,20 @@
             </button>
           </div>
 
-          <!-- 今天。最多三条，超出走「查看全部」。 -->
-          <section class="today-block" aria-label="今天">
-            <h2 class="today-head">今天</h2>
+          <!-- 今天。最多三条，超出走「查看全部」。
+               这个按钮**带 `hidden` 发出去**，和设计二一致。它的文字由
+               `loadReminders()` 按真实条数改写（「查看全部待办（共 N 件）」）；
+               在那之前屏幕上那句静态的「查看全部」是一句"下面还有更多"的断言，
+               而此刻一条都没有。`elder.js` 是 module（defer），HTML 解析完才跑，
+               所以这一段窗口是真的会画出来的。取数失败时它同样要收起来——
+               那一半在 `loadReminders()` 的 catch 里（`hideReminderToggle()`）。 -->
+          <!-- 标题是「接下来」而不是「今天」：这一块由 `rankReminders()` 填，按到期时间取最近三条，**不分哪一天**（还有「查看全部」可以展开）。
+             实测它列过「明天上午去社区量血压　8月30日 11:00」，而上面 `#todayLine` 同时写着「今天有 2 件事」。
+             `elder.js::renderTodayLine` 上面那段注释里的道理（「今天必须真的是今天」）只应用到了那一行，这一块没跟上。 -->
+          <section class="today-block" aria-label="接下来">
+            <h2 class="today-head">接下来</h2>
             <div id="reminders"></div>
-            <button id="toggleReminders" class="secondary block">查看全部</button>
+            <button id="toggleReminders" class="secondary block" hidden>查看全部</button>
           </section>
         </div>
 
@@ -175,18 +213,14 @@
 
         </div>
 
-        <!-- 状态通道属于老人端外壳，不属于 Focus Mode。
-             保存字号、刷新记录、首页待办失败都发生在 Focus Mode 之外；如果把它放进
-             `.elder-focus`，这些操作的反馈会写进一个默认隐藏的节点，用户一个字也看不到。
-             它保留 aria-live，所有状态仍从 elder.js 的 setStatus() 统一发出。 -->
-        <div id="status" class="meta status-line" role="status" aria-live="polite"></div>
-
         <!-- ═══════════════════════════════════════════════════════════════════
              ③ 记录
              ═══════════════════════════════════════════════════════════════════ -->
         <div class="elder-panel" data-panel="log" aria-label="记录" hidden>
           <h2 class="tab-head">办事记录</h2>
           <p class="tab-note">和无忧伴聊天的内容不会记在这里。</p>
+          <!-- 办事记录：卷轴。和家人端「做过的事」用同一个意象——
+               同一件事在两个壳里必须是同一个语义，否则那两处会被当成两件事。 -->
           <section id="logPanel" class="panel rail-card log-panel">
             <div id="activityLog" class="log-list"></div>
           </section>
@@ -222,6 +256,8 @@
 
                现在由 `renderKin()` 填：有真实联系人档案就显示它的名字，
                没有就只显示这个家庭真实存在的角色。**不编名字。** -->
+          <!-- 家人卡：团扇。R7 那张选择器表里 `.kin-card → round-fan` 就是这个映射，
+               这一条它选对了（团扇 = 团圆），所以沿用。 -->
           <section class="panel rail-card kin-card">
             <div id="kinList" class="kin-list" aria-live="polite"></div>
             <p class="kin-help-label">家人可以帮您</p>
@@ -293,6 +329,48 @@
               <span class="trust-pill">要紧的事请您念一遍</span>
               <span class="trust-pill">不会自动扣钱</span>
             </div>
+          </section>
+
+          <!-- 我的数据。
+               ..............................................................
+               这三块能力后端早就有（`/api/v1/emotions/review`、`/daily-report`、
+               `/privacy/data` + `/privacy/erase`），但**没有任何页面在调**——
+               做完了没有入口，等于没做。
+
+               为什么放在「我的」而不是首页：它们都是「关于我自己的」，
+               不是「今天要办的事」。首页那一屏只回答「下一件是什么」。
+
+               每一块都是「一个大按钮 + 一块结果」，不用弹窗：
+               弹窗要求她先理解「这层东西盖住了下面」，而结果就地展开不需要。 -->
+          <h2 class="tab-head">我的数据</h2>
+          <section class="panel rail-card">
+            <div class="data-tools" aria-label="我的数据">
+              <button id="moodReview" class="secondary block">看看这两周的心情</button>
+              <p id="moodReviewBody" class="meta data-out" hidden></p>
+
+              <button id="dayReport" class="secondary block">我今天怎么样</button>
+              <p id="dayReportBody" class="meta data-out" hidden></p>
+
+              <button id="myData" class="secondary block">优活替我记了些什么</button>
+              <div id="myDataBody" class="data-out" hidden></div>
+
+              <!-- 「可撤回」是「同意」成立的前提。
+                   在这之前这一页只能一次删掉全部（下面那个），不能收回其中一条——
+                   而家人提议要长期记住的那一条也**没有任何地方能点头**：
+                   四条端点早就跑得通，全仓只有 `elder3.js` 一个消费者。
+                   收回和点头都只有她本人做得了：后端对家人的令牌回 403。 -->
+              <button id="memories" class="secondary block">我答应让优活记住的事</button>
+              <div id="memoriesBody" class="data-out" hidden></div>
+            </div>
+
+            <!-- 删除是**两步**，而且第二步的按钮一开始不存在。
+                 后端 `/privacy/erase/preview` 会给出「要删几条、留下什么」和一个
+                 绑定条数的令牌，确认时重新数一遍再比对——它保证的不是防伪造
+                 （只有本人进得来），而是**她确认的对象和她看到的那一份是同一份**。
+                 回执写「删掉 7 条」实际删了 9 条，两边都不报错，那才是要防的。 -->
+            <p class="meta">下面这个删掉之后找不回来。会先告诉您要删什么，再问一次。</p>
+            <button id="eraseStart" class="secondary block">删掉优活记下的这些</button>
+            <div id="eraseBody" class="data-out" hidden></div>
           </section>
 
           <!-- 离开这一侧的出口。
@@ -402,5 +480,8 @@
   <script src="/static/common.js"></script>
   <script src="/static/sheet.js"></script>
   <script type="module" src="/static/elder.js"></script>
+  <!-- 不是 module：`elder.js` 是 module，一个 import 取不到就整张模块图不执行。
+       美术层做成经典脚本，它坏掉也不会把老人端拖成白屏。 -->
+  <script src="/static/art-cards.js" defer></script>
 </body>
 </html>

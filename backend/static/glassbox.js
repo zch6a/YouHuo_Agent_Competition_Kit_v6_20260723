@@ -38,6 +38,22 @@ function relianceRow(label, value) {
   return row;
 }
 
+/** 一条来源念成一句人话。
+ *
+ * 屏幕上不许出现 `label` / `source` / `trusted` / `verified` 这四个英文键，
+ * 也不许出现 `true` / `false`——所以不是 `JSON.stringify`，是逐项翻。
+ *
+ * 只讲 `verified`：它是 `youhuo-reliance-card` 里「核验过」对应的那个轴，
+ * 也是后端自己说话用的轴（`confidence_message` 数它，`warning` 点名它为假的）。
+ * 两个标志一起摆给一位老人是双倍负担，而 `youhuo-cognitive-load` 整条策略
+ * 就是反对这个。`trusted` 留在响应里给可信中心。
+ */
+function sourceLine(item) {
+  const where = item && item.source ? `，来自${item.source}` : '';
+  const state = item && item.verified ? '已核验' : '还没核验';
+  return `${(item && item.label) || '一项来源'}${where}（${state}）`;
+}
+
 function bulletList(items) {
   const ul = document.createElement('ul');
   items.forEach(item => {
@@ -76,6 +92,25 @@ export function renderGlassBox(host, card, preview) {
   box.appendChild(relianceRow('能否撤销', card.reversible ? '可以撤销' : '不能自动撤销，所以要多确认一次'));
   box.appendChild(relianceRow('下一步', card.next_step));
   box.appendChild(relianceRow('信息核验', card.confidence_message));
+  // 「依据的来源」这一格原先不存在：`card.data_sources` 后端一直在填，
+  // 而这里一处都没读（全前端唯一提到它的地方是 `stage.js:554` 的一句注释）。
+  //
+  // 实测（两个来源、一个未核验）她读到的只有「已核验1项来源。」——
+  // **已核验的那一项完全看不见**，未核验的那一项只出现在下面 warning
+  // 那句话里、旁边没有状态。而 `youhuo-reliance-card` 把「依据哪些来源」
+  // 列为这张卡要说明的六件事之一，答辩那一页的台词也把它列进了五件事。
+  //
+  // 放在「信息核验」之后：那一行说的是「几项核过」，紧接着列出是哪几项，
+  // 读起来是一句话的两半。放在 warning 之前，因为 warning 是对其中某一项的
+  // 补充说明，先有名单再有说明。
+  if (Array.isArray(card.data_sources) && card.data_sources.length) {
+    const row = document.createElement('div');
+    row.className = 'reliance-row';
+    const strong = document.createElement('strong');
+    strong.textContent = '依据的来源';
+    row.append(strong, bulletList(card.data_sources.map(sourceLine)));
+    box.appendChild(row);
+  }
   if (card.warning) {
     const warn = document.createElement('div');
     warn.className = 'notice warning';

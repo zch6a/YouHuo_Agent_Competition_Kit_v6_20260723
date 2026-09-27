@@ -1,0 +1,2442 @@
+{
+  "version": "3.0",
+  "count": 87,
+  "assets": [
+    {
+      "id": "brand_mark",
+      "role": "品牌心形 Logo",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        64,
+        126,
+        151,
+        211
+      ],
+      "extraction": "key",
+      "size": [
+        87,
+        85
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        87,
+        85
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/brand_mark.png",
+      "webp": "art/webp/brand_mark.webp",
+      "svg_wrapper": "art/svg/brand_mark.svg",
+      "sha256": "a8ffdafbcb8159bffa1d2cbbccd21833b7d2aa9ed79882f4f0fbf132ef40846c"
+    },
+    {
+      "id": "avatar",
+      "role": "老人头像",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        680,
+        127,
+        783,
+        230
+      ],
+      "extraction": "circle",
+      "size": [
+        103,
+        103
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        103,
+        103
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/avatar.png",
+      "webp": "art/webp/avatar.webp",
+      "svg_wrapper": "art/svg/avatar.svg",
+      "sha256": "480ab2c1f0eda4cfa2b5eb6253f35c29b33e4bf5baef031ac000e3a0b0607caa"
+    },
+    {
+      "id": "sun_disc",
+      "role": "暖橙旭日",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        526,
+        143,
+        641,
+        254
+      ],
+      "extraction": "circle",
+      "size": [
+        115,
+        111
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        115,
+        111
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/sun_disc.png",
+      "webp": "art/webp/sun_disc.webp",
+      "svg_wrapper": "art/svg/sun_disc.svg",
+      "sha256": "722025b88ac8c9c9974c2dfbc489bd7bd50672f675db94c6ce1681c22d59fb68"
+    },
+    {
+      "id": "scene_mountain_mid",
+      "role": "中景层叠山峰",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        280,
+        178,
+        620,
+        430
+      ],
+      "extraction": "scene",
+      "size": [
+        340,
+        252
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        340,
+        252
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/scene_mountain_mid.png",
+      "webp": "art/webp/scene_mountain_mid.webp",
+      "svg_wrapper": "art/svg/scene_mountain_mid.svg",
+      "sha256": "47b1214e9b03ffe8aaec6e3c8f17b93720b5003c73c4446f78018e124431a9f5"
+    },
+    {
+      "id": "scene_tree_left",
+      "role": "左侧秋树与山峰",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        30,
+        335,
+        245,
+        760
+      ],
+      "extraction": "scene",
+      "size": [
+        215,
+        425
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        215,
+        425
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/scene_tree_left.png",
+      "webp": "art/webp/scene_tree_left.webp",
+      "svg_wrapper": "art/svg/scene_tree_left.svg",
+      "sha256": "ad68ad6738bdc3a0d12eb600d72fe48ec7b4e2f03e9f8ff84838b15d42090c6f"
+    },
+    {
+      "id": "scene_pavilion_right",
+      "role": "右侧亭台瀑布",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        620,
+        330,
+        833,
+        760
+      ],
+      "extraction": "scene",
+      "size": [
+        213,
+        430
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        213,
+        430
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/scene_pavilion_right.png",
+      "webp": "art/webp/scene_pavilion_right.webp",
+      "svg_wrapper": "art/svg/scene_pavilion_right.svg",
+      "sha256": "5a15791c1eb9ae9581b88b107dab69ccb6e121509c3a6341473f8443d440c4e1"
+    },
+    {
+      "id": "scene_mountain_right_home",
+      "role": "首页右上山水亭阁",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        430,
+        245,
+        833,
+        445
+      ],
+      "extraction": "scene",
+      "size": [
+        403,
+        200
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        403,
+        200
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/scene_mountain_right_home.png",
+      "webp": "art/webp/scene_mountain_right_home.webp",
+      "svg_wrapper": "art/svg/scene_mountain_right_home.svg",
+      "sha256": "86a362032ad139230d481dc48f90694b00c31bd0e3e53707e512470938c2761b"
+    },
+    {
+      "id": "scene_mountain_left_home",
+      "role": "首页左上淡山",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        30,
+        205,
+        360,
+        285
+      ],
+      "extraction": "scene",
+      "size": [
+        330,
+        80
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        330,
+        80
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/scene_mountain_left_home.png",
+      "webp": "art/webp/scene_mountain_left_home.webp",
+      "svg_wrapper": "art/svg/scene_mountain_left_home.svg",
+      "sha256": "13497bd7b7831cec5b6395972c77ec998b8aab3ffc9d8ded3897dde3e45d5a62"
+    },
+    {
+      "id": "home_appt_medallion",
+      "role": "复诊心电金圈＋祥云",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        536,
+        456,
+        772,
+        689
+      ],
+      "extraction": "key",
+      "size": [
+        236,
+        233
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        236,
+        233
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_appt_medallion.png",
+      "webp": "art/webp/home_appt_medallion.webp",
+      "svg_wrapper": "art/svg/home_appt_medallion.svg",
+      "sha256": "92d0885fd32e2dc887fe5fb223be84d536340eb6038b3d7ee409842c31c9787f"
+    },
+    {
+      "id": "home_voice_orb",
+      "role": "首页语音发光球",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        298,
+        1184,
+        572,
+        1463
+      ],
+      "extraction": "circle",
+      "size": [
+        274,
+        279
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        274,
+        279
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_voice_orb.png",
+      "webp": "art/webp/home_voice_orb.webp",
+      "svg_wrapper": "art/svg/home_voice_orb.svg",
+      "sha256": "d83eefb94bb3d8b70c93d84d2adb94ea1e7f44b4ae1c93cd4d96d18c66caed49"
+    },
+    {
+      "id": "home_voice_wave_l",
+      "role": "首页左声波",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        118,
+        1260,
+        267,
+        1328
+      ],
+      "extraction": "key",
+      "size": [
+        149,
+        68
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        149,
+        68
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_voice_wave_l.png",
+      "webp": "art/webp/home_voice_wave_l.webp",
+      "svg_wrapper": "art/svg/home_voice_wave_l.svg",
+      "sha256": "97530dfbde2b2077e4f8ccd0075c7d21c311b0b967c8caa468f5b2a005e06bad"
+    },
+    {
+      "id": "home_voice_wave_r",
+      "role": "首页右声波",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        598,
+        1260,
+        747,
+        1328
+      ],
+      "extraction": "key",
+      "size": [
+        149,
+        68
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        149,
+        68
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_voice_wave_r.png",
+      "webp": "art/webp/home_voice_wave_r.webp",
+      "svg_wrapper": "art/svg/home_voice_wave_r.svg",
+      "sha256": "13cbfc466953c3f10f2ef0313e475053fab639054a90e8e6915ccc331e6eb0d7"
+    },
+    {
+      "id": "home_voice_mountain_l",
+      "role": "语音卡左侧山河金线",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        64,
+        1370,
+        260,
+        1517
+      ],
+      "extraction": "scene",
+      "size": [
+        196,
+        147
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        196,
+        147
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_voice_mountain_l.png",
+      "webp": "art/webp/home_voice_mountain_l.webp",
+      "svg_wrapper": "art/svg/home_voice_mountain_l.svg",
+      "sha256": "92b4278c293ee6a875fab40e78fd74b0e83f45edfe43c80fdfcf1f994c033fac"
+    },
+    {
+      "id": "home_voice_mountain_r",
+      "role": "语音卡右侧山河金线",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        600,
+        1370,
+        783,
+        1517
+      ],
+      "extraction": "scene",
+      "size": [
+        183,
+        147
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        183,
+        147
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_voice_mountain_r.png",
+      "webp": "art/webp/home_voice_mountain_r.webp",
+      "svg_wrapper": "art/svg/home_voice_mountain_r.svg",
+      "sha256": "a129582fa9f74f88af1e8a11ef92ed167a5001a67a9121e5c2cc4fc7e50ff079"
+    },
+    {
+      "id": "home_schedule_pill",
+      "role": "首页用药图标",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        903,
+        164,
+        973
+      ],
+      "extraction": "key",
+      "size": [
+        68,
+        70
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        68,
+        70
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_schedule_pill.png",
+      "webp": "art/webp/home_schedule_pill.webp",
+      "svg_wrapper": "art/svg/home_schedule_pill.svg",
+      "sha256": "244f839b9538f552ee2c9d42336b23cea95c75fc795cc5d561139e3a29e18f80"
+    },
+    {
+      "id": "home_schedule_people",
+      "role": "首页社区活动图标",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        994,
+        164,
+        1063
+      ],
+      "extraction": "key",
+      "size": [
+        68,
+        69
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        68,
+        69
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_schedule_people.png",
+      "webp": "art/webp/home_schedule_people.webp",
+      "svg_wrapper": "art/svg/home_schedule_people.svg",
+      "sha256": "246004dd6ee4b6093bcb07cbea7db02381d169839f4daba267c9716f695063f7"
+    },
+    {
+      "id": "home_schedule_pressure",
+      "role": "首页血压图标",
+      "source": "source/home.png",
+      "source_bbox_xyxy": [
+        96,
+        1082,
+        164,
+        1152
+      ],
+      "extraction": "key",
+      "size": [
+        68,
+        70
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        68,
+        70
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/home_schedule_pressure.png",
+      "webp": "art/webp/home_schedule_pressure.webp",
+      "svg_wrapper": "art/svg/home_schedule_pressure.svg",
+      "sha256": "fd5f66927ed68d1c45a6a3db21c20670efdd1b364c443a0d4f8de962f50bffd0"
+    },
+    {
+      "id": "listen_orb",
+      "role": "AI 倾听心形球",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        286,
+        620,
+        579,
+        910
+      ],
+      "extraction": "circle",
+      "size": [
+        293,
+        290
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        293,
+        290
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/listen_orb.png",
+      "webp": "art/webp/listen_orb.webp",
+      "svg_wrapper": "art/svg/listen_orb.svg",
+      "sha256": "8e1ee7277c2336286a8b4d2ae1bc1dd49cf7427271ef4515255986c3fc077b59"
+    },
+    {
+      "id": "listen_wave_l",
+      "role": "倾听左声波",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        95,
+        735,
+        275,
+        815
+      ],
+      "extraction": "key",
+      "size": [
+        180,
+        80
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        180,
+        80
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/listen_wave_l.png",
+      "webp": "art/webp/listen_wave_l.webp",
+      "svg_wrapper": "art/svg/listen_wave_l.svg",
+      "sha256": "28b5a73b37c4bba150b683a239cf565030ef51310320ee04b324e60244e3ab89"
+    },
+    {
+      "id": "listen_wave_r",
+      "role": "倾听右声波",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        588,
+        735,
+        770,
+        815
+      ],
+      "extraction": "key",
+      "size": [
+        182,
+        80
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        182,
+        80
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/listen_wave_r.png",
+      "webp": "art/webp/listen_wave_r.webp",
+      "svg_wrapper": "art/svg/listen_wave_r.svg",
+      "sha256": "93a1f4d67b3d70caec13060696eba6b8c357564ad13b16182bb57fdc268f9778"
+    },
+    {
+      "id": "suggest_water_art",
+      "role": "水费水滴章＋水纹祥云",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        104,
+        936,
+        364,
+        1112
+      ],
+      "extraction": "key",
+      "size": [
+        260,
+        176
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        260,
+        176
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/suggest_water_art.png",
+      "webp": "art/webp/suggest_water_art.webp",
+      "svg_wrapper": "art/svg/suggest_water_art.svg",
+      "sha256": "6be92d082c1f7c3147d66e331fb9d5fa8a982a9db1f937344bc60d60d693cacc"
+    },
+    {
+      "id": "suggest_calendar_art",
+      "role": "日历章＋祥云山景",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        472,
+        936,
+        732,
+        1112
+      ],
+      "extraction": "key",
+      "size": [
+        260,
+        176
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        260,
+        176
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/suggest_calendar_art.png",
+      "webp": "art/webp/suggest_calendar_art.webp",
+      "svg_wrapper": "art/svg/suggest_calendar_art.svg",
+      "sha256": "233e3365aa3e175813a5b9270ce95a72490625d31b316caa8fe5f726bb475687"
+    },
+    {
+      "id": "suggest_bill_art",
+      "role": "账单章＋竹山水墨",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        104,
+        1235,
+        364,
+        1410
+      ],
+      "extraction": "key",
+      "size": [
+        260,
+        175
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        260,
+        175
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/suggest_bill_art.png",
+      "webp": "art/webp/suggest_bill_art.webp",
+      "svg_wrapper": "art/svg/suggest_bill_art.svg",
+      "sha256": "a1101e77d3d3eb5376a8cf71d39fecdba4ac88bcf2f826acf0f5474ec29c677b"
+    },
+    {
+      "id": "suggest_pill_art",
+      "role": "药丸章＋花草水墨",
+      "source": "source/listen.png",
+      "source_bbox_xyxy": [
+        472,
+        1235,
+        732,
+        1410
+      ],
+      "extraction": "key",
+      "size": [
+        260,
+        175
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        260,
+        175
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/suggest_pill_art.png",
+      "webp": "art/webp/suggest_pill_art.webp",
+      "svg_wrapper": "art/svg/suggest_pill_art.svg",
+      "sha256": "abe84482d420a08174b041d314186ca689c76c3649429b08bbeee5032b75496f"
+    },
+    {
+      "id": "recognize_water_badge",
+      "role": "识别结果水滴徽章",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        92,
+        523,
+        190,
+        621
+      ],
+      "extraction": "key",
+      "size": [
+        98,
+        98
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        98,
+        98
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/recognize_water_badge.png",
+      "webp": "art/webp/recognize_water_badge.webp",
+      "svg_wrapper": "art/svg/recognize_water_badge.svg",
+      "sha256": "bf471e2b833c27a444a1237ae348e3324e5200df5e503f574843aaab8a294924"
+    },
+    {
+      "id": "recognize_step_bill",
+      "role": "查看账单步骤图标",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        128,
+        1258,
+        210,
+        1348
+      ],
+      "extraction": "key",
+      "size": [
+        82,
+        90
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        82,
+        90
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/recognize_step_bill.png",
+      "webp": "art/webp/recognize_step_bill.webp",
+      "svg_wrapper": "art/svg/recognize_step_bill.svg",
+      "sha256": "90783bac96191938f56543dbcea1a7dccc1fc14535573d45c9aaa45390e82e8c"
+    },
+    {
+      "id": "recognize_step_repeat",
+      "role": "复述确认步骤图标",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        384,
+        1258,
+        474,
+        1348
+      ],
+      "extraction": "key",
+      "size": [
+        90,
+        90
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        90,
+        90
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/recognize_step_repeat.png",
+      "webp": "art/webp/recognize_step_repeat.webp",
+      "svg_wrapper": "art/svg/recognize_step_repeat.svg",
+      "sha256": "c3dd23678d991b9b0222bd7730a8bb6c2a2f1348b7645e4e2ce990e3280c41c3"
+    },
+    {
+      "id": "recognize_step_pay",
+      "role": "完成支付步骤图标",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        620,
+        1258,
+        730,
+        1348
+      ],
+      "extraction": "key",
+      "size": [
+        110,
+        90
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        110,
+        90
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/recognize_step_pay.png",
+      "webp": "art/webp/recognize_step_pay.webp",
+      "svg_wrapper": "art/svg/recognize_step_pay.svg",
+      "sha256": "29865191e66ab7d6618166dd00a471dcaf01f621d47983222fd882d3754d5127"
+    },
+    {
+      "id": "recognize_scene_right",
+      "role": "识别页右侧山水亭阁",
+      "source": "source/recognize.png",
+      "source_bbox_xyxy": [
+        520,
+        246,
+        833,
+        500
+      ],
+      "extraction": "scene",
+      "size": [
+        313,
+        254
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        313,
+        254
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/recognize_scene_right.png",
+      "webp": "art/webp/recognize_scene_right.webp",
+      "svg_wrapper": "art/svg/recognize_scene_right.svg",
+      "sha256": "3f8b9d060b5d4961193845ff58c8a4ede1cc2f7ea0ba6897b35578af4d2fbf4f"
+    },
+    {
+      "id": "bill_water_badge",
+      "role": "账单页水滴徽章",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        91,
+        432,
+        218,
+        559
+      ],
+      "extraction": "key",
+      "size": [
+        127,
+        127
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        127,
+        127
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_water_badge.png",
+      "webp": "art/webp/bill_water_badge.webp",
+      "svg_wrapper": "art/svg/bill_water_badge.svg",
+      "sha256": "162f36cc14e083b3f14d0059ff560de31d5e33677caca750a1404fc45c31cd7f"
+    },
+    {
+      "id": "bill_scene_left",
+      "role": "账单页左下山水",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        30,
+        290,
+        335,
+        408
+      ],
+      "extraction": "scene",
+      "size": [
+        305,
+        118
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        305,
+        118
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_scene_left.png",
+      "webp": "art/webp/bill_scene_left.webp",
+      "svg_wrapper": "art/svg/bill_scene_left.svg",
+      "sha256": "9f2c130500d1c45b3f184441c4901cb55873036f53338341e15e413ea9314963"
+    },
+    {
+      "id": "bill_scene_right",
+      "role": "账单页右侧旭日山水",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        535,
+        250,
+        833,
+        410
+      ],
+      "extraction": "scene",
+      "size": [
+        298,
+        160
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        298,
+        160
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_scene_right.png",
+      "webp": "art/webp/bill_scene_right.webp",
+      "svg_wrapper": "art/svg/bill_scene_right.svg",
+      "sha256": "7c591d4c57af6219973009c5319a8016c34cd98fe57f8ed4ed29a8f6fbb245ea"
+    },
+    {
+      "id": "bill_safety_shield",
+      "role": "安全校验金盾",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        357,
+        1300,
+        495,
+        1397
+      ],
+      "extraction": "key",
+      "size": [
+        138,
+        97
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        138,
+        97
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_safety_shield.png",
+      "webp": "art/webp/bill_safety_shield.webp",
+      "svg_wrapper": "art/svg/bill_safety_shield.svg",
+      "sha256": "6ed1c4c51b73cc51fad3f7eb9c450309d1af46e672a9aad63b8ea93ffbb08bba"
+    },
+    {
+      "id": "bill_gold_cloud",
+      "role": "安全模块右侧金云",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        567,
+        1288,
+        795,
+        1438
+      ],
+      "extraction": "key",
+      "size": [
+        228,
+        150
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        228,
+        150
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_gold_cloud.png",
+      "webp": "art/webp/bill_gold_cloud.webp",
+      "svg_wrapper": "art/svg/bill_gold_cloud.svg",
+      "sha256": "8cb016c99dcafc3fb7dbb383f92d98bd60c176024571bd8e146cd7ddae329a81"
+    },
+    {
+      "id": "bill_safe_mountain_l",
+      "role": "安全模块左山河金线",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        58,
+        1332,
+        328,
+        1497
+      ],
+      "extraction": "scene",
+      "size": [
+        270,
+        165
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        270,
+        165
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_safe_mountain_l.png",
+      "webp": "art/webp/bill_safe_mountain_l.webp",
+      "svg_wrapper": "art/svg/bill_safe_mountain_l.svg",
+      "sha256": "74242715ed0d009f3940feae9519f6fcfc69617f95218fb030b8dbf1ddcf4de8"
+    },
+    {
+      "id": "bill_safe_mountain_r",
+      "role": "安全模块右山河金线",
+      "source": "source/bill.png",
+      "source_bbox_xyxy": [
+        510,
+        1370,
+        795,
+        1497
+      ],
+      "extraction": "scene",
+      "size": [
+        285,
+        127
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        285,
+        127
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/bill_safe_mountain_r.png",
+      "webp": "art/webp/bill_safe_mountain_r.webp",
+      "svg_wrapper": "art/svg/bill_safe_mountain_r.svg",
+      "sha256": "00868af4a7021ff1c34f1c698a214bddeb98284faeb29683a27de306133c86f2"
+    },
+    {
+      "id": "confirm_scene_right",
+      "role": "确认页右侧旭日山水",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        550,
+        225,
+        833,
+        380
+      ],
+      "extraction": "scene",
+      "size": [
+        283,
+        155
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        283,
+        155
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_scene_right.png",
+      "webp": "art/webp/confirm_scene_right.webp",
+      "svg_wrapper": "art/svg/confirm_scene_right.svg",
+      "sha256": "489881aee3dbf6ea352f33aeb1b76258036a159a1142be384ef539391d6beb59"
+    },
+    {
+      "id": "confirm_water_badge",
+      "role": "确认页水滴徽章",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        87,
+        405,
+        213,
+        512
+      ],
+      "extraction": "key",
+      "size": [
+        126,
+        107
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        126,
+        107
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_water_badge.png",
+      "webp": "art/webp/confirm_water_badge.webp",
+      "svg_wrapper": "art/svg/confirm_water_badge.svg",
+      "sha256": "0c13d0ce330f74c471b167bc0c21d42b4f24ec7c624aff84218dad4d65475c64"
+    },
+    {
+      "id": "confirm_security_badge",
+      "role": "平台安全盾牌",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        82,
+        820,
+        155,
+        878
+      ],
+      "extraction": "key",
+      "size": [
+        73,
+        58
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        73,
+        58
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_security_badge.png",
+      "webp": "art/webp/confirm_security_badge.webp",
+      "svg_wrapper": "art/svg/confirm_security_badge.svg",
+      "sha256": "28514876cd87f748b99c61e297867d203a2520e98636cbcf645ce49314ef9638"
+    },
+    {
+      "id": "confirm_gold_cloud",
+      "role": "确认模块祥云",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        635,
+        920,
+        797,
+        1020
+      ],
+      "extraction": "key",
+      "size": [
+        162,
+        100
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        162,
+        100
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_gold_cloud.png",
+      "webp": "art/webp/confirm_gold_cloud.webp",
+      "svg_wrapper": "art/svg/confirm_gold_cloud.svg",
+      "sha256": "b1cbb523bcccdceae53e4d6d4da5fe447413e15785f297947c32cb9e38c02720"
+    },
+    {
+      "id": "confirm_mic_orb",
+      "role": "复述确认发光语音球",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        280,
+        1210,
+        585,
+        1492
+      ],
+      "extraction": "circle",
+      "size": [
+        305,
+        282
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        305,
+        282
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_mic_orb.png",
+      "webp": "art/webp/confirm_mic_orb.webp",
+      "svg_wrapper": "art/svg/confirm_mic_orb.svg",
+      "sha256": "85d918efb836b907358970387cb286615a8f77abd4fdfdad62c919db49362392"
+    },
+    {
+      "id": "confirm_bottom_l",
+      "role": "确认页左下山河金线",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        30,
+        1710,
+        330,
+        1797
+      ],
+      "extraction": "scene",
+      "size": [
+        300,
+        87
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        300,
+        87
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_bottom_l.png",
+      "webp": "art/webp/confirm_bottom_l.webp",
+      "svg_wrapper": "art/svg/confirm_bottom_l.svg",
+      "sha256": "a10e5f5925302daf3bc965fae3f52e0c7b55254974fd439c162227056c864eb1"
+    },
+    {
+      "id": "confirm_bottom_r",
+      "role": "确认页右下山河金线",
+      "source": "source/confirm.png",
+      "source_bbox_xyxy": [
+        525,
+        1710,
+        833,
+        1797
+      ],
+      "extraction": "scene",
+      "size": [
+        308,
+        87
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        308,
+        87
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/confirm_bottom_r.png",
+      "webp": "art/webp/confirm_bottom_r.webp",
+      "svg_wrapper": "art/svg/confirm_bottom_r.svg",
+      "sha256": "9d34fcb6ecabf579e33633f9a75d76a0d5302f7131ab1117e704484ca2ff15bd"
+    },
+    {
+      "id": "success_check",
+      "role": "成功绿玉勾章＋祥云",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        295,
+        204,
+        570,
+        458
+      ],
+      "extraction": "key",
+      "size": [
+        275,
+        254
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        275,
+        254
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_check.png",
+      "webp": "art/webp/success_check.webp",
+      "svg_wrapper": "art/svg/success_check.svg",
+      "sha256": "bfef2dd20368f2140ace9d4c06ad942ec94f7938b0eff947e2d13c8b0d6cd1de"
+    },
+    {
+      "id": "success_water_splash",
+      "role": "支付卡片水花",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        500,
+        660,
+        760,
+        858
+      ],
+      "extraction": "key",
+      "size": [
+        260,
+        198
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        260,
+        198
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_water_splash.png",
+      "webp": "art/webp/success_water_splash.webp",
+      "svg_wrapper": "art/svg/success_water_splash.svg",
+      "sha256": "630d39280d23d5a93b64a5205f598584459b88cefdf544121c383ca749d5ee5a"
+    },
+    {
+      "id": "success_bamboo",
+      "role": "凭证操作竹林",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        598,
+        1040,
+        780,
+        1185
+      ],
+      "extraction": "key",
+      "size": [
+        182,
+        145
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        182,
+        145
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_bamboo.png",
+      "webp": "art/webp/success_bamboo.webp",
+      "svg_wrapper": "art/svg/success_bamboo.svg",
+      "sha256": "b36f3232cc4e2747acd04601adfcce7d1518dba08ae9115e6b93238a6c1f4de8"
+    },
+    {
+      "id": "success_hut",
+      "role": "返回首页亭舍",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        72,
+        1210,
+        245,
+        1365
+      ],
+      "extraction": "key",
+      "size": [
+        173,
+        155
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        173,
+        155
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_hut.png",
+      "webp": "art/webp/success_hut.webp",
+      "svg_wrapper": "art/svg/success_hut.svg",
+      "sha256": "48da04b298e5c1b11262511b7fabadc2fe854d30fb98dc9d664de91d4df52dc2"
+    },
+    {
+      "id": "success_crane",
+      "role": "今日事项 CTA 仙鹤",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        570,
+        1420,
+        740,
+        1522
+      ],
+      "extraction": "crane",
+      "size": [
+        170,
+        102
+      ],
+      "alpha_bbox": [
+        0,
+        6,
+        170,
+        102
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_crane.png",
+      "webp": "art/webp/success_crane.webp",
+      "svg_wrapper": "art/svg/success_crane.svg",
+      "sha256": "8e0096e15cc543a2d191497d242bbc380b495b82e81fd59d710f9238bab8c4e4"
+    },
+    {
+      "id": "success_scene_left",
+      "role": "成功页左侧群山松树",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        30,
+        165,
+        295,
+        610
+      ],
+      "extraction": "scene",
+      "size": [
+        265,
+        445
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        265,
+        445
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_scene_left.png",
+      "webp": "art/webp/success_scene_left.webp",
+      "svg_wrapper": "art/svg/success_scene_left.svg",
+      "sha256": "406451a0891e243fe2dae75cc0abda73bc47fc5de69dc694f9be6d5b20b56c9f"
+    },
+    {
+      "id": "success_scene_right",
+      "role": "成功页右侧山峰亭阁",
+      "source": "source/success.png",
+      "source_bbox_xyxy": [
+        600,
+        190,
+        833,
+        610
+      ],
+      "extraction": "scene",
+      "size": [
+        233,
+        420
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        233,
+        420
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/success_scene_right.png",
+      "webp": "art/webp/success_scene_right.webp",
+      "svg_wrapper": "art/svg/success_scene_right.svg",
+      "sha256": "d1e57944974f7f7fc688edb4ec8a805aaa4bf83da3a0c66c6a61855a4436d82e"
+    },
+    {
+      "id": "record_scene_left",
+      "role": "记录页左侧远山",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        30,
+        365,
+        310,
+        548
+      ],
+      "extraction": "scene",
+      "size": [
+        280,
+        183
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        280,
+        183
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_scene_left.png",
+      "webp": "art/webp/record_scene_left.webp",
+      "svg_wrapper": "art/svg/record_scene_left.svg",
+      "sha256": "077f93dbf1182268ee5522913e1c86d219d50af749befe63301663b59c1fcb72"
+    },
+    {
+      "id": "record_scene_right",
+      "role": "记录页右侧亭阁山水",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        585,
+        365,
+        833,
+        548
+      ],
+      "extraction": "scene",
+      "size": [
+        248,
+        183
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        248,
+        183
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_scene_right.png",
+      "webp": "art/webp/record_scene_right.webp",
+      "svg_wrapper": "art/svg/record_scene_right.svg",
+      "sha256": "f3fb6da6ddaf898888bb096115ca872de76edb3e1fbfbb131a223a64e1e12734"
+    },
+    {
+      "id": "record_water",
+      "role": "时间线水费图章",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        597,
+        263,
+        731
+      ],
+      "extraction": "key",
+      "size": [
+        130,
+        134
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        130,
+        134
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_water.png",
+      "webp": "art/webp/record_water.webp",
+      "svg_wrapper": "art/svg/record_water.svg",
+      "sha256": "11584e06bd1159070efc2906479678d2e990705be4e9bf540a98764090fed8f8"
+    },
+    {
+      "id": "record_family",
+      "role": "时间线家人图章",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        837,
+        263,
+        971
+      ],
+      "extraction": "key",
+      "size": [
+        130,
+        134
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        130,
+        134
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_family.png",
+      "webp": "art/webp/record_family.webp",
+      "svg_wrapper": "art/svg/record_family.svg",
+      "sha256": "c30c7a34836f3c493a07a68ba2a03715997797eef7f8b3395a0757f33340ffd3"
+    },
+    {
+      "id": "record_confirm",
+      "role": "时间线金额确认图章",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        1087,
+        263,
+        1220
+      ],
+      "extraction": "key",
+      "size": [
+        130,
+        133
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        130,
+        133
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_confirm.png",
+      "webp": "art/webp/record_confirm.webp",
+      "svg_wrapper": "art/svg/record_confirm.svg",
+      "sha256": "56bde5f8af2fc8be41a38ed87ae7901b89c01646cb8293b6f76e64975f83e734"
+    },
+    {
+      "id": "record_request",
+      "role": "时间线申请图章",
+      "source": "source/records.png",
+      "source_bbox_xyxy": [
+        133,
+        1325,
+        263,
+        1456
+      ],
+      "extraction": "key",
+      "size": [
+        130,
+        131
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        130,
+        131
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/record_request.png",
+      "webp": "art/webp/record_request.webp",
+      "svg_wrapper": "art/svg/record_request.svg",
+      "sha256": "c69300c78a0ea0c227a51d27f57ddf79115eb22b11dade6acd7871bc7968787d"
+    },
+    {
+      "id": "services_scene_left",
+      "role": "服务页左侧群山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        30,
+        220,
+        275,
+        515
+      ],
+      "extraction": "scene",
+      "size": [
+        245,
+        295
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        245,
+        295
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/services_scene_left.png",
+      "webp": "art/webp/services_scene_left.webp",
+      "svg_wrapper": "art/svg/services_scene_left.svg",
+      "sha256": "83ca15989280f925bf4e8e55a47ef653c0585fba73f3b10c20e4638d1d79dd95"
+    },
+    {
+      "id": "services_scene_center",
+      "role": "服务页中部远山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        300,
+        160,
+        585,
+        286
+      ],
+      "extraction": "scene",
+      "size": [
+        285,
+        126
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        285,
+        126
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/services_scene_center.png",
+      "webp": "art/webp/services_scene_center.webp",
+      "svg_wrapper": "art/svg/services_scene_center.svg",
+      "sha256": "cc80744ce00562be895c50f757f281fa4871772fee2174247e2460a5216b9c14"
+    },
+    {
+      "id": "services_scene_right",
+      "role": "服务页右侧亭阁山峰",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        220,
+        833,
+        515
+      ],
+      "extraction": "scene",
+      "size": [
+        223,
+        295
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        223,
+        295
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/services_scene_right.png",
+      "webp": "art/webp/services_scene_right.webp",
+      "svg_wrapper": "art/svg/services_scene_right.svg",
+      "sha256": "c14b7868b9206daebc8b3eb32d33962399b79c6a76163700a625fff1e6869591"
+    },
+    {
+      "id": "service_todo",
+      "role": "待办图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        82,
+        535,
+        183,
+        647
+      ],
+      "extraction": "key",
+      "size": [
+        101,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        101,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_todo.png",
+      "webp": "art/webp/service_todo.webp",
+      "svg_wrapper": "art/svg/service_todo.svg",
+      "sha256": "130a4ecaeff43e021c1baa58c9677c12d817892f891662396f5e99fad235af2a"
+    },
+    {
+      "id": "service_common",
+      "role": "常用服务图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        463,
+        535,
+        563,
+        647
+      ],
+      "extraction": "key",
+      "size": [
+        100,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        100,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_common.png",
+      "webp": "art/webp/service_common.webp",
+      "svg_wrapper": "art/svg/service_common.svg",
+      "sha256": "7867d9a6fd9f57278d034e91313d06893aa4526f8223f7f3343b02d8fb938c01"
+    },
+    {
+      "id": "service_records",
+      "role": "我的记录图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        82,
+        780,
+        183,
+        892
+      ],
+      "extraction": "key",
+      "size": [
+        101,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        101,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_records.png",
+      "webp": "art/webp/service_records.webp",
+      "svg_wrapper": "art/svg/service_records.svg",
+      "sha256": "d4bad0d3dae457d4a127c7321d4ad82dbcf9cfcf61ad934f10c66178d4116b8f"
+    },
+    {
+      "id": "service_ask",
+      "role": "问问看图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        463,
+        780,
+        563,
+        892
+      ],
+      "extraction": "key",
+      "size": [
+        100,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        100,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_ask.png",
+      "webp": "art/webp/service_ask.webp",
+      "svg_wrapper": "art/svg/service_ask.svg",
+      "sha256": "619a354090a5e1648d508774412177cdaae4d4058291d512b37ac1bd1bf45214"
+    },
+    {
+      "id": "service_health",
+      "role": "健康助手图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        82,
+        1012,
+        183,
+        1124
+      ],
+      "extraction": "key",
+      "size": [
+        101,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        101,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_health.png",
+      "webp": "art/webp/service_health.webp",
+      "svg_wrapper": "art/svg/service_health.svg",
+      "sha256": "a6f28e867c4e912d01aafc1b7c9922bf6b0051bd14b9da7ee238a7c0ec314fbc"
+    },
+    {
+      "id": "service_settings",
+      "role": "设置图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        463,
+        1012,
+        563,
+        1124
+      ],
+      "extraction": "key",
+      "size": [
+        100,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        100,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_settings.png",
+      "webp": "art/webp/service_settings.webp",
+      "svg_wrapper": "art/svg/service_settings.svg",
+      "sha256": "ceaf3d2f54b198cce1e68fbde0a93d933fb4c7988380b47c61b9c695df9cf451"
+    },
+    {
+      "id": "service_emergency",
+      "role": "紧急联系人图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        82,
+        1236,
+        183,
+        1348
+      ],
+      "extraction": "key",
+      "size": [
+        101,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        101,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_emergency.png",
+      "webp": "art/webp/service_emergency.webp",
+      "svg_wrapper": "art/svg/service_emergency.svg",
+      "sha256": "07b2bfa53c7729f83f4b1f126859520db9e62e55c9fda950ae983a7bea810f98"
+    },
+    {
+      "id": "service_utility",
+      "role": "生活缴费图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        463,
+        1236,
+        563,
+        1348
+      ],
+      "extraction": "key",
+      "size": [
+        100,
+        112
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        100,
+        112
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_utility.png",
+      "webp": "art/webp/service_utility.webp",
+      "svg_wrapper": "art/svg/service_utility.svg",
+      "sha256": "4a0c3d4bdc50577b458625262819aeeb270d02b0239623a6a97d898583f6a477"
+    },
+    {
+      "id": "service_credential",
+      "role": "我的凭证图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        82,
+        1447,
+        183,
+        1558
+      ],
+      "extraction": "key",
+      "size": [
+        101,
+        111
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        101,
+        111
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_credential.png",
+      "webp": "art/webp/service_credential.webp",
+      "svg_wrapper": "art/svg/service_credential.svg",
+      "sha256": "f45b1e1e1c04539766fdeda11c03fe73ae082617ed47e6d7590c40f2b7cff73a"
+    },
+    {
+      "id": "service_medication",
+      "role": "用药提醒图标",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        463,
+        1447,
+        563,
+        1558
+      ],
+      "extraction": "key",
+      "size": [
+        100,
+        111
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        100,
+        111
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_medication.png",
+      "webp": "art/webp/service_medication.webp",
+      "svg_wrapper": "art/svg/service_medication.svg",
+      "sha256": "bd6256003e2160b8edd5489f53076a6f5d37a671c7c112a9075e042257a28396"
+    },
+    {
+      "id": "service_bamboo",
+      "role": "常用服务竹林",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        675,
+        660,
+        795,
+        735
+      ],
+      "extraction": "key",
+      "size": [
+        120,
+        75
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        120,
+        75
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_bamboo.png",
+      "webp": "art/webp/service_bamboo.webp",
+      "svg_wrapper": "art/svg/service_bamboo.svg",
+      "sha256": "36b41c016ca1b2b7e2a60effa268e2fd905b8330c2a3b693ade8f73faf0bcde4"
+    },
+    {
+      "id": "service_records_mountain",
+      "role": "记录卡底部蓝山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        220,
+        952,
+        330,
+        980
+      ],
+      "extraction": "scene",
+      "size": [
+        110,
+        28
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        110,
+        28
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_records_mountain.png",
+      "webp": "art/webp/service_records_mountain.webp",
+      "svg_wrapper": "art/svg/service_records_mountain.svg",
+      "sha256": "343375cc3c1355b33feccf546354ce829f15d80c7b71443d136c18cbd14685ac"
+    },
+    {
+      "id": "service_ask_mountain",
+      "role": "问问看卡底部紫山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        952,
+        700,
+        980
+      ],
+      "extraction": "scene",
+      "size": [
+        90,
+        28
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        90,
+        28
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_ask_mountain.png",
+      "webp": "art/webp/service_ask_mountain.webp",
+      "svg_wrapper": "art/svg/service_ask_mountain.svg",
+      "sha256": "9feb08573a9ba7f3b36a0c067a7cfd50fc84b12148a71cb16b7b7ad83b40d0d4"
+    },
+    {
+      "id": "service_health_mountain",
+      "role": "健康助手卡橙山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        220,
+        1175,
+        330,
+        1204
+      ],
+      "extraction": "scene",
+      "size": [
+        110,
+        29
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        110,
+        29
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_health_mountain.png",
+      "webp": "art/webp/service_health_mountain.webp",
+      "svg_wrapper": "art/svg/service_health_mountain.svg",
+      "sha256": "93766e2dd9f6337baab00c0d559c3f5f83fcc88e5ba17ec61ef32acce79fe789"
+    },
+    {
+      "id": "service_settings_mountain",
+      "role": "设置卡灰山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        1175,
+        700,
+        1204
+      ],
+      "extraction": "scene",
+      "size": [
+        90,
+        29
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        90,
+        29
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_settings_mountain.png",
+      "webp": "art/webp/service_settings_mountain.webp",
+      "svg_wrapper": "art/svg/service_settings_mountain.svg",
+      "sha256": "8bd1e7670db03f8c932b4257a9c2c1d0b6e5c8003622de63cedb620c1a2d8f38"
+    },
+    {
+      "id": "service_emergency_mountain",
+      "role": "紧急联系人卡暖山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        220,
+        1383,
+        330,
+        1414
+      ],
+      "extraction": "scene",
+      "size": [
+        110,
+        31
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        110,
+        31
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_emergency_mountain.png",
+      "webp": "art/webp/service_emergency_mountain.webp",
+      "svg_wrapper": "art/svg/service_emergency_mountain.svg",
+      "sha256": "f4901809aa030f4b99e77500e4f4bdb86136e40d685ef4c42857bc0f3a4e6aa6"
+    },
+    {
+      "id": "service_utility_water",
+      "role": "生活缴费卡水景",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        1383,
+        700,
+        1415
+      ],
+      "extraction": "scene",
+      "size": [
+        90,
+        32
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        90,
+        32
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_utility_water.png",
+      "webp": "art/webp/service_utility_water.webp",
+      "svg_wrapper": "art/svg/service_utility_water.svg",
+      "sha256": "f32fe0ebd8757cd01bd4bd1110e2b7a2271921b61cea167844aec9365aa23583"
+    },
+    {
+      "id": "service_credential_mountain",
+      "role": "凭证卡绿山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        220,
+        1582,
+        330,
+        1610
+      ],
+      "extraction": "scene",
+      "size": [
+        110,
+        28
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        110,
+        28
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_credential_mountain.png",
+      "webp": "art/webp/service_credential_mountain.webp",
+      "svg_wrapper": "art/svg/service_credential_mountain.svg",
+      "sha256": "0428b0640b8311b96cf21accd2a1d884d61b8fd50cb1f87ff9920e2cda724e43"
+    },
+    {
+      "id": "service_medication_mountain",
+      "role": "用药卡紫山",
+      "source": "source/services.png",
+      "source_bbox_xyxy": [
+        610,
+        1582,
+        700,
+        1610
+      ],
+      "extraction": "scene",
+      "size": [
+        90,
+        28
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        90,
+        28
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/service_medication_mountain.png",
+      "webp": "art/webp/service_medication_mountain.webp",
+      "svg_wrapper": "art/svg/service_medication_mountain.svg",
+      "sha256": "47617539d6956058a20f2aa25d30f1b5555f023f56394c8677195fed624790be"
+    },
+    {
+      "id": "cert_scene_left",
+      "role": "可信凭证左侧山水",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        30,
+        445,
+        285,
+        610
+      ],
+      "extraction": "scene",
+      "size": [
+        255,
+        165
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        255,
+        165
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/cert_scene_left.png",
+      "webp": "art/webp/cert_scene_left.webp",
+      "svg_wrapper": "art/svg/cert_scene_left.svg",
+      "sha256": "e1b492422e96c65db25aff1d780543fe9f2b44715feeabdf8406427061ab695e"
+    },
+    {
+      "id": "cert_scene_right",
+      "role": "可信凭证右侧亭阁山峰",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        615,
+        445,
+        833,
+        610
+      ],
+      "extraction": "scene",
+      "size": [
+        218,
+        165
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        218,
+        165
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/cert_scene_right.png",
+      "webp": "art/webp/cert_scene_right.webp",
+      "svg_wrapper": "art/svg/cert_scene_right.svg",
+      "sha256": "8a9826fbf1db8685217c75c873bee1a3a6bed1a451821f2fa1287a5598a12537"
+    },
+    {
+      "id": "cert_shield",
+      "role": "可信凭证蓝盾主视觉",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        278,
+        248,
+        585,
+        526
+      ],
+      "extraction": "key",
+      "size": [
+        307,
+        278
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        307,
+        278
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/cert_shield.png",
+      "webp": "art/webp/cert_shield.webp",
+      "svg_wrapper": "art/svg/cert_shield.svg",
+      "sha256": "1d827960c3256fdc42e0bbbe57eb62454f871a128196b6382dd0b43b0961ecc7"
+    },
+    {
+      "id": "cert_gold_seal",
+      "role": "交易成功金色印记",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        555,
+        700,
+        765,
+        875
+      ],
+      "extraction": "key",
+      "size": [
+        210,
+        175
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        210,
+        175
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/cert_gold_seal.png",
+      "webp": "art/webp/cert_gold_seal.webp",
+      "svg_wrapper": "art/svg/cert_gold_seal.svg",
+      "sha256": "64d91be949120b19fec23f1c8e29385b268281a90b0d208f7e2e01b8432da791"
+    },
+    {
+      "id": "cert_footer_scene",
+      "role": "可信凭证底部山河金线",
+      "source": "source/cert.png",
+      "source_bbox_xyxy": [
+        30,
+        1690,
+        833,
+        1755
+      ],
+      "extraction": "scene",
+      "size": [
+        803,
+        65
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        803,
+        65
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/cert_footer_scene.png",
+      "webp": "art/webp/cert_footer_scene.webp",
+      "svg_wrapper": "art/svg/cert_footer_scene.svg",
+      "sha256": "b92b10c84fed93f3d82a2fe3fa0d4edba4b8fa0bcb8dcb7509c9f80c6ff5c90f"
+    },
+    {
+      "id": "profile_scene_right",
+      "role": "我的页右侧旭日山水",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        335,
+        225,
+        833,
+        350
+      ],
+      "extraction": "scene",
+      "size": [
+        498,
+        125
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        498,
+        125
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/profile_scene_right.png",
+      "webp": "art/webp/profile_scene_right.webp",
+      "svg_wrapper": "art/svg/profile_scene_right.svg",
+      "sha256": "2ebe41dbb09f90d91963b910283d2230e9a7e2a4f121272bb268935e9cb158d2"
+    },
+    {
+      "id": "profile_avatar_large",
+      "role": "我的页大头像",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        83,
+        382,
+        276,
+        570
+      ],
+      "extraction": "circle",
+      "size": [
+        193,
+        188
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        193,
+        188
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/profile_avatar_large.png",
+      "webp": "art/webp/profile_avatar_large.webp",
+      "svg_wrapper": "art/svg/profile_avatar_large.svg",
+      "sha256": "6820411cd582ea060ce121d381f685b0b25da66c3d35104f8626a435522b1a3c"
+    },
+    {
+      "id": "profile_health_mountain",
+      "role": "健康摘要右下山水",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        610,
+        720,
+        758,
+        756
+      ],
+      "extraction": "scene",
+      "size": [
+        148,
+        36
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        148,
+        36
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/profile_health_mountain.png",
+      "webp": "art/webp/profile_health_mountain.webp",
+      "svg_wrapper": "art/svg/profile_health_mountain.svg",
+      "sha256": "eedc73c0be3bea4b0e582c7888cd917922afdae6d5553a46b014963d9816f2c1"
+    },
+    {
+      "id": "profile_sos",
+      "role": "SOS 紧急呼叫圆章",
+      "source": "source/profile.png",
+      "source_bbox_xyxy": [
+        75,
+        1525,
+        192,
+        1643
+      ],
+      "extraction": "key",
+      "size": [
+        117,
+        118
+      ],
+      "alpha_bbox": [
+        0,
+        0,
+        117,
+        118
+      ],
+      "qc": "PASS_MANUAL_VISUAL_REVIEW",
+      "contains_business_text": false,
+      "png": "art/png/profile_sos.png",
+      "webp": "art/webp/profile_sos.webp",
+      "svg_wrapper": "art/svg/profile_sos.svg",
+      "sha256": "032ad763f0096b59e8597c23f11d8fb745a1f43535a3426ca9fff054f9c3a65b"
+    }
+  ]
+}

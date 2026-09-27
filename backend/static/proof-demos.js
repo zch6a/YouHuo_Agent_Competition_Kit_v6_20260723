@@ -26,6 +26,64 @@
 
   function output(id, value) { window.YouHuo.renderResult(id, value); }
 
+  /** 出错时写进输出区的那一句。
+   *
+   * 这个文件原先有 **27 处**把原始异常消息直接送上屏：状态行 1 处、
+   * `output(id, error.message)` 25 处、`container.textContent = error.message` 1 处。
+   * （`String(error.message).includes('UNIQUE')` 那一处是**判断**不是显示，留着。）
+   * 实测把 `/v2/auth/demo`
+   * 掐掉再刷新，状态行上是「没能建立演示身份：**Failed to fetch**——下面的按钮
+   * 会失败。」——原始浏览器异常、英文，印在答辩时投在大屏上的那一页。
+   * `judge.js` 上同一处已经修过（`report()` 走 `errorWords`）。
+   *
+   * 但这一页的输出区和状态行不一样：它的价值就在于「后端到底回了什么」。
+   * 无条件走 `errorWords` 会把 404 / 5xx 的后端原话换成四型兜底，
+   * 那是**丢掉**这一页唯一想给的东西。
+   *
+   * 所以判据和 `trust.js::receiptWords` 一致：**这句话里有没有中文**。
+   * 后端写的 detail 是中文（`api()` 抛的 `new Error(data.detail)`），原样留住；
+   * 浏览器抛的是英文（`Failed to fetch` / `NetworkError`），换成人话。
+   *
+   * `[object Object]` 单独挡一次：FastAPI 的 422 校验错误 `detail` 是一个
+   * **数组**，`new Error(data.detail)` 把它拼成 `[object Object]`
+   * （`common.js:174`，全站都有这个形状）。它既没有中文也不是四型之一，
+   * 不挡就会原样上屏。
+   */
+  function demoWords(error) {
+    const raw = String((error && error.message) || '').trim();
+    if (/^\[object \w+\]$/.test(raw)) {
+      return window.YouHuo.errorWords({status: 500}, '这一步').text;
+    }
+    if (/[一-鿿]/.test(raw)) return raw;
+    return window.YouHuo.errorWords(error, '这一步').text;
+  }
+
+  /** 同一件事，但只要**一个短句**。
+   *
+   * 状态行前面已经有主语了（「没能建立演示身份：」），再拼一个自带主语的 `text`
+   * 会说两遍——第一版实测出来的整句是
+   * 「没能建立演示身份：这一步暂时看不了：家里网不通。等一下我再试试下面的按钮
+   * 会失败。」：两个冒号、主语两遍、最后一句还粘在一起。
+   * `errorWords` 的 `say` / `then` 就是为这种地方留的。
+   */
+  function demoSay(error) {
+    const raw = String((error && error.message) || '').trim();
+    if (/[一-鿿]/.test(raw) && !/^\[object \w+\]$/.test(raw)) {
+      return raw.replace(/[。．.]+$/, '');
+    }
+    return window.YouHuo.errorWords(error).say;
+  }
+
+  /** 状态行：文字和语气一起换。写死在 `stage.html` 上的 `good` 已经换成 `info`。 */
+  function setStatus(text, tone) {
+    const el = byId('proofStatus');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = text;
+    el.classList.remove('good', 'bad', 'warning', 'info');
+    if (tone) el.classList.add(tone);
+  }
+
   /** 取控件；**取不到就吼**。
    *
    * 上一版这里是裸的 `byId(x).addEventListener(...)`：控件被改名或漏搬时抛
@@ -61,11 +119,10 @@
       // 所以是 hidden 而不是删掉。
       if (status) status.hidden = true;
     } catch (error) {
-      if (status) {
-        status.hidden = false;
-        status.classList.remove('good');
-        status.textContent = `没能建立演示身份：${error.message}——下面的按钮会失败。`;
-      }
+      // `remove('good')` 摘掉绿色之后落回 `.notice` 基类的琥珀——一次
+      // 「三个角色一个都没建起来、下面每个按钮都会失败」被画成一条普通提醒。
+      // 要的是 rgb(192,42,53)。
+      setStatus(`没能建立演示身份：${demoSay(error)}。下面的按钮会失败。`, 'bad');
     }
   }
 
@@ -82,7 +139,7 @@
           {text: '帮我缴水费', confidence: 0.93, engine: 'BackupASR'},
         ],
       })}));
-    } catch (error) { output('voiceOutput', error.message); }
+    } catch (error) { output('voiceOutput', demoWords(error)); }
   });
 
   on('voiceConflict', 'click', async () => {
@@ -94,7 +151,7 @@
           {text: '取消不要缴费', confidence: 0.91, engine: 'BackupASR'},
         ],
       })}));
-    } catch (error) { output('voiceOutput', error.message); }
+    } catch (error) { output('voiceOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -125,14 +182,14 @@
     try {
       output('policyOutput', await api('/v5/actions/authorize',
         {method: 'POST', body: JSON.stringify(paymentPolicyPayload(false))}));
-    } catch (error) { output('policyOutput', error.message); }
+    } catch (error) { output('policyOutput', demoWords(error)); }
   });
 
   on('policyAttack', 'click', async () => {
     try {
       output('policyOutput', await api('/v5/actions/authorize',
         {method: 'POST', body: JSON.stringify(paymentPolicyPayload(true))}));
-    } catch (error) { output('policyOutput', error.message); }
+    } catch (error) { output('policyOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -147,7 +204,7 @@
       })}, 'family');
       const view = await api(`/v5/break-glass/${record.id}/view`, {}, 'family');
       output('breakGlassOutput', {record, view});
-    } catch (error) { output('breakGlassOutput', error.message); }
+    } catch (error) { output('breakGlassOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -174,7 +231,7 @@
       })}, 'family');
       memoryId = item.id;
       output('memoryOutput', item);
-    } catch (error) { output('memoryOutput', error.message); }
+    } catch (error) { output('memoryOutput', demoWords(error)); }
   });
 
   on('memoryApprove', 'click', async () => {
@@ -183,12 +240,12 @@
       output('memoryOutput', await api('/v3/memories/decide', {
         method: 'POST', body: JSON.stringify({memory_id: memoryId, approve: true}),
       }, 'elder'));
-    } catch (error) { output('memoryOutput', error.message); }
+    } catch (error) { output('memoryOutput', demoWords(error)); }
   });
 
   on('memoryList', 'click', async () => {
     try { output('memoryOutput', await api(`/v3/memories/${state.elderId}`, {}, 'elder')); }
-    catch (error) { output('memoryOutput', error.message); }
+    catch (error) { output('memoryOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -202,7 +259,7 @@
         context: {bill_type: '水费'}, request_id: `trust-lab-${Date.now()}`,
       })});
       output('sagaOutput', state.saga);
-    } catch (error) { output('sagaOutput', error.message); }
+    } catch (error) { output('sagaOutput', demoWords(error)); }
   });
 
   on('sagaAdvance', 'click', async () => {
@@ -228,7 +285,7 @@
         }),
       }, role);
       output('sagaOutput', state.saga);
-    } catch (error) { output('sagaOutput', error.message); }
+    } catch (error) { output('sagaOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -264,7 +321,7 @@
         lamport_clock: 2, sensitivity: 'high', occurred_at: new Date().toISOString(),
       })}, 'family');
       output('syncOutput', {first, second});
-    } catch (error) { output('syncOutput', error.message); }
+    } catch (error) { output('syncOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -273,12 +330,12 @@
 
   on('truthDemo', 'click', async () => {
     try { output('truthOutput', await api('/v5/capability-truth')); }
-    catch (error) { output('truthOutput', error.message); }
+    catch (error) { output('truthOutput', demoWords(error)); }
   });
 
   on('metricsDemo', 'click', async () => {
     try { output('truthOutput', await api('/v5/metrics', {}, 'family')); }
-    catch (error) { output('truthOutput', error.message); }
+    catch (error) { output('truthOutput', demoWords(error)); }
   });
 
   on('capabilitiesDemo', 'click', async () => {
@@ -301,7 +358,7 @@
         container.append(card);
       }
     } catch (error) {
-      container.textContent = error.message;
+      container.textContent = demoWords(error);
     }
   });
 
@@ -364,8 +421,13 @@
     if (care.light) {
       const light = document.createElement('p');
       light.className = 'meta';
+      // 色温的两个取值都要有字。原先写的是 `warm ? '、暖光' : ''`——冷色那一半在屏幕上
+      // 是一个**空字符串**。后端刚补上冷色（`baseline_services.CareComposer`：屋里超过
+      // 30℃ 时 `warm=False`），如果这里不改，34℃ 的房间只会显示「亮度 55%」，「双色」
+      // 在响应里可达而在屏幕上仍然看不见——而这一行是 `/v7/care` 全仓唯一的消费者。
+      // `breathing` 保持单侧：它的另一侧是「不呼吸」，屏幕上不说话就是不呼吸。
       light.textContent = `灯光建议：亮度 ${care.light.brightness_pct}%`
-        + `${care.light.warm ? '、暖光' : ''}${care.light.breathing ? '、慢呼吸' : ''}`
+        + `${care.light.warm ? '、暖光' : '、冷光'}${care.light.breathing ? '、慢呼吸' : ''}`
         + `——${care.light.reason}（建议，未驱动任何设备）`;
       host.appendChild(light);
     }
@@ -393,7 +455,7 @@
 
   on('baselineDemo', 'click', async () => {
     try { await showBaseline(); }
-    catch (error) { output('baselineOutput', error.message); }
+    catch (error) { output('baselineOutput', demoWords(error)); }
   });
 
   on('coldRoomDemo', 'click', async () => {
@@ -403,7 +465,7 @@
         occurred_at: new Date().toISOString(), source: 'care-demo',
       })});
       await showBaseline();
-    } catch (error) { output('baselineOutput', error.message); }
+    } catch (error) { output('baselineOutput', demoWords(error)); }
   });
 
   /** 让偏离真的发生一次，而且这个时刻必须是**已经发生过的**。
@@ -423,12 +485,31 @@
 
   on('lateWakeDemo', 'click', async () => {
     try {
+      // 用了**哪一刻**要说出来。按钮原先写死「今天 11:20 才起」，而上面那个函数
+      // 在 11:20 之前退到「两分钟前」——上午答辩时屏幕上写着 11:20，库里写进去的
+      // 是当时那一刻。这里把真正用的那一刻报出来，屏幕上就不会有第二个说法。
+      const moment = pastDeviationMoment();
       await api('/v4/safety/heartbeat', {method: 'POST', body: JSON.stringify({
         elder_id: state.elderId, kind: 'morning_activity',
-        occurred_at: pastDeviationMoment().toISOString(),
+        occurred_at: moment.toISOString(),
       })});
       await showBaseline();
-    } catch (error) { output('baselineOutput', error.message); }
+      const host = byId('baselineOutput');
+      if (host) {
+        // 补零直接写在这里，**不新起一个 `const pad = …`**：
+        // `build_control_inventory.py` 认「控件之前最近一处函数定义」当 handler，
+        // 在这个 handler 里新定义一个名字会让它后面三颗按钮（routineDemo /
+        // monthlyReport / interactionDemo）的 handler 字段跟着变名——一次纯文案
+        // 修改在清单里牵动四条记录，而那三条的变化和这次改动毫无关系。
+        const said = document.createElement('p');
+        said.className = 'meta';
+        said.textContent = '刚刚写进去的是「今天 '
+          + `${String(moment.getHours()).padStart(2, '0')}:`
+          + `${String(moment.getMinutes()).padStart(2, '0')} 起床」这一条。`
+          + '上面的结论由后端拿他自己的常态算出来，不是这一页算的。';
+        host.appendChild(said);
+      }
+    } catch (error) { output('baselineOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -448,7 +529,7 @@
         method: 'POST', body: JSON.stringify({now: '2026-07-22T00:00:00Z', horizon_days: 60}),
       }, 'family');
       output('routineOutput', {routine, materialized});
-    } catch (error) { output('routineOutput', error.message); }
+    } catch (error) { output('routineOutput', demoWords(error)); }
   });
 
   on('monthlyReport', 'click', async () => {
@@ -459,7 +540,7 @@
           month: new Date().getMonth() + 1,
         }),
       }, 'family'));
-    } catch (error) { output('routineOutput', error.message); }
+    } catch (error) { output('routineOutput', demoWords(error)); }
   });
 
   on('interactionDemo', 'click', async () => {
@@ -467,19 +548,24 @@
       output('interactionOutput', await api('/v4/medications/interactions/check', {
         method: 'POST', body: JSON.stringify({medication_names: ['华法林', '阿司匹林']}),
       }));
-    } catch (error) { output('interactionOutput', error.message); }
+    } catch (error) { output('interactionOutput', demoWords(error)); }
   });
 
   on('emotionDemo', 'click', async () => {
     try {
       const text = byId('emotionText');
+      // 输入框里真有字才记账。原来这里无条件 `store_event: true`，而文本在
+      // 输入框为空时会退回那句写死的「我一个人很孤单，没人陪」——空着点一下，
+      // 她的心情回顾就多一条她没说过的孤单。记下一个人**真的打进去**的话
+      // 站得住；记下一句兜底文案不站得住。
+      const typed = text && text.value ? text.value : '';
       output('emotionOutput', await api('/v4/emotions/analyze', {
         method: 'POST', body: JSON.stringify({
-          elder_id: state.elderId, text: text ? text.value : '我一个人很孤单，没人陪',
-          store_event: true,
+          elder_id: state.elderId, text: typed || '我一个人很孤单，没人陪',
+          store_event: Boolean(typed),
         }),
       }));
-    } catch (error) { output('emotionOutput', error.message); }
+    } catch (error) { output('emotionOutput', demoWords(error)); }
   });
 
   on('medicalDemo', 'click', async () => {
@@ -492,7 +578,7 @@
           create_followup_reminder: true,
         }),
       }));
-    } catch (error) { output('medicalOutput', error.message); }
+    } catch (error) { output('medicalOutput', demoWords(error)); }
   });
 
   async function ensurePolicy() {
@@ -512,12 +598,12 @@
 
   on('locationInside', 'click', async () => {
     try { output('locationOutput', await ping(39.9042, 116.3974)); }
-    catch (error) { output('locationOutput', error.message); }
+    catch (error) { output('locationOutput', demoWords(error)); }
   });
 
   on('locationOutside', 'click', async () => {
     try { output('locationOutput', await ping(39.95, 116.45)); }
-    catch (error) { output('locationOutput', error.message); }
+    catch (error) { output('locationOutput', demoWords(error)); }
   });
 
   on('sosDemo', 'click', async () => {
@@ -526,7 +612,7 @@
       output('locationOutput', await api('/v4/safety/sos', {
         method: 'POST', body: JSON.stringify({elder_id: state.elderId, include_community: true}),
       }));
-    } catch (error) { output('locationOutput', error.message); }
+    } catch (error) { output('locationOutput', demoWords(error)); }
   });
 
   /* ======================================================================
@@ -549,7 +635,7 @@
         said.textContent = `提前提醒 ${data.advance_notified} 条，到期提醒 ${data.notified} 条，`
           + `升级家属 ${data.escalated} 条`;
       }
-    } catch (error) { output('schedulerOutput', error.message); }
+    } catch (error) { output('schedulerOutput', demoWords(error)); }
   });
 
   bootstrap();

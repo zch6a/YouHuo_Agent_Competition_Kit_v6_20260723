@@ -38,6 +38,7 @@ from .v4_models import (
     ItemMemoryRecord,
     ItemSearchResponse,
     LocationPingRequest,
+    MedicalDocumentRecord,
     MedicalReportAnalysis,
     MedicalReportAnalyzeRequest,
     MedicationPlanCreate,
@@ -72,6 +73,19 @@ from .v4_store import V4FeatureStore
 
 ActorDependency = Callable[..., AuthContext]
 
+#: 就医单据的四种，翻成人话。
+#:
+#: `MedicalDocumentKind` 的取值是英文标识（`checkup_report` …），
+#: 而它此前被直接拼进健康事件的标题里，家属那一屏上就出现
+#: 「checkup_report资料整理」。加一类就要在这里加一条——认不出来的落到
+#: 「就医」而不是原样显示，那样至少不会把一个数据库枚举摆到人眼前。
+_DOC_KIND_WORDS: dict[str, str] = {
+    "checkup_report": "体检报告",
+    "discharge_note": "出院小结",
+    "prescription": "处方",
+    "appointment_notice": "就诊通知",
+}
+
 
 def build_v4_router(
     db: Database,
@@ -105,8 +119,12 @@ def build_v4_router(
     def create_routine(payload: RoutineCreate, actor: AuthContext = Depends(current_actor)) -> RoutineRecord:
         ensure_target(actor, payload.elder_id)
         record = safe_call(lambda: store.create_routine(actor.family_id, actor.actor_id, payload))
+        #: `elder_id` 是给**她那一屏**用的（`privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+        #: 实体号是 `routine-…`，归属判断解析不出来。这是**第二条**建固定安排的路，
+        #: `/api/v1/routines` 那条已经带上了——两条都得带，补一条不算补。
         db.append_audit(actor.family_id, actor.actor_id, "ROUTINE_CREATED", record.id, {
             "frequency": record.frequency.value, "category": record.category.value,
+            "elder_id": record.elder_id,
         })
         return record
 
@@ -139,7 +157,8 @@ def build_v4_router(
         return record
 
     # -------------------- privacy-preserving emotional companion --------------------
-    @router.post("/emotions/analyze", response_model=EmotionAnalysis)
+    @router.post("/emotions/analyze", response_model=EmotionAnalysis,
+                 operation_id="analyzeEmotion")
     def analyze_emotion(payload: EmotionAnalyzeRequest, actor: AuthContext = Depends(current_actor)) -> EmotionAnalysis:
         ensure_target(actor, payload.elder_id, family_allowed=False)
         analysis = EmotionAnalyzer.analyze(payload.text)
@@ -154,7 +173,7 @@ def build_v4_router(
             if decision.deliver_now:
                 db.add_notification(
                     actor.family_id, ActorRole.FAMILY, "urgent_emotion",
-                    "老人端出现需要立即人工确认的高风险表达，请尽快联系。", payload.elder_id,
+                    "老人刚说了一句需要马上确认的话，请尽快联系。", payload.elder_id,
                 )
         return analysis
 
@@ -176,8 +195,11 @@ def build_v4_router(
         ensure_target(actor, payload.elder_id)
         record = safe_call(lambda: store.create_item(actor.family_id, actor.actor_id, payload, actor.role))
         event = "ITEM_MEMORY_ACTIVATED" if record.status == "active" else "ITEM_MEMORY_PROPOSED"
+        #: `elder_id` 给她那一屏用。事件名在上一行按状态二选一：
+        #: 家人记的是 `PROPOSED`（等她点头），她自己记的直接是 `ACTIVATED`。
         db.append_audit(actor.family_id, actor.actor_id, event, record.id, {
             "category": record.category.value, "scope": record.scope.value,
+            "elder_id": record.elder_id,
         })
         if record.status == "proposed":
             db.add_notification(actor.family_id, ActorRole.ELDER, "item_consent_required", "家人建议新增一条实物备忘，请您确认。", record.id)
@@ -214,8 +236,7 @@ def build_v4_router(
         ensure_target(actor, payload.elder_id)
         record = safe_call(lambda: store.create_contact(actor.family_id, actor.actor_id, payload, actor.role))
         db.append_audit(actor.family_id, actor.actor_id, "CONTACT_PROFILE_CREATED", record.id, {
-            "status": record.status, "scope": record.scope.value,
-        })
+            "status": record.status, "scope": record.scope.value, "elder_id": record.elder_id})
         if record.status == "proposed":
             db.add_notification(actor.family_id, ActorRole.ELDER, "contact_consent_required", "家人建议新增一位亲友档案，请您确认。", record.id)
         return record
@@ -265,7 +286,8 @@ def build_v4_router(
         )
 
     # -------------------- medical reports and longitudinal health archive --------------------
-    @router.post("/medical-reports/analyze", response_model=MedicalReportAnalysis)
+    @router.post("/medical-reports/analyze", response_model=MedicalReportAnalysis,
+                 operation_id="analyzeMedicalReport")
     def analyze_medical_report(
         payload: MedicalReportAnalyzeRequest, actor: AuthContext = Depends(current_actor)
     ) -> MedicalReportAnalysis:
@@ -278,7 +300,12 @@ def build_v4_router(
             HealthEventCreate(
                 elder_id=payload.elder_id,
                 kind="checkup",
-                title=f"{payload.kind.value}资料整理",
+                # **界面上不许出现英文枚举值。** 这一行原先是
+                # `f"{payload.kind.value}资料整理"`，于是家属那一屏上出现的是
+                # 「checkup_report资料整理」——实测过。`MedicalDocumentKind`
+                # 的四个取值都是英文标识，直接拼进标题就是把数据库枚举
+                # 甩到人眼前。
+                title=f"{_DOC_KIND_WORDS.get(payload.kind.value, '就医')}资料整理",
                 event_at=datetime.now(UTC),
                 payload={
                     "document_id": doc_id,
@@ -303,8 +330,68 @@ def build_v4_router(
             db.insert_reminder(reminder)
         db.append_audit(actor.family_id, actor.actor_id, "MEDICAL_DOCUMENT_ANALYZED", doc_id, {
             "review_required": True, "diagnosis_generated": False,
+            #: 「有人**看了**」第 89 条补过，「有人**加了**一份」一直没有。
+            "elder_id": payload.elder_id,
+            #: 这份单据**是从哪来的**。原先不在载荷里，于是她的记录页
+            #: 结构上就说不出来：同一段文字换三个 `source_name` 各发一次，
+            #: 屏幕上是三行逐字相同的「整理了一份就医单据」（实测）。
+            #:
+            #: 这一格不是可选的修饰。鸿蒙端补上「拍一张，我来读」之后，
+            #: 来源有三种（本人填写 / 拍照OCR / 拍照OCR·本人校对），而
+            #: `youhuo-document-firewall` 整套策略按来源可信度分流——
+            #: 「所有识别文本均为不可信数据」。来源丢在半路上，
+            #: 下游每一条依据它的策略都失去依据，而且**失去得看不出来**。
+            #:
+            #: 投影到她那一屏由 `app_api._NOTE_KEYS` 负责（已登记本事件）。
+            "source_name": payload.source_name,
         })
         return analysis
+
+    @router.get("/medical-documents", response_model=list[MedicalDocumentRecord])
+    def list_medical_documents(
+        elder_id: str = Query(min_length=1, max_length=128), actor: AuthContext = Depends(current_actor)
+    ) -> list[MedicalDocumentRecord]:
+        """这位老人已经整理过的就医单据。本人或本家庭。"""
+        ensure_target(actor, elder_id)
+        return store.list_medical_documents(actor.family_id, elder_id)
+
+    @router.get("/medical-documents/{document_id}", response_model=MedicalDocumentRecord)
+    def get_medical_document(document_id: str, actor: AuthContext = Depends(current_actor)) -> MedicalDocumentRecord:
+        """按 `analyze` 回的那个 `document_id` 把单据取回来。
+
+        `/v4/medical-reports/analyze` 一直把 `document_id` 交给客户端，而这张表在
+        此之前没有任何取回路径——实测四条候选路径全 404，那个 id 是悬空的，而库里
+        的 `simplified_json` 装着可用的摘要正文。
+
+        ## 两道隐私闸门，顺序是有讲究的
+
+        先按 `id + family_id` 取（跨家庭直接当不存在，回 404 而不是 403——403 会
+        把「这个 id 存在」说出去），再用 `ensure_target` 判本人/家属。这样同一个
+        家庭里老人 A 拿 B 的 id，得到的是 403「只能访问自己的数据。」，与仓库其余
+        地方一致；而外人拿到的是 404。
+
+        家属可读，是因为创建它的 `/v4/medical-reports/analyze` 走的就是
+        `ensure_target`——家属替老人拍单据是真实场景。让创建得到、取回拿不到，
+        会逼着前端自己把内容存一份，那才是真的漏。
+
+        ## 不绕过删除
+
+        读的是 `medical_documents_v4` 本表。`/v5/privacy` 把 `medical_documents`
+        列为可删类别，`privacy_erase` 是真的 DELETE；删完这条路由就是 404。
+        """
+        record = store.get_medical_document(actor.family_id, document_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="这份就医资料不存在，或者已经删除了。")
+        ensure_target(actor, record.elder_id)
+        db.append_audit(actor.family_id, actor.actor_id, "MEDICAL_DOCUMENT_READ", record.id, {
+            # `elder_id` 要写进来：老人端二的记录页靠「载荷里点名了她」才敢把
+            # **别人做的**这条留给她看（`privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+            # 少了它，家属取走她的就医单据，她那一屏一个字都没有。
+            # 和 `BREAK_GLASS_VIEWED` 是同一处形状。
+            "elder_id": record.elder_id,
+            "kind": record.kind.value,
+        })
+        return record
 
     @router.post("/health/events", response_model=HealthEventRecord)
     def create_health_event(payload: HealthEventCreate, actor: AuthContext = Depends(current_actor)) -> HealthEventRecord:
@@ -312,6 +399,10 @@ def build_v4_router(
         record = safe_call(lambda: store.create_health_event(actor.family_id, payload))
         db.append_audit(actor.family_id, actor.actor_id, "HEALTH_EVENT_CREATED", record.id, {
             "kind": record.kind.value, "scope": record.scope.value,
+            #: `elder_id` 是给**她那一屏**用的。这是记身体数据的
+            #: **第二条**路（家人替她记），`/api/v1/health/events` 那条
+            #: 已经带上了——两条都得带。
+            "elder_id": payload.elder_id,
         })
         return record
 
@@ -332,7 +423,11 @@ def build_v4_router(
         ensure_target(actor, payload.elder_id)
         record = safe_call(lambda: store.create_medication_plan(actor.family_id, payload, actor.role))
         event = "MEDICATION_PLAN_ACTIVATED" if record.active else "MEDICATION_PLAN_PROPOSED"
-        db.append_audit(actor.family_id, actor.actor_id, event, record.id, {"source": record.source})
+        #: `elder_id` 是给**她那一屏**用的（`privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+        #: 实体号是 `medplan-…`，归属判断解析不出来；这两种事又都可能是家属做的，
+        #: 少了这个字段，家人给她加的用药计划在她自己那一屏上不存在。
+        db.append_audit(actor.family_id, actor.actor_id, event, record.id,
+                        {"source": record.source, "elder_id": record.elder_id})
         if not record.active:
             db.add_notification(actor.family_id, ActorRole.ELDER, "medication_consent_required", "家人补充了一条用药计划，请您核对后确认。", record.id)
         return record
@@ -367,6 +462,18 @@ def build_v4_router(
 
     @router.get("/medications/{plan_id}/inventory", response_model=InventoryForecast)
     def medication_inventory(plan_id: str, actor: AuthContext = Depends(current_actor)) -> InventoryForecast:
+        """这份药还能吃几天，**以及该说的那句话**。
+
+        `message` / `should_highlight` / `whole_days_remaining` 是后端算好的结论，
+        前端直接用。加它们的原因：`backend/static/care.js` 的 `daysLeft()` 用 JS
+        把天数重算了一遍，红字阈值自己定成 `days <= 3`，而后端 warning 的线是
+        7 天。实测同一份计划（11 片、每天 2 片）：后端 `alert_level` 是 warning、
+        发了家属通知，屏幕上却是普通灰字「还够 5 天」——家属手机响了，老人这边
+        看不出任何异常。阈值现在只在 `InventoryService` 里有一份。
+
+        care.js 那一侧还要有人去接：把 `daysLeft()` 和 `days <= 3` 删掉，改读这
+        三个字段。那个文件不在这次的改动范围里。
+        """
         plan = store.get_medication_plan(plan_id)
         if not plan or plan.family_id != actor.family_id:
             raise HTTPException(status_code=404, detail="用药计划不存在。")
@@ -375,11 +482,27 @@ def build_v4_router(
             plan_id=plan.id, stock_units=plan.stock_units, units_per_dose=plan.units_per_dose,
             doses_per_day=len(plan.times_local), today=datetime.now(UTC).date(),
         )
-        if forecast.alert_level in {"critical", "warning"}:
-            db.add_notification(actor.family_id, ActorRole.FAMILY, "medication_inventory", f"{plan.display_name}库存预计不足，请核对补充。", plan.id)
+        if forecast.should_highlight:
+            # 这是一个 GET，而它写通知。刷新一次列表就多一条。
+            # 实测连打 5 次这个端点，家属收件箱里躺着 5 条一模一样的
+            # 「钙片库存预计不足，请核对补充。」——库存并没有变化，变化的只是
+            # 她刷了几次。所以同一份计划只要还有一条没读的，就不再补第二条。
+            #
+            # 按 `entity_id` 而不是按消息文本去重：文本里带药名，改一次话术就
+            # 会让去重悄悄失效。
+            already_waiting = any(
+                note.event_type == "medication_inventory" and note.entity_id == plan.id and note.read_at is None
+                for note in db.list_notifications(actor.family_id, ActorRole.FAMILY, limit=200)
+            )
+            if not already_waiting:
+                db.add_notification(
+                    actor.family_id, ActorRole.FAMILY, "medication_inventory",
+                    f"{plan.display_name}{forecast.message}", plan.id,
+                )
         return forecast
 
-    @router.post("/medications/interactions/check", response_model=InteractionCheckResult)
+    @router.post("/medications/interactions/check", response_model=InteractionCheckResult,
+                 operation_id="checkMedicationInteractions")
     def check_interactions(
         payload: InteractionCheckRequest, actor: AuthContext = Depends(current_actor)
     ) -> InteractionCheckResult:
@@ -408,7 +531,9 @@ def build_v4_router(
     @router.post("/safety/heartbeat")
     def heartbeat(payload: ActivityHeartbeatRequest, actor: AuthContext = Depends(current_actor)) -> dict[str, str]:
         ensure_target(actor, payload.elder_id, family_allowed=False)
-        event_id = safe_call(lambda: store.add_activity(actor.family_id, payload.elder_id, payload.kind, payload.occurred_at, payload.metadata))
+        # 不再传 `payload.metadata`：那个字段已经从模型里去掉了，
+        # 理由见 `v4_models.ActivityHeartbeatRequest` 的 docstring。
+        event_id = safe_call(lambda: store.add_activity(actor.family_id, payload.elder_id, payload.kind, payload.occurred_at))
         return {"event_id": event_id, "status": "recorded"}
 
     @router.post("/safety/inactivity/evaluate")
@@ -442,7 +567,8 @@ def build_v4_router(
             "message": "求助已进入最高优先级接力流程。比赛原型不会自动拨打公共紧急电话。",
         }
 
-    @router.post("/location/ping", response_model=GeofenceResult)
+    @router.post("/location/ping", response_model=GeofenceResult,
+                 operation_id="evaluateLocationSafety")
     def location_ping(payload: LocationPingRequest, actor: AuthContext = Depends(current_actor)) -> GeofenceResult:
         ensure_target(actor, payload.elder_id, family_allowed=False)
         store.add_location(
@@ -459,6 +585,24 @@ def build_v4_router(
             decision = FamilyAttentionBudget.decide("geofence_exit")
             if decision.deliver_now:
                 db.add_notification(actor.family_id, ActorRole.FAMILY, "geofence_exit", result.message, payload.elder_id)
+                #: **告诉了家人，就要给她留一行。**
+                #:
+                #: 隔壁 SOS 那一路是这么做的：通知家人 + 写 `SOS_TRIGGERED`，
+                #: 她的记录上于是有「您按了紧急求助，已经通知家人。」。
+                #: 这一路原先只发通知：实测她走到 14 公里外，家人收到
+                #: 「检测到设备超出已授权的日常活动范围…」，而她自己那一屏
+                #: **一行都没有**。同一件事（把她的情况告诉家人），两种做法。
+                #:
+                #: 只在**真发出去**的时候写（`deliver_now`）：注意力预算把这一条
+                #: 压下去的时候，家人并没有被打扰，也就没什么要告诉她的。
+                #: 每次定位都写才是另一个方向的错——她的记录会被位置刷满，
+                #: 底下那条判据专门钉住「在范围内不写」。
+                db.append_audit(
+                    actor.family_id, actor.actor_id, "GEOFENCE_ALERT_RAISED",
+                    payload.elder_id,
+                    {"elder_id": payload.elder_id,
+                     "distance_m": int(result.distance_from_home_m)},
+                )
         return result
 
     @router.get("/navigation/nearby", response_model=list[POIRecord])
@@ -497,7 +641,41 @@ def build_v4_router(
             actor.family_id, actor.actor_id, payload.elder_id,
             payload.requested_capabilities, payload.expires_in_minutes,
         ))
-        db.add_notification(actor.family_id, ActorRole.ELDER, "assistance_consent_required", "家人请求短时远程协助，请您确认。", record.id)
+        # 这句话原先是「家人请求短时远程协助，请您确认。」——它承诺了这一版做不到的事。
+        #
+        # 那四个能力名（查看当前这一步 / 语音指导 / 控件高亮 / 低风险表单提交）在全仓
+        # 只出现在白名单校验里，没有任何能力闸门读这条同意。实测：请求、同意、
+        # status 变 approved，然后什么都不会发生。老人读到「远程协助」，合理的理解是
+        # 女儿接下来能在她屏幕上做点什么；而她点完同意，屏幕上不会有任何变化。
+        #
+        # 为什么不是补上那条通道，而是改措辞：见 `AssistanceRequestRecord` 的注释
+        # （没有服务端到设备的推送/长连接；代为提交是这个仓库特意禁止的方向；
+        # 「查看当前这一步」家属现在就能看，不需要授权）。
+        #
+        # 改成说实话：说清有效期、说清系统不会替家属动手，并且**不说**它会做什么。
+        minutes = max(1, int((record.expires_at - record.created_at).total_seconds() // 60))
+        db.add_notification(
+            actor.family_id, ActorRole.ELDER, "assistance_consent_required",
+            f"家人想在接下来 {minutes} 分钟里帮您弄一件事，问您同不同意。"
+            "同意只是记下这次约定，优活不会替家人动您的屏幕、也不会替您提交任何东西；"
+            "真要帮忙还是得通电话。",
+            record.id,
+        )
+        #: **请求这一步也要留痕**，不只留她的回答。
+        #:
+        #: 原先这里只发一条通知就返回了：审计链上只有她点头之后的
+        #: `ASSISTANCE_DECIDED`。于是她读自己的记录，看到的是
+        #: 「决定了一次远程协助」——**前面没有任何人问过她**，
+        #: 一个回答凭空出现，看不出是谁提的、什么时候提的。
+        #: 这个形状本仓修过一次（记忆提议那一批），这一处漏了。
+        #:
+        #: `elder_id` 是给她那一屏用的：实体号是 `assist-…`，归属判断解析不出来，
+        #: 而动作人是家属，不带上她就会被「动作不是她做的」丢掉
+        #: （见 `privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+        db.append_audit(
+            actor.family_id, actor.actor_id, "ASSISTANCE_REQUESTED", record.id,
+            {"elder_id": payload.elder_id, "minutes": minutes},
+        )
         return record
 
     @router.post("/assistance/decide", response_model=AssistanceRequestRecord)
@@ -514,8 +692,26 @@ def build_v4_router(
         })
         return record
 
+    @router.get("/assistance/{elder_id}", response_model=list[AssistanceRequestRecord])
+    def list_assistance(elder_id: str, actor: AuthContext = Depends(current_actor)) -> list[AssistanceRequestRecord]:
+        """这户人家的远程协助请求，老人和绑定家属都能查。
+
+        在这条路由之前，`assistance_requests_v4` 是一张只写表：唯一的读取是
+        `decide_assistance` 自己那句 `WHERE id=?`。实测 `GET /v4/assistance` 是
+        405、`GET /v4/assistance/{id}` 是 404，零 UI 消费方。两个后果：老人点完
+        同意查不到自己同意了什么，以及 `expires_at` 永远不生效（把一条 approved
+        的到期时间拨到 2020 年，status 照旧是 approved）。
+
+        这里按 `elder_id` 取而不是按 `request_id`：`request_id` 只有刚发过请求的
+        那一端知道，而需要「我同意过什么」这份清单的是老人。过期在
+        `list_assistance_requests` 里落库。
+        """
+        ensure_target(actor, elder_id)
+        return store.list_assistance_requests(actor.family_id, elder_id)
+
     # -------------------- reports, care graph and capability truth table --------------------
-    @router.post("/reports/monthly", response_model=PrivacyReport)
+    @router.post("/reports/monthly", response_model=PrivacyReport,
+                 operation_id="generateMonthlyReport")
     def monthly_report(payload: MonthlyReportRequest, actor: AuthContext = Depends(current_actor)) -> PrivacyReport:
         ensure_target(actor, payload.elder_id)
         return store.monthly_report(actor.family_id, payload.elder_id, payload.year, payload.month)

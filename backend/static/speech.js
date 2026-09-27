@@ -211,6 +211,29 @@ export function splitClauses(text) {
     .filter(Boolean);
 }
 
+/** 给服务器那条好听的声音用：**按句子切，不按逗号切**。
+ *
+ * 逗号那一刀是给手机自带声音用的——它一口气念长句会平、还会卡住不报结束。
+ * 而把逗号切出来的小段逐个送去服务器念，每一小段都会被念成「一句话说完了」的降调，
+ * 听起来一顿一顿的，正是这次要换掉的那种「不像人」。整句送过去，句中的停顿和语调
+ * 由声音自己处理。只有超过 60 字的长句才在逗号处再切（一次送太长，第一声要等太久）。 */
+export const SENTENCE_MAX_CHARS = 60;
+export function splitSentences(text) {
+  const out = [];
+  for (const piece of String(text).split(/(?<=[。！？!?；;])/)) {
+    const sentence = piece.trim();
+    if (!sentence) continue;
+    if (sentence.length <= SENTENCE_MAX_CHARS) { out.push(sentence); continue; }
+    let buf = '';
+    for (const part of sentence.split(/(?<=[，,、：:])/)) {
+      if (buf && (buf + part).length > SENTENCE_MAX_CHARS) { out.push(buf.trim()); buf = ''; }
+      buf += part;
+    }
+    if (buf.trim()) out.push(buf.trim());
+  }
+  return out;
+}
+
 /** Pause after a clause, in milliseconds, based on how it ended.
  *
  * An enumeration comma (、) separates items in one breath and wants a shorter
@@ -227,26 +250,106 @@ function pauseAfter(clause) {
 
 /** null until probed; then true/false. The probe never blocks the first turn. */
 let neuralAvailable = null;
+let lastProbeAt = 0;
 let authTokenProvider = () => null;
+let statusListener = null;
 
-/** The elder client supplies its bearer token; synthesis is an authorised call. */
-export function configureNeuralVoice({getToken}) {
+/** 没探到好声音时，隔多久再探一次（只在要说话时顺手探，不另起定时器）。
+ *
+ * 公网那台服务器会冷启动：第一个打开页面的人把它叫醒，页面那一探可能赶在服务器
+ * 自己连上声音服务之前，于是整段对话都用手机自带的声音。所以「不可用」不是定论，
+ * 过一会儿再问一次；探到了，下一句就换成好听的那个。 */
+const REPROBE_MS = 20_000;
+
+/** The elder client supplies its bearer token; synthesis is an authorised call.
+ * `onStatus` 每探一次都会被叫一次，页面据此刷新那枚「怎么念给您听」的小标签。 */
+export function configureNeuralVoice({getToken, onStatus = null}) {
   authTokenProvider = getToken || (() => null);
+  statusListener = onStatus;
 }
 
 export async function probeNeuralVoice() {
+  lastProbeAt = Date.now();
+  let status;
   try {
     const token = authTokenProvider();
     const response = await fetch('/v6/speech/voice', {
       headers: token ? {Authorization: `Bearer ${token}`} : {},
     });
     if (!response.ok) throw new Error(String(response.status));
-    const status = await response.json();
+    status = await response.json();
     neuralAvailable = Boolean(status.available);
-    return status;
   } catch (_) {
     neuralAvailable = false;
-    return {available: false};
+    status = {available: false};
+  }
+  if (statusListener) {
+    try { statusListener(status); } catch (_) { /* 标签刷新失败不影响念 */ }
+  }
+  return status;
+}
+
+/** 她按下麦克风、或开始打字时叫一下：服务器趁她说话的工夫把念话那条连接开好。
+ *
+ * 只在好声音可用时叫；20 秒内只叫一次（服务器那边 30 秒内的连接都还能用）。
+ * 失败无所谓——念的时候服务器照常新开。 */
+let lastWarmAt = 0;
+export function warmNeuralVoice() {
+  if (!neuralAvailable || Date.now() - lastWarmAt < 20_000) return;
+  lastWarmAt = Date.now();
+  const token = authTokenProvider();
+  fetch('/v6/speech/warm', {
+    method: 'POST',
+    headers: token ? {Authorization: `Bearer ${token}`} : {},
+  }).catch(() => {});
+}
+
+/* 同一个播放器反复用，并在她第一次点屏幕时「解锁」它。
+ *
+ * iPhone 的规矩是：一个播放器第一次出声必须发生在手指点击的那一刻。而回答是
+ * 点完之后隔一两秒才从服务器回来的——每句 `new Audio()` 都是一个没解锁过的新播放器，
+ * 于是在 iPhone 上好听的那条每句都失败、退回手机自带的声音。
+ * 解锁用一小段现做的静音（在页面里拼出来的，不是去外面取的，页面的安全规矩允许）。 */
+let sharedAudio = null;
+let audioUnlocked = false;
+
+function audioElement() {
+  if (!sharedAudio) sharedAudio = new Audio();
+  return sharedAudio;
+}
+
+function silentClipUrl() {
+  const samples = 800;                       // 8kHz 下 0.1 秒
+  const buffer = new ArrayBuffer(44 + samples);
+  const view = new DataView(buffer);
+  const tag = (offset, text) => {
+    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  tag(0, 'RIFF'); view.setUint32(4, 36 + samples, true); tag(8, 'WAVE');
+  tag(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, 8000, true); view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+  tag(36, 'data'); view.setUint32(40, samples, true);
+  new Uint8Array(buffer, 44).fill(128);      // 8 位无符号 PCM 的静音是 128
+  return URL.createObjectURL(new Blob([buffer], {type: 'audio/wav'}));
+}
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  const audio = audioElement();
+  if (!audio.paused) return;                 // 已经在念了，说明早就能出声
+  const url = silentClipUrl();
+  audio.src = url;
+  audio.play().then(() => URL.revokeObjectURL(url)).catch(() => {
+    URL.revokeObjectURL(url);
+    audioUnlocked = false;                   // 这一下没解开，下一次点击再试
+  });
+}
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  for (const type of ['pointerdown', 'touchend', 'keydown']) {
+    window.addEventListener(type, unlockAudioOnce, {capture: true, passive: true});
   }
 }
 
@@ -299,12 +402,13 @@ async function playNeural(clauses, speed, state) {
     pending = i + 1 < clauses.length ? fetchClauseAudio(clauses[i + 1], speed) : null;
     if (pending) pending.catch(() => {});
     try {
-      const audio = new Audio(url);
+      const audio = audioElement();
       state.audio = audio;
       // A rejected play() means autoplay policy or no output device.
       await new Promise((resolve, reject) => {
         audio.onended = resolve;
         audio.onerror = () => reject(new Error('audio decode failed'));
+        audio.src = url;
         audio.play().catch(reject);
       });
     } catch (error) {
@@ -348,8 +452,13 @@ function playBrowser(clauses, {rate, pitch}, state, onFinish = null) {
  * Returns a cancel function so a new turn can interrupt the previous one.
  */
 export function speakClauses(text, {rate = 0.88, pitch = 1.0, today = new Date(), onDone = null} = {}) {
-  const clauses = splitClauses(speakableText(text, today));
+  const spoken = speakableText(text, today);
+  const clauses = splitClauses(spoken);
   const state = {cancelled: false, timer: null, audio: null, finished: false};
+  // 这一句照旧用手机的声音；顺手问一下服务器现在有没有好听的，下一句就能换过去。
+  if (neuralAvailable === false && Date.now() - lastProbeAt > REPROBE_MS) {
+    probeNeuralVoice();
+  }
 
   /** 报一次「说完了」，且**只报一次**。
    *
@@ -375,13 +484,15 @@ export function speakClauses(text, {rate = 0.88, pitch = 1.0, today = new Date()
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   if (neuralAvailable) {
+    // 整句送去服务器念（见 `splitSentences`）；手机自带的声音仍按逗号切。
+    const sentences = splitSentences(spoken);
     // Speed maps the profile's browser rate onto the model's speed factor.
-    playNeural(clauses, Math.max(0.5, Math.min(2.0, rate)), state).then(finish).catch(error => {
+    playNeural(sentences, Math.max(0.5, Math.min(2.0, rate)), state).then(finish).catch(error => {
       if (state.cancelled) return;
-      // Resume from the clause that failed so nothing is spoken twice.
+      // Resume from the sentence that failed so nothing is spoken twice.
       const from = Number.isInteger(error?.clauseIndex) ? error.clauseIndex : 0;
-      console.warn(`离线语音在第${from + 1}句失败，回落到浏览器语音：`, error?.message || error);
-      playBrowser(clauses.slice(from), {rate, pitch}, state, finish);
+      console.warn(`好听的声音在第${from + 1}句失败，改用手机自带的声音：`, error?.message || error);
+      playBrowser(splitClauses(sentences.slice(from).join('')), {rate, pitch}, state, finish);
     });
   } else {
     playBrowser(clauses, {rate, pitch}, state, finish);

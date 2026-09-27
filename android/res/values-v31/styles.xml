@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 安卓 12 起系统自己画启动屏：纸色底，中间是 App 图标。 -->
+    <style name="YouhuoTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:windowSplashScreenBackground">@color/paper_bg</item>
+        <item name="android:statusBarColor">@color/paper_bg</item>
+        <item name="android:navigationBarColor">@color/paper_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:colorAccent">@color/jade</item>
+        <item name="android:colorPrimary">@color/paper_bg</item>
+        <item name="android:colorPrimaryDark">@color/paper_bg</item>
+    </style>
+</resources>

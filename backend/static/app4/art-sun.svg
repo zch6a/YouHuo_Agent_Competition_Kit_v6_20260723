@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
+  <!-- 轮播插画 · 晨光：远山、太阳、两棵树。纯矢量，颜色只用半透明白，叠在任何底色上都成立。 -->
+  <circle cx="168" cy="58" r="30" fill="#fff" fill-opacity=".85"/>
+  <circle cx="168" cy="58" r="44" fill="#fff" fill-opacity=".18"/>
+  <circle cx="168" cy="58" r="60" fill="#fff" fill-opacity=".10"/>
+  <path d="M0 128 C40 96 70 100 104 116 C140 132 170 96 240 104 V160 H0 Z" fill="#fff" fill-opacity=".28"/>
+  <path d="M0 144 C50 120 96 130 140 140 C180 150 210 128 240 132 V160 H0 Z" fill="#fff" fill-opacity=".45"/>
+  <g fill="#fff" fill-opacity=".7">
+    <path d="M62 132 l10 -30 l10 30 z"/><rect x="70" y="130" width="4" height="10" rx="1"/>
+    <path d="M84 138 l7 -21 l7 21 z"/><rect x="89.5" y="136" width="3" height="8" rx="1"/>
+  </g>
+  <path d="M112 44 q8 -6 16 0 q8 -6 16 0" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -4,7 +4,8 @@
 
 ## 内容
 
-- `plugin_openapi_v6.generated.json`：由运行中的FastAPI自动生成，89个路径；
+- `plugin_openapi_v6.generated.json`：由运行中的FastAPI自动生成，**150个路径**
+  （2026-09-19 实测数过；上一版这里写「89个」，是错的，已改）；
 - `workflows/youhuo_workflow.json`：v6平台中立工作流；
 - `skills/*/SKILL.md`：13个任务、隐私、安全、健康、位置、语音、策略、Saga、认知负荷、信任卡和安全预演Skill；
 - `a2a/agent_card.json`：Context/Task/Artifact/Part能力声明；

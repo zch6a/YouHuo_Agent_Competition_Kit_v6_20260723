@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
 
-from .utils import clean_user_text
+from .utils import clean_user_text, restore_cjk_punctuation
 from .v5_models import ActionAuthorization, DataFact
 
 
@@ -119,6 +119,12 @@ class RelianceCardRequest(StrictModel):
     action: str = Field(min_length=1, max_length=80)
     risk_level: int = Field(default=1, ge=1, le=4)
     reversible: bool = True
+    #: 这一步之前必须点头的人，按念给老人的顺序给（例如 `["老人本人", "绑定家属"]`）。
+    #: 由调用方给——只有它知道这条流程实际卡在谁身上；`risk_level` 只表示政策档位，
+    #: 推不出具体是谁。空列表表示除风险档位本身的要求外没有额外的确认人。
+    #: **会出现在卡片上**：`RelianceCardService.build` 把它并进 `who_decides`，
+    #: 也就是老人在「谁来决定」那一格读到的那句话。理由（以及为什么不是新加一个
+    #: 卡片字段）写在 `v6_services.RelianceCardService` 的 docstring 里。
     confirmations: list[str] = Field(default_factory=list, max_length=8)
     evidence: list[SourceEvidence] = Field(default_factory=list, max_length=16)
     next_step: str = Field(min_length=1, max_length=300)
@@ -126,7 +132,24 @@ class RelianceCardRequest(StrictModel):
     @field_validator("heard_text", "goal", "current_step", "action", "next_step")
     @classmethod
     def clean_text(cls, value: str) -> str:
-        return clean_user_text(value, max_length=1000)
+        # `clean_user_text` 留着：这五个字段里 `heard_text` 是老人的原话，
+        # 其余四个由调用方给，都不能把控制字符夹带到卡片上。但它的 NFKC 那一步
+        # 会把每一个「，」折成半宽逗号，而这五个字段**整张卡都要念给老人听**。
+        #
+        # 实测（真打 `POST /v6/tasks/{id}/glass-box` 读响应体）：`failed` 那一屏
+        # 的「现在这一步」发出去是「未成功,已安全停下」，而全站别处（`common.js`
+        # 的 `STATUS_WORD`、`elder.js` 的 `STATE_WORD`）都是「未成功，已安全停下」。
+        # 同一句话两种标点，而后端这一份是唯一一份真的从服务器发出去的。
+        # `next_step` 同样中招：「请稍候，完成后会核对对方系统状态」。
+        #
+        # 这个缺陷这个文件的邻居已经修过一次：`v6_services.py:193` 的 `_simplify`
+        # 就是 `restore_cjk_punctuation(clean_user_text(...))`，判据是
+        # `test_conversation_robustness.py::test_chinese_punctuation_survives_the_adaptation_pass`。
+        # 那一次修的是陪聊那句话，玻璃盒这一层漏了——同一个缺陷，隔一层。
+        #
+        # 只在两个汉字之间还原，所以「126.50元」和「08:00」仍是 ASCII——
+        # `speech.js` 按正则认时间和金额，认不出「08：00」。
+        return restore_cjk_punctuation(clean_user_text(value, max_length=1000))
 
 
 class RelianceCard(StrictModel):

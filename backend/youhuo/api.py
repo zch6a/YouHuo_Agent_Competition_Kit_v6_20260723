@@ -1,31 +1,42 @@
 from __future__ import annotations
 
 import asyncio
+import mimetypes
 import os
 import secrets
+from datetime import UTC, datetime, timedelta
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from starlette.datastructures import MutableHeaders
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 
 from .database import Database, DemoIdentities, IdempotencyConflict
 from .engine import AuthorizationError, EngineError, YouHuoEngine, semantic_model_configured
-from .privacy import elder_activity_entries, task_view
+from .proactive import ProactiveLoop
+from .utils import local_now
+from .privacy import (
+    elder_activity_entries,
+    elder_activity_event_types,
+    task_view,
+)
 from .document_guard import DocumentAnalysis, DocumentAnalysisRequest, DocumentGuard
 from .memory_vault import ConsentMemoryVault, MemoryDecision, MemoryItem, MemoryProposal
 from .orchestration import DelegationDecision, DelegationPolicy, TaskGraph, TaskPlanner
 from .tool_registry import ToolDryRunResult, ToolManifest, build_default_registry
 from .v3_models import DelegationPreviewRequest, ToolDryRunRequest
+from .app_api import build_app_router
 from .v4_api import build_v4_router
 from .v4_services import MedicationKnowledgeBase
 from .v4_store import V4FeatureStore
 from .v5_api import build_v5_router
 from .v5_store import V5FeatureStore
+from .asr import NeuralEars
+from .cloud_voice import CloudVoice, VoiceChain
 from .tts import NeuralVoice
 from .v6_api import build_v6_router
 from .v6_store import V6FeatureStore
@@ -73,6 +84,8 @@ def create_app(
     db = Database(resolved_db)
     db.seed_demo()
     engine = YouHuoEngine(db)
+    # 主动服务的曲柄（`proactive.py`）。默认关，`YOUHUO_SCHEDULER_INTERVAL_S` 打开。
+    proactive = ProactiveLoop.from_env(engine)
     memory_vault = ConsentMemoryVault(db)
     tool_registry = build_default_registry()
     v4_store = V4FeatureStore(db)
@@ -95,9 +108,31 @@ def create_app(
     #
     # `YOUHUO_SEED_BASELINE=true` 等价于 `normal`，保留兼容：`run_demo.ps1` 和四个
     # 闸门脚本都在用它。
-    demo_state = os.getenv("YOUHUO_DEMO_STATE", "").lower()
-    if not demo_state:
-        demo_state = "normal" if seed_history else "empty"
+    # **显式实参压过环境变量，不是反过来。**
+    #
+    # 原先这里是「环境变量优先，没有才看实参」。后果：调用方写
+    # `create_app(..., seed_baseline_history=True)`，只要进程里有
+    # `YOUHUO_DEMO_STATE`，那个实参就被**静默忽略**——不播种，也不报错。
+    #
+    # 实测过这条怎么咬人：`test_the_clock_on_screen_comes_from_the_server.py`
+    # 的夹具明确传了 `seed_baseline_history=True`，docstring 里还写着
+    # 「不给这个参数 `/v2/reminders` 回 0 条」——它单独跑绿，在全套里六条一起红，
+    # 红出来的话是「今天一条安排都没有——这条判据在空转（种子没生效？）」。
+    # 一个被无声推翻的实参，表现成一句指着别处的错。
+    #
+    # 现在的分工：**实参决定播不播，环境变量只决定播哪一种。** 所以
+    # `YOUHUO_DEMO_STATE=attention` 仍然能把 `True` 细化成 attention，
+    # 但它不能把 `True` 关成 empty。
+    env_state = os.getenv("YOUHUO_DEMO_STATE", "").lower()
+    if seed_baseline_history is None:
+        demo_state = env_state or ("normal" if seed_history else "empty")
+    elif seed_baseline_history:
+        demo_state = env_state if env_state in {"normal", "attention"} else "normal"
+    else:
+        demo_state = "empty"
+    if env_state and env_state not in {"empty", "normal", "attention"}:
+        # 认不出来的取值照旧要报错，别因为实参在场就把它咽下去。
+        demo_state = env_state
     if demo_state not in {"empty", "normal", "attention"}:
         raise RuntimeError(
             f"YOUHUO_DEMO_STATE={demo_state!r} 不认识，只有 empty|normal|attention"
@@ -113,9 +148,43 @@ def create_app(
         # 一笔完整的已完成缴费。只写 `status='completed'` 的话，Trust Receipt 和
         # Audit 都会拿到一条残缺的链，而那两页的全部价值就是链本身。
         db.seed_demo_scenario(demo_ids, "completed_bill_payment")
+        # 一笔**停在等家属点头**的缴费。
+        #
+        # 这个产品的核心主张是「重要的事两边都同意才办」，而在加这一条之前，
+        # 演示数据里从来没有过一件需要家属点头的事——唯一那笔缴费一入库就是
+        # completed。驱动测试的结果是 `/v2/tasks` 只有 1 条、`#mNeedYou` 是 "0"、
+        # 家人端「今天」面板 0 个控件，永远显示「今天不用您操心，没有要您点头的事」。
+        # 前端没错，它如实反映了后端；是这个产品最想讲的那件事在屏幕上一次都没出现过。
+        #
+        # 只在 `attention` 下播：`normal` 的定义是「一切如常」，一件悬着的缴费
+        # 不属于如常。两个状态的语义差别本来就该体现在这种地方，而不只是基线曲线。
+        if demo_state == "attention":
+            db.seed_demo_scenario(demo_ids, "awaiting_family_approval")
+        # 身体记录与心情历史。**两个播种点必须一样。**
+        #
+        # 这一行原先只在 `/v2/auth/visitor` 那一侧有（见那里第 485 行的注释）。
+        # 后果是 `-demo` 家庭和访客家庭看到的不是同一个演示：
+        #
+        #                elder-demo   访客沙箱
+        #     身体数据          0          3
+        #     心情回顾          0          7
+        #
+        # 而 `-demo` 正是测试、启动播种和一切脚本用的那个家庭。所以「照护页的
+        # 身体和心情是空的」这句话，在脚本里量出来是真的、在浏览器里看是假的。
+        #
+        # 这正是这个文件第 478 行那段注释警告过的事——「两个播种点，改一个
+        # 等于没改」。那一次漏的是访客侧，这一次漏的是这一侧，方向反了而已。
+        v4_store.seed_demo_content("demo")
     # Optional offline neural voice; absent package or model simply means the
     # elder client keeps using the browser's own speech synthesis.
     neural_voice = NeuralVoice(Path(__file__).resolve().parents[2])
+    # 手机网页念给老人听的那条：先用云端的「晓晓」，连不上再用离线模型，都没有就是
+    # 手机自己的声音（见 `cloud_voice.py`）。**板子那条（`/api/v1/speech`）不走这里**：
+    # 云端只出 MP3，板子要的是裸 PCM 的 WAV，所以那边仍然只接离线模型。
+    web_voice = VoiceChain(neural_voice, CloudVoice.from_env())
+    # 反过来那一半：声音**进来**。同样是可选项——网页端有浏览器自带的识别，
+    # 缺这个只影响没有浏览器的调用方（那块 ESP32-S3 板子）。见 `asr.py`。
+    neural_ears = NeuralEars(Path(__file__).resolve().parents[2])
     resolved_demo_mode = (
         demo_mode
         if demo_mode is not None
@@ -124,8 +193,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        neural_voice.warm_up_async()
+        # 离线模型后台加载 + 云端后台试合成一句（连得上才对页面报「可用」）。
+        web_voice.warm_up_async()
+        proactive.start()
         yield
+        # 先停定时器再关库：线程要是正敲到一半，库先关了它就在关掉的连接上写。
+        proactive.stop()
         db.close()
 
     app = FastAPI(
@@ -154,6 +227,7 @@ def create_app(
     )
     app.state.db = db
     app.state.engine = engine
+    app.state.proactive = proactive
     app.state.demo_mode = resolved_demo_mode
     app.state.v4_store = v4_store
     app.state.v5_store = v5_store
@@ -185,7 +259,20 @@ def create_app(
             # Static assets, UI pages and speech synthesis never touch the
             # database; speech in particular takes ~1.5s per clause and holding
             # the shared lock would stall every other request.
-            if path.startswith("/static/") or path in _LOCK_EXEMPT_PATHS or path.startswith("/v6/speech/"):
+            # `/api/v1/speech` 和 `/v6/speech/` 同样豁免：合成一句要 ~1.5 秒，
+            # 而这把锁是全进程共享的——不豁免的话，老人点一次朗读，
+            # 别人的每一个请求都要排在它后面。
+            #
+            # `/api/v1/listen` 是同一件事的反方向，而且更久：一次最多认 30 秒音频，
+            # 识别是同步的。不豁免的话，那块板子传一段话上来，期间**全进程**
+            # 每一个请求都排在它后面——包括别人的 SOS。
+            # 判据在 `test_the_slow_engines_never_hold_the_shared_lock.py`，
+            # 它是按「谁调了 voice./ears.」推出来的，加第三条慢端点会自动红。
+            # `/download/` 是安卓安装包：几百 KB 的文件，慢网下要传好几秒，
+            # 而它一个字节都不碰库——和 `/static/` 同理。
+            if (path.startswith("/static/") or path in _LOCK_EXEMPT_PATHS
+                    or path.startswith("/v6/speech/") or path.startswith("/download/")
+                    or path in ("/api/v1/speech", "/api/v1/listen")):
                 await self.app(scope, receive, send)
                 return
             async with sqlite_request_lock:
@@ -194,7 +281,19 @@ def create_app(
     _SECURITY_HEADERS = (
         (
             b"content-security-policy",
-            b"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            # `style-src` 放开了 `'unsafe-inline'`。
+            #
+            # 这是一处**真的放宽，不掩饰**。新前端（`/app`）的十个页面把山水图层的
+            # 定位全写在 `style="left:0;top:112px;..."` 里，几十处每屏；严格
+            # `style-src 'self'` 会把它们全部丢弃，结果是山水堆到左上角、卡片塌掉。
+            #
+            # 放开的代价说清楚：内联样式可被用来做数据渗出（例如
+            # `background:url(...)` 带走内容）和界面伪装。保住的是更要紧的那条——
+            # `script-src 'self'` 一步没动，没有 `unsafe-inline`、没有 `unsafe-eval`、
+            # 没有 CDN，脚本仍然只能来自本站。样式注入需要先有注入点，而注入点
+            # 在 `script-src` 收紧的前提下本来就是通局条件。
+            b"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            b"img-src 'self' data:; "
             # blob: is required to play locally synthesized WAV audio; it is
             # created in-page from a same-origin response, never fetched.
             b"media-src 'self' blob:; "
@@ -245,6 +344,10 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware)
 
     static_dir = Path(__file__).resolve().parents[1] / "static"
+    # 两个演示页各自的安装清单是 `/static/manifest-*.webmanifest`。`.webmanifest`
+    # 直到较新的 Python 才进内置类型表；公网那台机器的 Python 版本不由我们定，
+    # 查不到时 StaticFiles 会回 `text/plain`。登记一次，不赌版本。
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     bearer = HTTPBearer(auto_error=False)
 
@@ -271,6 +374,39 @@ def create_app(
     def home() -> FileResponse:
         return FileResponse(static_dir / "index.html")
 
+    # --- 新前端（山水版）-----------------------------------------------------
+    #
+    # 这一版走「前端优先」：界面先定稿，后端按它的契约补接口。十个页面是一组
+    # 互相跳转的静态 HTML，自带 `assets/js` 那套 mock/rest 双模客户端。
+    #
+    # `/app` 单独挂一条路由而不是并进现有的六页：那六页有自己的四层令牌体系和
+    # 一整套判据，两套东西混在一个目录里，谁都说不清哪条规则该管谁。
+    # 页面之间用相对路径互相引用（`../assets/css/app.css`、`../art/png/…`、
+    # `records.html`），所以直接按磁盘结构从 `/static/app/` 提供，一处都不用改写。
+    # `/app` 只做一个跳转，给人一个短地址。
+    @app.get("/app", include_in_schema=False)
+    def elder_app_entry() -> RedirectResponse:
+        return RedirectResponse(url="/static/app/pages/home.html")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        """浏览器不管你有没有，每开一页都会去要一次 `/favicon.ico`。
+
+        没有这条路由的后果实测：山水版那十七页（它们不像老六页那样自己声明
+        `<link rel="icon">`）每次加载都在控制台留一条
+        「Failed to load resource: 404」。那不是产品缺陷，但它是**噪音**——
+        而噪音的代价是真错误混在里面看不出来。这一轮扫十七页时，
+        每一页唯一那条「控制台错误」都是它。
+
+        图标复用 PWA 那一套现成的（`manifest.webmanifest` 指的就是这几个），
+        不另做一份，免得哪天换了品牌图只改一处。
+        """
+        return FileResponse(
+            static_dir / "icons" / "icon-192.png",
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
     @app.get("/sw.js", include_in_schema=False)
     def service_worker() -> FileResponse:
         # Must be served from the origin root: a worker's scope cannot rise above
@@ -287,6 +423,27 @@ def create_app(
             static_dir / "manifest.webmanifest", media_type="application/manifest+json"
         )
 
+    # 安卓 App 的安装包（`android/build_apk.py` 编出来放进 `static/download/`）。
+    #
+    # 单开一条根路由、不直接用 `/static/download/…`：
+    #   · 类型要对——`application/vnd.android.package-archive`，并带上文件名，
+    #     手机浏览器才会当成安装包存下来，而不是按字节流乱起名；
+    #   · service worker 的 `isApi()` 放行 `/download/`，发了新版以后队友点下载
+    #     拿到的就是新版，不是外壳缓存里的上一版（见 sw.js）。
+    # 只认清单里这两个名字，别的一律 404——不给路径参数留任何往外走的余地。
+    _APK_FILES = ("youhuo-elder.apk", "youhuo-family.apk", "youhuo-app.apk")
+
+    @app.get("/download/{name}", include_in_schema=False)
+    def download_app(name: str) -> FileResponse:
+        path = static_dir / "download" / name
+        if name not in _APK_FILES or not path.is_file():
+            raise HTTPException(status_code=404, detail="没有这个安装包。")
+        return FileResponse(
+            path,
+            media_type="application/vnd.android.package-archive",
+            filename=name,
+        )
+
     @app.get("/elder", include_in_schema=False)
     def elder_ui() -> FileResponse:
         return FileResponse(static_dir / "elder.html")
@@ -298,6 +455,59 @@ def create_app(
     @app.get("/care", include_in_schema=False)
     def care_ui() -> FileResponse:
         return FileResponse(static_dir / "care.html")
+
+    # ---- 并行的第二套设计 ------------------------------------------------
+    #
+    # 两套设计同时在线，各走一条路由，**共用同一份业务逻辑**
+    # （`family.js` / `care.js` / `common.js` / `identity.js`）。
+    #
+    # 不给设计二单写一份接线：这个项目已经因为「两套实现各自往返都绿、
+    # 跨子系统才红」栽过一次（字号语速和 SOS 各有两套实现）。
+    # 一份逻辑、两张皮，是唯一不会分叉的做法。
+    #
+    # 设计二是**四屏合一**的壳（今天/待办/照护/我的），而设计一把照护拆成
+    # 独立的 `/care`。这个差异是有意的，不是没对齐——它正是要比较的东西。
+    @app.get("/family2", include_in_schema=False)
+    def family_v6_ui() -> FileResponse:
+        return FileResponse(static_dir / "family-v6.html")
+
+    # 老人端**设计二**。和 `/elder` 并行，供比较；业务逻辑共用同一份 `elder.js`
+    # ——它需要 41 个 id，这一页把设计二缺的 23 个逐个补齐，一份逻辑、两张皮。
+    #
+    # 两版的差异是有意的：设计一把「下一件」和麦克风放在一张素净的卡片流里，
+    # 设计二是一整套纸张与山水的视觉语言，外加一个像素向导。要比较的正是这个。
+    @app.get("/elder2", include_in_schema=False)
+    def elder_v6_ui() -> FileResponse:
+        return FileResponse(static_dir / "elder-v6.html")
+
+    # ---- 并行的第三套设计：网页端 ------------------------------------------
+    #
+    # 设计一二都是手机版式（单栏、底部四格）。设计三是**网页端**：双栏，
+    # 左栏叙事、右栏主舞台，跟着窗口宽度走。它们不是手机版的放大，
+    # 版式本身就是另一套，所以并列而不是替换。
+    #
+    # 和设计二同一条规矩：**不给它们单写一份业务逻辑**。接线脚本
+    # （`elder3.js` / `family3.js`）只负责把这套 DOM 接到同一批后端端点上，
+    # 用的是同一份 `common.js` 的 `api()` / `login()` / `once()`。
+    @app.get("/elder3", include_in_schema=False)
+    def elder_v3_ui() -> FileResponse:
+        return FileResponse(static_dir / "elder-v3.html")
+
+    @app.get("/family3", include_in_schema=False)
+    def family_v3_ui() -> FileResponse:
+        return FileResponse(static_dir / "family-v3.html")
+
+    # ---- 第四套：照着「像个真 App」重做的两端 -------------------------------
+    #
+    # 暖黄顶栏 + 搜索、轮播、四列宫格、分区卡片、底部五格（中间是说话）。
+    # 同样**不另写业务逻辑**：`app4/*.js` 只把这套 DOM 接到已有的端点上。
+    @app.get("/elder4", include_in_schema=False)
+    def elder_app4_ui() -> FileResponse:
+        return FileResponse(static_dir / "elder-app4.html")
+
+    @app.get("/family4", include_in_schema=False)
+    def family_app4_ui() -> FileResponse:
+        return FileResponse(static_dir / "family-app4.html")
 
     @app.get("/trust", include_in_schema=False)
     def trust_ui() -> FileResponse:
@@ -336,6 +546,14 @@ def create_app(
             "semantic_mode": "model_advised" if configured else "deterministic_only",
             "model_can_authorize": False,
             "demo_mode": resolved_demo_mode,
+            # 小优的大脑（`agent_brain.py`）。**文本发往哪个服务商写在这里，不藏。**
+            "agent_mode": "model_planned" if engine.agent else "deterministic_only",
+            "agent": engine.agent.status() if engine.agent else {"enabled": False},
+            # 主动服务：服务器自己的定时器。`last_tick_at` 不再往前走就是掉了。
+            "proactive": proactive.snapshot(),
+            # 念给老人听的声音。云端开着时**要念的话发往哪里写在这里**，和上面的大脑一样不藏。
+            # 只报云端这一块：离线那一侧的状态第一次要导入原生库（几秒），不放进健康检查。
+            "voice": web_voice.cloud.status() if web_voice.cloud else {"enabled": False},
         }
 
     @app.post("/v2/auth/demo", response_model=DemoLoginResponse)
@@ -370,6 +588,15 @@ def create_app(
             baseline_store.seed_demo_for(suffix)
             db.seed_demo_reminders(ids)
             db.seed_demo_scenario(ids, "completed_bill_payment")
+            # 停在等家属点头的那一笔，也要播在**这条**路径上。
+            #
+            # 上面 create_app 里那次只种 `-demo` 那个固定家庭，而前端走的是
+            # `/v2/auth/visitor`——每个访客一个新家庭，播种在这里。
+            # 我第一版只改了 create_app，结果是：库里确实多了一行
+            # （`select count(*) where status='awaiting_family_approval'` 返回 1），
+            # 而浏览器里 `/v2/tasks` 还是只有 1 条。两个播种点，改一个等于没改。
+            if demo_state == "attention":
+                db.seed_demo_scenario(ids, "awaiting_family_approval")
             # 照护页的「身体」与「心情」两段实测是空的（0 条 / event_count=0）。
             # 它们和上面三样一样是**演示历史**，所以挂在同一个开关上：真实部署
             # 不受影响。`v4_store.seed_demo()` 那个是无条件调用的，因为它种的是
@@ -405,6 +632,10 @@ def create_app(
 
     @app.post("/v2/chat", response_model=ChatResponse)
     def chat(payload: ChatRequest, actor: AuthContext = Depends(current_actor)) -> ChatResponse:
+        # 老人刚说完一句：趁优活还在想，先把念话那条连接开好（见 `CloudVoice.prewarm`），
+        # 回答一回来第一句就能念。后台开，不挡这一轮。
+        if web_voice.cloud is not None and actor.role == ActorRole.ELDER:
+            web_voice.cloud.prewarm()
         try:
             return engine.handle(actor, payload)
         except Exception as exc:
@@ -450,6 +681,14 @@ def create_app(
         except Exception as exc:
             raise handle_engine_error(exc) from exc
 
+    #: 每次 tick 把循环例程续到几天后。
+    #:
+    #: 比老人那一屏建例程时用的 7 天（`app_api._ROUTINE_HORIZON_DAYS`）宽一些：
+    #: 那一个要的是「最近这一周」别把今日安排冲垮，这一个要的是**即使调度器
+    #: 隔几天才跑一次，地平线也不会穿**。14 天在两者之间，而且因为不再排
+    #: 过期场次（见 `materialize_routines`），宽一点不会攒出轰炸。
+    _TICK_ROUTINE_HORIZON_DAYS = 14
+
     @app.post("/v2/demo/scheduler/evaluate")
     def scheduler_evaluate(
         payload: ReminderEvaluationRequest,
@@ -458,7 +697,37 @@ def create_app(
         if not resolved_demo_mode:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="演示调度入口已关闭。")
         try:
-            return engine.scheduler_tick(actor, payload.now)
+            # **先把循环例程续到地平线，再 tick。**
+            #
+            # 这个工程里有两个调度器，而它们没接上（「注册了 ≠ 接上了」）：
+            #
+            #     SchedulerService.tick      提前提醒 / 到点通知 / 未应答升级
+            #     materialize_routines       把循环例程排成具体场次
+            #
+            # 实测：她建一条「每天 08:00 吃降压药」（排到 7 天后），家属按天
+            # 跑这个接口连跑 30 天——**场次一直是 8**，第 8 天起每次 tick 都是
+            # `{'notified': 0, 'escalated': 0, 'advance_notified': 0}`，
+            # 因为那条她被告知「每天」「进行中」的安排已经没有场次了。
+            # 显式调一次 `/v4/routines/materialize` 当场 +30 条——机器是好的，
+            # 只是那个周期性跑的东西从来不去驱动它。
+            #
+            # 放在这一层而不是 `engine.scheduler_tick()`：那个方法的返回形状
+            # 被 `test_reminders.py` 按**整字典**钉着（`== {"notified": 0,
+            # "escalated": 0, "advance_notified": 0}`），而这一层是加法。
+            # 权限边界没变：这个入口和 `/v4/routines/materialize` 一样只许
+            # 家属或系统进（`engine.scheduler_tick` 自己第一行就在判）。
+            #
+            # 顺序要紧：先续排再 tick，这一轮新排上的场次当场就能被
+            # 提前提醒那一级看到；反过来要等下一次。
+            # 续排不会排出过期场次（见 `materialize_routines` 的 docstring），
+            # 所以断档之后也不会一次性轰炸她。
+            scope = None if actor.role == ActorRole.SYSTEM else actor.family_id
+            scheduled = v4_store.materialize_routines(
+                scope, payload.now, _TICK_ROUTINE_HORIZON_DAYS)
+            result = engine.scheduler_tick(actor, payload.now)
+            return dict(result,
+                        routine_occurrences_created=scheduled["occurrences_created"],
+                        routine_occurrences_skipped=scheduled["occurrences_skipped"])
         except Exception as exc:
             raise handle_engine_error(exc) from exc
 
@@ -476,10 +745,51 @@ def create_app(
     def list_reminders(
         actor: AuthContext = Depends(current_actor),
         limit: int = Query(default=100, ge=1, le=500),
+        since: datetime | None = Query(default=None),
+        until: datetime | None = Query(default=None),
     ) -> list[dict[str, Any]]:
-        reminders = db.list_reminders(actor.family_id, limit=limit)
-        if actor.role == ActorRole.ELDER:
-            reminders = [item for item in reminders if item.elder_id == actor.actor_id]
+        #: **`elder_id` 交给 SQL。** 原先是取整个家庭最老的 `limit` 条、
+        #: 再在下面按 `elder_id` 筛——两层叠加，她自己的提醒要同时挤进
+        #: 家庭那一页**和**她那一筛才看得见。而这条 SQL 留的是最老的：
+        #: 家里攒够 `limit` 条更早的提醒之后，老人首页那行
+        #: 「今天有 N 件事」直接不显示。实测垫 120 条历史之后，
+        #: `/v2/reminders?limit=50` 回来的是 2025-11-22 到 2026-01-10 的行，
+        #: 而库里她有 5 条待办（`elder.js:1404` 的 `renderTodayLine` 拿到的一页
+        #: 里一条今天的都没有）。
+        #:
+        #: `since` / `until` 补上那个缺掉的口径。`elder.js:1177` 的注释写着
+        #: 「`/v2/reminders` 没有按日筛选的参数，所以在这里按日期筛」——
+        #: 取一页再在客户端筛，筛出来的是「这一页里的今天」，不是她的今天。
+        #: 两个窗口都不给时行为**一个字都不变**（仍是按 `due_at` 升序取
+        #: `limit` 条），所以老调用方一个都不受影响。
+        #: **补一个下界：本地昨天零点。** 光按 `elder_id` 筛还不够——
+        #: 垫的历史提醒**也可能是她自己的**，所以窗口里仍然可能全是过去的行。
+        #: 实测垫 120 条之后，`/v2/reminders?limit=50` 回来的还是
+        #: 2025-11-22 到 2026-01-10，老人首页那行「今天有 N 件事」不显示。
+        #:
+        #: 下界留一天，和 `app_api._my_reminders` **一模一样**（那里把理由
+        #: 写全了）：本地当天的界限换算成 UTC 之后，边界上那几条不能被切掉；
+        #: 而且**昨天漏掉的那一条**要还看得见。刻意**没有上界**——
+        #: 这一屏要看得见接下来的安排，抄一个上界过来会让「明天以后」整个
+        #: 消失。
+        #:
+        #: **不分角色。** 这条 SQL 是 `ORDER BY due_at ASC`，它自己的排序就是
+        #: 「接下来要发生的」；按升序取最老的一页和这个意图拧着（历史视图要的
+        #: 是 `DESC`）。两个消费方渲染的也都是「接下来」：`family3.js` 的
+        #: `items.slice(0, 5)` 和 `family.js` 那一屏，没有一处渲染历史。
+        #: 实测家人那一侧垫 120 条之后，那张卡的前五行变成
+        #: 「历史提醒000..004」——**全是早就办完的**，而同一时刻接下来那条
+        #: 已经不在这一页里了。
+        #:
+        #: 显式传了 `since` 就以调用方的为准，想翻更早的仍然翻得到。
+        #: 窗口有界之后 `limit` 只是安全阀，不再是取样口径。
+        if since is None:
+            day_start = local_now(datetime.now(UTC)).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            since = day_start - timedelta(days=1)
+        reminders = db.list_reminders(
+            actor.family_id, limit=limit, since=since, until=until,
+            elder_id=actor.actor_id if actor.role == ActorRole.ELDER else None)
         return [item.model_dump(mode="json") for item in reminders]
 
     @app.get("/v2/notifications")
@@ -543,6 +853,14 @@ def create_app(
         def entity_belongs_to_elder(entity_id: str | None) -> bool | None:
             if not entity_id:
                 return None
+            # 实体号**就是她本人**时，这件事当然是她的。
+            #
+            # 安全设置那条审计写的就是这个形状
+            # （`append_audit(..., "SAFETY_POLICY_UPDATED", payload.elder_id, …)`）。
+            # 少了这一句，家人改她的设置那一条会被下面「动作不是她做的」丢掉，
+            # 而 `/elder3` 那一侧一直看得到——两个设计又分叉。
+            if entity_id == target:
+                return True
             if entity_id.startswith("task"):
                 task = db.get_task(entity_id)
                 return None if task is None else task.elder_id == target
@@ -551,8 +869,21 @@ def create_app(
                 return None if reminder is None else reminder.elder_id == target
             return None
 
-        # Read a wider window than `limit` because the allow-list drops most rows.
-        events = db.list_audit(actor.family_id, limit=min(limit * 10, 2000))
+        # 窗口只装**她那一屏认得的**事件，筛选在 SQL 里做。
+        #
+        # 原先是「取最近 `limit*10` 条家庭流水，再在 Python 里按白名单筛」。
+        # 链上绝大多数事件她那张表不认（登录、会话、语义路由、定时器……），
+        # 于是链一长，那 300 条里就一条都不剩。实测 **312 条**时这一屏变成 0 行，
+        # 屏幕上写「还没有记录」——而她那天刚按过一次紧急呼叫。
+        #
+        # 这正是 `list_audit` 自己的注释批评过的那个形状（可信中心那份凭证）：
+        # 「取最近 200 条再在客户端筛……而页面上看不出来」。同一条道理，
+        # 这一处照着做：limit 作用在她的事件上，不是作用在整个家庭的流水上。
+        events = db.list_audit(
+            actor.family_id,
+            limit=min(limit * 10, 2000),
+            event_types=elder_activity_event_types(),
+        )
         return elder_activity_entries(
             events, entity_belongs_to_elder=entity_belongs_to_elder, elder_id=target
         )[:limit]
@@ -614,10 +945,16 @@ def create_app(
                 raise HTTPException(status_code=403, detail="老人账户不属于当前家庭。")
         else:
             raise HTTPException(status_code=403, detail="当前角色无权提出记忆项。")
-        item = memory_vault.propose(actor.family_id, payload)
+        try:
+            item = memory_vault.propose(actor.family_id, payload)
+        except ValueError as exc:
+            #: 和 `decide_memory` 同一个约定：领域层抛 `ValueError` 带中文消息，
+            #: 这里映成 409。原先这里没有 try，于是「同一个 key 提两遍」
+            #: 一路冒成 500，客户端只能显示「我这边出了点问题」。
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         db.append_audit(
             actor.family_id, actor.actor_id, "MEMORY_PROPOSED", item.id,
-            {"key": item.key, "sensitivity": item.sensitivity.value, "scope": item.scope.value},
+            {"key": item.key, "sensitivity": item.sensitivity.value, "scope": item.scope.value, "elder_id": item.elder_id},
         )
         return item
 
@@ -658,9 +995,20 @@ def create_app(
             raise HTTPException(status_code=403, detail="老人账户不属于当前家庭。")
         return memory_vault.list_visible(actor.family_id, elder_id, viewer_role=actor.role.value)
 
+    # 山水版老人端（`/app`）的门面。它把那一版前端写死的 `/api/v1/...` 路径翻译到
+    # 真实业务上——复述核验、任务状态机、审计链都是同一份，不是第二套。
+    # demo_mode 决定「没带令牌」是退回演示老人还是 401。
+    # 不传的话这一层在真实部署里也会把演示家庭的数据发给任何人。
+    app.include_router(build_app_router(db, engine, v4_store, demo_mode=resolved_demo_mode,
+                                        voice=neural_voice, v6_store=v6_store,
+                                        memory_vault=memory_vault, ears=neural_ears,
+                                        # 体感那一行要读 `environment_samples_v7`。
+                                        # 这张表一直在收板子的温湿度光照，而老人自己的
+                                        # 首页从来没有读过它。
+                                        baseline_store=baseline_store))
     app.include_router(build_v4_router(db, v4_store, current_actor, medication_kb))
     app.include_router(build_v5_router(db, v5_store, current_actor))
-    app.include_router(build_v6_router(db, v6_store, current_actor, neural_voice))
+    app.include_router(build_v6_router(db, v6_store, current_actor, web_voice))
     app.include_router(
         build_baseline_router(db, baseline_store, current_actor, baseline_store.errand_facts)
     )

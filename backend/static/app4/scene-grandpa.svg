@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 180">
+  <!-- 原创插画 · 爷爷在藤椅上喝茶。优活「暖阳」画风：扁平、无描边、暖橙为主色，一处绿植点睛。 -->
+  <!-- 背后的窗与阳光 -->
+  <rect x="96" y="8" width="92" height="96" rx="46" fill="#fff" fill-opacity=".55"/>
+  <circle cx="160" cy="36" r="14" fill="#ffd36b"/>
+  <!-- 绿植 -->
+  <path d="M176 150 c-2 -26 6 -44 16 -52 c-2 16 -6 34 -16 52z" fill="#7cc39a"/>
+  <path d="M176 150 c-8 -20 -20 -30 -32 -32 c8 12 18 24 32 32z" fill="#5daa7e"/>
+  <path d="M166 146 h22 l-3 26 a4 4 0 0 1 -4 3.5 h-8 a4 4 0 0 1 -4 -3.5z" fill="#c96c14"/>
+  <!-- 藤椅 -->
+  <path d="M40 92 c0 -30 22 -46 50 -46 s50 16 50 46 v34 h-100z" fill="#e8a33d"/>
+  <path d="M52 96 c0 -22 16 -36 38 -36 s38 14 38 36" fill="none" stroke="#f7c27a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M64 100 c0 -14 11 -24 26 -24 s26 10 26 24" fill="none" stroke="#f7c27a" stroke-width="4" stroke-linecap="round"/>
+  <rect x="34" y="118" width="112" height="16" rx="8" fill="#c96c14"/>
+  <path d="M46 134 l-6 38 M134 134 l6 38" stroke="#a9560f" stroke-width="6" stroke-linecap="round"/>
+  <!-- 腿与鞋 -->
+  <path d="M74 120 h34 c10 0 14 6 14 14 v26 h-14 v-22 h-34z" fill="#6f5a49"/>
+  <path d="M108 160 h20 a6 6 0 0 1 0 12 h-20z" fill="#3b2a1e"/>
+  <!-- 身体：暖橙毛衣 -->
+  <path d="M68 124 c-4 -28 6 -50 26 -50 s28 20 24 50z" fill="#f29a38"/>
+  <path d="M84 76 l10 14 l10 -14" fill="#fff4d6"/>
+  <!-- 手臂与茶杯 -->
+  <path d="M110 92 c10 4 16 12 18 20 l-10 4 c-2 -6 -6 -10 -12 -12z" fill="#e8872a"/>
+  <rect x="120" y="100" width="16" height="16" rx="4" fill="#fff"/>
+  <path d="M136 104 a5 5 0 0 1 0 8" fill="none" stroke="#fff" stroke-width="3"/>
+  <path d="M124 94 q2 -6 0 -10 M130 94 q2 -6 0 -10" fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="122" cy="114" r="5" fill="#f6c9a0"/>
+  <!-- 头 -->
+  <rect x="88" y="62" width="12" height="14" rx="5" fill="#eab48a"/>
+  <circle cx="94" cy="50" r="17" fill="#f6c9a0"/>
+  <path d="M77 48 c0 -12 8 -19 17 -19 s17 7 17 19 c-4 -6 -10 -8 -17 -8 s-13 2 -17 8z" fill="#f4efe6"/>
+  <ellipse cx="94" cy="62" rx="9" ry="4" fill="#f4efe6"/>
+  <circle cx="88" cy="50" r="1.8" fill="#3b2a1e"/><circle cx="100" cy="50" r="1.8" fill="#3b2a1e"/>
+  <path d="M84 45 h7 M97 45 h7" stroke="#e7ddcf" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="84" cy="55" r="3" fill="#f29a8a" fill-opacity=".45"/><circle cx="104" cy="55" r="3" fill="#f29a8a" fill-opacity=".45"/>
+  <path d="M90 57 q4 3 8 0" fill="none" stroke="#b5735a" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- 眼镜 -->
+  <circle cx="88" cy="50" r="4.5" fill="none" stroke="#6f5a49" stroke-width="1.4"/>
+  <circle cx="100" cy="50" r="4.5" fill="none" stroke="#6f5a49" stroke-width="1.4"/>
+  <path d="M92.5 50 h3" stroke="#6f5a49" stroke-width="1.4"/>
+  <!-- 地面 -->
+  <ellipse cx="100" cy="174" rx="92" ry="5" fill="#e8a33d" fill-opacity=".18"/>
+</svg>

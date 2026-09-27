@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eee8dd" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="优活家人" />
+<!-- 这一页自己的安装清单（原先引的是全站共用那份，装出来一打开是旧版的老人端）。 -->
+<link rel="manifest" href="/static/manifest-family2.webmanifest" />
+<link rel="apple-touch-icon" href="/static/icons/family-apple-180.png" />
+<!-- 安卓 App 外壳的网页一侧；普通浏览器里什么都不做。排在其它脚本之前。 -->
+<script src="/static/app-bridge.js"></script>
+<script src="/static/register-sw.js"></script>
+<title>优活 · 家人端</title>
+<link rel="stylesheet" href="/static/family-v6.css">
+<link rel="stylesheet" href="/static/control-states.css">
+</head>
+<body data-surface="consumer">
+<div class="preview-stage">
+<main class="phone" id="familyPhone" data-tab="today">
+    <a class="back-link" href="/">← 返回首页</a>
+
+    <!-- 操作回执。care.js 唯一缺的那个 id。语气由后端决定，不由前端猜——「今天该吃的都记过了」是 409，不能画成绿色成功框。 -->
+    <p class="notice" aria-live="polite" id="careNotice" hidden></p>
+
+
+<div class="ink-mountains">
+<svg viewBox="0 0 430 265" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="fadeM4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#769487" stop-opacity=".36"/>
+      <stop offset="1" stop-color="#769487" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blurM4"><feGaussianBlur stdDeviation="2.2"/></filter>
+  </defs>
+  <path d="M0 157 C46 132 70 93 104 101 C126 106 140 137 162 130 C196 118 212 61 249 71 C286 81 291 125 318 127 C350 129 372 89 430 73 L430 0 L0 0Z" fill="url(#fadeM4)" filter="url(#blurM4)"/>
+  <path d="M0 178 C62 151 83 119 116 127 C148 135 157 163 187 149 C226 131 238 95 270 103 C303 111 315 151 346 148 C374 145 394 121 430 112" fill="none" stroke="#5d7e70" stroke-opacity=".28" stroke-width="1.3"/>
+  <path d="M272 92 C286 79 297 68 306 48 M305 49 C296 48 291 44 286 38 M305 49 C314 42 319 36 323 29" fill="none" stroke="#957045" stroke-opacity=".28" stroke-width="1.2"/>
+  <ellipse cx="286" cy="38" rx="7" ry="3" fill="#789489" fill-opacity=".28" transform="rotate(24 286 38)"/>
+  <ellipse cx="323" cy="29" rx="7" ry="3" fill="#789489" fill-opacity=".25" transform="rotate(-30 323 29)"/>
+</svg>
+</div>
+
+
+<div class="bottom-grass">
+<svg viewBox="0 0 430 150" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 137 C40 126 62 132 98 120 C136 107 169 124 205 115 C248 104 278 118 318 110 C355 102 391 108 430 94 L430 150 L0 150Z" fill="#8fa18b" fill-opacity=".10"/>
+  <g fill="none" stroke="#638173" stroke-opacity=".27" stroke-width="1.1">
+    <path d="M34 148 C39 128 38 111 31 94 M39 128 C49 117 55 108 59 94"/>
+    <path d="M103 150 C103 129 108 115 118 98 M107 126 C97 115 91 104 89 91"/>
+    <path d="M336 150 C334 128 328 112 318 97 M331 127 C345 118 354 106 358 92"/>
+    <path d="M386 150 C388 129 397 113 410 102"/>
+  </g>
+  <g fill="#799181" fill-opacity=".25">
+    <ellipse cx="59" cy="94" rx="8" ry="3" transform="rotate(-42 59 94)"/>
+    <ellipse cx="89" cy="91" rx="8" ry="3" transform="rotate(38 89 91)"/>
+    <ellipse cx="118" cy="98" rx="9" ry="3" transform="rotate(-36 118 98)"/>
+    <ellipse cx="318" cy="97" rx="9" ry="3" transform="rotate(35 318 97)"/>
+    <ellipse cx="358" cy="92" rx="8" ry="3" transform="rotate(-35 358 92)"/>
+  </g>
+</svg>
+</div>
+
+<header class="topbar">
+  <div class="brand-mark">
+    <div class="brand-seal">优</div>
+    <div class="brand-copy"><strong>优活</strong><small>陪伴与接力</small></div>
+  </div>
+  <div class="top-weather"><strong>家人端</strong><span id="famUpdated">今天 17:26 更新</span></div>
+</header>
+
+<div class="app-viewport" id="main">
+  <section class="panel family-panel" data-panel="today" aria-label="今天">
+    <div class="identity-island">
+      <div class="hello">爸爸</div>
+      <h1 id="famVerdict">今天整体平稳</h1>
+      <p id="famHeadline">没有明显异常，有一件小事需要您确认。</p>
+      <!-- 这三处原先写死的是**今天的病情摘要**：「最近一次活动 17:48 · 在家」、
+           「生活节律已回到平常范围 · 安全状态正常」、「上午起床稍晚，但下午已经恢复。
+           晚饭后有一次血压测量」。它们没有 id，family.js 一个都不改——注水之后
+           一字不变，屏幕上永远是这几句。
+           而它们正上方的 <h1> 和 #famHeadline 是**真的**，今天说的是「起床：今天
+           还没有有效记录」。同一屏上两种说法打架，赢的是写死的那一种，因为它更
+           肯定、更靠上。
+           这一页的主张是「说到做到、每一步可核验」，所以这里改成只说**这一页
+           怎么工作**——那句话不依赖今天的数据，永远是真的。 -->
+      <div class="role-chip">家人视角 · 只看要您接力的事</div>
+    </div>
+
+    <div class="status-ribbon"><i></i><span>有记录才说，没有记录也直说</span></div>
+
+    <div class="companion-note">
+      <svg class="heart-line" viewBox="0 0 36 32"><path d="M18 28C12 23 4 17 4 10.5 4 6 9 4 13 7.2 15.2 8.9 16.4 11 18 13.4 20 9.3 22 6 26.3 5.8 31.2 5.6 33 9.5 31.3 13.7 29 19.2 23.7 23.5 18 28Z"/></svg>
+      <strong>今天不用一直盯着看</strong>
+      <span>先提醒他本人；要您拍板、或他没有回应，才送到这一屏。</span>
+    </div>
+
+    <div class="section-head"><h2>需要您确认</h2><span>只放要您拍板的</span></div>
+    <div id="tasks" class="confirm-zone">
+      <article class="confirm-card">
+        <strong>周五复诊前，需要确认接送方式</strong>
+        <p>社区医院 · 8月21日 09:30。爸爸本人已经知道这件事，现在只等家里决定谁陪同。</p>
+        <button type="button">去确认 →</button>
+      </article>
+    </div>
+
+    <div class="section-head"><h2>今天怎么样</h2><span>只和他自己比</span></div>
+    <article id="dailyReport" class="report-strip" aria-live="polite">
+      <strong>和平常差不多</strong>
+      <p>活动量、用药和安全都没有明显变化。午后有一次短暂心情低落，没有持续。</p>
+    </article>
+
+    <div class="metric-row">
+      <div class="metric"><span>待您确认</span><strong id="mNeedYou">1</strong></div>
+      <div class="metric"><span>进行中</span><strong id="mActive">2</strong></div>
+      <div class="metric"><span>今天到期</span><strong id="mToday">1</strong></div>
+    </div>
+
+    <div class="section-head"><h2>其他正在办的事</h2><span>不用您动手</span></div>
+    <div id="otherTasks" class="reminders">
+      <div class="reminder-item"><time>19:30</time><div><strong>晚间量血压</strong><small>结果会同步到照护档案</small></div><em>待完成</em></div>
+      <div class="reminder-item"><time>20:00</time><div><strong>晚间用药</strong><small>氨氯地平 · 1片</small></div><em>待提醒</em></div>
+    </div>
+    <button id="refresh" class="more-btn" type="button">刷新今天的情况 ↻</button>
+  </section>
+
+  <section class="panel family-panel" data-panel="todo" aria-label="待办" hidden>
+    <p class="panel-kicker">家人端 · 待办</p>
+    <h2 class="tab-head">待办与提醒</h2>
+    <p class="tab-note">先按日期看，再决定要不要给爸爸添一件事。重要的放前面，不把所有提醒铺满一屏。</p>
+
+    <div id="calendar" class="todo-calendar">
+      <div class="day-pill"><span>周一</span><b>17</b><span>2件</span></div>
+      <div class="day-pill active"><span>今天</span><b>18</b><span>3件</span></div>
+      <div class="day-pill"><span>周三</span><b>19</b><span>1件</span></div>
+      <div class="day-pill"><span>周四</span><b>20</b><span>1件</span></div>
+      <div class="day-pill"><span>周五</span><b>21</b><span>复诊</span></div>
+    </div>
+
+    <!-- 「今天还有两件事 / 晚间血压和用药都已经安排好」也是写死的：注水后一字不变，
+         而它正上方的日历读的是真数据（今天实际有三条，时间也不是晚上）。
+         换成只说提醒是怎么走的——那是真的，而且不随今天有几件事变化。 -->
+    <div class="companion-note">
+      <svg class="heart-line" viewBox="0 0 36 32"><path d="M18 28C12 23 4 17 4 10.5 4 6 9 4 13 7.2 15.2 8.9 16.4 11 18 13.4 20 9.3 22 6 26.3 5.8 31.2 5.6 33 9.5 31.3 13.7 29 19.2 23.7 23.5 18 28Z"/></svg>
+      <strong>提醒先给他，不先给您</strong>
+      <span>您添的每一条都先提醒他本人；到点还没有确认，才按您设的时间通知家人。</span>
+    </div>
+
+    <!-- 这里原先还有一节「今天」，里面三条写死的待办（19:30 量血压 / 20:00 服晚间药 /
+         21:30 给女儿回电话）。它没有 id，谁都不会改它，于是同一屏上有两份「今天」：
+         上面那份日历是真的（今天三条，11:00 与 14:00），下面这份是假的，而且更像
+         一张正经的清单。删掉假的那一份——「先按日期看」这句话说的本来就是上面那个日历。 -->
+
+    <div class="section-head"><h2>给他添一件事</h2><span>新增一条</span></div>
+    <!-- `novalidate`：实测这一页原先按「同步到他的手机」时 `checkValidity()` 为 false，
+         浏览器拦在 submit 之前，于是 `createReminder()` 里那三句中文指引
+         （「事项还没填…」「时间还没选。」以及再按一次的那一支）**从来不跑**——
+         请求 0、`#familyNotice` 空。设计一同一份 `family.js`，那边早就关了原生校验。
+         `required` 保留：它还给读屏软件提供「这一项必填」的语义。 -->
+    <form id="reminderForm" class="family-form" novalidate>
+      <label>事项<input id="reminderTitle" required placeholder="例如：复诊前准备病历"></label>
+      <label>时间<input id="reminderDue" type="datetime-local" required></label>
+      <!-- 后端字段是 `escalation_after_minutes`，单位是分钟。标签原先只写
+           「多久没确认再通知家人」，输入框里是一个光秃秃的 30——30 什么？ -->
+      <label>多久没确认再通知家人（分钟）<input id="escalation" type="number" min="5" max="1440" value="30"></label>
+      <button type="submit">同步到他的手机</button>
+    </form>
+
+    <!-- 让优活记住一件事。**她本人点头之后才生效。**
+         在这一条之前 `/v3/memories/propose` 全仓零个前端消费者：老人端三个界面
+         都能点头、能不点、能逐条收回了，而没有任何界面能提出一条——那张
+         「等您点头」的卡片于是永远不会出现。
+         三个枚举用固定的最温和档（`preference` + `family_summary`，半年后自己忘掉），
+         界面上不摆下拉：那三个值的中文说法在后端，前端再摆一套就是两套说法。 -->
+    <div class="section-head"><h2>让优活记住一件事</h2><span>要他点头</span></div>
+    <form id="memoryForm" class="family-form" novalidate>
+      <label>是什么<input id="memKey" required placeholder="例如：看电视的音量"></label>
+      <label>具体内容<input id="memDetail" required placeholder="例如：晚上九点之后把声音调小"></label>
+      <label>为什么<input id="memPurpose" required placeholder="例如：提醒时不影响邻居"></label>
+      <button type="submit">问他要不要记住</button>
+    </form>
+    <p class="section-note">他会在自己那一页看到这一条；同意了优活才会用，半年之后自己忘掉。他随时可以收回。</p>
+
+    <div class="section-head"><h2>通知</h2><span>系统发来的</span></div>
+    <div id="notices">
+      <div class="notice-line">今天没有新的超时提醒。</div>
+    </div>
+  </section>
+
+  <section class="panel family-panel" data-panel="care" aria-label="照护" hidden>
+    <p class="panel-kicker">家人端 · 照护</p>
+    <h2 class="tab-head">照护中心</h2>
+    <p class="tab-note" id="careUpdated">先看「他最近怎么样」，再进入用药、身体、心情和安全。所有细节仍在，但第一屏先看人。</p>
+    <!-- care.js 只在**取不到**照护档案时用这一行说话（成功就 hidden=true），
+         所以它的初始文案是一闪而过的加载态。原先写的是「照护信息已连接 ·
+         最近更新 17:26」——一个编出来的时刻，而且在还没连上的时候说已经连上了。 -->
+    <p id="status" class="notice-line" aria-live="polite">正在读取照护档案……</p>
+
+    <nav class="care-seg" aria-label="照护分区">
+      <button class="is-current" data-care-section="overview">概览</button>
+      <button data-care-section="today">今天</button>
+      <button data-care-section="med">用药</button>
+      <button data-care-section="body">身体</button>
+      <button data-care-section="mood">心情</button>
+      <button data-care-section="safety">安全</button>
+      <button data-care-section="trend">趋势</button>
+    </nav>
+
+    <section class="care-detail" data-care-panel="overview">
+      <article id="ovVerdict" class="care-verdict">
+        <small>概览 · 结论</small>
+        <strong>最近一周总体稳定</strong>
+        <p>今天与自己的常态接近。用药按时，身体记录没有新增高风险信号，安全设置正常。</p>
+      </article>
+      <!-- 这五行是**入口**，不是结论。
+           它们原先每一行都下了判断：「和平常差不多 · 还有2件事」「3项长期用药 ·
+           今天均正常」「血压最近7天在个人常态附近」，右边还各挂一个「正常」「平稳」。
+           care.js 不碰 #overviewBody（它只改上面那张 #ovVerdict），所以这些判断是
+           写死的、永远不变的。今天真实的结论就在它们正上方：「今天该有的记录还没
+           出现，建议打个电话问一声」——而紧挨着它的第一行写着「和平常差不多」。
+           一行永远说「正常」的摘要，比没有摘要更坏：它会让人不再点进去看。
+           现在每一行只说**那一节里有什么**，右边统一是「查看 →」。判断留给
+           #ovVerdict 和各分区里的真数据。 -->
+      <div id="overviewBody" class="care-rows" aria-live="polite">
+        <div id="ovToday" class="care-row" data-care-target="today"><span class="care-symbol">今</span><div><strong>今天</strong><small>作息、活动与用药的当天记录</small></div><em>查看 →</em></div>
+        <div id="ovMed" class="care-row" data-care-target="med"><span class="care-symbol">药</span><div><strong>在吃什么药</strong><small>长期用药，和每一次服药的确认</small></div><em>查看 →</em></div>
+        <div id="ovBody" class="care-row" data-care-target="body"><span class="care-symbol">身</span><div><strong>身体</strong><small>血压、就诊与体检记录，只记不判断</small></div><em>查看 →</em></div>
+        <div id="ovMood" class="care-row" data-care-target="mood"><span class="care-symbol">心</span><div><strong>心情</strong><small>只有类别和趋势，没有聊天原文</small></div><em>查看 →</em></div>
+        <div id="ovSafety" class="care-row" data-care-target="safety"><span class="care-symbol">安</span><div><strong>安全</strong><small>联系人、静默规则与外出范围</small></div><em>查看 →</em></div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="today" hidden>
+      <div class="section-head"><h2>他今天怎么样</h2><span>生活节律</span></div>
+      <div id="todayBody" aria-live="polite">
+        <div class="companion-note"><strong>今天没有明显偏离常态</strong><span>起床晚了38分钟，午后活动量恢复；晚饭时间正常。</span></div>
+        <div class="reminders">
+          <div class="reminder-item"><time>08:05</time><div><strong>起床</strong><small>比平常晚38分钟</small></div><em>已恢复</em></div>
+          <div class="reminder-item"><time>12:10</time><div><strong>午间用药</strong><small>已确认</small></div><em>完成</em></div>
+          <div class="reminder-item"><time>17:42</time><div><strong>晚饭</strong><small>和平常接近</small></div><em>完成</em></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="med" hidden>
+      <div class="section-head"><h2>在吃什么药</h2><span>长期用药</span></div>
+      <!-- `organic-flow`（那条斜着的时间轴）挂在**内层**。
+           care.js 对 `#medBody` 做 replaceChildren，注水后这里是 `.care-item` 卡片，
+           不再是 `.record-bubble`。装饰挂在 #medBody 自己身上时，那条 ::before 竖线
+           会留在原地对着一堆没有气泡的卡片画，屏幕上是一根无主的线。 -->
+      <div id="medBody" aria-live="polite">
+        <div class="organic-flow">
+          <article class="record-bubble"><span class="record-time">08:00</span><strong>阿司匹林肠溶片</strong><p>100mg · 1片 · 今天已确认</p></article>
+          <article class="record-bubble"><span class="record-time">12:00</span><strong>二甲双胍</strong><p>0.5g · 1片 · 今天已确认</p></article>
+          <article class="record-bubble"><span class="record-time">20:00</span><strong>氨氯地平</strong><p>5mg · 1片 · 等待晚间提醒</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="body" hidden>
+      <div class="section-head"><h2>身体</h2><span>只记录，不判断</span></div>
+      <div id="bodyBody" aria-live="polite">
+        <article class="care-verdict"><small>最近一次血压</small><strong>128 / 78 mmHg</strong><p>与爸爸自己的近30天常态接近。</p></article>
+        <div class="care-chart"><i class="h55"></i><i class="h66"></i><i class="h60"></i><i class="h72"></i><i class="h63"></i><i class="h68"></i><i class="h64"></i></div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="mood" hidden>
+      <div class="section-head"><h2>心情</h2><span>只看趋势</span></div>
+      <div id="moodBody" aria-live="polite"><div class="companion-note"><strong>最近两周大多平稳</strong><span>只有类别和趋势，不展示陪伴聊天原文。今天午后有一次短暂低落，没有持续。</span></div></div>
+    </section>
+
+    <section class="care-detail" data-care-panel="safety" hidden>
+      <div class="section-head"><h2>安全</h2><span>联系人与规则</span></div>
+      <!-- 两栏网格也挂内层。care.js 注水后 `#safetyBody` 装的是一份摘要、一个小标题、
+           一条名单和一张表单——把它们塞进 `grid-template-columns:1fr 1fr` 里，
+           表单会被劈成半屏宽，标题和名单并排。 -->
+      <div id="safetyBody" aria-live="polite">
+        <div class="service-grid">
+          <div class="service-item"><b>紧急联系人</b><span>女儿 · 第一联系人</span></div>
+          <div class="service-item"><b>静默提醒</b><span>长时间无活动后先问本人</span></div>
+          <div class="service-item"><b>外出范围</b><span>超过常用活动范围才提醒</span></div>
+          <div class="service-item"><b>设备状态</b><span>手机在线 · 电量78%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="care-detail" data-care-panel="trend" hidden>
+      <div class="section-head"><h2>这一周</h2><span>只和自己比</span></div>
+      <div id="weekly" aria-live="polite">
+        <article class="care-verdict"><small>只和自己比</small><strong>本周整体没有明显变化</strong><p>生活节律、用药确认和心情趋势都在个人常态附近。</p></article>
+        <div class="care-chart"><i class="h48"></i><i class="h55"></i><i class="h61"></i><i class="h57"></i><i class="h65"></i><i class="h60"></i><i class="h63"></i></div>
+      </div>
+    </section>
+  </section>
+
+  <section class="panel family-panel" data-panel="mine" aria-label="我的" hidden>
+    <p class="panel-kicker">家人端 · 我的</p>
+    <h2 class="tab-head">我的与可信记录</h2>
+    <p class="tab-note">把做过的事和入口收在这里。默认看结果，不让家人先面对一长串技术细节。</p>
+
+    <div class="identity-island">
+      <div class="hello">家人账号</div>
+      <h1>陪伴不是盯梢</h1>
+      <p>优活只在需要接力的时候把事情交给您。</p>
+    </div>
+
+    <!-- 三格里只有第一格是活的：family.js 把 #mChain 写成「完好」或「异常」。
+         另外两格（已协助完成 7 / 需要追踪 0）没有 id，谁都不会填，于是两个编出来的
+         数字并排站在一个真数字旁边，看起来和它一样可信。
+         删掉那两格，剩下的一格铺满一行——`.metric-row-one` 这个类名本来就在这里，
+         只是从来没有任何规则配它（现在补上了）。
+         标签也跟着改：值是「完好 / 异常」，而「本月可信记录」听起来该是一个条数。 -->
+    <div class="metric-row metric-row-one">
+      <div class="metric"><span>这些记录有没有被改过</span><strong id="mChain">完好</strong></div>
+    </div>
+    <p id="chain" class="notice-line">最近一条：今天 15:42，已确认周五复诊挂号结果。</p>
+
+    <div class="section-head"><h2>做过的事</h2><span>可信记录</span></div>
+    <div id="audit" class="record-flow">
+      <div class="record-row"><strong>复诊挂号已确认</strong><span>今天 15:42 · 家人确认 · 社区医院返回成功</span></div>
+      <div class="record-row"><strong>用药提醒同步完成</strong><span>昨天 20:05 · 系统返回已送达老人端</span></div>
+      <div class="record-row"><strong>家庭联系人更新</strong><span>8月15日 · 家人确认 · 备用联系人已设置</span></div>
+    </div>
+
+    <div class="section-head"><h2>其他</h2><span>更多入口</span></div>
+    <!-- 四个入口原先都是 `href="javascript:void(0)"`。两层问题：
+         1. 这个站的响应头是 `script-src 'self'`，没有 unsafe-inline——`javascript:`
+            URL 会被 CSP 直接拦下。按下去不是「暂时没做」，是控制台里一条违规、
+            屏幕上什么都不发生。
+         2. 「通知设置」在这个产品里根本没有对应的页面。一个指着不存在的地方的
+            名字，和一句假话是一件事。
+         现在四个各自落到一个真实存在的去处：`/trust` 与 `/` 是真路由，
+         `#care` / `#ovSafety` 走 initSections 的锚点解析（后者是照护页
+         「他身边的人」所在的那一节，a.js 会把二级分区一起切过去）。 -->
+    <div class="fam-links">
+      <a class="fam-link" href="#care">照护档案</a>
+      <a class="fam-link" href="/trust">可信中心</a>
+      <a class="fam-link" href="#ovSafety">家庭成员</a>
+      <a class="fam-link" href="/">换一个人用</a>
+    </div>
+
+    <div class="trust-strip">
+      <strong>关于可信结果</strong><br>
+      只有真实系统返回成功，优活才会显示「已完成」；重要操作会记录由谁确认和最终结果。
+    </div>
+  </section>
+</div>
+
+<!-- 回执通道。**在 `.app-viewport` 之外**——这一条是搬过来的，原先写在
+     「今天」那个 `section.panel` 里面，而四个分区靠 `panel[hidden]`
+     切换。（这里故意不写成完整的开标签：写成标签形态之后，我自己那条
+     「它还在 panel 里吗」的检查就命中了这段注释里的字，而不是真标记。）
+     实测（浏览器，切到「待办」加一条提醒）：提醒真的建了，
+     `#familyNotice` 里也写上了「已经设置提醒：…」，而它的高度是 0、
+     在 hidden 子树里，整屏可见文本里**一个字都没有**。
+
+     它自己的 `hidden` 是 false——藏起来的是祖先。只查元素自身的 `hidden`
+     查不出这一条。
+
+     同一套设计的另一半早就记下并改过了（`elder-v6.html` 那条注释：
+     「把 `#status` 放进去，这些操作的反馈会写进一个默认隐藏的节点，
+     用户一个字也看不到。它压在标签栏上方，四格都看得见。」）；
+     设计一那边也是对的（`/family` 上它是 `.phone-scroll` 的直接子节点）。
+     三份实现里错的是这一份。 -->
+<p id="familyNotice" class="notice-line" role="status" aria-live="polite" hidden></p>
+
+<nav class="dock family-tabs" aria-label="主要分区">
+  <button type="button" class="seg is-current" data-section="today" aria-current="page"><span class="nav-icon"></span><span>今天</span></button>
+  <button type="button" data-section="todo" class="seg"><span class="nav-icon"></span><span>待办</span></button>
+  <button type="button" data-section="care" class="seg"><span class="nav-icon"></span><span>照护</span></button>
+  <button type="button" data-section="mine" class="seg"><span class="nav-icon"></span><span>我的</span></button>
+</nav>
+</main>
+</div>
+
+<div class="youhuo-robot-mascot" id="youhuoRobotMascot" aria-live="polite" aria-label="优活小优向导">
+  <div class="youhuo-robot-bubble" id="youhuoRobotBubble" role="status"></div>
+  <canvas class="youhuo-robot-canvas" id="youhuoRobotCanvas" width="56" height="90" aria-hidden="true"></canvas>
+</div>
+
+<script src="/static/family-v6-a.js"></script>
+<script src="/static/family-v6-b.js"></script>
+
+  <!-- 业务逻辑一律用仓库的这四份，和设计一同一份代码。
+       包自带的 family-v6-a/b.js 是 fetch×0 的纯 UI 壳（吉祥物拖拽、动效），
+       只负责视觉；两者分工不重叠。
+       顺序要紧：identity → common 提供 window.YouHuo，family/care 依赖它。 -->
+  <script src="/static/identity.js"></script>
+  <script src="/static/common.js"></script>
+  <!-- 这两份必须是 `type="module"`。
+       两个文件顶层都写了 `const {api, byId, errorWords} = window.YouHuo`，
+       在同一个全局作用域里同时加载会
+       `SyntaxError: Identifier 'api' has already been declared`
+       ——**整个文件不执行**，四屏里有两屏是死的。
+
+       设计一不会撞：`/family` 只加载前者、`/care` 只加载后者。
+       设计二是四屏合一，两份同时在。模块各有自己的顶层作用域，撞不上。 -->
+  <!-- 顺序也要紧：care 在前、family 在后。
+       两份都在末尾调 `window.YouHuo.initSections(...)`，默认分区不同
+       （care 传 'overview'，family 传 'today'）。后跑的那个说了算。
+
+       设计二的分区集是**家人端那套**（today/todo/care/mine），没有 'overview'。
+       care.js 先跑时它的 'overview' 解析不到、退回第一个分区，随后 family.js
+       再按 'today' 定一次，结果一致。反过来的话，最后生效的是一个
+       解析不到的名字——实测首屏 `当前打开 []`，四个面板全关着，
+       要手动点一下才出内容。 -->
+  <script type="module" src="/static/care.js"></script>
+  <script type="module" src="/static/family.js"></script>
+</body>
+</html>

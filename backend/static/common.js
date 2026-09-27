@@ -407,11 +407,47 @@
   //: 一次取消会显示成一个绿色的成功框，而用户无法把它和真的成功区分开。
   const THEME_TONE = {warning: 'warning', warn: 'warning', danger: 'bad', error: 'bad'};
   function toneOf(data) {
+    /* 语气由后端的 `code` 给，不是一律画绿。
+     *
+     * 这一处原先是 `code !== 'OK' && code !== 'SUCCESS'`——**两个比较都恒为真**：
+     * `ResponseCode` 的取值是小写的（`models.py:60`：`ok` / `task_completed` /
+     * `need_more_info` / `duplicate_blocked` / `safety_alert` / `error` …），
+     * 而这里比的是大写 `'OK'`；`'SUCCESS'` 根本不在那个枚举里。
+     * 于是**凡是带 `code` 的响应都落到 warning**，连 `code: "ok"` 也是。
+     *
+     * 实测（`/family3` 按「＋」真建一条提醒）：后端 `code = "task_completed"`，
+     * 屏幕上「已经设置提醒：…」配的是**琥珀色警告条**。一次成功的写操作
+     * 看起来像出了点事。影响这一层的全部 26 处调用：`/care`、`/family`、
+     * `/family2`、`/family3`、`/elder3`、任务详情页。
+     *
+     * 这张表**留在函数内部**：`test_the_screen_is_new_after_the_write.py:356`
+     * 把 `THEME_TONE` 和这个函数分别抠出来 `new Function` 起来跑，
+     * 放外面的常量在那个 eval 里是 ReferenceError（`THEME_TONE` 它抠了，
+     * 所以那一个留在外面不动）。
+     */
+    const CODE_TONE = {
+      //: 办成了 / 只是在说话——绿色。
+      ok: 'good',
+      task_completed: 'good',
+      chat: 'good',
+      mode_switched: 'good',
+      //: 还缺一步，要人接着做——琥珀。
+      need_more_info: 'warning',
+      need_elder_confirmation: 'warning',
+      need_family_approval: 'warning',
+      duplicate_blocked: 'warning',
+      task_cancelled: 'warning',
+      //: 出事了 / 报错——红。
+      safety_alert: 'bad',
+      error: 'bad',
+    };
     const theme = ((data || {}).ui || {}).theme;
     if (theme && THEME_TONE[theme]) return THEME_TONE[theme];
     const code = (data || {}).code;
-    if (code && code !== 'OK' && code !== 'SUCCESS') return 'warning';
-    return 'good';
+    if (!code) return 'good';
+    //: 认不出来的 code 按 warning——和这一处原来的保守取向一致：
+    //: 宁可让一次成功看起来像「要留意一下」，也不要让一次没办成看起来像办成了。
+    return CODE_TONE[String(code).toLowerCase()] || 'warning';
   }
 
   //: 平台抛的错，和后端写的错，不是一回事。
@@ -668,6 +704,7 @@
       //: （`check_page_runtime` 正是用 `prefers-reduced-motion: reduce` 在量这一页，
       //: 它必须量到最终状态，而不是过渡中间的某一帧）。
       const instant = !document.startViewTransition
+        || document.documentElement.classList.contains('app4-embedded')
         || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (instant) {
         apply();
@@ -735,15 +772,83 @@
     form_assistance: '帮您填表',
   };
 
-  //: 任务状态 → 给人看的话。键必须是 `TaskStatus` 的值。
+  /* ==========================================================================
+     一个状态，一句话——分**自称**和**他称**两份，不是六份
+     ..........................................................................
+     实测（不是读代码，是把六份表并排列出来）：同一个 `TaskStatus`，七个键全都在，
+     分歧纯在措辞。
+
+         状态          common.js  task-detail  app.js    page-family  elder.js  family.js
+         executing     正在办      正在办      正在办理  正在办理     正在办理  正在执行
+         completed     办好了      办好了      交易成功  已办好       已完成并核验 已完成并核验
+         collecting    还在问清楚  还在问清楚  还在准备  还在准备     正在收集信息 正在收集信息
+
+     六份表里没有一个键是六处一致的。而 `completed` 这一行最要紧：同一笔钱办好之后，
+     老人端说「办好了」、凭证页说「交易成功」、家人端说「已完成并核验」——读的人
+     没法判断这是同一件事，也没法判断「交易成功」是不是比「已完成」更强的一句话。
+
+     ## 为什么是两份，不是一份
+
+     状态的措辞里有**一个**真的和读者有关的维度：这件事是不是他自己的。同一个
+     `awaiting_elder_confirmation`，老人在读自己的事时该说「等您复述确认」，
+     家人和评委在读别人的事时该说「等老人复述确认」。合成一份会让其中一边说错话。
+
+     所以标准说法是一对：`STATUS_WORD`（自称）与 `STATUS_WORD_OTHER`（他称）。
+     两份**只允许在提到人的那几个键上不一样**——判据就是照这个建的：
+     两份对同一个键给出不同的话时，其中至少一份必须出现「您」或「老人」，
+     否则那不是称呼差异，那是漂移。`executing` 的「正在办理 / 正在执行」正是这么
+     被抓出来的：两边都没提人，所以它没有理由不一样。
+
+     ## 措辞取哪一份
+
+     取 `elder.js` / `family.js` 那一对——它们是唯一成对设计过的两份（七个键里
+     恰好只有两个提到人的键不同），而且覆盖着最大的两个壳。`executing` 统一成
+     「正在办理」：这个产品对老人说的是「办」，「执行」是工程行话。
+
+     ## /app 那两份字面副本已经收掉了
+
+     这段原先写着「`app/pages/*.html` 不加载 common.js，所以那两份副本留着，
+     由判据钉住」。**那句话现在是假的**：17 个页面各加了一行
+     `<script src="/static/common.js">`（放在自己的脚本之前），
+     `app/assets/js/app.js` 的 `CHAIN_WORDS`(17 条) 与 `CERT_STATE`(7 条)、
+     `page-family-approve.js` 的 `STATUS`(7 条) 与 `STEP`(18 条) 都删了，
+     改成读这一层。留下来的是**配色和图标**（`STATUS_COLOR` / `STEP_ICON`），
+     那不是说法，不该收进词表。
+
+     顺带补上了三十几个码：字面副本只有 17～18 条，这一层的审计表有六十多条，
+     副本时代 `SCHEDULER_TICK` 那类落到兜底「留下一条记录」，现在有话说。
+
+     取值刻意写成直接取 `window.YouHuo.AUDIT_WORD`，**不写
+     `(window.YouHuo && …) || {}`**：那个写法会在这一层没加载时让整条链
+     印出 17 行「留下一条记录」，看起来完全正常；直接取会抛 TypeError，
+     被全局 catch 弹成「操作失败」——看得见。
+
+     一段说明「为什么这里还有副本」的注释，在副本消失之后会让下一个人
+     以为副本还在。那比没有注释糟。
+     ========================================================================== */
+
+  //: 任务状态 → 给人看的话（**自称**：他在读自己的事）。键必须是 `TaskStatus` 的值。
   const STATUS_WORD = {
-    collecting: '还在问清楚',
-    awaiting_elder_confirmation: '等您确认',
-    awaiting_family_approval: '等家人点头',
-    executing: '正在办',
-    completed: '办好了',
-    cancelled: '已经取消',
-    failed: '没办成，已经停下',
+    collecting: '正在收集信息',
+    awaiting_elder_confirmation: '等您复述确认',
+    awaiting_family_approval: '等家人接力',
+    executing: '正在办理',
+    completed: '已完成并核验',
+    cancelled: '已取消',
+    failed: '未成功，已安全停下',
+  };
+
+  //: 同一批状态的**他称**说法：家人、评委在读别人的事。
+  //:
+  //: 和上面那份逐键比对，只有提到人的两个键不同。判据不许出现第三种差异。
+  const STATUS_WORD_OTHER = {
+    collecting: '正在收集信息',
+    awaiting_elder_confirmation: '等老人复述确认',
+    awaiting_family_approval: '等您接力确认',
+    executing: '正在办理',
+    completed: '已完成并核验',
+    cancelled: '已取消',
+    failed: '未成功，已安全停下',
   };
 
   //: 状态 → 语气。只列需要着色的那几个，其余保持中性——这是有意的，
@@ -763,15 +868,464 @@
     return TASK_WORD[String(type || '')] || '这件事';
   }
 
-  /** 任务状态的中文说法。同上，认不出说「还在办」。 */
-  function statusWord(status) {
-    return STATUS_WORD[String(status || '')] || '还在办';
+  /** 任务状态的中文说法。同上，认不出说「还在办」。
+   *
+   * `audience` 是 `'self'`（默认，他在读自己的事）或 `'other'`（家人、评委在读
+   * 别人的事）。**默认值不是随手选的**：`/judge` 与设计三的家人端此前都在调
+   * 无参的这一个，于是屏幕上对家人说「等您确认」——而要确认的人不是她。
+   * 那两处的调用点要显式传 `'other'`；漏传的那一处会在报告里点名。
+   *
+   * 兜底「还在办」不许等于任何一个正常说法：否则「翻译成功」和「翻译失败」
+   * 在屏幕上长得一样。这个形状这个仓库刚栽过一次——`family3.js` 的
+   * `note: '记录'` 和它自己的 `|| '记录'` 撞了，一条没登记的记录和一条
+   * 登记成「记录」的记录再也分不开。判据里有一条专门盯它。
+   */
+  function statusWord(status, audience) {
+    const table = audience === 'other' ? STATUS_WORD_OTHER : STATUS_WORD;
+    return table[String(status || '')] || '还在办';
   }
 
+  /* ==========================================================================
+     审计事件码 → 一句人话。五份表，同一个码没有一处措辞相同
+     ..........................................................................
+     实测把五份并排列出来（`judge.js` 31 条、`family.js` 24 条、
+     `page-family-approve.js` 12 条、`app/assets/js/app.js` 8 条，外加 `trust.js`
+     那份三段式的凭证叙述）：
+
+         TASK_CREATED                  开始办一件事 / 开始办一件事 / 开始办一件事 / 立下这件事
+         ELDER_CONFIRMED               您确认了 / 老人确认了 / 确认了 / 老人确认
+         TEACH_BACK_VERIFIED           复述核对通过 / 复述核对通过 / 复述确认通过 / 她复述通过
+         FAMILY_APPROVAL_RECORDED      家人已点头 / 家人已点头 / 点了同意 / 家人点头，已记下
+         FAMILY_APPROVED_AND_EXECUTED  家人同意后已办好 / 同上 / 同意后办好了 / 家人点头，随即执行
+
+     ## 措辞不是这里发明的，是后端已经有的
+
+     `app_api.py` 里那张 `_WORDS`（40 条）就是这个词表，而且它已经上屏：
+     `GET /app/records` 是后端翻好之后才发给前端的。它自己的注释写着这张表是
+     `SELECT event_type, COUNT(*) FROM audit_events GROUP BY 1` 查库定的案——
+     也就是说它是唯一一份被真实数据校对过的。
+
+     所以这里的措辞**逐字照 `_WORDS`**，判据也是照它对的（不是照这里写的一份清单
+     对——那样就又多了一份会过期的表）。`_WORDS` 没有的码才在这里补，补的那些
+     判据管不到措辞，只管「不许和别处不一致」。
+
+     ## 同样是自称 / 他称一对，而且只有一个键需要分
+
+     `_WORDS` 是给老人自己的记录页写的，通篇只有一处说「您」：`ELDER_CONFIRMED`
+     的「您确认了」。所以他称那份只需要覆盖这一个键。判据要求这个覆盖集**恰好**
+     等于「自称说法里出现「您」的那些键」——多一条是无理由的漂移，少一条是
+     对家人说了「您确认了」。
+     ========================================================================== */
+
+  //: 审计事件码 → 一句人话（**自称**）。前 20 条逐字来自 `app_api.py::_WORDS`。
+  const AUDIT_WORD = {
+    TASK_CREATED: '开始办一件事',
+    ELDER_CONFIRMED: '您确认了',
+    TEACH_BACK_VERIFIED: '复述核对通过',
+    FAMILY_APPROVAL_RECORDED: '家人已点头',
+    FAMILY_APPROVED_AND_EXECUTED: '家人同意后已办好',
+    NOTIFICATION_CREATED: '发出一条通知',
+    //: 这一条曾经是**两边不一样**的：后端 `_WORDS` 写的是「演示数据已就绪」，
+    //: 而「演示」在 `test_app_surface_speaks_no_engineering` 的禁用词表里，
+    //: 逐字照抄会让那道闸门在八个页面上同时变红（一处词，八个参数化）。
+    //: 于是「和后端逐字一致」那条判据留了一个推出来的例外：后端那句话本身
+    //: 含有消费面禁用词时，这里可以改写。
+    //:
+    //: **那个冲突后来是从源头修掉的**，不是靠这个例外一直绕着走——绕不干净：
+    //: 后端那句话经 `/api/v1/records` 直接下发到两个消费面（老人自己的记录页、
+    //: 家人端三「我的」的时间线），而它不经过任何静态文件，静态那道判据
+    //: 一个字节也看不到它。实测在家人端三的时间线上读到过这一行：
+    //:
+    //:     演示数据已就绪     21:44 · 服务
+    //:
+    //: 所以后端那一条也换成了下面这句，两边现在一字不差。看得见它的判据是
+    //: `test_app_records_speak_chinese` 里的
+    //: `test_no_banned_consumer_word_is_translated_onto_the_screen`——
+    //: 它查后端那几张**运行时**词表，不查 HTML。
+    DEMO_SEEDED: '铺好了这个家庭的起始数据',
+    DEMO_LOGIN: '登录了优活',
+    MEDICATION_DOSE_RECORDED: '记了一次服药',
+    MEDICATION_PLAN_DECIDED: '确认了一份用药计划',
+    //: 下面三条逐字照后端 `_WORDS`。主语去掉了——这几个事件的动作人会变
+    //: （`privacy._WHO_FROM_ACTOR` 里都有），写死「家人」会把她自己
+    //: 提的那一条说成家人提的。他称版在下面 `AUDIT_WORD_OTHER` 里，
+    //: 而那张表必须正好是这边含「您」的那一组，所以三条都得在这里。
+    MEMORY_PROPOSED: '想让优活记一件事，等您点头',
+    ITEM_MEMORY_PROPOSED: '想让优活记一件东西，等您点头',
+    MEDICATION_PLAN_PROPOSED: '加了一份用药计划，等您点头',
+    MEMORY_APPROVED: '同意记住一件事',
+    MEMORY_REJECTED: '没有同意记那一件',
+    MEMORY_REVOKED: '让优活忘掉一条',
+    ROUTINES_MATERIALIZED: '排好了接下来的固定安排',
+    ROUTINE_OCCURRENCE_COMPLETED: '完成了一件固定安排',
+    'app.payment.prepared': '发起申请',
+    'app.payment.teach_back': '复述确认',
+    'app.payment.awaiting_family': '等家人确认',
+    'app.emergency.requested': '紧急呼叫',
+    'app.reminder.created': '加了一条提醒',
+    'app.reminder.completed': '办好了一件事',
+    'app.reminder.cancelled': '取消了一条提醒',
+    'app.reminder.moved': '改了提醒的时间',
+    'app.settings.changed': '改了设置',
+    'app.appointment.created': '记下一次就医安排',
+    'app.appointment.cancelled': '取消了一次就医安排',
+    'app.emergency.notify_failed': '紧急呼叫没能通知到家人',
+    'app.contact.phone_set': '登记了紧急联系电话',
+    'app.health.recorded': '记了一次身体数据',
+    'app.medication.decided': '确认了一份用药计划',
+    'app.memory.decided': '决定了一条要不要记',
+    'app.memory.forgotten': '让优活忘掉一条',
+    'app.privacy.erased': '删掉了一批个人数据',
+    'app.routine.created': '加了一件固定安排',
+    'app.routine.paused': '暂停了一件固定安排',
+    'app.routine.resumed': '恢复了一件固定安排',
+    //: 下面这些 `_WORDS` 里没有，但审计链上真的会出现（评委页原先各写一份）。
+    //: 措辞在这里定案，别处不许再起一套。
+    SESSION_CREATED: '开始一次对话',
+    TASK_SLOT_CORRECTED: '更正了其中一项信息',
+    TEACH_BACK_REJECTED: '复述没对上，停在原地',
+    FAMILY_REJECTED: '家人没有同意',
+    FAMILY_APPROVED_EXECUTION_FAILED: '家人同意了，但这件事没办成',
+    FAMILY_REMINDER_CREATED: '家人替您加了一条提醒',
+    TASK_EXECUTED: '这件事办妥了',
+    TASK_FAILED: '没能办成，已安全停下',
+    TASK_CANCELLED: '这件事停下了',
+    TASK_EXPLANATION_VIEWED: '有人调阅了这件事的说明',
+    TASK_PROOF_GENERATED: '生成了一份完成证明',
+    REMINDER_CANCELLED: '取消了一条提醒',
+    SOS_TRIGGERED: '按了紧急求助',
+    SAFETY_SIGNAL: '优活觉得这件事要当心',
+    SEMANTIC_ROUTED: '听出要办的是哪件事',
+    MODE_SWITCHED: '换了交互模式',
+    EMOTIONAL_TASK_PAUSE: '先陪您说话，原来那件事先放着',
+    EMOTIONAL_TASK_RESUMED: '回来接着办原来那件事',
+    SUSPICIOUS_INSTRUCTION_BLOCKED: '挡下了一句可疑的话',
+    VOICE_CONSENSUS_RESOLVED: '有句话没听准，重新对了一遍',
+    SCHEDULER_TICK: '定时巡检走了一遍',
+    PURPOSE_BOUND_POLICY_DECISION: '按目的绑定判定该不该放行',
+    SAFE_ACTION_PREVIEWED: '执行前先预演一遍',
+    RELIANCE_CARD_CREATED: '出了一张托付说明卡',
+    COGNITIVE_LOAD_PLAN_CREATED: '把这一屏的信息量压低',
+  };
+
+  //: 他称的**差集**，不是又一份全表：只列自称说法里说「您」的那些键。
+  //: 判据钉住「这个集合恰好等于自称里带「您」的键集」——所以它不会悄悄长大。
+  const AUDIT_WORD_OTHER = {
+    //: 这三条跟着「去掉写死的主语」那一改一起加。自称版说「等您点头」，
+    //: 家属读别人的事时说「等老人点头」——称呼照 `_WORDS_OTHER` 的约定。
+    MEMORY_PROPOSED: '想让优活记一件事，等老人点头',
+    ITEM_MEMORY_PROPOSED: '想让优活记一件东西，等老人点头',
+    MEDICATION_PLAN_PROPOSED: '加了一份用药计划，等老人点头',
+    ELDER_CONFIRMED: '老人确认了',
+    //: 这两条的自称版说「您」，而说的是老人。家属屏读同一张表时
+    //: 不能对女儿说「您」——做那件事的人不是她。
+    EMOTIONAL_TASK_PAUSE: '先陪老人说话，原来那件事先放着',
+    FAMILY_REMINDER_CREATED: '家人替老人加了一条提醒',
+  };
+
+  //: **这里刻意不配一个 `auditWord()` 取值函数。**
+  //:
+  //: 写过一个，然后删了：没有调用者。共享的是**词表**，不是兜底那句话——每一页
+  //: 认不出来时该说什么不一样，而那不是漂移，是各自的正当选择：
+  //:
+  //:   `/judge`  「（这个步骤还没有中文说法，原值在下面的完整记录里）」
+  //:             ——评委页下面真的有那份完整记录，这句话在指路。
+  //:   `/app`    「留下一条记录」
+  //:             ——老人的凭证页没有「原始记录」那一块，不能许一个不存在的去处。
+  //:
+  //: 所以取值各页自己做（`judge.js` 的 `word(表, 值, 类别, 退回表)`），
+  //: 这一层只提供两张表。一个没人调的导出函数比没有更糟：它看起来像已经统一了，
+  //: 而实际统一没有发生——这个仓库管这叫「declared is not reachable」。
+
+
+  //: 「存下来」——把「优活替我记了些什么」那一屏存成一份文件。
+  //:
+  //: 为什么在这一层：三个老人端界面都渲染这一屏（`elder.js` 服务设计一和设计二，
+  //: `elder3.js` 服务设计三），而后端那句 `message` 对三个都说「可以存下来」。
+  //: 各写一份就是这一轮一直在收敛的那个形状。
+  //:
+  //: **文件里写的必须等于屏幕上看到的。** `renderCounts()` 只印条数 > 0 的行，
+  //: 所以这里用同一条过滤。一份和屏幕不一致的「存下来」，比不能存更糟——
+  //: 她会拿着它去对，而对不上。判据钉的就是这一条。
+  function myDataText(data) {
+    const rows = (data.buckets || []).filter((b) => Number(b.count) > 0);
+    //: 时间直接切后端给的串。它已经是本地钟点带偏移
+    //: （`local_now(generated).isoformat()`），前端再用设备时区算一遍
+    //: 就是这个项目修过的那个缺陷。也因此这里不需要第四个 `Asia/Shanghai` 常量。
+    const when = String(data.generatedAt || '');
+    const day = when.slice(0, 10);
+    const clock = when.slice(11, 16);
+    const out = ['优活替您存着的东西', ''];
+    if (day) out.push(clock ? `导出时间：${day} ${clock}` : `导出时间：${day}`);
+    out.push(`一共 ${Number(data.total) || 0} 条`);
+    out.push('');
+    rows.forEach((b) => out.push(`${b.name}　${b.count} 条`));
+    if (!rows.length) out.push('这几类里现在没有替您存着的记录。');
+    out.push('');
+    if (data.digest) {
+      //: 后端给的摘要是**截断**的（12 位 + 省略号，为了能念出来）。
+      //: 管它叫「核验摘要」等于请人拿它去核验然后失败。
+      out.push(`摘要开头：${data.digest}`);
+      out.push('（只有开头几位，用来对照，不能用它核验。）');
+    }
+    if (data.note) out.push(String(data.note));
+    out.push('');
+    out.push('这一份是那一屏的原样留存，不含逐条记录。');
+    return out.join('\n');
+  }
+
+  //: 存成文件。`a[download]` + blob：CSP 是
+  //: `default-src 'self'; script-src 'self'`，而 `a[download]` 不走取回指令，
+  //: 没有 `download-src` 这种东西——所以它过得去。**但这是推理，不是测量**，
+  //: 所以判据里有一条真在浏览器里点它、看文件名和内容。
+  function saveTextFile(filename, text) {
+    const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    //: 不给它任何类名，也不设 `hidden`。
+    //:
+    //: 第一版写了 `link.className = 'visually-hidden'`——而全仓四份样式表里
+    //: **根本没有这个类**（`base.css` / `components.css` 都查过）。那是一句
+    //: 指向不存在的东西的代码：它不会报错，只会让人以为位置有人管。
+    //: 而 `hidden` 又有另一头的风险：部分内核对不可见元素的 `click()` 不触发下载。
+    //:
+    //: 真正的答案是两者都不需要——挂上、点、摘掉全在同一个同步块里，
+    //: 中间没有一次绘制，所以它从来不会被看见。
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    //: 立刻 revoke 会让部分内核的下载拿到空文件；下一帧再放。
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    return filename;
+  }
+
+  //: 给两个调用方共用的一颗按钮。挂在清单**下面**，不是标题旁边——
+  //: 她读完「都记了我什么」才会想到「那我存一份」。
+  //:
+  //: 形状照这一层里既有的那个：一句 `p.meta` + 一颗 `button`。
+  //: 第一版用的是 `.service-entry`，那是**首页那一排服务卡**的类
+  //: （`min-height:96px`），塞进 `.data-out` 面板里是卡中卡；而这个面板本来就有
+  //: `.data-out button{width:100%;min-height:56px}` 和 `.data-out button.secondary`
+  //: 两条规则，专门为这个位置写的——`startErase` 用的就是它。
+  //: 关键动作 ≥56px 由那条既有规则保证，不用我再声明一遍。
+  function appendSaveMyData(host, data, speak) {
+    //: 一条都没有的时候不出这颗按钮。
+    //:
+    //: 后端在 `total == 0` 那一支说的是「这几类里，优活现在没有替您存任何记录。」
+    //: ——**它没有承诺「可以存下来」**（那句话只在有记录时才说）。所以那时摆一颗
+    //: 「存下来」，是为一个没有做出的承诺加一个控件，存出来的还是一个空文件。
+    //: 这是打开真页面才看见的：新库上那一屏正是 0 条。
+    if (!(Number(data.total) > 0)) return null;
+    const hint = document.createElement('p');
+    hint.className = 'meta';
+    hint.textContent = '存成一个文件，可以给家人看。';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'secondary';
+    button.dataset.do = 'save-my-data';
+    button.textContent = '存下来';
+    /* 每一次按都要有**各自**的回执。
+     *
+     * 原来两次按下去写的是同一个串（`已经存成「${name}」。`），DOM 不变、
+     * 指纹不变、也没有请求——CDP 巡检据此把它报成死控件，而**它没报错**：
+     * 她按了一下不确定成没成、再按一下，屏幕纹丝不动。而第二次是真的又存了
+     * 一个文件（浏览器自动加 `(1)` 后缀）。做了事却什么都不说。
+     *
+     * 所以这里钉的是「随次数变化」这个性质，不是某一句文案。
+     */
+    let saved = 0;
+    button.addEventListener('click', () => {
+      const name = `优活-我的数据-${String(data.generatedAt || '').slice(0, 10)}.txt`;
+      try {
+        saveTextFile(name, myDataText(data));
+      } catch (err) {
+        /* 存不下的时候要说。
+         *
+         * 原来这一句是裸调：`saveTextFile()` 一抛，下面那行回执就不执行，
+         * 屏幕上什么都不变——和「点下去什么都不发生」长得一模一样。
+         * 不提「下载」这个词的失败原因：她要的是下一步能做什么。 */
+        hint.textContent = '这台设备没能存下这个文件。您可以让家人帮您截一张图。';
+        if (typeof speak === 'function') speak('这台设备没能存下这个文件。');
+        return;
+      }
+      saved += 1;
+      hint.textContent = saved === 1
+        ? `已经存成「${name}」。`
+        : `又存了一份，一共存了 ${saved} 次，都在您的下载里。`;
+      if (typeof speak === 'function') {
+        speak(saved === 1 ? '存好了，在您的下载里。' : '又存了一份，都在您的下载里。');
+      }
+    });
+    host.append(hint, button);
+    return button;
+  }
+
+  /* 一条长期记忆要她点头时，屏幕上说的那句话。**两个老人端界面共用这一份。**
+   *
+   * 三样缺一不可：谁看得见（`scope`）、记多久（`daysLeft`）、记它干什么（`purpose`）。
+   * 少任何一样，点头就只是点头，而屏幕上照样是一句通顺的话——
+   * 没有截图、点击遍历或控制台能看出区别。
+   *
+   * 后端给的 `scope` / `sensitivity` **已经是中文**，这里不再翻一遍：
+   * 同一个值两套说法是这个项目栽过的那件事（字号语速和 SOS 各有两份实现）。
+   *
+   * 放在共享层而不是各写一份：`elder3.js` 早就有它，而 `elder.js`
+   * （服务 `/elder` 与 `/elder2`）这一轮才补上同意这一整块。
+   * 复制一份就是让「记多久」在两个界面上有两种算法。 */
+  const noStop = (s) => String(s == null ? '' : s).replace(/[。．.，,、；;：:]+$/, '');
+
+  function memoryWords(m, pending) {
+    const bits = [m.scope];
+    if (typeof m.daysLeft === 'number') {
+      bits.push(pending ? `记住的话，${m.daysLeft} 天后自己忘掉`
+                        : `还会记 ${m.daysLeft} 天`);
+    }
+    if (m.purpose) bits.push(`为的是${noStop(m.purpose)}`);
+    return bits.join(' · ');
+  }
+
+  /* 家人提议让优活长期记住一件事。**她本人点头之后才生效。**
+   *
+   * 在这一条之前 `/v3/memories/propose` 全仓**零个前端消费者**：
+   * 老人端三个界面都能点头、能不点、能逐条收回了，而没有任何界面能提出一条。
+   * 那张「等您点头」的卡片于是在产品里永远不会出现——要看见它得直接打 API。
+   *
+   * 三个枚举用固定的最温和档，不做成下拉：
+   *
+   *     sensitivity: 'preference'    最轻的一档
+   *     scope: 'family_summary'      家人只看得到「有这一条」，看不到内容
+   *     ttl_days                     用后端默认（180 天），屏幕上说清
+   *
+   * 一是这三个枚举的中文说法**在后端**（读模型回的 `scope` 就是中文），
+   * 前端再摆一套下拉就是同一个值两套说法。二是界面上根本不提供
+   * `sensitive` / `family_shared` 这些组合——最重的那几种不该由「家人随手一提」产生。
+   *
+   * @param elderId  这一条要记在谁身上。后端会核它属不属于当前家庭（不属于回 403）。
+   */
+  async function proposeMemory(elderId, {key, detail, purpose}) {
+    return api('/v3/memories/propose', {
+      method: 'POST',
+      body: JSON.stringify({
+        elder_id: elderId,
+        key,
+        //: `value` 后端收 `Any`。装一句人话，不装工程结构：
+        //: 她那一侧读的是 `noStop(m.detail)`，倒一个嵌套对象进去，
+        //: 屏幕上就会出现花括号。
+        value: {说明: detail},
+        sensitivity: 'preference',
+        scope: 'family_summary',
+        purpose,
+      }),
+    }, 'family');
+  }
+
+  /* 把一个「让优活记住一件事」的表单接上去。**两个界面共用这一份。**
+   *
+   * 只吃元素，不吃 id：`/family` 与 `/family2` 用 id，而山水版那一套用 `name`。
+   * 把选择器写死在这里，将来第三个界面接它时就得改这里。
+   *
+   * `notify(话, 语气)` 由调用方给——每个界面把回执写在自己那一处。
+   *
+   * `elderId` **可以传一个函数**，而且在这个项目里必须这么传：
+   * `family.js:2` 是 `let ELDER_ID = 'elder-demo'`，到第 241 行身份解析完才
+   * 被换成真的那个。接线发生在模块顶层，那时候读到的还是占位值——
+   * 冻住它的话，这个表单会一直往 `elder-demo` 身上提议，
+   * 而后端会正确地回 403「老人账户不属于当前家庭」。
+   * 所以下面在**提交那一刻**才解析。
+   */
+  function wireProposeMemory(opts) {
+    const {form, submit, keyInput, detailInput, purposeInput, elderId,
+           notify, after} = opts;
+    if (!form || !keyInput || !detailInput || !purposeInput) return false;
+
+    /* 反复按同一下也要有反应。
+     *
+     * 这一轮已经三次栽在「同一句话赋两遍 → DOM 不动、指纹不动、请求 0」：
+     * 「存下来」按第二次、`showMemories()` 在列表为空时把件数说两遍、
+     * 「同步到他的手机」表单空着连按两次。她之所以再按，正是因为不确定
+     * 刚才那一下有没有算上。
+     *
+     * 记的是「哪一格」而不是一个计数：填好一格再空另一格时，
+     * 第二句不该指着一格她刚填好的。
+     */
+    let lastBlockedBy = null;
+
+    const MISSING = {
+      key: ['要让优活记住的是什么？写一个短名字，比如「看电视的音量」。',
+            '「是什么」那一格还是空的。光标已经放在那儿了，写一个短名字就行。'],
+      detail: ['具体是什么？写一句他看得懂的话，比如「晚上九点之后把声音调小」。',
+               '「具体内容」那一格还是空的。光标已经放在那儿了，写一句话就行。'],
+      purpose: ['记它是为了什么？这一句会原样给他看，比如「提醒时不影响邻居」。',
+                '「为什么」那一格还是空的。光标已经放在那儿了，写一句话就行。'],
+    };
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const key = (keyInput.value || '').trim();
+      const detail = (detailInput.value || '').trim();
+      const purpose = (purposeInput.value || '').trim();
+
+      for (const [name, field, value] of [['key', keyInput, key],
+                                          ['detail', detailInput, detail],
+                                          ['purpose', purposeInput, purpose]]) {
+        if (value) continue;
+        const again = lastBlockedBy === name;
+        lastBlockedBy = name;
+        notify(MISSING[name][again ? 1 : 0], 'warning');
+        field.focus();
+        return;
+      }
+      lastBlockedBy = null;
+
+      once(submit || form.querySelector('[type="submit"]'), async () => {
+        try {
+          //: 在**这一刻**解析，不在接线时（见上面那段说明）。
+          const eid = typeof elderId === 'function' ? elderId() : elderId;
+          const item = await proposeMemory(eid, {key, detail, purpose});
+          /* 回执里**不能**说「记住了」。
+           *
+           * 后端把它存成 `status = "proposed"`，要她本人点头才变 active
+           * （`/v3/memories/decide` 对家人的令牌回 403）。
+           * 一句「已经记住了」会让家人以为这件事办完了——而她那一侧
+           * 还摆着一张等她点头的卡。这一页的全部主张是「说到做到」。
+           */
+          notify(`记下了，在等他点头：「${item.key || key}」。`
+                 + '他在自己那一页会看到这一条，同意了优活才会用；'
+                 + '半年之后它自己忘掉。', 'good');
+          form.reset();
+          if (typeof after === 'function') after(item);
+        } catch (err) {
+          notify(errorWords(err, '这一条').text, 'warning');
+        }
+      });
+    });
+    return true;
+  }
+
+  // One timer per notice. Replacing a message cancels the previous dismissal.
+  const noticeTimers=new WeakMap(), activeNotices=new Set();
+  function dismissNotice(host){clearTimeout(noticeTimers.get(host));host.hidden=true;activeNotices.delete(host);}
+  function showNotice(host,message,{duration=5000}={}){
+    if(!host)return;
+    clearTimeout(noticeTimers.get(host));
+    const text=document.createElement('span');text.textContent=message;
+    const close=document.createElement('button');close.type='button';close.className='notice-dismiss';close.setAttribute('aria-label','关闭提示');
+    close.onclick=()=>dismissNotice(host);
+    host.replaceChildren(text,close);host.hidden=false;host.classList.add('dismissible-notice');activeNotices.add(host);
+    if(duration>0)noticeTimers.set(host,setTimeout(()=>dismissNotice(host),Math.max(duration,Math.min(12000,message.length*100))));
+  }
+  window.addEventListener('hashchange',()=>{for(const host of activeNotices)dismissNotice(host);});
+  window.addEventListener('pagehide',()=>{for(const host of activeNotices)dismissNotice(host);});
+
   window.YouHuo = {
-    ready, login, api, forget, token,
+    ready, login, api, forget, token, showNotice, dismissNotice,
     byId, pretty, VERDICT, verdictOf, renderResult, initSections, once, toneOf,
     errorKind, errorWords,
-    TASK_WORD, STATUS_WORD, STATUS_TONE, taskWord, statusWord,
+    TASK_WORD, STATUS_WORD, STATUS_WORD_OTHER, STATUS_TONE, taskWord, statusWord,
+    AUDIT_WORD, AUDIT_WORD_OTHER,
+    myDataText, saveTextFile, appendSaveMyData,
+    noStop, memoryWords, proposeMemory, wireProposeMemory,
   };
 })();

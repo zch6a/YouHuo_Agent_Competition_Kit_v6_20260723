@@ -1,0 +1,126 @@
+/* Selected proposals: 01,02,04,06,08,10,14,16.
+ * Material follows purpose, never list position. Small controls stay quiet.
+ * Background paint only: no extra focus targets or changes to business state. */
+:root {
+  --surface-paper:linear-gradient(110deg,#fffef9f7 15%,#fffef9d9 62%,#fffef970),url('/static/app4/life-paper.webp') 85% 30% / cover;
+  --surface-jade:radial-gradient(ellipse at 98% 3%,#fff4c9 0,transparent 48%),radial-gradient(ellipse at 0 100%,#c7ddbf 0,transparent 65%),#edf5e8;
+  --surface-cloud:radial-gradient(ellipse at 14% 120%,#fffefa 0 28%,transparent 29%),radial-gradient(ellipse at 84% 132%,#fffefa 0 38%,transparent 39%),linear-gradient(145deg,#f5fbfc,#e7f0f2);
+  --surface-linen:repeating-linear-gradient(0deg,#8c896807 0 1px,transparent 1px 4px),repeating-linear-gradient(90deg,#8c896809 0 1px,transparent 1px 4px),#f7f4e9;
+  --surface-letter:linear-gradient(155deg,transparent 49.5%,#dbd5bd55 50%,transparent 50.5%) right bottom / 130px 44px no-repeat,linear-gradient(205deg,transparent 49.5%,#dbd5bd55 50%,transparent 50.5%) right bottom / 130px 44px no-repeat,#fffcf2;
+  --surface-dew:radial-gradient(circle at 104% 80%,transparent 0 40px,#ffffffb3 41px 42px,transparent 43px 59px,#ffffff80 60px 61px,transparent 62px),radial-gradient(ellipse at 100% 0,#e5edc5,transparent 65%),#f1f7e9;
+  --surface-feather:radial-gradient(circle at 108% -12%,transparent 0 63px,#d5ad6330 64px 70px,#b187a51c 71px 79px,#d5ad6345 80px 81px,transparent 82px),linear-gradient(140deg,#fff9eb,#f7f0ed);
+  --surface-clay:radial-gradient(circle at 105% 85%,transparent 0 28px,#b779592b 29px 30px,transparent 31px 38px,#b7795920 39px 40px,transparent 41px),radial-gradient(#92705d13 .6px,transparent .8px) 0 0 / 5px 5px,#fbefe4;
+  --surface-edge:#d9e1d2;
+  --surface-shadow:inset 0 2px 1px #ffffffa6,0 7px 18px #34452c08;
+}
+
+/* Main screens: paper for arrangements, jade for health, letter for messages. */
+.a4-card, .a4-settings { background:var(--surface-paper); border-color:var(--surface-edge); box-shadow:var(--surface-shadow); border-radius:26px; }
+.a4-slide, .a4-slide.warm { background:var(--surface-paper); border-radius:25px; border-color:#e2dbc4; box-shadow:var(--surface-shadow); }
+.a4-slide.alt { background:var(--surface-jade); border-color:#c9ddc2; border-radius:25px; }
+.a4-slide:has(.a4-metric) { border-radius:25px; }
+.a4-slide::after { opacity:.15; }
+#todayList, #allReminders, #reminders, #errands { background:var(--surface-paper); border-color:#e2dbc4; border-radius:26px; box-shadow:var(--surface-shadow); }
+#medCard, #meds { background:var(--surface-jade); border-color:#c9ddc2; border-radius:28px; box-shadow:var(--surface-shadow); }
+#doneList, .a4-card:has(#dayWord) { background:var(--surface-linen); border-color:#d9d5be; border-radius:24px; box-shadow:inset 0 0 0 5px #ffffff50,0 3px 0 #e5dfcf,0 8px 18px #5b563b09; }
+#newsHome { background:var(--surface-cloud); border-color:#d0e0e1; border-radius:28px; box-shadow:var(--surface-shadow); }
+#newsAll, #inbox { background:var(--surface-letter); border-color:#e2dcca; border-radius:24px; box-shadow:0 4px 0 #e8e5d5,0 9px 15px #645f4009; }
+#newsAll .a4-row + .a4-row, #inbox .a4-row + .a4-row { border-top:1px dashed #d6cfb9; }
+#approveHome, #approveAll { background:var(--surface-feather); border-color:#e6d6bf; border-radius:26px; box-shadow:var(--surface-shadow); }
+#contactList, #people, #familyChips .a4-chip, .a4-card:has(#familySees) { background:var(--surface-clay); border-color:#e8d4c2; border-radius:24px; box-shadow:var(--surface-shadow); }
+#channels { background:var(--surface-dew); border-color:#d2dfc4; border-radius:28px; box-shadow:var(--surface-shadow); }
+.a4-card:has(#meName) { background:var(--surface-feather); border-color:#e5d6c6; border-radius:28px; box-shadow:var(--surface-shadow); }
+.a4-note { border-top-color:#b9cfb4; }
+.a4-row + .a4-row { border-top-color:#d4dccd; }
+
+/* Settings rows have their own material, with a neutral frame between them. */
+.a4-settings { padding:8px; background:#fffefa; }
+.a4-setting { padding:16px 14px; border:1px solid transparent; border-radius:18px; margin:4px 0; background:var(--surface-linen); }
+.a4-settings .a4-setting:last-child { border-bottom:1px solid transparent; }
+.a4-setting[data-feature='reminders'], .a4-setting[data-feature='today'] { background:var(--surface-paper); }
+.a4-setting[data-feature='med'], .a4-setting[data-feature='body'] { background:var(--surface-jade); }
+.a4-setting[data-feature='safety'], .a4-setting[data-feature='trend'] { background:var(--surface-dew); }
+.a4-setting[data-feature='mood'] { background:var(--surface-clay); }
+.a4-setting[data-feature='trust'] { background:var(--surface-feather); }
+.a4-setting[href] { background:var(--surface-cloud); }
+.a4-setting > span:last-child { color:#52705a; }
+
+/* Controls borrow material, without tiny illustrations behind their labels. */
+.a4-btn, .a4-msg .actions button { border:1px solid #dcc995; border-radius:16px; background:linear-gradient(145deg,#fff0bc,#edd89a); box-shadow:inset 0 2px 1px #ffffff80,0 3px 6px #8263270b; }
+.a4-btn.ghost { background:linear-gradient(145deg,#f6fbfc,#e2eef0); border-color:#c8dadd; color:#35576a; }
+.a4-btn.danger, .a4-msg.bot.warn { background:#fbe9e2; border:1px solid #e6c5b8; color:#923c30; }
+.a4-chip { background:var(--surface-clay); border-color:#e8d4c2; border-radius:18px; }
+.a4-pill { border:1px solid #e5d8b5; box-shadow:inset 0 1px 0 #fff9; }
+.a4-pill.ok { border-color:#c0d2bf; }
+.a4-pill.late { border-color:#e7c3b7; }
+.a4-quick button, .a4-search { background:linear-gradient(145deg,#fffefa,#f1eedf); border-color:#dcd6c1; box-shadow:inset 0 2px 1px #fff9; }
+.a4-compose input { background:linear-gradient(#f4f6ee,#fffdf7); border-color:#ccd9c5; box-shadow:inset 0 2px 4px #3c59330a; border-radius:18px; }
+.a4-compose .send { background:linear-gradient(145deg,#39715c,#285342); border:1px solid #285342; box-shadow:inset 0 1px 0 #ffffff35; }
+.a4-compose .talk { border-radius:17px; background:linear-gradient(145deg,#edf6e6,#d8e8cf); border:1px solid #c9dbc1; }
+.a4-msg.bot { background:var(--surface-cloud); border:1px solid #d4e2e0; box-shadow:0 3px 10px #38505a06; }
+.a4-msg.me { background:var(--surface-jade); border:1px solid #cbdcc2; }
+.a4-pet-menu { background:var(--surface-letter); border-color:#dfd7bd; box-shadow:0 12px 36px #1f453326; }
+.a4-pet-menu button { padding:10px; margin-top:5px; border:1px solid #dedccb; border-radius:13px; background:#fffefa99; }
+.a4-pet-menu button:last-child { border:1px solid #dedccb; }
+
+/* Navigation is a quiet cloud tray; its active tab is the jade marker. */
+.a4-tabs { border:1px solid #d2dfd3; border-bottom:0; border-radius:24px 24px 0 0; background:linear-gradient(180deg,#fffefa,#edf3ec); box-shadow:0 -5px 22px #324b3208; gap:3px; }
+.a4-tabs button { border-radius:17px; }
+.a4-tabs button[aria-current='page'] { background:var(--surface-jade); box-shadow:inset 0 1px 0 #fff,0 2px 4px #36582d0b; }
+.a4-tabs button[aria-current='page']::after { display:none; }
+.a4-tabs .a4-nav-voice .orb { width:42px; height:32px; border-radius:12px; background:linear-gradient(145deg,#ffedb6,#eddaa0); border:1px solid #e2ce95; }
+
+/* Full feature pages: the same selected materials, assigned by content. */
+.app4-embedded .family-form, .app4-embedded .care-form,
+.app4-embedded .care-item, .app4-embedded .care-block,
+.app4-embedded .task, .app4-embedded .care-row,
+.app4-embedded .record-row, .app4-embedded .metric-row,
+.app4-embedded .workspace-data-card, .app4-embedded .care-empty,
+.app4-embedded .art-row, .app4-embedded .art-card,
+.app4-embedded .trust-fact, .app4-embedded .promise {
+  background:var(--surface-paper); border-color:#dddcca; box-shadow:var(--surface-shadow);
+}
+.app4-embedded .workspace-intro, .app4-embedded .trust-claim { background:var(--surface-feather); border-color:#e5d6c6; border-radius:26px; box-shadow:var(--surface-shadow); }
+.app4-embedded .habit-row, .app4-embedded .log-item, .app4-embedded .audit-row,
+.app4-embedded[data-view='history'] .task,
+.app4-embedded[data-view='trend'] .care-block { background:var(--surface-linen); border-color:#d9d5be; box-shadow:inset 0 0 0 4px #ffffff50,0 3px 0 #e5dfcf; }
+.app4-embedded .calendar-day { background:var(--surface-paper); border-color:#e2dbc4; box-shadow:var(--surface-shadow); }
+.app4-embedded .calendar-day.today { background:var(--surface-jade); border-color:#abc79e; }
+.app4-embedded[data-view='med'] .care-item,
+.app4-embedded[data-view='med'] .care-block,
+.app4-embedded[data-view='med'] .care-form,
+.app4-embedded[data-view='body'] .care-block,
+.app4-embedded[data-view='body'] .care-item { background:var(--surface-jade); border-color:#c9ddc2; }
+.app4-embedded[data-view='safety'] .care-block,
+.app4-embedded[data-view='safety'] .care-item,
+.app4-embedded[data-view='today'] .care-block,
+.app4-embedded .report-verdict, .app4-embedded .care-verdict,
+.app4-embedded .trust-strip { background:var(--surface-dew); border-color:#d2dfc4; box-shadow:var(--surface-shadow); }
+.app4-embedded[data-view='mood'] .care-block,
+.app4-embedded[data-view='mood'] .care-item,
+.app4-embedded .companion-note, .app4-embedded .fam-link { background:var(--surface-clay); border-color:#e8d4c2; }
+.app4-embedded .digest, .app4-embedded .notice, .app4-embedded .notice-line { background:var(--surface-cloud); border:1px solid #d0e0e1; }
+.app4-embedded .receipt.art-receipt { background:var(--surface-letter); border-color:#e2dcca; box-shadow:0 4px 0 #e8e5d5,0 9px 15px #645f4009; }
+.app4-embedded .receipt-chain { background:var(--surface-linen); border-color:#d9d5be; }
+.app4-embedded .workspace-data-card[data-kind='eraseStart'] { background:#fff0e9; border-color:#e6c5b8; }
+.app4-embedded input:not([type='checkbox']):not([type='radio']), .app4-embedded select, .app4-embedded textarea { background:linear-gradient(#f5f7f0,#fffefa); border-color:#cbd8c4; box-shadow:inset 0 2px 4px #3c59330a; }
+.app4-embedded .family-form > button, .app4-embedded .care-form button[type='submit'], .app4-embedded .contact-primary { background:linear-gradient(145deg,#39715c,#285342); border:1px solid #285342; box-shadow:inset 0 1px 0 #ffffff35; }
+.app4-embedded .secondary, .app4-embedded .care-actions button { background:linear-gradient(145deg,#f4f9ee,#e0edd7); border-color:#c6d8bc; box-shadow:inset 0 1px 0 #fff; }
+.app4-embedded .segmented, .app4-embedded .care-seg { background:linear-gradient(#f1f3e9,#e9efdf); border:1px solid #d3dcc9; box-shadow:inset 0 2px 4px #314b2507; }
+.app4-embedded .segmented button.active, .app4-embedded .segmented button[aria-pressed='true'], .app4-embedded .care-seg button.is-current { background:linear-gradient(145deg,#39715c,#285342); color:white; }
+.app4-embedded .danger, .app4-embedded button.danger { background:#faeae3; border-color:#e6c5b8; color:#943d31; }
+/* Secondary interaction surfaces, including task details and consent. */
+.app4-embedded .task-space, .app4-embedded .confirm-card { background:var(--surface-feather); border:1px solid #e5d6c6; border-radius:26px; box-shadow:var(--surface-shadow); }
+.app4-embedded .reliance-card, .app4-embedded .next-item { background:var(--surface-paper); border:1px solid #dddcca; border-radius:24px; box-shadow:var(--surface-shadow); }
+.app4-embedded .record-bubble, .app4-embedded .report-strip { background:var(--surface-linen); border-color:#d9d5be; border-radius:22px; }
+.app4-embedded .reminder-item { background:var(--surface-paper); border:1px solid #e2dbc4; border-radius:20px; padding:16px; margin:12px 0; }
+.app4-embedded .detail-layer { background:var(--surface-letter); border-color:#e2dcca; border-radius:26px; }
+.app4-embedded .bubble.agent, .app4-embedded .msg { background:var(--surface-cloud); border:1px solid #d0e0e1; }
+.app4-embedded .bubble.user { background:var(--surface-jade); border:1px solid #c9ddc2; }
+.app4-embedded .quick button, .app4-embedded .focus-tool, .app4-embedded .more-btn { background:linear-gradient(145deg,#fffefa,#f1eedf); border:1px solid #dcd6c1; border-radius:15px; box-shadow:inset 0 1px 0 #fff9; }
+.app4-embedded .composer button { background:linear-gradient(145deg,#39715c,#285342); border:1px solid #285342; }
+.app4-embedded .notice.good, .app4-embedded .report-verdict.good { background:#edf5e8; border-color:#bdd2b7; color:#31563f; }
+.app4-embedded .notice.info { background:#fff6df; border-color:#decd9e; color:#725421; }
+.app4-embedded .notice.warning, .app4-embedded .report-verdict.warning { background:#fff0df; border-color:#dfc297; color:#80491e; }
+.app4-embedded .notice.bad, .app4-embedded .report-verdict.bad { background:#fae9e3; border-color:#dfbdb0; color:#8c392d; }
+@media(prefers-reduced-motion:reduce) { .a4-tabs button { transition:none; } }

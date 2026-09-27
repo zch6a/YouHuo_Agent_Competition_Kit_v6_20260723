@@ -11,14 +11,102 @@
 
 //: 版本号必须随本文件的缓存策略一起变。
 //:
-//: 上一版把 /v7/* 当成外壳缓存了下来，那些条目此刻还躺在已安装设备的 v1 缓存里。
+//: 上一版把 v7 那一整棵路径（`/v7/` 底下的全部）当成外壳缓存了下来，那些条目
+//: 此刻还躺在已安装设备的 v1 缓存里。
+//:
+//: 这一行原先写成 `/v7/` 后面直接跟一个通配星号。星号紧贴斜杠就凑出了块注释的
+//: 开记号——凡是「先用正则把块注释整段剥掉」的判据，扫到这一行就从这里开始
+//: 当块注释吃，一直吃到文件后面下一个闭记号为止，中间的代码在它眼里不存在，
+//: 而它会**报绿**。所以这个文件里的路径一律用文字描述，不写贴着斜杠的星号。
+//: 判据在 `test_the_clock_on_screen_comes_from_the_server.py`。
 //: activate 只删除 key 不等于 VERSION 的缓存——不改这个字符串，被污染的条目就会
 //: 一直留着，改了 isApi() 也救不回已经装好的那批。
 //: v8 → v9：外壳清单漏了 `task-space.js`（这个会话早些时候加的），现在又要加
 //: `task-detail.js`。不升这个字符串，已安装的设备会继续用 v8 那份**缺两个模块**
 //: 的清单——而 `elder.js` 是 `type="module"`，一个 import 取不到就是整个模块图
 //: 一起失败，离线的老人端不是降级而是白屏。
-const VERSION = 'youhuo-shell-v10';
+//: v10 → v11：加了美术卡片层（`art-cards.css` + `art-cards.js`，family/care/trust
+//: 三页都引）。不升这个字符串，已安装的设备会继续用 v10 那份缺两个文件的清单——
+//: 缺 JS 是整页白屏，缺 CSS 是卡壳图层没有定位规则，SVG 会以原始尺寸铺满全页。
+//:
+//: ⚠ 上面这三行我第一次写的时候漏了 `//`，只写了 `: v10 → v11…`。
+//: 后果不是「注释格式不好看」——**整个文件语法错误，service worker 从此没装上过**。
+//: `register-sw.js` 结尾是 `.catch(() => {})`，把 `ServiceWorker script evaluation
+//: failed` 完整吃掉，控制台一声不响。浏览器里 `getRegistrations()` 返回 0，
+//: 离线外壳没有、PWA 装不上，而这个文件里每一句关于缓存版本的话都成了空话。
+//: `node --check backend/static/sw.js` 一秒能查出来，而它此前不在任何门里。
+//: v12 → v13：老人端换成 v8 版式，多出 `elder-family-v3.css`（第五层，20KB）。
+//:
+//: **不升这个字符串的后果不只是离线**。用户在浏览器里点进 /elder 看到的还是
+//: 旧版——sw.js 是 stale-while-revalidate（`hit || fetching`），已安装的 worker
+//: 先返回 v12 缓存里的那份 `elder.html`，新版要等下一次启动才生效。
+//: 我装完 v8 之后忘了这一步，用户打开看到的是旧页面，而服务器上明明是新的。
+//: 装任何一次前端包，「改文件」和「让浏览器拿到」是两件事。
+//: v13 → v14：家人端设计二上线（/family2），多出四个文件。
+//: v14 → v15：老人端设计二上线（/elder2），多出四个文件。
+//: 这一页的业务逻辑是 `elder.js`（已在册），它是 `type="module"`——漏缓存
+//: 它 import 的任何一个模块都是整页白屏，不是降级。那几个也早就在册了，
+//: 这里多的只是这一版自己的版式和两份视觉脚本。
+//: v15 → v16：`/elder2` 的验收。两件事都改了缓存里的**内容**而不是清单：
+//:   ① `elder-v6.html` 补上了 manifest / apple 全屏那一套和 `register-sw.js`。
+//:      v15 是为这一页升的，可这一页当时**从不注册 service worker**——外壳
+//:      声明了它，而它自己永远装不上，第一次就直接进 `/elder2` 的人拿不到缓存。
+//:   ② `elder-v6.css` 把主要操作从 48/52 抬到 56（设计一那批同名控件量出来是 56），
+//:      并给 `.segmented button` 补 `min-width`（「慢」「大」实测 37×48，低于下限）。
+//: 清单一条没变，所以「漏文件」那种检查看不出区别——但 stale-while-revalidate
+//: 会先把 v15 缓存里的旧 HTML/CSS 返回去，用户看到的还是 37px 那一版。
+//: 「改文件」和「让浏览器拿到」是两件事，这个文件上面第 37 行已经为同一件事写过一次。
+//: v16 → v17：`isApi()` 漏掉了整个 `/api/v1` 层（50 个端点）。
+//: 已安装的 worker 缓存里躺着一批 `/api/v1` 的旧响应，`activate` 只删 key 不等于
+//: VERSION 的缓存——不升这个字符串，改了 `isApi()` 也救不回已经装好的那批，
+//: 而它们会继续把「上一次的答案」交给老人。详见下面 `isApi()` 上面那段。
+//: v17 → v18：设计三（网页端）上线，`/elder3` 与 `/family3`。
+//: 这一版**不共用**设计一二的业务脚本——它是另一套 DOM，接线是
+//: `elder3.js` / `family3.js`。清单里因此多出两页 HTML、两份接线、两份接线样式，
+//: 外加交付包自己的 CSS/JS 与两页共用的 `v3/`（飞鹤动画 2.2 MB + 国风麦克风）。
+//: 漏掉 `v3/crane-animation-master.js` 不是"少个动画"：它是 `<script src>`，
+//: 离线时取不到就是一次加载失败，后面的接线脚本照跑，但飞鹤那一层不存在。
+//: v18 → v19：「家人加的药等老人点头」这条流程两头都接上了，动到的是
+//: `elder.js` `elder3.js` `family3.js` `family3-wiring.css` —— **四份全在下面
+//: 的预缓存清单里**。不升这个字符串，已经装过这个站点的浏览器会继续拿 v18
+//: 缓存里的旧接线：家人端那个加药入口根本不存在，老人端也不会问她要不要吃，
+//: 而**页面看起来完全正常**。这个项目已经为同一件事栽过两次（37px 那一版、
+//: `/api/v1` 的旧响应），这是第三次写同一条注释。
+//: v19 → v20：设计三补齐了「我的数据」四条、玻璃盒、记一次已吃/没吃、
+//: 记一次身体数据。动到 `elder-v3.html` `elder3.js` `elder3-wiring.css`
+//: `family3.js` `family3-wiring.css`——五份全在下面的清单里。
+//: 玻璃盒走的是**动态 `import('/static/glassbox.js')`**，那份也早在清单里，
+//: 漏了它不是「少张卡」：弱网下 import 直接 reject，走进 catch 把卡收掉，
+//: 屏幕上什么都不会少，只是那张卡再也不出现。
+//: v20 → v21：设计三补上最后三条（措辞适配 `/v6/interaction/plan`、
+//: 一件事的经过 `/v2/tasks` + `task-detail.js`、优活给家人的消息
+//: `/v2/notifications`）。后两条也走动态 `import()`，两份模块都早在清单里。
+//: v21 → v22：`judge.js`（失败不再印成绿的、不再印 `Failed to fetch`）和
+//: `family3.js`（照护屏那句概括真的换掉）都改了。不升这个字符串，
+//: 回访的人第一次打开拿到的还是缓存里的旧脚本——审计页照旧把失败印成绿的，
+//: 而我这边看新装的浏览器一切正常。
+//: v22 → v23：山水版的 `app.js` / `page-settings.js` 改了（问候语按时段、
+//: 字号样例不再是一句编出来的服药指令）。
+//:
+//: 这两个文件**不在 `SHELL` 预缓存清单里**，一眼看上去像是不受这里影响——
+//: 不是。下面的 fetch 处理器拦截**所有**非 API 的同源 GET，命中就先给缓存
+//: （`return hit || fetching`），没命中也会 `cache.put` 存下来。也就是说
+//: 十七页 app 的脚本是**运行时被缓存**的，回访的人第一次打开拿到的是旧的。
+//: 而 `activate` 只保留 key === VERSION 的那一份，所以升号才会把它们清掉。
+//: v24 → v25：评委会打开的三页都改了——`trust.js`（失败不再印成绿、印章现在
+//: 受链自校验管）、`judge.js`（两处漏网的原始异常）、`proof-demos.js`（27 处
+//: 原始异常 + 状态行语气）。三个都在下面的 `SHELL` 预缓存清单里。
+//:
+//: 不升号，回访的评委第一次打开拿到的还是缓存里的旧脚本——失败照旧印成绿的，
+//: 而我这边看新装的浏览器一切正常。这个项目为同一个形状付过一次代价。
+//: v25 → v26：两个演示页变成「真 App」。`elder-v6.html` / `family-v6.html` 的头换了
+//: （各自的安装清单与图标、`app-bridge.js`），`speech.js` 改成整句送去念、共用一个
+//: 播放器，`elder.js` 的声音小标签认得云端了，`control-states.css` 加了 App 手感那几条。
+//: 全在外壳里；不升号，回访的人拿到的是旧头——装到主屏还是旧版的老人端。
+//: 另：`isApi()` 加了 `download`（安卓安装包），理由见那里。
+//: v26 → v27：第四套「像个真 App」的两端上线（/elder4、/family4），多出九个文件。
+//: v27 → v28：第四套加质感层：原创插画五张、霞鹜文楷子集字体。
+const VERSION = 'youhuo-shell-v63';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:
@@ -37,6 +125,62 @@ const SHELL = [
   '/static/base.css',
   '/static/components.css',
   '/static/pages.css',
+  // 美术卡片层。CSS 和 JS 都要在：JS 缺了是整页白屏（闸门
+  // `test_shell_covers_every_module` 抓的就是这一条），CSS 缺了更隐蔽——
+  // 卡壳 `<img>` 还会被插进 DOM，只是没有 `position:absolute`，
+  // 于是一张 156KB 的山水图以原始尺寸把整页推开。
+  '/static/art-cards.css',
+  '/static/art-cards-family.css',
+  // 老人端 v8 的第五层。漏缓存它，离线时 /elder 会少掉一整层版式规则——
+  // 而那一层管的是壳结构、麦克风区和四个面板的排布，缺了不是"样式差一点"，
+  // 是回到没有布局的裸文档流。
+  '/static/elder-family-v3.css',
+  // 家人端设计二（/family2）。四屏合一的壳，和设计一并行。
+  // 业务逻辑共用 family.js / care.js，这里只多出它自己的版式和视觉脚本。
+  '/family2',
+  '/static/family-v6.html',
+  '/static/family-v6.css',
+  '/static/family-v6-a.js',
+  '/static/family-v6-b.js',
+  // 老人端设计二（/elder2）。同样只多出它自己的版式和两份视觉脚本——
+  // 业务逻辑走的是已经在册的 `elder.js` 那一整条 import 链。
+  '/elder2',
+  '/static/elder-v6.html',
+  '/static/elder-v6.css',
+  '/static/elder-v6-a.js',
+  '/static/elder-v6-b.js',
+  // 老人端 / 家人端**设计三 · 网页端**（/elder3 /family3）。
+  //
+  // 和设计二不同：这两页不共用 `elder.js` / `family.js`，它们是另一套 DOM，
+  // 接线各自一份。交付包自己的 CSS 很大（2.3 MB / 1.6 MB，内联了美术），
+  // 但那正是这一版的全部价值，缺了就是一张没有画的纸。
+  '/elder3',
+  '/static/elder-v3.html',
+  '/static/elder3.js',
+  '/static/elder3-wiring.css',
+  '/static/elder3/app-01.css',
+  '/static/elder3/page-motion-and-ui.js',
+  '/static/elder3/yoli-mascot.js',
+  '/family3',
+  '/static/family-v3.html',
+  '/static/family3.js',
+  '/static/family3-wiring.css',
+  '/static/family3/style-01.css',
+  '/static/family3/script-01.js',
+  '/static/family3/script-02.js',
+  '/static/family3/script-03.js',
+  '/static/family3/script-04.js',
+  '/static/family3/script-05.js',
+  '/static/family3/script-06.js',
+  '/static/family3/script-07.js',
+  '/static/family3/script-08.js',
+  '/static/family3/script-09.js',
+  '/static/family3/script-11.js',
+  '/static/family3/script-12.js',
+  // 两页共用。飞鹤动画在两个交付包里字节一致，装一份。
+  '/static/v3/crane-animation-master.js',
+  '/static/v3/mic-guofeng.png',
+  '/static/art-cards.js',
   '/static/landing.js',
   // 首页这一轮换了新设计，多出两个文件。两个都必须在这里：
   //   landing.css    离线时缺它 = 首页裸奔（它是这一页专属的第五层样式）
@@ -79,6 +223,69 @@ const SHELL = [
   '/static/icons/icon-512.png',
   '/static/icons/icon-192-maskable.png',
   '/static/icons/icon-512-maskable.png',
+  // 两个演示页各自的安装清单和图标（它们不再引上面那份共用的）。
+  // 页面请求的就是这几个完整 URL——缓存按完整 URL 索引，写错一个字就是离线首装缺图标。
+  '/static/manifest-elder2.webmanifest',
+  '/static/manifest-family2.webmanifest',
+  // 第四套（/elder4、/family4）：两页 + 共用的样式、图标、底子 + 各自的接线。
+  '/elder4',
+  '/family4',
+  '/static/app4/app4.css',
+  '/static/app4/life-elder.webp',
+  '/static/app4/life-family.webp',
+  '/static/app4/quiet-leaf.svg',
+  '/static/app4/life-icons.webp',
+  '/static/app4/life-paper.webp',
+  '/static/app4/icons.svg',
+  '/static/app4/core4.js',
+  '/static/app4/youhuo-logo.png',
+  '/static/manifest-app4.webmanifest',
+  '/static/app4/shell4.js',
+  '/static/app4/workspace4.js',
+  '/static/app4/workspace4.css',
+  '/static/app4/surfaces4.css',
+  '/static/app4/type4.css',
+  '/static/app4/journal4.css',
+  '/static/app4/avatar-son.svg',
+  '/static/app4/portrait-son.png',
+  '/static/app4/portrait-daughter.png',
+  '/static/app4/portrait-community.png',
+  '/static/app4/avatar-daughter.svg',
+  '/static/app4/avatar-community.svg',
+  '/static/app4/trust-workspace.html',
+  '/static/app4/elder-workspace.html',
+  '/static/app4/family-workspace.html',
+  '/static/app4/pet4.js',
+  '/static/app4/pet-hub4.js',
+  '/static/app4/pet-fan4.js',
+  '/static/app4/pet-chatter4.js',
+  '/static/app4/pet-art4.css',
+  '/static/app4/pet4.css',
+  '/static/app4/xiaoyou/poster.webp',
+  '/static/app4/pet-art4.js',
+  '/static/app4/elder4.js',
+  '/static/app4/family4.js',
+  '/static/app4/art-sun.svg',
+  '/static/app4/art-leaf.svg',
+  '/static/app4/art-home.svg',
+  '/static/app4/scene-grandpa.svg',
+  '/static/app4/scene-daughter.svg',
+  '/static/app4/wenkai-medium.woff',
+  '/static/manifest-elder4.webmanifest',
+  '/static/manifest-family4.webmanifest',
+  '/static/icons/elder-192.png',
+  '/static/icons/elder-512.png',
+  '/static/icons/elder-maskable-192.png',
+  '/static/icons/elder-maskable-512.png',
+  '/static/icons/elder-apple-180.png',
+  '/static/icons/family-192.png',
+  '/static/icons/family-512.png',
+  '/static/icons/family-maskable-192.png',
+  '/static/icons/family-maskable-512.png',
+  '/static/icons/family-apple-180.png',
+  // 安卓外壳的网页一侧。两页都在 <head> 里同步加载它：离线时缺它是一个 404，
+  // 页面照常（它在浏览器里本来就什么都不做），但在 App 里就少了朗读和听写。
+  '/static/app-bridge.js',
 ];
 
 self.addEventListener('install', event => {
@@ -107,9 +314,38 @@ self.addEventListener('activate', event => {
  * top of this file says must never happen: a family member could have been
  * shown yesterday's 日报 and told nothing was unusual. Matching /v\d+/ means a
  * future version cannot reintroduce the bug by being forgotten here.
+ *
+ * ⚠ 而它**还是又发生了一次**，就在这段注释底下。
+ *
+ * `/api/v1` 那一层（老人端门面，50 个端点）是后来加的，它以 `/api/` 开头，
+ * `^\/(v\d+|…)` 一个都不匹配——于是整层被当成外壳缓存，走
+ * stale-while-revalidate（`hit || fetching`：先把上一次的响应交出去）。
+ *
+ * 实测（同一个访客、四次调用，真实状态 59 → 59 → 0）：
+ *
+ *     GET /api/v1/privacy/data      →  0     ← 上一次的
+ *     POST /privacy/erase/preview   →  59    ← POST 不走缓存，是真的
+ *     POST /privacy/erase           →  删掉 59 条，库里核实过：真删了
+ *     GET /api/v1/privacy/data      →  59    ← 又是上一次的
+ *
+ * 屏幕上的效果是：老人删完自己的数据，页面告诉他**一条都没删**。
+ * 这正是本文件开头那句「serving a stale copy … would be the one failure this
+ * product is built to avoid」，而且发生在最需要信任的那条路径上。
+ *
+ * 写操作没受影响（下面 `request.method !== 'GET'` 早退），受影响的全是读。
+ * 但「读到旧的」在这个产品里不是小问题：日报、用药、亲友、隐私清单都是读。
+ *
+ * 加 `api`。同时**必须升 VERSION**——已安装的 worker 缓存里躺着一批
+ * `/api/v1` 的旧响应，`activate` 只删 key 不等于 VERSION 的缓存，
+ * 不升的话改了这个函数也救不回已经装好的那批。这一条上面第 14 行说过一次。
+ *
+ * `download`：安卓安装包（`/download/youhuo-elder.apk` 这类）。它不是权威状态，
+ * 但和权威状态有同一个要求——**必须是最新的**。走外壳缓存的话，发了新版以后
+ * 队友点下载，拿到的是缓存里上一版（stale-while-revalidate 先交旧的），装完一看
+ * 什么都没变。放行给网络，而且不占缓存（一个几百 KB 的包没有理由存两份）。
  */
 function isApi(url) {
-  return /^\/(v\d+|health|ping|docs|redoc|openapi)(\/|$|\.)/.test(url.pathname);
+  return /^\/(v\d+|api|health|ping|docs|redoc|openapi|download)(\/|$|\.)/.test(url.pathname);
 }
 
 self.addEventListener('fetch', event => {
@@ -146,3 +382,5 @@ self.addEventListener('fetch', event => {
     }),
   );
 });
+
+

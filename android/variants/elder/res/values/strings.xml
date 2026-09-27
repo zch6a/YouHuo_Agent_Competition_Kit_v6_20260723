@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- @BASE_URL@ 由 build_apk.py 填（默认是公网那个演示地址，换服务器只改一个参数）。 -->
+<resources>
+    <string name="app_name">优活老人</string>
+    <string name="role">elder</string>
+    <string name="start_url">@BASE_URL@/elder2</string>
+    <string name="offline_title">连不上优活</string>
+    <string name="offline_body">请看看手机有没有连上网。\n连上以后，点下面的按钮再试一次。</string>
+    <string name="offline_retry">再试一次</string>
+    <string name="channel_name">提醒</string>
+    <string name="channel_desc">吃药、复查、办事的提醒</string>
+    <string name="notify_more">%1$s（还有 %2$d 条）</string>
+    <string name="saved_to_downloads">已经存到手机的「下载」里：%1$s</string>
+    <string name="saved_to_path">已经存好了：%1$s</string>
+    <string name="save_failed">没存成，请再试一次。</string>
+</resources>

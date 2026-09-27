@@ -24,6 +24,28 @@
 
 const statusEl = document.querySelector('#judgeStatus');
 
+/** 状态行：**文字和颜色一起换**。
+ *
+ * `judge.html:102` 上写死了 `class="notice good"`，而这一页的五处写入
+ * 只改 `textContent`。于是：
+ *
+ *     boot() 失败                    错误消息      印成**绿的**
+ *     run() 里任何一步失败            错误消息      印成**绿的**
+ *     整条家庭链自校验没通过          「没通过」    印成**绿的**
+ *
+ * 这是**审计页**——它存在的全部意义就是「不对的时候要看得出来」。
+ * 一句「没通过」配一条绿边，比不显示更糟：它把一个失败讲成了一个成功。
+ *
+ * 顺带：状态不只靠颜色。这三处的文字本身就说清了通过与否
+ * （「没通过」「取不到」），颜色是第二条通道，不是唯一那条。
+ */
+function setStatus(text, tone) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.classList.remove('good', 'bad', 'warning', 'info');
+  if (tone) statusEl.classList.add(tone);
+}
+
 /** 身份、登录、401 重放都在 common.js 里。
  *
  * 只要家属身份：审计链（`/v2/audit`）和运行指标（`/v5/metrics`）都只对绑定家属开放，
@@ -71,10 +93,15 @@ function bindControls() {
   document.querySelector('#tabRuntime').addEventListener('click', onTab);
   document.querySelector('#tabTests').addEventListener('click', onTab);
 }
-// `#txnGo` 不在上面：它是这个表单的提交按钮（**刻意不写 type**，这样
-// `components.css` 那条 `form > button:not([type])` 会给它 56px 的关键操作触控高度）。
-// 给它再挂一个 click 就会和 submit 各跑一次，同一笔事务连取两遍。它的禁用与恢复在
-// `busy()` 里；`#txnId` 由 `wantedId()` 读，两者都不需要自己的监听器。
+// `#txnGo` 不在上面：它是这个表单的提交按钮（不写 type，`<button>` 在 `<form>` 里
+// 默认就是提交）。给它再挂一个 click 就会和 submit 各跑一次，同一笔事务连取两遍。
+// 它的禁用与恢复在 `busy()` 里；`#txnId` 由 `wantedId()` 读，两者都不需要监听器。
+//
+// 这里原先写着「刻意不写 type，这样 `components.css` 的 `form > button:not([type])`
+// 会给它 56px 的关键操作触控高度」。**两个前提都不成立**：HTML 里它写着
+// `type="submit"`，而且它在 `.controls` 里、从来不是 `<form>` 的直接子元素——
+// 那条规则一次都没有选中过它。一段描述着不存在机制的注释，比没有注释更贵：
+// 下一个人会以为这个高度有人管着。它拿的是 48px 触控下限，对「读一笔」是对的。
 
 //: 六格系统面板：格子按钮 → 面板 → 出处说明 → 落点表里的哪一行。
 //:
@@ -101,6 +128,7 @@ const state = {
   picked: null,     // 时间轴上选中的那一条（审计记录的序号）
   truth: null,      // /v5/capability-truth 的缓存，安全与测试两格共用
   loaded: new Set(),// 已经取过的系统格，切回来不重取
+  contextReads: 0,  // 调阅这一笔之后，这一页自己往链上写了几条调阅记录
 };
 
 /* --- 翻译层 ---------------------------------------------------------------
@@ -110,43 +138,19 @@ const state = {
  * 原值都在同一块下面那份可展开的完整记录里。
  */
 
-//: 审计事件码 → 这一步在人话里叫什么。
+//: 审计事件码 → 这一步在人话里叫什么。**表已经搬到 `common.js`**。
+//:
+//: 这一页原先自己拿着 31 条。实测把五份并排列出来：同一个码，五处里没有一处
+//: 措辞相同——`TASK_CREATED` 在这里叫「立下这件事」，在 `family.js` /
+//: `page-family-approve.js` / `app.js` 叫「开始办一件事」，而后端 `app_api.py`
+//: 的 `_WORDS`（那张是查库定案的、而且已经通过 `/app/records` 上屏）也叫
+//: 「开始办一件事」。也就是说这一页是那个四比一里的一。
+//:
+//: 措辞现在逐字来自 `common.js::AUDIT_WORD`，而它又被判据钉在 `_WORDS` 上。
+//: 这一页是**他称**（评委在读别人的事），所以传 `'other'`。
 //:
 //: 这张表刻意不含任何任务状态键（`collecting` / `executing` …）：那一套由
 //: `window.YouHuo.statusWord()` 统一负责，各页各抄一份正是这个项目漂过的地方。
-const EVENT_WORD = {
-  SESSION_CREATED: '开始一次对话',
-  SEMANTIC_ROUTED: '听出她要办什么',
-  TASK_CREATED: '立下这件事',
-  TASK_SLOT_CORRECTED: '更正了其中一项信息',
-  COGNITIVE_LOAD_PLAN_CREATED: '把这一屏的信息量压低',
-  SAFE_ACTION_PREVIEWED: '执行前先预演一遍',
-  PURPOSE_BOUND_POLICY_DECISION: '按目的绑定判定该不该放行',
-  SUSPICIOUS_INSTRUCTION_BLOCKED: '拦下一条可疑指令',
-  VOICE_CONSENSUS_RESOLVED: '两路识别打架，取共识',
-  TEACH_BACK_VERIFIED: '她复述通过',
-  TEACH_BACK_REJECTED: '她复述没通过，停在原地',
-  ELDER_CONFIRMED: '老人确认',
-  FAMILY_APPROVAL_RECORDED: '家人点头，已记下',
-  FAMILY_APPROVED_AND_EXECUTED: '家人点头，随即执行',
-  FAMILY_APPROVED_EXECUTION_FAILED: '家人点头了，但没能执行',
-  FAMILY_REJECTED: '家人不同意',
-  FAMILY_REMINDER_CREATED: '家人建了一条提醒',
-  TASK_EXECUTED: '这件事办妥了',
-  TASK_FAILED: '没能办成，已安全停下',
-  TASK_CANCELLED: '这件事停下了',
-  NOTIFICATION_CREATED: '发出一条通知',
-  SCHEDULER_TICK: '定时巡检走了一遍',
-  RELIANCE_CARD_CREATED: '生成一张给她看的说明卡',
-  TASK_EXPLANATION_VIEWED: '有人调阅了这件事的说明',
-  TASK_PROOF_GENERATED: '生成了一份完成证明',
-  MODE_SWITCHED: '换了交互模式',
-  EMOTIONAL_TASK_PAUSE: '察觉情绪不对，先停一停',
-  EMOTIONAL_TASK_RESUMED: '情绪平复，接着办',
-  SAFETY_SIGNAL: '一条安全信号',
-  DEMO_LOGIN: '一次沙箱登录',
-  DEMO_SEEDED: '铺好了一套沙箱数据',
-};
 
 //: 会改变这一笔去向的那些步骤。「只看关键步骤」留下的就是它们。
 //:
@@ -196,15 +200,151 @@ const METRIC_WORD = {
   trace_errors: '记下的错误条数',
 };
 
-/** 查表。认不出说认不出，**不回落到原值**。 */
-function word(table, value, kind) {
-  return Object.prototype.hasOwnProperty.call(table, String(value))
-    ? table[String(value)]
-    : `（这个${kind}还没有中文说法，原值在下面的完整记录里）`;
+//: `/v5/.../explain` 的 `what_i_understood` 里那些槽位名。
+//:
+//: 后端把它拼成 `键：值` 的字符串再发过来（`v5_services.py:706`），所以屏幕上是
+//: 「任务类型：bill_payment」「amount_cents：6840」——**一个英文枚举值加两个英文
+//: 字段名**，就在「系统听懂了什么」这一格里。文件头第二条说的就是这件事。
+//:
+//: 只翻**认得的**键，认不出的连键带值原样留着：这一格叫「系统听懂了什么」，
+//: 少列一条比改写一条糟得多，而原值本来就在下面那份完整记录里。
+//:
+//: 「任务类型」这个键**不在表里**，是有意的：它本来就是中文，改写它只是换个说法，
+//: 而这一格的缺陷从来不是它——是它的**值**（`bill_payment`）。值由 `slotLine`
+//: 单独过一遍 `taskWord`。
+const SLOT_WORD = {
+  amount_cents: '金额（分）',
+  amount_yuan: '金额（元）',
+  bill_type: '账单种类',
+  bill_id: '账单编号',
+  period: '所属月份',
+  hospital: '医院',
+  department: '科室',
+  appointment_date: '号源日期',
+  appointment_time: '号源时间',
+  due_date: '到期日',
+  due_time: '到期时刻',
+  title: '标题',
+  goal: '她说的目标',
+  teach_back_attempts: '复述了几遍',
+  family_approved: '家人点过头了吗',
+  family_approval_count: '几位家人点过头',
+  //: 这三个是**驱动一笔缴费**真的会出现、而这张表原先没有的。
+  //: `family_approved` 的孪生兄弟 `elder_confirmed` 就在隔壁，
+  //: 一个有词一个没有——和 KNOWN_ISSUES 第 306 条那两条兄弟模式
+  //: 是同一个形状。
+  elder_confirmed: '老人自己确认过了吗',
+  family_approver: '点头的那位家人',
+  company: '缴费单位',
+  //: 只在家属点头**之前**那张卡上——点头后多出来的三个审批字段
+  //: 把它挤出了那 12 条。判据原先只看点头后那一张，所以看不见它。
+  payment_request_id: '付款请求编号',
+};
+
+//: **明写的「故意留原样」名单。**
+//:
+//: 上面那段说的「认不出的键连键带值原样留着」是个有意的决定，
+//: 但**哪些是有意留的**必须写下来——否则「有意」和「漏了」
+//: 在屏幕上长得一模一样，而这一格是评委真的会读的一格。
+//:
+//: 这三个都是工程量，不是「系统从她那儿听懂的」东西：
+//: 64 位任务图指纹、老人确认串的哈希、内部交错置信度。
+//: 原值在下面那份完整记录里，那才是它们的位置。
+//:
+//: 判据 `test_the_judge_card_names_every_slot_it_shows` 两头都查：
+//: 驱动出来的每个键要么在 `SLOT_WORD` 里、要么在这份名单里，
+//: 两份名单不许重叠。新长出来的键会让它红——那时要做一次决定，
+//: 而不是默默落到原值。
+const SLOT_RAW_ON_PURPOSE = new Set([
+  'task_graph_digest',
+  'elder_confirmation_hash',
+  'interleaving_confidence',
+]);
+
+//: 后端那一串是 Python 拼的，所以布尔值到屏幕上是 `True` / `False`
+//: ——**Python 的写法，连 JS 的 `true` 都不是**。实测「家人点过头了吗」
+//: 这一行印的是「家人点过头了吗：True」。
+const BOOL_WORD = {True: '是', False: '不是', true: '是', false: '不是'};
+
+//: 确认表上那个决定。取值只有两个，`engine.py:1505` 写 `reject`、
+//: `engine.py:1529` 写 `approve`，别处不写——所以这张表是封闭的，
+//: 判据两头都查。
+const VOTE_WORD = {approve: '点了头', reject: '没有同意'};
+
+/** 查表。认不出说认不出，**不回落到原值**。
+ *
+ * `base` 是可选的第二张表，先查 `table` 再查它。审计事件码的说法分自称 / 他称
+ * 两份，而他称那份只列**提到人的那几个键**（当前只有 `ELDER_CONFIRMED`）——
+ * 让它退到自称那份上，比再抄一份全表安全：抄的那份会漏掉后来新增的码，
+ * 而漏掉的表现是屏幕上一句「还没有中文说法」，不是报错。
+ */
+function word(table, value, kind, base) {
+  const key = String(value);
+  if (Object.prototype.hasOwnProperty.call(table, key)) return table[key];
+  if (base && Object.prototype.hasOwnProperty.call(base, key)) return base[key];
+  return `（这个${kind}还没有中文说法，原值在下面的完整记录里）`;
 }
 
 function eventWord(type) {
-  return word(EVENT_WORD, type, '步骤');
+  return word(window.YouHuo.AUDIT_WORD_OTHER, type, '步骤', window.YouHuo.AUDIT_WORD);
+}
+
+/** 后端拼好的一行 `键：值`，把认得的部分翻成中文。
+ *
+ * 第一条永远是 `任务类型：<TaskType 枚举>`，所以它的**值**也要翻——那是这一格里
+ * 唯一一个走到屏幕上的英文枚举值，其余是字段名。
+ * 认不出的键原样留下：这一层是翻译，不是过滤。
+ */
+function slotLine(line) {
+  const text = String(line == null ? '' : line);
+  const cut = text.indexOf('：');
+  if (cut < 0) return text;
+  const key = text.slice(0, cut);
+  const rest = text.slice(cut + 1);
+  const name = Object.prototype.hasOwnProperty.call(SLOT_WORD, key) ? SLOT_WORD[key] : key;
+  //: 值那一侧也要看一眼：`任务类型` 的值是英文枚举（早就在翻），
+  //: 而布尔槽位的值是 Python 的 `True` / `False`。两者都是
+  //: 「界面上不许出现英文枚举值」这条红线管的东西。
+  const shown = key === '任务类型'
+    ? window.YouHuo.taskWord(rest)
+    : (Object.prototype.hasOwnProperty.call(BOOL_WORD, rest)
+        ? BOOL_WORD[rest] : rest);
+  return `${name}：${shown}`;
+}
+
+/** 确认表上的一行 `actor_id：decision`，翻成人话。
+ *
+ * 后端把它拼成字符串再发（`v5_services.py` 的 `ExplanationCard.build`），
+ * 于是这一格原样印着 `daughter-demo：approve`——**一个工程标识加一个
+ * 英文枚举值**，就在「谁在确认表上点过头」这个中文小标题底下。
+ *
+ * 这一页的 `actorWord()` 早就有了，审计流水那两处一直在用，
+ * 只有这一格没接上。**一件事两条路、只修一条**，`privacy.py` 里那段
+ * 注释说的就是这个仓库最常见的失败。
+ *
+ * 种子数据的投票表是空的，所以默认演示里这一行是「尚无确认记录」——
+ * 这条路只有在**真的有人点过头之后**才出声。没有「：」的那两句
+ * （「尚无确认记录」「仍有确认步骤未完成」）原样返回。
+ */
+function confirmLine(line) {
+  const text = String(line == null ? '' : line);
+  const cut = text.indexOf('：');
+  if (cut < 0) return text;
+  return `${actorWord(text.slice(0, cut))}：`
+    + word(VOTE_WORD, text.slice(cut + 1), '决定');
+}
+
+/** 「第 N 档（共 4 档）」，**N 真的是个数才说**。
+ *
+ * 两处原先都是裸插值（`第 ${card.risk_level} 档`、`第 ${state.task.risk_level} 档`）。
+ * 这一页此前印过一次 `第 undefined 次通过` 的同门缺陷就在隔壁 `/trust` 上，
+ * 而这两处的字段来自两个不同的接口，任一个改形状都会以同样的方式漏出来。
+ */
+function riskWords(level) {
+  const n = Number(level);
+  return Number.isFinite(n)
+    ? `第 ${n} 档（共 4 档，档位越高越要人来定）`
+    : '这一条上没有记下风险档位';
 }
 
 /** 这一条是谁做的。
@@ -244,6 +384,26 @@ function mainValue(task) {
   return {text: '这一类事务没有单一主值', from: '这一类事务的要点不落在某一个数字上'};
 }
 
+/** 这一笔用一句话说是什么。
+ *
+ * **不许用 `card.summary`。** 那不是一句摘要，是后端拼的
+ * `f"{task_type.value} · {status.value}"`（`v5_services.py:729`）——两个英文枚举。
+ * 它原先直接落在「这件事是什么」这一行上，屏幕上是
+ * 「这件事是什么：bill_payment · completed」，而**下一行**的 `current_status`
+ * 就被翻成了「办好了」。半边翻译比不翻更难看，也正是文件头第二条禁的那件事。
+ *
+ * 任务记录自己的摘要（「2026-07水费 68.40元」）信息量更大，有就用它。
+ * 没有任务记录时（链比任务活得久）才去拆 `card.summary`，两半各自翻译。
+ */
+function taskSummary(card) {
+  const own = String((state.task || {}).summary || '').trim();
+  if (own) return own;
+  const type = String((card || {}).summary || '').split('·')[0].trim();
+  // `'other'`：这一页的读者是评委，读的是**别人**的事。传默认值会说「等您确认」，
+  // 而要确认的人不在这一页前面。
+  return `${window.YouHuo.taskWord(type)} · ${window.YouHuo.statusWord((card || {}).current_status, 'other')}`;
+}
+
 /** 谁的确认让这一笔往下走。全部从链上读，不从任务状态推。 */
 function authority(events) {
   const has = (type) => events.some((e) => String(e.event_type).startsWith(type));
@@ -274,7 +434,7 @@ async function loadTaskList() {
     const option = document.createElement('option');
     option.value = task.id;
     option.textContent = `${window.YouHuo.taskWord(task.task_type)} · ${task.summary}`
-      + ` · ${window.YouHuo.statusWord(task.status)}`;
+      + ` · ${window.YouHuo.statusWord(task.status, 'other')}`;
     pick.appendChild(option);
     // datalist 给的是编号本身：粘编号的人要补全的是编号，不是摘要。
     const hint = document.createElement('option');
@@ -283,21 +443,51 @@ async function loadTaskList() {
   });
 }
 
-/** 现在该看哪一笔：地址栏里指定的 → 输入框里填的 → 选单选中的 → 最近一笔。 */
+//: 地址栏带进来的那个编号，**在这个文档被解析的那一刻**读一次。
+//:
+//: 必须在这里读、而且必须只读这一次：`loadTransaction` 每次都会把
+//: `location.hash` 覆写成它正在看的那一笔，所以载入之后再读 hash 读到的是
+//: 页面自己刚写下去的值，不是别人递过来的那个链接。
+const INITIAL_HASH = decodeURIComponent(String(location.hash || '').replace(/^#/, '')).trim();
+
+//: 地址栏那一个还没有被用掉。第一次调阅之后清掉——从那以后是人在开车。
+let honourInitialHash = Boolean(INITIAL_HASH);
+
+/** 现在该看哪一笔：**第一次载入**看地址栏，之后看输入框 → 选单 → 最近一笔。
+ *
+ * 这个函数的文档原先写的是「地址栏里指定的 → 输入框里填的 → 选单选中的 → 最近一笔」，
+ * 而代码写的是 `typed || picked || fromHash || …`——**地址栏排在第三**。
+ * 它因此一次都没生效过：`loadTaskList()` 往 `#txnPick` 里塞选项，浏览器自动选中第一
+ * 条，于是 `picked` 永远非空，`fromHash` 永远轮不到。实测把
+ * `/judge#task-seed-await-…` 交给一个全新标签页，打开的是 `task-seed-bill-…`
+ * ——另一笔事务，而且页面不会说任何一句话。
+ *
+ * 这一页的主张是「主动权在看的人手里，他指定编号」。递一个链接过去正是"别人指定"
+ * 唯一的形式，也是评委之间互相指认一笔事务唯一的办法。
+ *
+ * 顺序不能简单地改成 `fromHash` 优先：`loadTransaction` 会把 hash 写成当前这一笔，
+ * 那样一来在输入框里换一个编号会被上一笔的 hash 顶掉。所以是**一次性**的优先级。
+ */
 function wantedId() {
-  const fromHash = decodeURIComponent(String(location.hash || '').replace(/^#/, '')).trim();
+  if (honourInitialHash && INITIAL_HASH) return INITIAL_HASH;
   const typed = byId('txnId').value.trim();
   const picked = byId('txnPick').value.trim();
-  return typed || picked || fromHash || (state.tasks[0] && state.tasks[0].id) || '';
+  return typed || picked || (state.tasks[0] && state.tasks[0].id) || '';
 }
 
 /* --- 调阅一笔事务 ---------------------------------------------------------- */
 
 async function loadTransaction() {
   const id = wantedId();
+  // 地址栏那一次机会用掉了。**放在这里而不是成功之后**：编号打错时也该停在
+  // 那个错误上，而不是下一次静默换成别的一笔——「它换了一笔而且不说」正是
+  // 这条路径原来的毛病。
+  honourInitialHash = false;
   if (!id) throw new Error('还没有指定要看哪一笔事务，而这个家庭的清单也是空的');
 
-  statusEl.textContent = '正在调阅这一笔事务的链……';
+  setStatus('正在调阅这一笔事务的链……', 'info');
+  // 换一笔就重新数：下面那句「这一次打开又多了几条」说的是**这一笔**。
+  state.contextReads = 0;
   // 两处都对齐到同一个编号，免得输入框和选单各说各的。
   byId('txnId').value = id;
   byId('txnPick').value = state.tasks.some((t) => t.id === id) ? id : '';
@@ -317,19 +507,19 @@ async function loadTransaction() {
   renderHead();
   renderTimeline();
   renderNotes();
-  // 默认选中最后一步：查一笔事务的人最先想知道的是"它现在停在哪儿"。
-  pickStep(state.events.length ? state.events[state.events.length - 1].id : null);
+  pickStep(defaultStep());
   await loadContext(id);
 
-  statusEl.textContent = `这一笔在链上有 ${state.events.length} 条记录。`
-    + `整条家庭链的自校验：${state.chainValid ? '通过' : '没通过'}。`;
+  setStatus(`这一笔在链上有 ${state.events.length} 条记录。`
+    + `整条家庭链的自校验：${state.chainValid ? '通过' : '没通过'}。`,
+    state.chainValid ? 'good' : 'bad');
 }
 
 function renderHead() {
   const task = state.task;
   const value = mainValue(task);
   byId('txnWhat').textContent = task ? window.YouHuo.taskWord(task.task_type) : '查无此任务记录';
-  byId('txnState').textContent = task ? window.YouHuo.statusWord(task.status) : '不详';
+  byId('txnState').textContent = task ? window.YouHuo.statusWord(task.status, 'other') : '不详';
   byId('txnValue').textContent = task ? value.text : '不详';
   byId('txnAuthority').textContent = authority(state.events);
 
@@ -352,6 +542,31 @@ function visibleEvents() {
   const kept = state.events.filter((e) => KEY_EVENTS.includes(String(e.event_type)));
   // 一条关键步骤都没有的时候不给空白：那会让人以为链是空的。
   return kept.length ? kept : state.events;
+}
+
+//: 这一页**自己**在链上留下的记录。取一次决策上下文就多一条（页面上那段
+//: 「调阅这一栏，本身也会留下记录」把这件事说在前面了）。
+const PAGE_OWN_EVENTS = ['TASK_EXPLANATION_VIEWED'];
+
+/** 默认摊开哪一步。
+ *
+ * 原先是 `state.events[state.events.length - 1]`，理由写着「查一笔事务的人最先
+ * 想知道的是它现在停在哪儿」。那个理由是对的，那行代码在第二次打开这一页之后就
+ * 不成立了：链上最后一条变成了**这一页自己刚写下的调阅记录**，于是「它停在哪儿」
+ * 的答案成了「有人看过它」。
+ *
+ * 更糟的是它还看不见：默认档位是「只看关键步骤」，而调阅记录不在关键步骤里——
+ * 右边摊开着一条左边列表里根本找不到的记录，时间轴上一条高亮都没有。实测如此。
+ *
+ * 所以两层：先排掉这一页自己的痕迹，再落在**当前档位真的显示出来的**那一批的
+ * 最后一条。两层都空才退回整条链的最后一条——那时链上除了调阅什么都没有，
+ * 摊开它才是对的。
+ */
+function defaultStep() {
+  const shown = visibleEvents();
+  const real = shown.filter((e) => !PAGE_OWN_EVENTS.includes(String(e.event_type)));
+  const pool = real.length ? real : shown;
+  return pool.length ? pool[pool.length - 1].id : null;
 }
 
 function renderTimeline() {
@@ -402,8 +617,10 @@ function renderEvidence() {
   head.replaceChildren();
   const event = state.events.find((e) => e.id === state.picked);
   if (!event) {
-    showJSON('#evBody', {这一栏: '左边还没有选中任何一步'});
-    showJSON('#evChainBody', {这一栏: '要先在左边选中一步'});
+    // 「左边」只在三栏并排时成立。720px 以下 `.dashboard-grid` 退成单列，
+    // 时间轴在**上面**——那时这两句是在给一个不存在的方向指路。按栏目名说。
+    showJSON('#evBody', {这一栏: '时间轴上还没有选中任何一步'});
+    showJSON('#evChainBody', {这一栏: '要先在时间轴上选中一步'});
     return;
   }
   const rows = [
@@ -447,9 +664,20 @@ function renderNotes() {
   fill(how, 'tlHowLine', `这一笔一共 ${state.events.length} 条记录，其中关键步骤 ${key} 条；`
     + `整条家庭链此刻的自校验结果是「${state.chainValid ? '通过' : '没通过'}」。`);
 
+  // 这个数**只能**说成「读这条链的时候有几条」。
+  //
+  // 顺序是钉死的：先取链（`/v2/audit`），再取决策上下文（`/v5/.../explain`），
+  // 而后者会往链上写一条 `TASK_EXPLANATION_VIEWED`。也就是说 `state.events` 里
+  // 永远缺这一次自己写的那条。原文写的是「这一笔上**现在**有 N 条调阅记录」，
+  // 而屏幕上第一次打开时它是 0——同一屏上隔壁那句还写着「每刷新一次这一页就会
+  // 多一条」。一个自称「这一页自己不存任何一个值」的页面，第一个说错的就是它
+  // 自己的计数。
   const looks = state.events.filter((e) => e.event_type === 'TASK_EXPLANATION_VIEWED').length;
-  fill(self, 'ctxSelfLine', `这一笔上现在有 ${looks} 条调阅记录。`
-    + '每刷新一次这一页就会多一条——那是真的，不是页面在计数。');
+  fill(self, 'ctxSelfLine', `读这条链的时候，这一笔上有 ${looks} 条调阅记录。`
+    + (state.contextReads
+      ? `取决策上下文又写了 ${state.contextReads} 条，重新调阅一次就看得见它们。`
+      : '')
+    + '这个数是从链上数出来的，不是页面自己在计数。');
 }
 
 /** 往一个 details 里补一行由数据生成的说明；重复调用只更新，不堆叠。 */
@@ -475,25 +703,47 @@ async function loadContext(id) {
   const box = document.querySelector('#ctxBody');
   try {
     const card = await api(`/v5/tasks/${encodeURIComponent(id)}/explain`);
+    state.contextReads += 1;
     showJSON('#ctxBody', {
-      这件事是什么: card.summary,
-      现在到哪一步: window.YouHuo.statusWord(card.current_status),
-      风险档位: `第 ${card.risk_level} 档（共 4 档，档位越高越要人来定）`,
-      系统听懂了什么: card.what_i_understood,
+      这件事是什么: taskSummary(card),
+      现在到哪一步: window.YouHuo.statusWord(card.current_status, 'other'),
+      风险档位: riskWords(card.risk_level),
+      系统听懂了什么: (card.what_i_understood || []).map(slotLine),
       为什么这么办: card.why_this_action,
-      用到了哪些数据: card.data_used,
-      谁确认过: card.confirmations,
+      // `data_used` 是一串 `{source, purpose}`。`common.js` 的 `FIELD_LABEL` 认得
+      // `purpose`（「用途」）但不认得 `source`，于是这一格渲染成一列「source / 用途 /
+      // source / 用途」——半边中文半边英文，比两边都英文更像没做完。
+      // 键在这里就换掉，不去动那张全站共享的表。
+      用到了哪些数据: (card.data_used || []).map(
+        (row) => ({来源: (row || {}).source, 用途: (row || {}).purpose})),
+      // 「谁确认过」读的是**确认投票表**（`approval_rows`），不是这一笔的链。
+      // 两者可以不一致——种子数据就是这样：链上有 `FAMILY_APPROVED_AND_EXECUTED`，
+      // 而投票表是空的，于是这一行说「尚无确认记录」，同一屏顶上的「权威方」说
+      // 「家人点头」。两句都没说谎，说谎的是把它们摆在一起而不说各自读的是什么。
+      谁在确认表上点过头: (card.confirmations || []).map(confirmLine),
       办成的凭据: card.completion_evidence,
       能不能撤: card.reversible ? '可以按规则撤销或补偿' : '不可自动撤销',
       要撤怎么撤: card.undo_guidance,
       为这件事存下了什么: card.stored_data,
       隐私说明: card.privacy_note,
     });
+    // 这一次调阅刚往链上写了一条，那段自述里的条数要跟着走。见 `renderNotes`。
+    renderNotes();
   } catch (error) {
     // 这一栏塌了不该把另外两栏一起拖下水：链和证据已经在屏幕上了，
     // 而它们才是这一页的主张。所以这里就地说明，不往上抛。
     box.replaceChildren();
-    box.textContent = `这一笔的决策说明没能取到：${error.message}`;
+    // `${error.message}` 在这儿和状态行那一处是同一个泄漏，只是**不走
+    // `setStatus`**，所以 `test_a_failure_is_never_painted_green` 那条
+    // 「`setStatus(error.message` 一处都不许有」的判据看不见它。
+    // 掐掉 `/v5/…/explanation` 再刷新，这一栏上是「这一笔的决策说明没能取到：
+    // Failed to fetch」——同一句英文，只是换了一栏。
+    //
+    // 用 `say` / `then` 自己拼，不用 `text`：`text` 自带主语（「……暂时看不了」），
+    // 和这里已经有的前半句叠起来会说两遍。`errorWords` 就是为这种地方留的这两个字段。
+    const words = window.YouHuo.errorWords(error, '这一笔的决策说明');
+    box.textContent = `这一笔的决策说明没能取到：${words.say}。`
+      + (words.then ? `${words.then}。` : '');
   }
 }
 
@@ -534,7 +784,7 @@ async function loadSysSafety() {
       : ['这一笔上没有任何安全机制被触发过'],
     我们明确不宣称的能力: truth.adapters_not_claimed_as_production,
     这一笔的风险档位: state.task
-      ? `第 ${state.task.risk_level} 档（共 4 档）`
+      ? riskWords(state.task.risk_level)
       : '这一笔的任务记录已经不在了，档位无从谈起',
   });
   note('srcSafety', `这一次在这一笔的链上数到 ${fired.length} 次安全动作。`);
@@ -593,7 +843,10 @@ async function loadSysRuntime() {
       counters[word(METRIC_WORD, key, '计数')] = value;
     });
   } catch (error) {
-    counters = {取不到: error.message};
+    // 同一个泄漏的第三处。这一处更隐蔽：它不是一句文案，是一个**被渲染成 JSON 的
+    // 值**——`showJSON` 会把它原样打进「开机以来的计数」那一格里，于是审计页上
+    // 出现 `{"取不到": "Failed to fetch"}`。
+    counters = {取不到: window.YouHuo.errorWords(error, '这台服务器的计数').text};
   }
   showJSON('#sysRuntimeBody', {
     这台服务器此刻: health.status === 'ok' ? '正常' : '不正常',
@@ -665,9 +918,14 @@ function beatOf(name) {
  * 于是「点了没反应」。
  */
 function report(error, outSelector) {
-  statusEl.textContent = error.message;
+  // `error.message` 直接印，实测（把 `/v2/audit` 掐掉再刷新）屏幕上是
+  // **「Failed to fetch」**——原始浏览器异常，英文，印在审计页上。
+  // `errorWords` 是这个仓库为这件事准备的那一层：它按 `.status` 分型，
+  // 说得清是「连不上」「服务器拒绝了」还是「这台服务上没开」。
+  const words = window.YouHuo.errorWords(error, '这一笔的记录').text;
+  setStatus(words, 'bad');
   const out = outSelector && document.querySelector(outSelector);
-  if (out) { out.replaceChildren(); out.textContent = error.message; }
+  if (out) { out.replaceChildren(); out.textContent = words; }
 }
 
 /** 取数期间把两个会重新发起请求的控件按住。
@@ -772,11 +1030,13 @@ async function showTab(tabId) {
 async function boot() {
   IDS = await window.YouHuo.ready();
   await window.YouHuo.login('family');
-  statusEl.textContent = '正在读这个家庭的事务清单……';
+  setStatus('正在读这个家庭的事务清单……', 'info');
   await loadTaskList();
   await run('transaction');
   await showTab(currentTab());
 }
 
 bindControls();
-boot().catch((error) => { statusEl.textContent = error.message; });
+boot().catch((error) => {
+  setStatus(window.YouHuo.errorWords(error, '这个家庭的事务清单').text, 'bad');
+});

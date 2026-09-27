@@ -30,23 +30,23 @@
  * 没有数据库的情况下被直接调用。
  */
 
-//: 任务状态 → 给人看的话。认不出来就说「还在办」，不漏枚举值。
+//: 任务状态的说法**已经收敛到 `common.js`**，这里原先那份是它的逐字节死拷贝。
 //:
-//: 这张表和 `elder.js` 的 `TASK_TYPE_WORD`、`task-space.js` 的 `TASK_WORD`
-//: 是同一类东西的第四份。它们要在 Phase C 收敛到一处；现在先各自带着，
-//: 但**都不许**兜底成原始枚举。
-const STATUS_WORD = {
-  completed: '办好了',
-  executing: '正在办',
-  collecting: '还在问清楚',
-  awaiting_elder_confirmation: '等您确认',
-  awaiting_family_approval: '等家人点头',
-  cancelled: '已经取消',
-  failed: '没办成，已经停下',
-};
+//: 死拷贝比漂移的拷贝更容易骗人：两份一模一样，谁改了一份都看不出另一份没跟上。
+//: 实测六份状态表并排之后才看清，这一份和 `common.js` 是同一句话的两个副本，而
+//: 同一个壳里的 `elder.js` 说的是第三句（`completed` 在这里是「办好了」，在
+//: `elder.js` 是「已完成并核验」）——老人点开一条记录，抬头和列表说的不是一件事。
+//:
+//: 取值放在函数体里而不是模块顶层：module 的求值时机早于普通脚本执行完，
+//: 在顶层取 `window.YouHuo` 会拿到 undefined。这一点和下面 `taskWord` 一样。
+//:
+//: `statusWord()` 传的是**自称**（默认）：这一屏是老人在读自己的事。
 
 //: 状态 → 语气。和 `common.js` 的 `toneOf` 一个意思，但那个读的是响应的
 //: `ui.theme`，这里读的是任务状态，所以不能复用。
+//:
+//: 这一份**没有**跟着搬走：它的值是 CSS 类名，不是给人读的字，
+//: 而共享词汇层管的是措辞。判据也是照「值里有没有中文」分的。
 const STATUS_TONE = {
   completed: 'good',
   cancelled: 'warning',
@@ -172,7 +172,7 @@ export function taskDetailViewModel(task) {
     // 动它要连那些一起看；这一层自己拼，把「哪个月」翻成人话、金额只出现一次。
     subject,
     amount: yuan(details.amount_yuan),
-    statusWord: STATUS_WORD[status] || '还在办',
+    statusWord: window.YouHuo.statusWord(status),
     statusTone: STATUS_TONE[status] || 'neutral',
     rows,
   };

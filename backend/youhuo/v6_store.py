@@ -108,6 +108,15 @@ class V6FeatureStore:
             )
         return self._profile(row)
 
+    #: 这张表上可以改的列。顺序要和下面那条 INSERT 的占位符对得上。
+    #: 列名和 `InteractionProfileUpdate` 的字段名一一同名——
+    #: `model_fields_set` 直接拿来筛就靠这一点。
+    _PROFILE_COLUMNS = (
+        "speech_rate", "verbosity", "max_options", "max_sentence_chars",
+        "repeat_sensitive", "teach_back_high_risk", "font_scale",
+        "hearing_support", "dialect_hint",
+    )
+
     def upsert_profile(
         self,
         family_id: str,
@@ -121,39 +130,46 @@ class V6FeatureStore:
                 (family_id, payload.elder_id),
             ).fetchone()
             version = (int(row["version"]) + 1) if row else 1
+            #: 只覆盖调用方**真的送来**的列。
+            #:
+            #: 原先每一列都写成 payload 的值，而这个模型每个字段都有默认值——
+            #: 于是没送的字段不是「保持不变」，是**回到默认**。实测最疼的一条：
+            #: 她说「我听不清」之后档案是 `hearing_support=True,
+            #: max_sentence_chars=24`，随后任何一次不带这两个字段的 PUT
+            #: 都会把它们打回 `False / 42`，而她只是按了一下「保存我的习惯」。
+            #:
+            #: 用 `model_fields_set` 判断，不拿「值等于默认值」去猜：
+            #: 后者会把一次真的「改回默认」当成没送。
+            #: （`v4_store.upsert_safety_policy` 是同一个形状，同一天修的。）
+            values = {
+                "speech_rate": payload.speech_rate,
+                "verbosity": payload.verbosity.value,
+                "max_options": payload.max_options,
+                "max_sentence_chars": payload.max_sentence_chars,
+                "repeat_sensitive": int(payload.repeat_sensitive),
+                "teach_back_high_risk": int(payload.teach_back_high_risk),
+                "font_scale": payload.font_scale,
+                "hearing_support": int(payload.hearing_support),
+                "dialect_hint": payload.dialect_hint,
+            }
+            touched = [c for c in self._PROFILE_COLUMNS if c in payload.model_fields_set]
+            sets = [f"{c}=excluded.{c}" for c in touched] + [
+                "updated_by=excluded.updated_by",
+                "updated_at=excluded.updated_at",
+                "version=excluded.version",
+            ]
             conn.execute(
-                """
+                f"""
                 INSERT INTO interaction_profiles_v6(
-                    family_id,elder_id,speech_rate,verbosity,max_options,max_sentence_chars,
-                    repeat_sensitive,teach_back_high_risk,font_scale,hearing_support,dialect_hint,
+                    family_id,elder_id,{",".join(self._PROFILE_COLUMNS)},
                     updated_by,updated_at,version
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(family_id,elder_id) DO UPDATE SET
-                    speech_rate=excluded.speech_rate,
-                    verbosity=excluded.verbosity,
-                    max_options=excluded.max_options,
-                    max_sentence_chars=excluded.max_sentence_chars,
-                    repeat_sensitive=excluded.repeat_sensitive,
-                    teach_back_high_risk=excluded.teach_back_high_risk,
-                    font_scale=excluded.font_scale,
-                    hearing_support=excluded.hearing_support,
-                    dialect_hint=excluded.dialect_hint,
-                    updated_by=excluded.updated_by,
-                    updated_at=excluded.updated_at,
-                    version=excluded.version
+                ) VALUES (?,?,{",".join("?" * len(self._PROFILE_COLUMNS))},?,?,?)
+                ON CONFLICT(family_id,elder_id) DO UPDATE SET {",".join(sets)}
                 """,
                 (
                     family_id,
                     payload.elder_id,
-                    payload.speech_rate,
-                    payload.verbosity.value,
-                    payload.max_options,
-                    payload.max_sentence_chars,
-                    int(payload.repeat_sensitive),
-                    int(payload.teach_back_high_risk),
-                    payload.font_scale,
-                    int(payload.hearing_support),
-                    payload.dialect_hint,
+                    *(values[c] for c in self._PROFILE_COLUMNS),
                     actor.actor_id,
                     iso(now),
                     version,
@@ -169,6 +185,12 @@ class V6FeatureStore:
     ) -> StudySession:
         session_id = new_id("study")
         now = utcnow()
+        # `status` is a constant, not state. This is the only writer of the
+        # column and nothing can change it afterwards: the protocol has no
+        # "end a study" operation (see the note in add_observation). It stays
+        # in the row and in the response because the shipped plugin contract
+        # xiaoyi/plugin_openapi_v6.generated.json already publishes the field;
+        # do not add a reader that branches on it.
         with self.db.transaction() as conn:
             conn.execute(
                 """
@@ -214,13 +236,24 @@ class V6FeatureStore:
         actor: AuthContext,
         payload: StudyObservationCreate,
     ) -> StudyObservation:
+        # Scoped by family only, deliberately not by status. A row in
+        # study_sessions_v6 is a participant enrolment (anonymous code, role,
+        # consent version), not a time-boxed sitting: docs/30_V6_USER_STUDY_
+        # PROTOCOL.md §6 enumerates the whole feature as register-participant,
+        # record-observation, aggregate-summary, and observations accumulate
+        # against one enrolment across both conditions and all six tasks. So
+        # there is no "this study is over" state to check, and the column below
+        # only ever holds one value. The former `AND status='active'` clause
+        # could not reject anything; it read like a protection and was not one.
+        # If withdrawal of consent is ever added it must delete the row (§5 data
+        # minimisation), not flip a flag, so this lookup would still be right.
         with self.db._lock:
             session = self.conn.execute(
-                "SELECT id FROM study_sessions_v6 WHERE family_id=? AND id=? AND status='active'",
+                "SELECT id FROM study_sessions_v6 WHERE family_id=? AND id=?",
                 (family_id, payload.session_id),
             ).fetchone()
         if session is None:
-            raise ValueError("用户实验会话不存在、已结束或不属于当前家庭。")
+            raise ValueError("用户实验会话不存在或不属于当前家庭。")
         obs_id = new_id("obs")
         now = utcnow()
         with self.db.transaction() as conn:

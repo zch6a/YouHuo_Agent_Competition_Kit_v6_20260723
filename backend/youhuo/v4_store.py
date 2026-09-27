@@ -4,12 +4,12 @@ import hashlib
 import json
 import sqlite3
 from calendar import monthrange
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from .database import Database, iso, utcnow
 from .models import ActorRole, ReminderRecord, ReminderStatus
-from .utils import canonical_json, new_id
+from .utils import canonical_json, local_zone, new_id
 from .v4_models import (
     AssistanceRequestRecord,
     ContactCreate,
@@ -18,12 +18,15 @@ from .v4_models import (
     DeviceRegisterRequest,
     DoseRecord,
     DoseRecordRequest,
+    DoseStatus,
     EmotionAnalysis,
     EmotionEvent,
     HealthEventCreate,
     HealthEventRecord,
     ItemMemoryCreate,
     ItemMemoryRecord,
+    MedicalDocumentKind,
+    MedicalDocumentRecord,
     MedicationPlanCreate,
     MedicationPlanRecord,
     OccurrenceStatus,
@@ -354,6 +357,59 @@ class V4FeatureStore:
         ids = DemoIdentities.for_suffix(suffix)
         today = utcnow().replace(hour=9, minute=0, second=0, microsecond=0)
 
+        #: 亲友档案：两位。**这张表此前从来没被种过。**
+        #:
+        #: 上面 `seed_demo()` 种的是 `safety_contacts_v4`（应急接力名单，一位社区
+        #: 网格员）——那是配置。而 `/v4/contacts/{elder}` 读的是**另一张表**
+        #: `contact_profiles_v4`，它一直是 0 行。两处界面因此同时是空的：
+        #:
+        #:   /elder 的「家人」屏   只印「女儿」「儿子」两个词，没有关系、没有电话。
+        #:                        elder.js 的注释写着「`/v4/contacts/{elder}` 在演示
+        #:                        数据下是空的（实测），与其编一个名字，不如说清
+        #:                        有几位、各是什么关系」——那个退让是对的，
+        #:                        但它退让的前提是这张表空着。
+        #:   /care 的「安全」屏   「还没有登记亲友」，而它上面刚写着「12 小时没动静
+        #:                        就找人」。设置在、人不在。
+        #:
+        #: 所以补在这里而不是改渲染：一处补上，两屏同时活，而且两边读的是同一份
+        #: 真数据，不是各自编的兜底。
+        #:
+        #: `consent_status='active'` 且 `consented_by=elder_id`：这两位是老人自己的
+        #: 子女，本人认的。`create_contact` 里家属添的记 `proposed`（要本人点头），
+        #: 老人自己添的当场 `active`——种子走的是后者这条语义。
+        #:
+        #: 电话过 `_mask_phone`，不手写掩码串：演示数据的形状必须和真实写入路径
+        #: 一样。缴费种子那边栽过一次（漏了 `attempts`，凭证正文印出
+        #: 「第 undefined 次通过」），教训是同一条。
+        kin = [
+            ("daughter", "女儿", "13800138001", "住得近，平时来得多"),
+            ("son", "儿子", "13900139002", "在外地，周末打电话"),
+        ]
+        with self.db.transaction() as conn:
+            for tag, relation, phone, note in kin:
+                masked, digest = self._mask_phone(phone)
+                conn.execute(
+                    """INSERT OR IGNORE INTO contact_profiles_v4(
+                        id,family_id,elder_id,display_name,relation,phone_masked,phone_digest,
+                        notes,scope,face_template_digest,consented_by,consent_status,
+                        created_at,updated_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (f"person-{tag}-{suffix}", ids.family_id, ids.elder_id,
+                     # `scope` 必须是 ShareScope 的成员：private / family_summary /
+                     # family_shared。我第一版写的是 `"family"`——**不在枚举里**，
+                     # 于是 `GET /v4/contacts/{elder}` 反序列化时 500。
+                     #
+                     # 而那个 500 在界面上**看不出来**：care.js 那一行是
+                     # `api(...).catch(() => [])`，服务端错误被吞成空数组，
+                     # 屏幕上显示「还没有登记他身边的人」——和真的没数据一模一样。
+                     # 我因此差点判成「种子没跑」，实际库里两行都在。
+                     #
+                     # 取 family_shared 而不是 family_summary：这两位是家属看得见
+                     # 全貌的人（关系 + 打码电话），不是只给一个汇总数字。
+                     relation, relation, masked, digest, note, "family_shared",
+                     None, ids.elder_id, "active", iso(today), iso(today)),
+                )
+
         #: 身体：三条，都在过去。一次体检、一次门诊、一条记录。
         health = [
             (7, "checkup", "社区体检：血压 138/86",
@@ -479,19 +535,79 @@ class V4FeatureStore:
             created_at=datetime.fromisoformat(row["created_at"]), updated_at=datetime.fromisoformat(row["updated_at"]),
         )
 
-    def materialize_routines(self, family_id: str, now: datetime, horizon_days: int) -> dict[str, int]:
+    #: 断档之后最多往前跳多少场。日更的例程闲置十三年也够——
+    #: 到不了就说明有别的问题（时区炸了、游标被写坏了），
+    #: 那种情形**不要静默停住**，让它落在回执的 `occurrences_skipped` 上
+    #: 和下面那句 hilog 里，而不是假装追上了。
+    _MAX_CATCH_UP_STEPS = 5000
+
+    def materialize_routines(
+        self, family_id: str | None, now: datetime, horizon_days: int
+    ) -> dict[str, int]:
+        """把循环例程排成具体场次。**不排已经过点的。**
+
+        ## 为什么不排过去
+
+        实测两条路都会造出过期场次，而它们都会在下一次 tick 被当成「到点了」
+        发给她：
+
+        1. 晚上 22:07 建一条「每天早上八点」的例程，`first_due` 给的是
+           **今天 08:00**（`RecurrenceEngine.first_due` 是纯日历算术，
+           没有「那个点已经过了」这个概念）。于是她在 22:07 收到
+           「待办提醒：吃降压药。」——那是早上八点的药。**吃药这件事上，
+           这是多吃一次的风险。** 同一秒她还收到「提前提醒：还有9小时52分钟
+           就到吃降压药了」，两句话互相矛盾。
+        2. 断了 30 天之后补排一次：`occurrences_created: 30`，其中 34 条
+           提醒已经过点而状态还是 scheduled，下一 tick
+           `{'notified': 34}`——**34 条「待办提醒：吃降压药。」同一秒到达**。
+           而家属调这个接口正是第 232 条记下的唯一补救办法。
+
+        正常运行时**一条都不会跳**：场次是提前几天建的，建的时候都在未来。
+        只有断档之后才跳，那正是该跳的时候。跳了多少条写在回执里
+        （`occurrences_skipped`），不静默。
+
+        ## 跳过的那些要不要告诉她
+
+        这一版只在回执里报数，没有给她发「这几天的提醒断了」。
+        那是产品决定（要不要让她知道自己漏了几天的药），记在 KNOWN_ISSUES
+        里等定。**不要因为难就假装没断过。**
+        """
         horizon = now + timedelta(days=horizon_days)
-        routines = [item for item in self.list_routines(family_id) if item.status == RoutineStatus.ACTIVE]
+        routines = [
+            item for item in self._all_routines(family_id)
+            if item.status == RoutineStatus.ACTIVE
+        ]
         created = 0
         duplicates = 0
+        skipped = 0
         for routine in routines:
             due = routine.next_due_at
+
+            def advance(moment: datetime) -> datetime:
+                return RecurrenceEngine.next_after(
+                    current_due_utc=moment, frequency=routine.frequency,
+                    interval=routine.interval, weekdays=routine.weekdays,
+                    day_of_month=routine.day_of_month,
+                    time_local=routine.time_local, timezone=routine.timezone,
+                )
+
+            # 先把游标推到「现在」之后。这一段**只推游标、不建场次**，
+            # 所以断档多久都不会攒出一次轰炸。
+            catch_up = 0
+            while due < now and catch_up < self._MAX_CATCH_UP_STEPS:
+                catch_up += 1
+                skipped += 1
+                due = advance(due)
+
             guard = 0
             while due <= horizon and guard < 500:
                 guard += 1
                 occurrence_id = new_id("occ")
+                # `routine.family_id` 而不是那个参数：系统级调用传的是
+                # `None`（跨家庭），而且就算传了具体值，用例程自己的那个
+                # 才是对的——这一行以前只是因为列表是按家庭筛的才碰巧一致。
                 reminder = ReminderRecord(
-                    id=new_id("reminder"), family_id=family_id, elder_id=routine.elder_id, title=routine.title,
+                    id=new_id("reminder"), family_id=routine.family_id, elder_id=routine.elder_id, title=routine.title,
                     due_at=due, escalation_after_minutes=routine.escalation_after_minutes,
                     status=ReminderStatus.SCHEDULED, source=f"routine:{routine.id}", created_by=routine.created_by,
                     created_at=now,
@@ -504,46 +620,109 @@ class V4FeatureStore:
                                 id,routine_id,family_id,elder_id,due_at,status,reminder_id,completed_at,created_at
                             ) VALUES (?,?,?,?,?,?,?,?,?)""",
                             (
-                                occurrence_id, routine.id, family_id, routine.elder_id, iso(due),
+                                occurrence_id, routine.id, routine.family_id, routine.elder_id, iso(due),
                                 OccurrenceStatus.SCHEDULED.value, reminder.id if inserted_reminder else None, None, iso(now),
                             ),
                         )
                     created += 1
                 except sqlite3.IntegrityError:
                     duplicates += 1
-                due = RecurrenceEngine.next_after(
-                    current_due_utc=due, frequency=routine.frequency, interval=routine.interval,
-                    weekdays=routine.weekdays, day_of_month=routine.day_of_month,
-                    time_local=routine.time_local, timezone=routine.timezone,
-                )
+                due = advance(due)
             with self.db.transaction() as conn:
                 conn.execute(
                     "UPDATE recurring_routines SET next_due_at=?,updated_at=? WHERE id=?",
                     (iso(due), iso(now), routine.id),
                 )
-        return {"routines": len(routines), "occurrences_created": created, "duplicates": duplicates}
+        return {"routines": len(routines), "occurrences_created": created,
+                "duplicates": duplicates, "occurrences_skipped": skipped}
+
+    def _all_routines(self, family_id: str | None) -> list[RoutineRecord]:
+        """一个家庭的，或者**全部**家庭的。
+
+        `family_id=None` 是给系统级调度用的：真实部署里那个 cron 不属于
+        任何一个家庭。`list_routines` 的 `family_id` 是必填的，所以这里
+        单独走一支，而不是把那个签名放松掉——它另外四处调用都确实有家庭。
+        """
+        if family_id is not None:
+            return self.list_routines(family_id)
+        rows = self.conn.execute(
+            "SELECT * FROM recurring_routines ORDER BY created_at DESC"
+        ).fetchall()
+        return [self._row_routine(row) for row in rows]
+
+    def set_routine_status(self, family_id: str, elder_id: str, routine_id: str,
+                           status: RoutineStatus) -> RoutineRecord:
+        """暂停 / 恢复一条例程。
+
+        没有删除：例程停掉之后 `materialize_routines` 不再为它生成新的发生，
+        但已经生成的提醒和历史发生原样留着。删掉的话，那些提醒会变成
+        指向一个不存在的例程的孤儿。
+        """
+        row = self.conn.execute(
+            "SELECT * FROM recurring_routines WHERE id=? AND family_id=? AND elder_id=?",
+            (routine_id, family_id, elder_id),
+        ).fetchone()
+        if not row:
+            raise PermissionError("循环事务不属于当前老人。")
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE recurring_routines SET status=?,updated_at=? WHERE id=?",
+                (status.value, iso(utcnow()), routine_id),
+            )
+        return self._row_routine(
+            self.conn.execute("SELECT * FROM recurring_routines WHERE id=?", (routine_id,)).fetchone()
+        )
+
+    #: 发生表本身没有那句鼓励话——它一条例程一句，存在 `recurring_routines` 上。
+    #: 两处读发生的地方都走这个 JOIN，那句话才到得了调用方（原来 SQL 里 JOIN 了、
+    #: 函数里不用，等于白 JOIN）。
+    #:
+    #: `JOIN` 而不是 `LEFT JOIN`：`routine_id` 是指向 `recurring_routines(id)` 的
+    #: 外键，`PRAGMA foreign_keys=ON`（见 `Database.__init__`），而且例程没有删除
+    #: 路径（`set_routine_status` 只改状态）。所以这个 JOIN 不会悄悄吃掉行。
+    #:
+    #: 列名要带 `o.` 前缀：两张表都有 `family_id` 和 `elder_id`，不限定就是
+    #: ambiguous column name。
+    _OCCURRENCE_SELECT = (
+        "SELECT o.*,r.positive_message FROM routine_occurrences o"
+        " JOIN recurring_routines r ON r.id=o.routine_id"
+    )
+
+    @staticmethod
+    def _row_occurrence(row: sqlite3.Row) -> RoutineOccurrence:
+        return RoutineOccurrence(
+            id=row["id"], routine_id=row["routine_id"], family_id=row["family_id"], elder_id=row["elder_id"],
+            due_at=datetime.fromisoformat(row["due_at"]), status=OccurrenceStatus(row["status"]),
+            positive_message=row["positive_message"],
+            reminder_id=row["reminder_id"], completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
 
     def list_occurrences(self, family_id: str, elder_id: str | None = None) -> list[RoutineOccurrence]:
-        query = "SELECT * FROM routine_occurrences WHERE family_id=?"
+        """列出循环事务的发生，**带上那句鼓励话**。
+
+        补在这一层而不是只补在「完成」那一步：`GET /v4/routine-occurrences/{elder}`
+        因此也能在做之前就拿到这句话，界面用不着为了一句鼓励再单独去查例程。
+        """
+        query = f"{self._OCCURRENCE_SELECT} WHERE o.family_id=?"
         args: list[Any] = [family_id]
         if elder_id:
-            query += " AND elder_id=?"
+            query += " AND o.elder_id=?"
             args.append(elder_id)
-        query += " ORDER BY due_at DESC LIMIT 500"
+        query += " ORDER BY o.due_at DESC LIMIT 500"
         rows = self.conn.execute(query, args).fetchall()
-        return [
-            RoutineOccurrence(
-                id=row["id"], routine_id=row["routine_id"], family_id=row["family_id"], elder_id=row["elder_id"],
-                due_at=datetime.fromisoformat(row["due_at"]), status=OccurrenceStatus(row["status"]),
-                reminder_id=row["reminder_id"], completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
-                created_at=datetime.fromisoformat(row["created_at"]),
-            )
-            for row in rows
-        ]
+        return [self._row_occurrence(row) for row in rows]
 
     def complete_occurrence(self, family_id: str, elder_id: str, occurrence_id: str) -> RoutineOccurrence:
+        """记一次「做完了」，并把该说的那句话交回去。
+
+        返回值改成直接重读这一行，不再从 `list_occurrences` 里挑。原来那行是
+        `[item for item in self.list_occurrences(...) if item.id == occurrence_id][0]`，
+        而 `list_occurrences` 有 `LIMIT 500`：老人的发生攒过五百条以后，完成一条
+        更早的就会在这里 `IndexError` → 500，而她看到的是「助手坏了」。
+        """
         row = self.conn.execute(
-            "SELECT o.*,r.positive_message FROM routine_occurrences o JOIN recurring_routines r ON r.id=o.routine_id WHERE o.id=?",
+            f"{self._OCCURRENCE_SELECT} WHERE o.id=?",
             (occurrence_id,),
         ).fetchone()
         if not row or row["family_id"] != family_id or row["elder_id"] != elder_id:
@@ -558,7 +737,11 @@ class V4FeatureStore:
             reminder = self.db.get_reminder(row["reminder_id"])
             if reminder and reminder.status != ReminderStatus.COMPLETED:
                 self.db.update_reminder_status(reminder.id, ReminderStatus.COMPLETED, "completed_at", when)
-        return [item for item in self.list_occurrences(family_id, elder_id) if item.id == occurrence_id][0]
+        updated = self.conn.execute(
+            f"{self._OCCURRENCE_SELECT} WHERE o.id=?",
+            (occurrence_id,),
+        ).fetchone()
+        return self._row_occurrence(updated)
 
     # ----- emotion -----
     def add_emotion_event(self, family_id: str, elder_id: str, text: str, source: str, analysis: EmotionAnalysis) -> EmotionEvent:
@@ -837,16 +1020,68 @@ class V4FeatureStore:
         return self._row_contact(row) if row else None
 
     # ----- health documents / timeline -----
+    #: 同一份单据来过几条路时，来路之间的分隔符。中文正文用全角分号。
+    SOURCE_SEPARATOR = "；"
+
     def save_medical_document(
         self, family_id: str, elder_id: str, source_name: str, analysis: Any
     ) -> str:
+        """存一份就医单据，按内容去重；**去重时把来路并上去，不丢。**
+
+        ## 原先丢在哪
+
+        这里按 `(elder_id, source_digest)` 去重，命中就 `return existing["id"]`
+        ——**一个字都不更新**。于是 `source_name` 永远是第一次提交时那个值。
+
+        实测（同一段体检报告，按可信度从高到低换三个来路各发一次）：
+
+            以「老人本人填写」提交        -> medicaldoc-48f5…
+            以「拍照OCR·本人校对」提交   -> medicaldoc-48f5…（同一个）
+            以「拍照OCR」提交            -> medicaldoc-48f5…（同一个）
+
+            她的记录（审计投影）：三行，note 分别是那三个来路        对
+            单据行（家属读 /v4/medical-documents）：
+                source_name='老人本人填写'   **只有第一条**
+
+        **两处对同一份单据各说一套**，而单据那一侧说的是三档里**最可信**
+        的一档——错在更让人放心的那一侧。一位家属读单据列表，被告知这份
+        报告是老人自己打进去的，而她自己的记录里写着它也来自拍照识别。
+
+        第 89 条那一轮修的是审计那一侧（`v4_api.py:335-346` 给
+        `MEDICAL_DOCUMENT_ANALYZED` 的载荷加了 `source_name`），
+        **投影修好了，存下来的那一行没修**——一个功能两条路只修了一条。
+
+        ## 为什么是并上去，不是覆盖
+
+        覆盖成最后一条同样会丢信息（而且丢的是「她本人填过」这件事）。
+        `youhuo-document-firewall` 按来源可信度分流，安全判断要看**最弱
+        的那一环**，所以三条都得在。去重后按出现顺序拼，不重复。
+
+        ## 已知的取舍：这个字段没有上限
+
+        接口层每个 `source_name` 单值 ≤120 字，而这一列是 SQLite `TEXT`，
+        并上去之后没有硬上限。载体自己只会产生三种取值，所以实际很短
+        （三条并起来 24 个字）。真被灌大了是**看得见**的，不是静默的——
+        而静默丢掉一条来路才是这一修要消掉的那种。记在 KNOWN_ISSUES 里。
+        """
         self.ensure_elder(family_id, elder_id)
         existing = self.conn.execute(
-            "SELECT id FROM medical_documents_v4 WHERE elder_id=? AND source_digest=?",
+            "SELECT id,source_name FROM medical_documents_v4 WHERE elder_id=? AND source_digest=?",
             (elder_id, analysis.source_digest),
         ).fetchone()
         if existing:
-            return str(existing["id"])
+            doc_id = str(existing["id"])
+            already = [part for part
+                       in str(existing["source_name"] or "").split(
+                           self.SOURCE_SEPARATOR) if part]
+            if source_name not in already:
+                merged = self.SOURCE_SEPARATOR.join(already + [source_name])
+                with self.db.transaction() as conn:
+                    conn.execute(
+                        "UPDATE medical_documents_v4 SET source_name=? WHERE id=?",
+                        (merged, doc_id),
+                    )
+            return doc_id
         doc_id = new_id("medicaldoc")
         with self.db.transaction() as conn:
             conn.execute(
@@ -861,6 +1096,70 @@ class V4FeatureStore:
                 ),
             )
         return doc_id
+
+    @staticmethod
+    def _row_medical_document(row: sqlite3.Row) -> MedicalDocumentRecord:
+        """把两列 JSON 还原成一份可读的单据。
+
+        列名和键名不一样（`simplified_json` 里是 `summary` / `cautions`，模型上是
+        `summary_for_elder` / `caution_flags`），所以这里逐键取，不用 `**`。
+        缺键给空值而不是 KeyError：这两列是历史写入的，往回读不能因为一条老记录
+        少一个键就让整条取回路径 500。
+        """
+        extracted = json.loads(row["extracted_json"])
+        simplified = json.loads(row["simplified_json"])
+        return MedicalDocumentRecord(
+            id=row["id"],
+            elder_id=row["elder_id"],
+            kind=MedicalDocumentKind(row["kind"]),
+            source_name=row["source_name"],
+            source_digest=row["source_digest"],
+            dates=list(extracted.get("dates") or []),
+            measurements=list(extracted.get("measurements") or []),
+            follow_up_date=extracted.get("follow_up_date"),
+            terms=list(simplified.get("terms") or []),
+            summary_for_elder=str(simplified.get("summary") or ""),
+            caution_flags=list(simplified.get("cautions") or []),
+            review_required=bool(row["review_required"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    def get_medical_document(self, family_id: str, document_id: str) -> MedicalDocumentRecord | None:
+        """按 `document_id` 取回那份单据。**这是这张表的第一个真正的读取方。**
+
+        `/v4/medical-reports/analyze` 一直把 `document_id` 回给客户端，而在这之前
+        全仓对 `medical_documents_v4` 的唯一 SELECT 是去重用的
+        `WHERE elder_id=? AND source_digest=?`——`extracted_json` 和
+        `simplified_json` 写进去就没有人读过。实测拿着那个 id 去试四条候选路径
+        全是 404：它是一个悬空引用。
+
+        ## 为什么用 `family_id` 约束，而不是取到了再比
+
+        `WHERE id=? AND family_id=?` 让跨家庭的查询「不存在」，路由那一侧就能
+        统一回 404。先取回来再比较，写法上很容易变成「比之前先把内容读出来」，
+        而这是就医单据。
+
+        本人 / 家属的那一层在路由里用 `ensure_target` 判（与创建它的
+        `/v4/medical-reports/analyze` 同一把尺子）。这里不判角色，是因为这个方法
+        也要给「列出我自己的单据」用。
+
+        删除不会被绕过：读的是本表，没有第二份缓存。`/v5/privacy` 的
+        `privacy_erase` 对 `medical_documents` 是真的 DELETE，删完这里就 None。
+        """
+        row = self.conn.execute(
+            "SELECT * FROM medical_documents_v4 WHERE id=? AND family_id=?",
+            (document_id, family_id),
+        ).fetchone()
+        return self._row_medical_document(row) if row else None
+
+    def list_medical_documents(self, family_id: str, elder_id: str) -> list[MedicalDocumentRecord]:
+        """这位老人已经整理过的单据，新的在前。"""
+        self.ensure_elder(family_id, elder_id)
+        rows = self.conn.execute(
+            "SELECT * FROM medical_documents_v4 WHERE family_id=? AND elder_id=? ORDER BY created_at DESC LIMIT 200",
+            (family_id, elder_id),
+        ).fetchall()
+        return [self._row_medical_document(row) for row in rows]
 
     def create_health_event(self, family_id: str, payload: HealthEventCreate) -> HealthEventRecord:
         self.ensure_elder(family_id, payload.elder_id)
@@ -974,8 +1273,42 @@ class V4FeatureStore:
                     )
         except sqlite3.IntegrityError as exc:
             raise ValueError("该时间点的服药记录已存在。") from exc
-        self.db.append_audit(family_id, actor_id, "MEDICATION_DOSE_RECORDED", plan_id, {"status": record.status.value})
+        #: `elder_id` 是给她那一屏用的：实体号是 `medplan-…`，归属判断解析不出来，
+        #: 而家人也记得动这一笔——不带上她，家人记的那次就会被
+        #: 「动作不是她做的」丢掉（见 `privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+        self.db.append_audit(
+            family_id, actor_id, "MEDICATION_DOSE_RECORDED", plan_id,
+            {"status": record.status.value, "elder_id": plan.elder_id},
+        )
         return record
+
+    def list_doses(self, family_id: str, elder_id: str, start: date, end: date) -> list[DoseRecord]:
+        """这段日期内**逐条**的服药记录。
+
+        `medication_adherence` 给的是汇总数（吃了几次、漏了几次）。老人那一屏要的是
+        「早上八点那次吃了没」——按计划和时间点逐格显示。用汇总数拼不出来：
+        两片药各一次、吃了一次，汇总说 taken=1，但说不出是哪一片。
+        """
+        plan_ids = [plan.id for plan in self.list_medication_plans(family_id, elder_id)]
+        if not plan_ids:
+            return []
+        placeholders = ",".join("?" for _ in plan_ids)
+        rows = self.conn.execute(
+            f"""SELECT * FROM medication_doses_v4 WHERE plan_id IN ({placeholders})
+                AND scheduled_at>=? AND scheduled_at<? ORDER BY scheduled_at""",
+            [*plan_ids, f"{start.isoformat()}T00:00:00+00:00",
+             f"{(end + timedelta(days=1)).isoformat()}T00:00:00+00:00"],
+        ).fetchall()
+        return [
+            DoseRecord(
+                id=row["id"], plan_id=row["plan_id"],
+                scheduled_at=datetime.fromisoformat(row["scheduled_at"]),
+                status=DoseStatus(row["status"]),
+                recorded_at=datetime.fromisoformat(row["recorded_at"]),
+                note=row["note"] or "",
+            )
+            for row in rows
+        ]
 
     def medication_adherence(self, family_id: str, elder_id: str, start: date, end: date) -> dict[str, Any]:
         plans = self.list_medication_plans(family_id, elder_id)
@@ -997,20 +1330,60 @@ class V4FeatureStore:
         }
 
     # ----- safety/location -----
+    #: 这张表上可以改的列。顺序要和下面那条 INSERT 的占位符对得上。
+    _POLICY_COLUMNS = (
+        "inactivity_minutes", "home_lat", "home_lon",
+        "geofence_radius_m", "notify_community",
+    )
+
     def upsert_safety_policy(self, family_id: str, payload: SafetyPolicyUpdate) -> dict[str, Any]:
+        """只覆盖调用方**真的送来**的那几列。
+
+        ## 为什么不能整行覆盖
+
+        `SafetyPolicyUpdate` 每个字段都有默认值。原先这里 `ON CONFLICT DO UPDATE`
+        把每一列都写成 payload 的值，于是没送的字段不是「保持不变」，
+        而是**回到默认**。实测：
+
+            她设好家的范围               home=(39.9042, 116.3974) radius=500
+            她走到 20 公里外             alert_created=True
+            家人 PUT {inactivity_minutes: 240}          -> 200
+            再看                        home=(None, None) radius=1500
+            她再走到同一个地方           alert_created=False 「尚未设置家庭活动范围」
+
+        **家人改了一句不相干的设置，走失报警自己关掉了**，而那次改动回的是 200。
+
+        ## 为什么用 `model_fields_set`
+
+        「送了 `geofence_radius_m=1500`」和「没送、默认就是 1500」在值上分不开，
+        只有 `model_fields_set` 分得开。拿「值等于默认值」去猜，
+        会把一次真的「改回默认」当成没送。
+
+        严格说 PUT 是整体替换。可这个模型每个字段都有默认值，
+        完整的 body 和只送一个字段的 body 在服务端长得一模一样——
+        那条语义在这里只会表现为静悄悄的数据丢失，而丢的是一个安全控制。
+        """
         self.ensure_elder(family_id, payload.elder_id)
         now = utcnow()
+        values = {
+            "inactivity_minutes": payload.inactivity_minutes,
+            "home_lat": payload.home_lat,
+            "home_lon": payload.home_lon,
+            "geofence_radius_m": payload.geofence_radius_m,
+            "notify_community": int(payload.notify_community),
+        }
+        #: 第一次插入用完整的一行（那时没有旧值可保），冲突时只更新送来的列。
+        touched = [c for c in self._POLICY_COLUMNS if c in payload.model_fields_set]
+        sets = [f"{c}=excluded.{c}" for c in touched] + ["updated_at=excluded.updated_at"]
         with self.db.transaction() as conn:
             conn.execute(
-                """INSERT INTO safety_policies_v4(
-                    elder_id,family_id,inactivity_minutes,home_lat,home_lon,geofence_radius_m,notify_community,updated_at
-                ) VALUES (?,?,?,?,?,?,?,?)
-                ON CONFLICT(elder_id) DO UPDATE SET inactivity_minutes=excluded.inactivity_minutes,
-                home_lat=excluded.home_lat,home_lon=excluded.home_lon,geofence_radius_m=excluded.geofence_radius_m,
-                notify_community=excluded.notify_community,updated_at=excluded.updated_at""",
+                f"""INSERT INTO safety_policies_v4(
+                    elder_id,family_id,{",".join(self._POLICY_COLUMNS)},updated_at
+                ) VALUES (?,?,{",".join("?" * len(self._POLICY_COLUMNS))},?)
+                ON CONFLICT(elder_id) DO UPDATE SET {",".join(sets)}""",
                 (
-                    payload.elder_id, family_id, payload.inactivity_minutes, payload.home_lat, payload.home_lon,
-                    payload.geofence_radius_m, int(payload.notify_community), iso(now),
+                    payload.elder_id, family_id,
+                    *(values[c] for c in self._POLICY_COLUMNS), iso(now),
                 ),
             )
         return self.get_safety_policy(family_id, payload.elder_id)
@@ -1029,13 +1402,25 @@ class V4FeatureStore:
         result["notify_community"] = bool(result["notify_community"])
         return result
 
-    def add_activity(self, family_id: str, elder_id: str, kind: str, occurred_at: datetime, metadata: dict[str, Any]) -> str:
+    def add_activity(self, family_id: str, elder_id: str, kind: str, occurred_at: datetime) -> str:
+        """记一次「她还在动」。
+
+        原先这个方法收一个 `metadata: dict`，来自
+        `ActivityHeartbeatRequest.metadata`。那个字段已经删掉了——理由写在
+        `v4_models.ActivityHeartbeatRequest` 的 docstring 里：没有生产者，
+        没有可诚实交付的消费者，而且是个无上界的明文口子。
+
+        列本身留着不动。`metadata_json` 是 `NOT NULL`，删列要迁移，而它现在
+        恒为 `"{}"`——`baseline_store` 的播种一直就是这么写的（那里字面写着
+        `"{}"`）。留一个恒为空对象的列，比为它做一次迁移便宜，也比留一个
+        「收下就扔」的入参诚实。
+        """
         self.ensure_elder(family_id, elder_id)
         event_id = new_id("activity")
         with self.db.transaction() as conn:
             conn.execute(
                 "INSERT INTO activity_events_v4(id,family_id,elder_id,kind,occurred_at,metadata_json) VALUES (?,?,?,?,?,?)",
-                (event_id, family_id, elder_id, kind, iso(occurred_at), canonical_json(metadata)),
+                (event_id, family_id, elder_id, kind, iso(occurred_at), "{}"),
             )
         return event_id
 
@@ -1060,8 +1445,32 @@ class V4FeatureStore:
             threshold = int(policy["inactivity_minutes"])
             alert = inactive_minutes >= threshold
             if alert:
+                #: **「从来没有过」不是「很久没有」。**
+                #: 上面 `last` 为空时 `inactive_minutes` 取 `inf`，
+                #: `>= threshold` 照旧成立。于是一家刚装好、还没上报过
+                #: 任何一条心跳，评估一次就收到「老人这边很久没有动静了，
+                #: 请先打个电话问问。」——而**同一份返回里**
+                #: `inactive_minutes` 写着 `None`，等于自己承认不知道
+                #: 多久。两个字段互相打脸，而那句话是它并不知道的事，
+                #: 方向还是让人更担心的那一侧。
+                #:
+                #: 驱动出来的（全新一家、阈值 720 分钟、刚设好策略）：
+                #:     last_activity_at = None
+                #:     inactive_minutes = None
+                #:     alert_created    = True
+                #:     家属收到「老人这边很久没有动静了，请先打个电话问问。」
+                #:
+                #: **照旧报警**（一台从不上报的设备确实该说一声），
+                #: 只把话换成它真知道的那件事，并且给出能动手的下一步。
                 self.db.add_notification(
-                    family_id, ActorRole.FAMILY, "inactivity_check", "老人端长时间无交互，请先电话核实情况。",
+                    family_id, ActorRole.FAMILY, "inactivity_check",
+                    (
+                        "老人这边很久没有动静了，请先打个电话问问。"
+                        if last else
+                        "还没有收到过这一侧的任何动静记录，所以说不上"
+                        "多久没动静。先确认手机在她身边、优活的通知"
+                        "权限开着。"
+                    ),
                     policy["elder_id"],
                 )
             results.append(
@@ -1073,8 +1482,20 @@ class V4FeatureStore:
             )
         return results
 
+    #: 存进 `location_events_v4.accuracy_m` 的「这次没报精度」。
+    #:
+    #: 那一列是 `REAL NOT NULL`，SQLite 没法 ALTER 掉 NOT NULL（要重建表），
+    #: 所以用一个**落在合法取值域之外**的数：接口层 `ge=0, le=10000`，
+    #: 真实精度永远非负，因此 -1 不可能和任何一次真实读数撞上
+    #: （判据 `test_a_location_without_accuracy_does_not_raise_an_alarm.py`
+    #: 钉住这个关系）。
+    #:
+    #: 它**不许流到人眼前**：`/v5/break-glass/{id}/view` 会把它翻回
+    #: `None`，家属看到的是「没有这个数」，不是 -1。
+    ACCURACY_UNKNOWN = -1.0
+
     def add_location(
-        self, family_id: str, elder_id: str, latitude: float, longitude: float, accuracy_m: float, occurred_at: datetime, source: str
+        self, family_id: str, elder_id: str, latitude: float, longitude: float, accuracy_m: float | None, occurred_at: datetime, source: str
     ) -> str:
         self.ensure_elder(family_id, elder_id)
         event_id = new_id("location")
@@ -1083,7 +1504,9 @@ class V4FeatureStore:
                 """INSERT INTO location_events_v4(
                     id,family_id,elder_id,latitude,longitude,accuracy_m,occurred_at,source
                 ) VALUES (?,?,?,?,?,?,?,?)""",
-                (event_id, family_id, elder_id, latitude, longitude, accuracy_m, iso(occurred_at), source),
+                (event_id, family_id, elder_id, latitude, longitude,
+                 self.ACCURACY_UNKNOWN if accuracy_m is None else accuracy_m,
+                 iso(occurred_at), source),
             )
             # Minimize location retention: keep only the latest 200 events per elder.
             conn.execute(
@@ -1165,6 +1588,47 @@ class V4FeatureStore:
             )
         return record
 
+    @staticmethod
+    def _row_assistance(row: sqlite3.Row, status: str | None = None) -> AssistanceRequestRecord:
+        return AssistanceRequestRecord(
+            id=row["id"], family_id=row["family_id"], elder_id=row["elder_id"], requested_by=row["requested_by"],
+            requested_capabilities=json.loads(row["capabilities_json"]), status=status or row["status"],
+            expires_at=datetime.fromisoformat(row["expires_at"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            resolved_at=datetime.fromisoformat(row["resolved_at"]) if row["resolved_at"] else None,
+        )
+
+    def list_assistance_requests(self, family_id: str, elder_id: str) -> list[AssistanceRequestRecord]:
+        """这户人家的远程协助请求，**并且过期的真的算过期**。
+
+        在这个方法出现之前，全仓对 `assistance_requests_v4` 的唯一读取是
+        `decide_assistance` 自己那句 `WHERE id=?`。后果有两个：
+
+        1. `expires_at` 是一列纯装饰。实测把一条 approved 的 `expires_at` 拨到
+           2020 年，`status` 照旧是 approved——因为没有第二个人读，也就没有第二
+           个人有机会说它过期了。
+        2. 老人点完同意之后，无处可查自己同意了什么、还有多久。这条同意是她给
+           的，她却是唯一看不到它的人。
+
+        过期在**读的时候**落库（惰性），不靠定时任务：这个仓库里没有调度器，
+        而「只在响应里算，不写回去」会让同一条记录在库里和屏幕上不一致——
+        `monthly_report` 直接扫表，那里读到的就还是 approved。
+
+        `rejected` 和已经 `expired` 的不动：终态不再改。
+        """
+        now = utcnow()
+        with self.db.transaction() as conn:
+            conn.execute(
+                """UPDATE assistance_requests_v4 SET status='expired'
+                   WHERE family_id=? AND elder_id=? AND status IN ('pending','approved') AND expires_at<=?""",
+                (family_id, elder_id, iso(now)),
+            )
+        rows = self.conn.execute(
+            "SELECT * FROM assistance_requests_v4 WHERE family_id=? AND elder_id=? ORDER BY created_at DESC",
+            (family_id, elder_id),
+        ).fetchall()
+        return [self._row_assistance(row) for row in rows]
+
     def decide_assistance(self, family_id: str, elder_id: str, request_id: str, approve: bool) -> AssistanceRequestRecord:
         row = self.conn.execute("SELECT * FROM assistance_requests_v4 WHERE id=?", (request_id,)).fetchone()
         if not row or row["family_id"] != family_id or row["elder_id"] != elder_id:
@@ -1190,9 +1654,29 @@ class V4FeatureStore:
         self.ensure_elder(family_id, elder_id)
         start = date(year, month, 1)
         end = date(year, month, monthrange(year, month)[1])
-        start_iso = f"{start.isoformat()}T00:00:00+00:00"
+        # 「八月」是**老人那边的八月**，不是格林尼治的八月。
+        #
+        # 这两行原先是 `f"{start.isoformat()}T00:00:00+00:00"`——把本地日期
+        # 直接盖上 UTC 偏移。于是在东八区，「八月的报告」实际统计的是
+        # 8/1 本地 08:00 → 9/1 本地 08:00。实测（三条 occurrence，
+        # 用不同状态区分成员）：
+        #
+        #     本地 8/01 03:00  completed  → **不在**八月的报告里
+        #     本地 8/15 12:00  scheduled  → 在（对照）
+        #     本地 9/01 03:00  skipped    → **在**八月的报告里
+        #
+        # 两个方向各错 8 小时，而且**在计数上会互相抵消**：第一版探针三条
+        # 都用 `completed`，数出来是 2，看着正好，其实成员全错。
+        # 受影响的是 `routine_occurrences` / `tasks` / `notifications` 三张表。
+        #
+        # 同一个缺陷在 `baseline_store.errand_facts` 里是按「天」的版本，
+        # 那边已经修了（见那里 `datetime.combine(..., tzinfo=...)` 的注释）。
+        zone = local_zone()
+        start_iso = iso(datetime.combine(start, time(), tzinfo=zone))
         next_month = end + timedelta(days=1)
-        end_iso = f"{next_month.isoformat()}T00:00:00+00:00"
+        # 取**次月本地零点**，不是 start + 31 天：月长不一，而且这样对
+        # 夏令时切换也是安全的（这个时区目前没有，但写法不该依赖它）。
+        end_iso = iso(datetime.combine(next_month, time(), tzinfo=zone))
         occurrence_rows = self.conn.execute(
             """SELECT status,COUNT(*) AS c FROM routine_occurrences WHERE family_id=? AND elder_id=?
                AND due_at>=? AND due_at<? GROUP BY status""",

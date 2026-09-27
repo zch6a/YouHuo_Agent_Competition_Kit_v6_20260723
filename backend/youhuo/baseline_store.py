@@ -19,9 +19,17 @@ import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .utils import LOCAL_TIMEZONE, new_id
+
 #: 目标市场。真实产品应当按老人档案存各自的时区；在拿到那份数据之前，用一个明确
 #: 写出来的默认值，好过默默地用 UTC——后者会把每个人的"一天"切在早上八点。
-DEFAULT_TIMEZONE = "Asia/Shanghai"
+#:
+#: 值取自 `utils.LOCAL_TIMEZONE`，**不再写第二遍字面量**。提醒那一层读墙上时间
+#: （`app_api` 的 `/agenda`、`_parse_when`）用的是那一个常量，这一层用来切「哪一
+#: 天」。各写一份字面量的时候两者相等纯属巧合：谁只改了其中一个，日报的「今天」
+#: 和首页的「今天」就成了两个不同的日子——同一条提醒两块屏幕两种说法，而两边
+#: 各自的判据都是绿的。
+DEFAULT_TIMEZONE = LOCAL_TIMEZONE
 
 
 def _zone(name: str) -> ZoneInfo:
@@ -35,7 +43,6 @@ from .baseline import Channel, Observation, minutes_of_day
 from .baseline_models import EnvironmentSample
 from .baseline_services import ErrandFacts
 from .database import Database, iso, utcnow
-from .utils import new_id
 
 
 class BaselineStore:
@@ -218,8 +225,24 @@ class BaselineStore:
         事"。子女关心的"有没有事情要误"两者都算，但"在等您确认"只可能来自任务——
         提醒不需要家属批准。
         """
-        start = iso(datetime.combine(day, datetime.min.time()))
-        end = iso(datetime.combine(day + timedelta(days=1), datetime.min.time()))
+        # `day` 是**老人所在时区**的那一天（调用方传进来的就是 `local_today`），而
+        # `due_at` 一律按 UTC 存。所以本地零点必须**先标成本地零点**，再由 iso()
+        # 换算成 UTC 边界。
+        #
+        # 原先这两行是 naive 的 `datetime.combine(day, min.time())`：iso() 见到
+        # tzinfo 为 None 就直接盖上 UTC（database.py:70-72），于是窗口实际是
+        # 本地 08:00 → 次日 08:00。差的不是一点，是**整段早晨消失**——任何本地
+        # 00:00-08:00 的提醒（起床药、晨起血压）永远不进当天日报，同时次日凌晨
+        # 那一段被算进今天。实测：07:30 / 08:00 / 23:00 三条都在今天，首页
+        # `/api/v1/agenda` 数出 3 条，日报 `dueToday` 只承认 2 条，丢掉的正是
+        # 07:30 那顿药。家人读的是日报。
+        #
+        # 用 `_zone(DEFAULT_TIMEZONE)` 而不是自己拼 `timedelta(hours=8)`：偏移是
+        # 时区的属性，不是常数。`end` 也按**次日本地零点**算，不是 start + 24h，
+        # 这样将来换到有夏令时的时区仍然是「那一天」。
+        zone = _zone(DEFAULT_TIMEZONE)
+        start = iso(datetime.combine(day, datetime.min.time(), tzinfo=zone))
+        end = iso(datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=zone))
         lines: list[str] = []
 
         with self.db._lock:
@@ -238,7 +261,17 @@ class BaselineStore:
         due_today = len(reminders)
         completed = 0
         overdue = 0
-        now_iso = iso(datetime.combine(day + timedelta(days=1), datetime.min.time()))
+        # 「逾期」要跟**真正的此刻**比。
+        #
+        # 原先这一行与上面的 `end` 逐字节相同，于是下面 `row["due_at"] < now_iso`
+        # 对窗口里每一条都成立：**还没到点被算成逾期**。实测：下午三点半时，一条
+        # 23:00 的钙片在 `/api/v1/reminders` 上 `overdue=False`，在日报里却被计进
+        # `overdue` 并写成「还没办」。而 `overdue` 还会经 `FallbackAlerting.decide`
+        # 变成「有该办的事快要误了」去打扰家人——一天里每一条待办都会触发一次。
+        #
+        # 比的是 iso() 出来的串，和上面那条 SQL 的窗口比较同一种形态：都带 `+00:00`
+        # 偏移、都是 UTC，逐字符比较与时序一致。
+        now_iso = iso(utcnow())
         for row in reminders:
             if row["status"] == "completed":
                 completed += 1

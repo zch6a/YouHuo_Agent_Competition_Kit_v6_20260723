@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from . import __version__
 from .database import Database, utcnow
 from .models import ActorRole, AuthContext
 from .privacy import task_view
@@ -35,6 +36,7 @@ from .v5_models import (
     VoiceTurnRequest,
     VoiceTurnResolution,
 )
+from .v4_store import V4FeatureStore
 from .v5_services import ExplanationService, MerkleProofService, PurposeBoundPolicy, VoiceConsensusEngine
 from .v5_store import V5FeatureStore
 
@@ -59,7 +61,8 @@ def build_v5_router(
             return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
-    @router.post("/voice/resolve", response_model=VoiceTurnResolution)
+    @router.post("/voice/resolve", response_model=VoiceTurnResolution,
+                 operation_id="resolveVoice")
     def resolve_voice(
         payload: VoiceTurnRequest,
         actor: AuthContext = Depends(current_actor),
@@ -84,7 +87,8 @@ def build_v5_router(
         )
         return result
 
-    @router.post("/actions/authorize", response_model=ActionAuthorization)
+    @router.post("/actions/authorize", response_model=ActionAuthorization,
+                 operation_id="authorizeAction")
     def authorize_action(
         payload: ActionAuthorizeRequest,
         actor: AuthContext = Depends(current_actor),
@@ -107,7 +111,8 @@ def build_v5_router(
         )
         return result
 
-    @router.post("/sagas", response_model=SagaRecord)
+    @router.post("/sagas", response_model=SagaRecord,
+                 operation_id="createSaga")
     def create_saga(
         payload: SagaCreateRequest,
         actor: AuthContext = Depends(current_actor),
@@ -174,7 +179,8 @@ def build_v5_router(
         )
         return updated
 
-    @router.post("/sync/operations", response_model=SyncOperationResult)
+    @router.post("/sync/operations", response_model=SyncOperationResult,
+                 operation_id="applySyncOperation")
     def apply_sync(
         payload: SyncOperationRequest,
         actor: AuthContext = Depends(current_actor),
@@ -225,7 +231,8 @@ def build_v5_router(
         )
         return result
 
-    @router.post("/break-glass", response_model=BreakGlassRecord)
+    @router.post("/break-glass", response_model=BreakGlassRecord,
+                 operation_id="openBreakGlass")
     def open_break_glass(
         payload: BreakGlassRequest,
         actor: AuthContext = Depends(current_actor),
@@ -264,7 +271,7 @@ def build_v5_router(
             actor.actor_id,
             "BREAK_GLASS_CLOSED",
             record_id,
-            {"status": record.status},
+            {"status": record.status, "elder_id": record.elder_id},
         )
         return record
 
@@ -283,7 +290,15 @@ def build_v5_router(
                    WHERE family_id=? AND elder_id=? ORDER BY occurred_at DESC LIMIT 1""",
                 (actor.family_id, record.elder_id),
             ).fetchone()
-            result["scopes"]["location"] = dict(row) if row else {"status": "no_recent_location"}
+            # 那一列存的可能是 `V4FeatureStore.ACCURACY_UNKNOWN`（-1，因为
+            # 列是 NOT NULL，没法存 NULL）。**这个数不许出现在家属眼前**：
+            # 一位家属在紧急查看里读到「精度 -1 米」是一句没有意义的话，
+            # 读到 0 更糟——那是「精确到米」的意思，而实际上根本没这个数。
+            # 翻回 `null`，让「没有这个数」就显示成没有。
+            location = dict(row) if row else {"status": "no_recent_location"}
+            if location.get("accuracy_m") == V4FeatureStore.ACCURACY_UNKNOWN:
+                location["accuracy_m"] = None
+            result["scopes"]["location"] = location
         if "health_summary" in record.scopes:
             rows = db._conn.execute(
                 """SELECT kind,title,event_at,source FROM health_events_v4
@@ -309,7 +324,10 @@ def build_v5_router(
             actor.actor_id,
             "BREAK_GLASS_VIEWED",
             record.id,
-            {"scopes": record.scopes},
+            # `elder_id` 要写进来：老人端二的记录页靠「载荷里点名了她」
+            # 才敢把别人做的这条留给她看（见 `privacy._ABOUT_HER_EVEN_IF_ANOTHER_ACTED`）。
+            # 少了它，那一屏只会显示「开了权限」，不会显示「资料真的被读了」。
+            {"elder_id": record.elder_id, "scopes": record.scopes},
         )
         return result
 
@@ -319,21 +337,42 @@ def build_v5_router(
         if not task or task.family_id != actor.family_id:
             raise HTTPException(status_code=404, detail="任务不存在。")
         require_elder_access(actor, task.elder_id)
-        evidence: list[str] = []
-        for key in ("appointment_id", "payment_receipt", "receipt_id", "reminder_id", "verification_digest"):
-            if task.result.get(key):
-                evidence.append(f"{key}={task.result[key]}")
-        card = ExplanationService.build(task, store.approval_rows(task_id), evidence)
+        # 「办成的凭据」读的是 `task.result` 里**真的被写进去过**的那几个键。
+        #
+        # 原先这里是一份五个名字的清单，其中 `payment_receipt` / `receipt_id` /
+        # `verification_digest` 全仓库只出现在这一行，从没有人写过它们；剩下两个
+        # （`appointment_id` / `reminder_id`）恰好是真键，于是挂号和提醒是好的，
+        # 而缴费——真实形状是 `{"bill_id": …, "verification": {…}}`——走完整条
+        # 「老人复述 → 家人点头 → 状态核验」之后，评委页仍然说它没有凭据。
+        #
+        # 名单和状态门都挪进了 `ExplanationService.completion_evidence`：那里能
+        # 和写入方（`services.py` / `engine.py`）的形状对着写注释，也能单独测。
+        card = ExplanationService.build(
+            task,
+            store.approval_rows(task_id),
+            ExplanationService.completion_evidence(task),
+        )
         db.append_audit(actor.family_id, actor.actor_id, "TASK_EXPLANATION_VIEWED", task_id, {"status": task.status.value})
         return card
 
-    @router.post("/tasks/{task_id}/proof", response_model=TaskProofBundle)
+    @router.post("/tasks/{task_id}/proof", response_model=TaskProofBundle,
+                 operation_id="createTaskProof")
     def create_task_proof(task_id: str, actor: AuthContext = Depends(current_actor)) -> TaskProofBundle:
         task = db.get_task(task_id)
         if not task or task.family_id != actor.family_id:
             raise HTTPException(status_code=404, detail="任务不存在。")
         require_elder_access(actor, task.elder_id)
-        events = [event for event in db.list_audit(actor.family_id, limit=2000) if event.entity_id == task_id]
+        #: **在 SQL 里按 `entity_id` 筛**，limit 才作用在「这一件事」上。
+        #:
+        #: 原先取整条家庭流水的最新 2000 条再在 Python 里认 `entity_id`。
+        #: 一个家庭用久了，第 2000 条之前的那些步就再也进不了这份凭据——
+        #: 而端点照样 200，`merkle_root` 照样算得出来，校验端点照样说它是好的。
+        #: 一份**少了前几步**的凭证，和一份完整的从外面看长得一模一样，
+        #: 而凭证的全部价值就是「每一步都在」。
+        #:
+        #: `list_audit` 的 docstring 把这个坑写了两遍（凭证链 200 条、
+        #: 她那一屏 300 条）。这是第三处。
+        events = db.list_audit(actor.family_id, limit=2000, entity_id=task_id)
         snapshot = task.model_dump(mode="json")
         bundle = MerkleProofService.build_bundle(
             bundle_id=new_id("proof"),
@@ -356,7 +395,24 @@ def build_v5_router(
 
     @router.post("/proofs/verify", response_model=ProofVerifyResult)
     def verify_proof(payload: ProofVerifyRequest) -> ProofVerifyResult:
-        return MerkleProofService.verify(payload.bundle)
+        """校验一份凭据，**并且和服务器留存的那一份对一遍**。
+
+        原先这里只传 `payload.bundle`，于是校验的每一项都是那份包自己跟自己对
+        （见 `MerkleProofService.verify` 的 docstring）。`store_proof` 一直在写
+        `proof_bundles_v5`，而没有任何地方读它——真正那一份就躺在库里，
+        校验却从不看它。
+
+        这条端点**故意不要令牌**（凭据要能被第三方核验，那是它的意义）。
+        按 id 查留存记录只泄露「这个 id 存不存在、对不对得上」，不返回内容；
+        id 是 `new_id("proof")` 生成的，枚举不出来。
+        """
+        return MerkleProofService.verify(
+            payload.bundle,
+            recorded=store.recorded_proof_json(payload.bundle.id),
+            # 端点必须严：这台服务知道自己有没有出过这份凭据。
+            # 查不到就判否，而不是回「自洽」——界面上的绿勾看的是 `valid`。
+            require_record=True,
+        )
 
     @router.post("/privacy/export", response_model=PrivacyExportBundle)
     def export_privacy_data(
@@ -397,6 +453,38 @@ def build_v5_router(
 
     @router.post("/traces", status_code=204)
     def add_trace(payload: TraceSpanCreate, actor: AuthContext = Depends(current_actor)) -> None:
+        """记一条 span。**这一版刻意只写不读，下面是理由。**
+
+        现状（实测）：`app.routes` 里路径含 `trace` 或 `span` 的路由只有这一条
+        `POST /v5/traces`；写进 `trace_spans_v5` 的行，全仓唯一的读取是
+        `V5FeatureStore.metrics()` 里一句 `COUNT(*) … WHERE status='error'`，
+        也就是 `GET /v5/metrics` 的 `trace_errors`。发两条 span（一条 ok、一条
+        error）之后 `trace_errors` 是 1——两行里只有这一个整数出得来，span 树、
+        父子关系、脱敏后的 `attributes` 没有任何读回路径。
+
+        ## 为什么不补一条读它的端点
+
+        补 `GET /v5/traces/{trace_id}` 需要一个真实消费方，否则只是把「收下一个
+        没人看的 blob」换成「后端有、前端没画」——同一个毛病换个位置。而这个项目
+        **已经决定过**这件事：`ONBOARDING.md` 把 `/v5/…traces` 列在「明确不该上
+        老人端的」里面。span 树是给工程排障用的，不是给老人或子女看的界面，
+        老人端多一屏 span 列表对她没有任何意义。所以这一版保持只写。
+
+        ## 那「没人读」这件事怎么算说清了
+
+        两点，都是行为不是措辞：
+
+        一，`/v5/capability-truth` 把「隐私脱敏运行指标与Trace」列进
+        `implemented_and_tested`。脱敏确实做了（`add_trace` 里
+        `PrivacyRedactor.redact_value`），但**从外面验证不了**，所以那条声明只能
+        靠读代码相信。`tests/test_nothing_is_accepted_and_dropped.py` 直接查库
+        断言写进去的是脱敏后的值，把这条声明变成可复核的。
+
+        二，只写的表没有下游读者，意味着**写入时没被挡住的坏数据此后永远不会被
+        发现**。`V5FeatureStore.add_trace` 的 docstring 记着两个实测到的例子
+        （span 编号撞车会静默删掉别人那一行；结构上不可能的父链一律 204），
+        那两道检查现在是这张表唯一的读者。
+        """
         try:
             store.add_trace(actor.family_id, actor.actor_id, payload)
         except Exception as exc:
@@ -410,9 +498,23 @@ def build_v5_router(
 
     @router.get("/capability-truth")
     def capability_truth(actor: AuthContext = Depends(current_actor)) -> dict[str, Any]:
+        """这一版真正做到了什么、哪些只是适配层。
+
+        `version` 原先硬编码 `"5.0.0"`，而 `/v6/competition/evidence` 的
+        `project_version` 是 `"6.0.0"`——**同一个产品两个版本号，而且两页都在评委
+        面前**。权威来源是 `pyproject.toml` 的 `version = "6.0.0"`
+        （`scripts/check_artifacts_v6.py` 就是按它检查的，`/health`、`/ping` 和
+        FastAPI 的 `info.version` 也都是 6.0.0），所以 5.0.0 是错的那一个。
+
+        这里读 `youhuo.__version__`，不再写第四个字面量：那个常量已经存在
+        （`youhuo/__init__.py`，值就是 6.0.0），此前**一个消费者都没有**。
+        用它等于少一处会各自漂移的字面量，不是新造一个来源。
+        `pyproject.toml` 与它一致这件事由
+        `tests/test_nothing_is_accepted_and_dropped.py` 钉住。
+        """
         del actor
         return {
-            "version": "5.0.0",
+            "version": __version__,
             "implemented_and_tested": [
                 "N-best语音共识与高风险澄清",
                 "目的绑定数据流与外部策略决策",

@@ -10,7 +10,7 @@ from .database import Database
 from .models import ActorRole, AuthContext, ReminderRecord, ReminderStatus, ToolResult
 from .privacy import redact_text
 from .security import SafetyPolicy
-from .utils import combine_date_time, new_id
+from .utils import combine_date_time, local_now, new_id, restore_cjk_punctuation
 
 
 def _period_words(period: str) -> str:
@@ -166,6 +166,23 @@ class HospitalService:
         )
 
 
+#: 账单类型 → 收费单位。`bills` 表**没有单位这一列**（只有
+#: id/family_id/bill_type/period/amount_cents/due_date/paid/paid_at），
+#: 而屏幕上要写「向谁交的钱」。这是演示数据的一部分，接真营业厅之后从查询里取。
+#:
+#: 放在这里而不是门面层，是因为**槽位是在这里填的**。原先这张表只存在于
+#: `app_api.py` 的路由工厂里，后果是：`/api/v1/payments/prepare` 建的那一笔
+#: 凭证上有收款方，而**语音建的那一笔没有**——`lookup()` 的 data 里没有这一项，
+#: 而 `engine.py:725` 的 `task.slots.update(lookup.data)` 就是引擎填槽的全部来源。
+#: 语音是这个产品的主路径，凭证上「向谁交的钱」那一格恰恰最不能空。
+#: 实测（三条路径各办一笔）：种子 None、按钮 示例供电公司、语音 None。
+BILL_COMPANY = {
+    "水费": "示例自来水公司",
+    "电费": "示例供电公司",
+    "燃气费": "示例燃气公司",
+}
+
+
 class BillingService:
     def lookup(self, db: Database, family_id: str, bill_type: str) -> ToolResult:
         row = db.unpaid_bill(family_id, bill_type)
@@ -192,6 +209,11 @@ class BillingService:
                 "period": row["period"],
                 "amount_cents": row["amount_cents"],
                 "due_date": row["due_date"],
+                # 认不出来的类型就不写这一项：界面上宁可少一行，也不编一个单位。
+                # 写 `""` 是错的——那会让「取到了，是空的」和「没取到」变成同一件事，
+                # 而家人审批页对后者显示的是「还没有取到」。
+                **({"company": BILL_COMPANY[row["bill_type"]]}
+                   if row["bill_type"] in BILL_COMPANY else {}),
             },
             user_message=(
                 f"查到{_period_words(row['period'])}的{row['bill_type']}是{amount:.2f}元，"
@@ -230,6 +252,32 @@ class BillingService:
 
 
 class ReminderService:
+    @staticmethod
+    def _created_words(title: str, due_at: datetime) -> str:
+        """建好之后说给人听的那句话。**过去的时刻不许说成一个安排。**
+
+        原先无条件说「已经设置提醒：{title}，时间是{when}。」，
+        而 `when` 可能已经过去了。实测：家人把 `due_at` 填成 6 小时前，
+        回的是「已经设置提醒：ZZ六小时前的药，时间是2026-09-01 01:48。」
+        ——那个钟点早就过了。
+
+        同一台服务器上就医那条路是诚实的（`app_api.py`）：
+        「…这个时间已经过去了，就不另外提醒了。」一件事两条路，
+        一条说实话一条不说。
+
+        这里**两边都不断言**：
+          · 不说「会马上提醒」——这个部署里没有后台定时器
+            （见 KNOWN_ISSUES 第 185 条），那会是另一句没依据的话；
+          · 也不说「不会提醒」——真有调度在跑时它会响
+            （`due_reminders` 选的是 `due_at <= now`）。
+        只说清发生了什么，以及要按时提醒该怎么办。
+        """
+        when = local_now(due_at).strftime("%Y-%m-%d %H:%M")
+        if due_at <= datetime.now(UTC):
+            return (f"已经记下了：{title}。您填的时间（{when}）已经过去了，"
+                    "要按时提醒的话，请改一个以后的时间。")
+        return f"已经设置提醒：{title}，时间是{when}。"
+
     def create(
         self,
         db: Database,
@@ -262,7 +310,17 @@ class ReminderService:
             ok=True,
             code="REMINDER_CREATED",
             data={"reminder_id": record.id, "title": record.title, "due_at": record.due_at.isoformat()},
-            user_message=f"已经设置提醒：{title}，时间是{record.due_at.astimezone(UTC).strftime('%Y-%m-%d %H:%M')}。",
+            # **念出来的钟点走老人所在时区。**
+            #
+            # 这一行原先是 `.astimezone(UTC)`——显式把存储时刻换成 UTC 再念。
+            # 下面 `create_from_parts` 那段注释复盘的正是这一类缺陷，
+            # 而它当时只修了**存储**：现在库里存的是对的，念出来的还是 UTC。
+            #
+            # 实测（`due_at=19:00+08:00`）：
+            #     这句话  「已经设置提醒：量血压，时间是2026-08-25 11:00。」
+            #     卡片上   time="19:00"
+            # 老人听到的那个钟点，在这个 App 的任何一屏上都不存在。
+            user_message=self._created_words(title, record.due_at),
         )
 
     def create_from_parts(
@@ -308,7 +366,14 @@ class NotificationService:
         message: str,
         entity_id: str | None = None,
     ) -> ToolResult:
-        safe = redact_text(SafetyPolicy.sanitize_untrusted_text(message))
+        # 这条正文是**系统自己写的**，可它照样要过一遍不可信文本的消毒
+        # （纵深防御，留着）。代价是那一步的 NFKC 会把「，」「：」折成半宽：
+        # 实测家属收到的是「…风险,请尽快联系确认。」和「老人请求办理:支付…」。
+        #
+        # `restore_cjk_punctuation` 只在两个中文字之间还原，所以 `08:00`
+        # 和 `126.50` 不会被动。写法照 `v6_services.py:193`。
+        safe = restore_cjk_punctuation(
+            redact_text(SafetyPolicy.sanitize_untrusted_text(message)))
         record = db.add_notification(family_id, recipient_role, event_type, safe, entity_id)
         db.append_audit(
             family_id,
@@ -346,11 +411,24 @@ class SchedulerService:
         false ("还有24小时" three hours before the appointment).
         """
         minutes = max(1, round((due_at - now).total_seconds() / 60))
-        if minutes >= 120:
-            return f"还有约{round(minutes / 60)}小时"
-        if minutes >= 60:
-            return "还有约1小时"
-        return f"还有约{minutes}分钟"
+        if minutes < 60:
+            return f"还有约{minutes}分钟"
+        # 原先是 `>=120` 走 `round(minutes/60)` 小时、`60..119` 一律
+        # 「还有约1小时」。两个方向都会说假话（实测）：
+        #
+        #     真实 1 小时 59 分 -> 「还有约1小时」   少报 59 分钟
+        #     真实 2 小时 30 分 -> 「还有约2小时」   少报 30 分钟（round(2.5)=2）
+        #     真实 3 小时 30 分 -> 「还有约4小时」   **多报** 30 分钟（round(3.5)=4）
+        #
+        # `round` 在 .5 上取偶，所以同一句话两个方向都会偏。而这个函数的
+        # docstring 写的就是「不要告诉她假话」。
+        #
+        # 现在：满小时说整数；余数不到 10 分钟仍说「约」（误差 <10 分钟）；
+        # 余数够大就把小时和分钟都说出来。**任何一档都不会多报。**
+        hours, rest = divmod(minutes, 60)
+        if rest < 10:
+            return f"还有约{hours}小时"
+        return f"还有{hours}小时{rest}分钟"
 
     def _advance_notices(
         self,
@@ -403,7 +481,29 @@ class SchedulerService:
         escalated = 0
         advance_notified = self._advance_notices(db, notifications, now, family_id=family_id)
         for reminder in db.due_reminders(now, family_id=family_id):
-            if reminder.status == ReminderStatus.SCHEDULED:
+            # **到点要叫她，哪怕她早就说过「我知道了」。**
+            #
+            # 这一支原先只认 `SCHEDULED`，于是 acknowledged 从这里和下面
+            # 升级那一支中间掉下去。实测（家人建一条三小时后的提醒，
+            # 她当场按「我知道了」）：
+            #
+            #     到点 tick      -> {"notified": 0}   老人通知里没有 reminder_due
+            #     到点+31 分 tick -> {"escalated": 1}  家人收到「仍未确认完成」
+            #     老人**始终**没有被叫过
+            #
+            # 一顿药就这么静静地没了。而「我知道了」画在每一条没完成的
+            # 提醒上（包括几天后才到点的），所以入口是现成的。
+            #
+            # **状态不动。** `/api/v1/agenda`（`app_api.py:613`）和
+            # `/api/v1/reminders`（`:2523`）都用 `status is ACKNOWLEDGED`
+            # 显示「知道了」，而「「知道了」不是「办完了」」是专门争回来的区别。
+            # `update_reminder_status` 的守卫只有
+            # `status NOT IN (cancelled, completed)`，所以拿同一个状态调它
+            # 就只落 `notified_at`。幂等由 `notified_at is None` 保证。
+            if reminder.notified_at is None and reminder.status in (
+                ReminderStatus.SCHEDULED,
+                ReminderStatus.ACKNOWLEDGED,
+            ):
                 notifications.send(
                     db,
                     family_id=reminder.family_id,
@@ -412,10 +512,32 @@ class SchedulerService:
                     entity_id=reminder.id,
                     message=f"待办提醒：{reminder.title}。",
                 )
-                if db.update_reminder_status(reminder.id, ReminderStatus.NOTIFIED, "notified_at", now):
+                stays = (
+                    ReminderStatus.NOTIFIED
+                    if reminder.status is ReminderStatus.SCHEDULED
+                    else ReminderStatus.ACKNOWLEDGED
+                )
+                if db.update_reminder_status(reminder.id, stays, "notified_at", now):
                     notified += 1
                 continue
-            if reminder.status == ReminderStatus.NOTIFIED:
+            #: **ACKNOWLEDGED 也要走这一支。**
+            #:
+            #: `due_reminders` 选的是 scheduled / notified / acknowledged 三种，
+            #: 而这里原先只分支前两种——acknowledged 每次都从两条路中间掉下去，
+            #: 一次都不会再被处理。而 `reminder_action("acknowledge")` 没有
+            #: 「到点了吗」这道检查，老人端又把「我知道了」画在每一条
+            #: 没完成的提醒上（包括几天后才到点的）。
+            #:
+            #: 实测：家人建一条三天后的提醒，她当场按「我知道了」，
+            #: 之后把时钟推过到点逐次跑调度——同一轮里**别的**三条提醒
+            #: 该响的响了、该升级的升级了，这一条一次都没轮到，
+            #: 家人一条通知都没收到。一顿药就这么静静地没了。
+            #:
+            #: 升级判的是「**没确认完成**」（看那句话本身：「到期后仍未确认
+            #: 完成」），不是「没被通知过」。她说了句知道、事没办，
+            #: 到点之后家人照样该被告知。
+            if reminder.status in (ReminderStatus.NOTIFIED,
+                                   ReminderStatus.ACKNOWLEDGED):
                 threshold = reminder.due_at + timedelta(minutes=reminder.escalation_after_minutes)
                 if now >= threshold:
                     notifications.send(

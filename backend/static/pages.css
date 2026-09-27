@@ -36,7 +36,7 @@
   width: 72px; height: 72px;
   display: grid; place-items: center;
   border-radius: var(--r-2xl);
-  font-size: 34px; font-weight: 800; line-height: 1;
+  font-size: 34px; font-weight: 700; line-height: 1;
   color: var(--ink-invert);
   background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
@@ -71,7 +71,7 @@
   color: var(--youhuo-blue-ink);
   background: color-mix(in srgb, var(--youhuo-blue) 12%, var(--surface-2));
 }
-.role-pick strong { font-size: var(--text-xl); font-weight: 800; color: var(--ink); }
+.role-pick strong { font-size: var(--text-xl); font-weight: 700; color: var(--ink); }
 .role-pick-note { font-size: var(--text-sm); color: var(--ink-3); line-height: var(--lh-snug); }
 /* 家人那一格用陪伴模式的暖色，两个身份从第一眼就不是同一个颜色。 */
 .role-pick[data-role="family"] .role-pick-icon {
@@ -242,14 +242,14 @@
   background: var(--surface);
   border-color: var(--line-strong);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .page-section > :first-child { margin-top: 0; }
 .section-head {
   margin: var(--space-6) 0 var(--space-2);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: var(--lh-tight);
   color: var(--ink);
 }
@@ -297,7 +297,7 @@
   color: inherit;
   text-decoration: none;
 }
-.promise > strong { font-size: var(--text-sm); font-weight: 800; color: var(--ink); }
+.promise > strong { font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
 .promise > span { font-size: var(--text-sm); line-height: var(--lh-snug); color: var(--ink-2); }
 /* 只有**是链接**的那种才画箭头。
    手机框里那四条底线现在是 `<li class="promise">`（框里没有可跳的分区了），
@@ -408,6 +408,26 @@ body[data-focus="on"] .elder-focus > #taskSpace {
    #status 在 elder-focus 外，保存设置与首页待办失败也要能看见。 */
 body[data-focus="on"] .elder-focus > .composer,
 body[data-focus="on"] .elder-layout > .status-line { flex: 0 0 auto; }
+/* 上面那一条只在 Focus Mode 里、而且只管 `.elder-layout` 的**直接**子元素。
+   `#status` 住在 `.elder-layout > .panel stage` 里面，深一层，所以够不着——
+   于是在窄布局下它被压成 0 高。
+
+   实测（真浏览器 430×932，`/elder`，首页有真实数据）：
+
+       .panel.stage        display: flex（列）   ← 桌面宽度下是 block，所以只有窄布局坏
+       #status             flex-shrink: 1 · min-height: 0 · **高度 0**
+       首页那一屏          1792px
+       加上 flex-shrink:0  高度 20
+
+   `setStatus()` 是这一页对老人说的每一句「现在怎么了」的唯一出口，
+   所以「手机宽度上有内容就没有状态行」等于那些话一句都不出现。
+
+   `min-height` 那道兜底也没了：`components.css` 给的是 22px，而
+   `elder-family-v3.css`（这一页也加载）把它改成 0。
+
+   (0,2,0)，压过 `elder-family-v3.css` 里的 `.status-line`(0,1,0)，
+   不依赖加载顺序；只作用在老人端这个布局里，不碰别页的同名类。 */
+.elder-layout .status-line { flex: 0 0 auto; }
 .status-line:empty { min-height: 0; margin-top: 0; }
 .elder-layout > .status-line { margin: var(--space-1) var(--space-4) 0; }
 
@@ -570,7 +590,7 @@ body[data-task-view] .elder-focus > #chat {
 .task-amount {
   margin: 0;
   font-size: var(--text-3xl);
-  font-weight: 800;
+  font-weight: 700;
   line-height: var(--lh-tight);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -680,7 +700,7 @@ body[data-task-view] .elder-focus > #chat {
 .next-label {
   margin: 0;
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .1em;
   color: var(--ink-3);
 }
@@ -689,7 +709,7 @@ body[data-task-view] .elder-focus > #chat {
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-size: 28px;
-  font-weight: 750;
+  font-weight: 700;
   line-height: var(--lh-tight);
   color: var(--ink);
 }
@@ -702,7 +722,7 @@ body[data-task-view] .elder-focus > #chat {
 .today-head {
   margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .06em;
   color: var(--ink-3);
 }
@@ -720,7 +740,7 @@ body[data-task-view] .elder-focus > #chat {
 .tab-head {
   margin: var(--space-5) 0 var(--space-2);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 .elder-panel > .tab-head:first-child { margin-top: 0; }
@@ -733,7 +753,7 @@ body[data-task-view] .elder-focus > #chat {
 
 /* 家人。不做社交系统：谁能帮我、能帮什么、怎么找她，三件事。 */
 .kin-card { display: grid; gap: var(--space-1); }
-.kin-name { margin: 0; font-size: 26px; font-weight: 750; color: var(--ink); }
+.kin-name { margin: 0; font-size: 26px; font-weight: 700; color: var(--ink); }
 .kin-rel { margin: 0; font-size: 17px; color: var(--ink-2); }
 /* 一位家人一格。多于一位时用缩进的发丝线分开——这个家庭真实有两位
    （身份里的 daughter_id 与 son_id），而这一屏原先只写死了一位。
@@ -945,12 +965,12 @@ body[data-task-view] .elder-focus > #chat {
 .detail-head { display: grid; gap: var(--space-1); margin-bottom: var(--space-4); }
 .detail-subject { margin: 0; font-size: var(--text-lg); }
 .detail-amount {
-  margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -.01em;
+  margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.01em;
   font-variant-numeric: tabular-nums;
 }
 /* 状态不只靠颜色：文字和颜色同时给。MedCore 与 Medito 独立得出同一条结论，
    两边都实测过（前者的 e2e 刻意钉住文案「so a colour-swap regression surfaces here」）。 */
-.detail-status { margin: 0; font-weight: 750; }
+.detail-status { margin: 0; font-weight: 700; }
 .detail-status.good { color: color-mix(in srgb, var(--ok) 42%, var(--ink)); }
 .detail-status.warning { color: color-mix(in srgb, var(--warn) 46%, var(--ink)); }
 .detail-status.bad { color: color-mix(in srgb, var(--danger) 46%, var(--ink)); }
@@ -1005,7 +1025,7 @@ body[data-task-view] .elder-focus > #chat {
   letter-spacing: .1em;
   color: var(--ink-3);
 }
-.receipt-title { margin: 0; font-size: 22px; font-weight: 750; line-height: var(--lh-tight); }
+.receipt-title { margin: 0; font-size: 22px; font-weight: 700; line-height: var(--lh-tight); }
 
 /* 没有进链的那一句。放在时间轴**之前**是有意的：先说清楚这份凭证不记什么，
    再看它记了什么。 */
@@ -1325,7 +1345,7 @@ body[data-task-view] .elder-focus > #chat {
   width: 44px; height: 44px; flex: none;
   display: grid; place-items: center;
   border-radius: var(--r-lg);
-  font-size: var(--text-xl); font-weight: 800; line-height: 1;
+  font-size: var(--text-xl); font-weight: 700; line-height: 1;
   color: var(--ink-invert);
   background: linear-gradient(150deg, var(--youhuo-blue), var(--youhuo-blue-shade));
 }
@@ -1336,7 +1356,7 @@ body[data-task-view] .elder-focus > #chat {
 .stage-group h2 {
   margin: 0;
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .08em;
   color: var(--ink-3);
   text-transform: none;
@@ -1365,7 +1385,7 @@ body[data-task-view] .elder-focus > #chat {
   border-color: var(--ink-3);
   background: var(--surface-3);
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 /* 命中区 48px。对比度闸门量出来这个链接是 156×16——`min-height` 对行内元素无效，
    这是这个项目第三次踩同一个坑（首页的演示入口、家人端正文里的可信中心链接）。
@@ -1478,6 +1498,46 @@ body[data-task-view] .elder-focus > #chat {
 }
 
 .care-block { margin: var(--space-4) 0 0; }
+/* 照护页的动作层。
+   ..........................................................................
+   这一页此前是纯读的，所以既没有按钮排，也没有表单。现在「用药」能记一次、
+   「身体」能记一笔、「安全」能添一位亲友，三处共用下面这三个类。
+
+   按钮本身**不在这里定义**：裸 `<button>` 和 `.secondary` 在 `components.css`
+   和 `base.css` 里已经有完整的一套（尺寸、圆角、按下反馈、焦点环）。这里只管
+   它们怎么排。新造一套 `.btn` 会让这一页的按钮和另外六页长得不一样，而这次的
+   要求恰恰是「使用相同的组件」。 */
+.care-actions {
+  display: flex;
+  flex-wrap: wrap;                 /* 320px 上「记一次已吃」+「这次没吃」放不下一行 */
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+/* 两个动作平分一行，而不是一个撑满、一个缩到文字宽——后者读起来像主次关系，
+   而「吃了」和「没吃」是对等的两件事，把「没吃」做小会让漏服更难被记录。 */
+.care-actions > button { flex: 1 1 auto; min-width: 8em; }
+
+/* 圆角写字面值：这个项目没有 --radius-* 令牌，全项目都是字面 px。
+   我第一版写的 `var(--radius-lg)` 是编的——CSS 不报错，它把**整条声明丢掉**
+   （invalid at computed-value time），于是表单变成直角，而且只有截图看得出来。
+   `test_no_undefined_custom_properties` 抓到了这一条。 */
+.care-form {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.care-field { display: grid; gap: var(--space-1); margin-bottom: var(--space-3); }
+/* 标签是可见的，不是 placeholder：一边打电话问老人一边填的时候，
+   placeholder 在打第一个字时就消失了。 */
+.care-field > label { font-size: var(--text-sm); color: var(--ink-2); font-weight: 650; }
+.care-field > input {
+  width: 100%;
+  min-height: 48px;                /* 触控目标下限；这一页和老人端用同一个数 */
+  box-sizing: border-box;
+}
+
 .care-block-head {
   display: flex;
   align-items: center;
@@ -1833,6 +1893,67 @@ body.is-clean .stage-proof { display: none; }
 }
 .stage-escape:hover { opacity: 1; transform: none; }
 
+/* --- 五分钟节拍器 -------------------------------------------------------- */
+/*
+ * 只在 `?cue=1` 时出现，而且它要**压过答辩模式**：`body.is-clean` 把顶栏和两栏
+ * 都 `display: none` 了，节拍器恰恰是"只剩手机"那一版最需要的东西——那正是
+ * 正式演示的形态。所以下面用的是固定定位 + 高 z-index，不走 `.is-clean` 的收起。
+ *
+ * 字号取 `--text-sm` 而不是更大：它是余光里看的东西，不该和中间那台手机抢注意力。
+ */
+.cue-deck {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  /* 这里**不能**写成 `var(--shadow-2, 0 2px 12px rgba(0,0,0,.12))`。
+   *
+   * 那段兜底看着是"令牌万一没定义就还有个样子"，其实是两处坏：
+   * 一、`--shadow-2` 定义在 tokens.css 第 120 行、深色模式在第 376 行重载，
+   *   凡引 pages.css 的七页都先引了 tokens.css——兜底永远走不到，是死代码；
+   * 二、它把令牌的颜色**手抄了一遍**。抄的时候是照浅色抄的，于是深色模式下
+   *   这块不会跟着第 376 行走——正是 `test_design_rulers.py::
+   *   test_no_shadow_hardcodes_a_colour` 要挡的那种"同一个颜色写两遍、两处都
+   *   绕开令牌"（`.step-index` 那一例）。判据读的是 `box-shadow` 的值，它分不
+   *   清"兜底"和"真写死"，而它也**不该**去分清：一律走令牌就对了。 */
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.cue-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  /* `--ink-1` 这个项目里没有：墨色那一族是 `--ink`（16.5:1）、`--ink-2`、
+     `--ink-3`。时钟是整条里唯一要"一眼看到"的东西，给它最深的那档。 */
+  color: var(--ink);
+}
+.cue-seg { font-weight: 500; }
+.cue-track {
+  width: 160px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.cue-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ink);
+}
+.cue-note { font-size: var(--text-xs); color: var(--ink-3); }
+/* 超时之后整条变红：最后 30 秒还在讲，观众已经知道你超了。 */
+.cue-deck.is-over .cue-clock { color: var(--danger, #c0392b); }
+.cue-deck.is-over .cue-fill { background: var(--danger, #c0392b); }
+
 /* 窄屏上舞台没有意义：手机浏览器里直接用应用本身。 */
 @media (max-width: 900px) {
   .demo-stage { grid-template-columns: 1fr; padding: var(--space-4); }
@@ -1885,7 +2006,7 @@ body.is-clean .stage-proof { display: none; }
      的注释——这一轮已经在三处踩过同一个坑。） */
   color: var(--youhuo-blue-ink);
 }
-.score-ribbon span { color: var(--ink-3); font-weight: 750; font-size: var(--text-xs); }
+.score-ribbon span { color: var(--ink-3); font-weight: 700; font-size: var(--text-xs); }
 
 /* --------------------------------------------------------------------------
    评委页的七拍
@@ -1958,7 +2079,7 @@ body.is-clean .stage-proof { display: none; }
   display: grid; place-items: center;
   border-radius: var(--r-lg);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   /* 演过的那一拍才上色。没演过是空心的——这一页打开时七拍都还没发生，用七个实心
      蓝块假装它们已经发生过，是这一页最不该做的事。 */
@@ -1984,7 +2105,7 @@ body.is-clean .stage-proof { display: none; }
 .beat-title {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .08em;
   color: var(--ink-3);
 }
@@ -2024,7 +2145,7 @@ body.is-clean .stage-proof { display: none; }
   line-height: var(--lh-loose);
   color: var(--ink-2);
 }
-.beat-why strong { color: var(--ink); font-weight: 750; }
+.beat-why strong { color: var(--ink); font-weight: 700; }
 
 /* Proof 层。 */
 .beat-proof { margin-top: var(--space-3); }
@@ -2113,7 +2234,7 @@ body.is-clean .stage-proof { display: none; }
   color: #14224a;
   background: #fff;
   text-decoration: none;
-  font-weight: 800;
+  font-weight: 700;
   transition: transform .18s ease;
 }
 .button-link:hover { transform: translateY(-2px); }
@@ -3122,6 +3243,55 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
   .role-header { margin-bottom: var(--space-1); }
 }
 
+/* --- Focus Mode 那一列在**所有**屏高上都要装得下 ----------------------------
+   实测（`check_focus_geometry.py` 量到的那三档，加上一支专门的截图探针）：
+
+       视口        .elder-focus   各块之和    差
+       360×800        445           497      +52   ← 输入行被顶出 .stage
+       375×812        457           497      +40
+       390×844        489           497       +8
+
+   下面那个 `@media (max-height: 720px)` 块里已经有一套缩法，**但它只在 ≤720
+   的屏上生效**，而 800 / 812 / 844 这三档正好落在它外面——闸门红的正是这三档。
+
+   这三条不是新发明，是把那个块里**已经论证过**的取舍推广到所有屏高：
+
+     · orb 在 Focus Mode 里缩到 104 / 76。那个块的注释写着理由：orb 此刻的
+       职责已经从「吸引第一眼」变成「告诉她还在同一件事里」，而输入框够不到
+       是一次**功能性失效**——两者的优先级不在同一个量级。
+     · 两处间距按同一个块里的取法收紧，走令牌（4px 网格）。
+     · `#chat` 地板 96 → 80。80 是闸门自己写的下限
+       （`check_focus_geometry.py` 的 `MIN_CHAT_HEIGHT`，注释：「约两行 17px
+       正文加行距——比这更少，屏幕上只剩半句话」）。96 那一条的本意本来就写着
+       「她必须永远看得见自己刚说的至少两行」，80 仍然满足它。
+
+   **放在这个位置**（在 ≤720 那块**之前**）：同特异性下后者胜，于是 ≤720 那一档
+   的行为**一个字都不变**——320×568 现在就是绿的，不该被这一改碰到。
+
+   实测这套之后：360×800 **-21**、375×812 -33、390×844 -38、412×915 -38、
+   320×568 不变。**没有藏掉任何一个控件**：`.say-label` / `.quick` / `.mic-hint`
+   在 >720 的屏上照旧，而 orb 那句提示实测**零遮挡**（见上面那条 img 的注释）。
+   ------------------------------------------------------------------------ */
+body[data-focus="on"] .mic-dial { width: 96px; height: 96px; }
+body[data-focus="on"] .mic-big { width: 70px; height: 70px; }
+/* **`img` 和 `svg` 都要写。** 这一页的图形是 `<img src="/static/art/elder-mic.webp">`
+   （`elder.html`），而全站那七处 `.mic-big svg` 一条都匹配不上它——
+   固有尺寸居中画，按钮缩了它不缩，于是**盖住下面那句提示**（实测整句 25px）。 */
+body[data-focus="on"] .mic-big img,
+body[data-focus="on"] .mic-big svg {
+  width: 88px; height: 88px; object-fit: contain;
+}
+/* orb 那一块自己的上下外边距清零，把余量从 1px 抬到 21px（360×800）。
+   这一屏上它是「告诉她还在同一件事里」，不再需要四周留白。 */
+body[data-focus="on"] .mic-stage { margin-top: 0; margin-bottom: 0; }
+body[data-focus="on"] .elder-focus > #chat { min-height: 80px; }
+body[data-focus="on"] .elder-focus .composer > .controls {
+  margin-top: var(--space-1);
+}
+body[data-focus="on"] .elder-focus .composer > #openExtras {
+  margin-top: var(--space-1);
+}
+
 /* --- 矮屏的 Focus Mode（放在文件末尾，因为媒体查询不增加特异性） -------------
    这个块原先插在第 395 行，而既有的 `body[data-focus="on"] .mic-dial { width: 132px }`
    在第 403 行 —— 在它后面。同特异性后者胜，于是 orb 一点没缩，而同一个块里
@@ -3163,4 +3333,42 @@ body[data-nav="tabbar"] main.shell:not(.app-frame) {
      这是这一段里唯一"因为差几个像素而调的数"，所以写清差多少、从哪拿的。 */
   body[data-focus="on"] .elder-focus .composer > .controls { margin-top: var(--space-2); }
   body[data-focus="on"] .elder-focus .composer > #openExtras { margin-top: var(--space-1); }
+}
+
+/* 审计工作台（`/judge`）：把「查哪一笔」收成一行。
+   ..........................................................................
+   实测 1440×900 打开 `/judge`：文档高 2224，而三栏工作区（`#workbench`，三条
+   340px 并排）的顶边在 **y=832**——首屏 900 只露出它 68px。也就是说，一个评委
+   打开这一页，第一屏看到的是标题、一段说明和一个还没填的表单，**看不到任何
+   证据**；要滚一屏才够得着这一页真正的内容。
+
+   吃掉首屏的是最上面两块：`.judge-header` 225px + `#txnForm` **381px**。
+   而那 381px 是四个块竖着排出来的——两个 `<label>` 各占一整行（`components.css:235`
+   给 `label` 的就是 `display:grid`，块级）、两个按钮一行、状态行一行。它在
+   1060px 宽的面板里竖排，不是有人决定过要竖排，是**没有针对宽屏的规则**：
+   `components.css:654` 的 `.controls` 只管得到它自己那两个按钮，管不到上面两
+   个 label。手机 390 上竖排是对的，那里只能竖；宽屏竖排只是没人写过横排。
+
+   这一页的性质是「看的人决定查哪一件」（`judge.html:40-44` 那段注释），而它的
+   用法是**先选一笔、再看三栏**。选一笔不值得占掉三分之二个首屏。所以 ≥900px
+   上收成一行：选单 / 编号 / 两个按钮，状态行单独留在下面（它是 aria-live，
+   消息会长，塞进同一行会把它挤没）。
+
+   `align-items: end` 而不是 `center`：三个格子的高度不同（label 是「文字＋控件」
+   两行，按钮格只有一行），居中会让两个 label 的文字和控件错开。 */
+@media (min-width: 900px) {
+  #txnForm {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.1fr) minmax(200px, 1.1fr) auto;
+    align-items: end;
+    gap: var(--space-3);
+  }
+  /* `label` 自带的 `margin-bottom: var(--space-4)`（`components.css:235`）是给竖排
+     预备的，横排之后它会在每个格子下面多留一块。 */
+  #txnForm > label { margin-bottom: 0; }
+  #txnForm > .controls {
+    margin-top: 0;
+    grid-template-columns: auto auto;
+  }
+  #txnForm > .notice { grid-column: 1 / -1; margin-top: var(--space-2); }
 }

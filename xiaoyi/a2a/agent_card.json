@@ -3,7 +3,7 @@
   "version": "6.0.0",
   "description": "优活v6：面向独居老人的可信、适老、可恢复生活Agent；包含认知负荷治理、玻璃盒信任校准和安全预演。",
   "capabilities": {
-    "streaming": true,
+    "streaming": false,
     "long_running_tasks": true,
     "user_intervention": true,
     "ui_companion": true
@@ -47,19 +47,69 @@
   },
   "skills": [
     {
-      "id": "cognitive-load-governor",
+      "id": "wuyou-companion-privacy",
+      "name": "无忧陪伴隐私隔离",
+      "description": "提供适老陪伴，同时与实名办事、家属审计和高风险工具严格分离。"
+    },
+    {
+      "id": "youhuo-break-glass",
+      "name": "紧急破窗最小授权",
+      "description": "在明确紧急、老人无法响应时，允许绑定家属获得短时、最小范围的救援信息。"
+    },
+    {
+      "id": "youhuo-cognitive-load",
       "name": "适老认知负荷治理",
-      "description": "一次只问一件事、限制选项、适配语速/字号并对高风险使用复述确认。"
+      "description": "把复杂办事信息改写成老人易理解的一次一问交互。根据风险、语音置信度、重试次数和个人设置，限制每轮句长与选项数量。"
     },
     {
-      "id": "reliance-card",
+      "id": "youhuo-document-firewall",
+      "name": "拍照文档防火墙",
+      "description": "处理老人拍摄的账单、挂号单和药盒，防止OCR/VLM错误或文档提示注入进入执行链。"
+    },
+    {
+      "id": "youhuo-durable-saga",
+      "name": "可恢复长流程事务",
+      "description": "把挂号、缴费、报告复查和补药组织成可暂停、可恢复、可补偿的长流程任务。"
+    },
+    {
+      "id": "youhuo-emotion-pause",
+      "name": "情绪识别安全暂停",
+      "description": "在老人办事过程中识别明确、可解释的低落、孤独、焦虑或烦躁信号，安全暂停而不是丢弃原任务。"
+    },
+    {
+      "id": "youhuo-health-guard",
+      "name": "健康档案医疗边界",
+      "description": "对体检报告、就诊记录、药盒和服药计划进行结构化整理，同时保持医疗安全边界。"
+    },
+    {
+      "id": "youhuo-location-safety",
+      "name": "位置安全与精度感知围栏",
+      "description": "提供老人主动授权的位置记录、精度感知地理围栏、附近医院/药店/菜市场导航和求助接力。"
+    },
+    {
+      "id": "youhuo-purpose-bound-policy",
+      "name": "目的绑定参照监视器",
+      "description": "在模型之外执行目的绑定、来源追踪、字段最小化和确认策略，作为所有工具调用前的确定性引用监视器。"
+    },
+    {
+      "id": "youhuo-reliance-card",
       "name": "玻璃盒信任校准卡",
-      "description": "显示系统听到什么、来源是否核验、谁决定和下一步。"
+      "description": "生成老人可理解的“玻璃盒依赖校准卡”，说明系统听到了什么、正在做什么、依据哪些来源、谁拥有最终决定权、下一步是什么以及能否撤销。"
     },
     {
-      "id": "safe-action-preview",
+      "id": "youhuo-safe-preview",
       "name": "安全动作预演",
-      "description": "在副作用前展示允许字段、被剥离字段、人工确认和回滚计划。"
+      "description": "在任何可能产生副作用的工具调用前，执行无副作用预演：Schema过滤、用途绑定、来源可信度、老人确认、家属批准、可撤销性与补偿计划。"
+    },
+    {
+      "id": "youhuo-task-guard",
+      "name": "受治理任务图",
+      "description": "将老人办事请求转换为受治理任务，不允许模型删除确认、权限、dry-run或结果核验节点。"
+    },
+    {
+      "id": "youhuo-voice-consensus",
+      "name": "语音多候选共识",
+      "description": "将多个 ASR N-best 候选合并为一个可审计结果；对支付、挂号、身份等副作用场景采用更高阈值，候选冲突时必须澄清。"
     }
   ]
 }

@@ -1,0 +1,216 @@
+/* 优活手机端 · 整页美术密度
+   ============================================================================
+
+   ## 这一层解决的是什么
+
+   `/app` 原来的做法是：`.phone` 一层平的纸色渐变，`.card` 一张磨砂白卡，
+   然后往卡的角上贴一张 PNG。交接包 09 号文档把这个列成反例——
+   「不是白卡加圆角再往角落贴花」。
+
+   把交接包那套 R10 原样跑起来看过：整页是一幅画（竹、梅、山、锦鲤、荷），
+   密度确实高得多。但同一张截图里它也是**空的**——「下一件」那张卡只有画，
+   没有时间没有标题；「今天」那一段只剩一个空的「查看全部」白条；
+   还硬编码了一个叫「李叔」的人名（系统里根本没有这个数据）。
+   那正是它自己 09 号反例 7 说的「只追求美术，忽略 App 逻辑」。
+
+   所以这一层搬的是**密度**，不是那些页面。`/app` 的 17 页业务、
+   `data-bind`、`data-action`、路由一个不动。
+
+   ## 三层，从下往上
+
+     1. `.phone::before`   顶部竹枝 + 底部松山，中间留空给内容
+     2. `.phone` 背景       纸纹（内联 SVG 噪点，不占请求）+ 暖色天光
+     3. `.card`             半透明，让下面那幅画透上来
+
+   第 3 条是关键：卡片不透，铺再多背景也只是「白卡下面藏了张画」。
+
+   ## 不做的事
+
+   - 不搬交接包那份 `pages.css`（**311 个 `!important`**，
+     它自己的工作单 P1 第一条就是要收敛这个）
+   - 不往列表项上贴东西（09 号反例 6：所有卡片都国风化会变成古风网页）
+   - 不用 `!important`
+   -------------------------------------------------------------------------- */
+
+.phone {
+  /* 纸纹 + 顶部天光。噪点用内联 data-URI：不多一次请求，也不会 404。 */
+  background-image:
+    linear-gradient(180deg, rgba(203, 178, 132, .20) 0, rgba(203, 178, 132, 0) 300px),
+    url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, var(--paper), var(--paper2));
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-size: 100% 300px, 140px 140px, 100% 100%;
+}
+
+/* 底部松山。`.phone` 已经是 `position: relative; overflow: hidden`，
+   所以这一层不会溢出手机框。 */
+.phone::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 300px;
+  z-index: 0;                 /* 在 .scene(1) 之下、背景之上 */
+  pointer-events: none;
+  background: url("/static/art/icon/pine-band.png") center bottom / cover no-repeat;
+  opacity: .34;
+}
+
+/* 顶部竹枝，右上角。和底部的松上下呼应，中间那一段留给内容——
+   09 号反例 6 要的「主次」在版面上就是这个：四角有景，中间干净。 */
+.phone::after {
+  content: "";
+  position: absolute;
+  right: -18px;
+  top: 84px;
+  width: 168px;
+  height: 250px;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/static/art/icon/bamboo-top.png") right top / contain no-repeat;
+  opacity: .26;
+}
+
+/* 卡片透出景。
+   **这一条是关键**：卡不透，上面铺再多背景也只是「白卡下面藏了张画」，
+   而那就是原来的样子。`.card` 本来就有 `backdrop-filter: blur(8px)`，
+   把底色的不透明度降下来，那个模糊才真的在模糊**背后的画**。 */
+.card {
+  background: rgba(255, 253, 248, .74);
+  border-color: rgba(255, 255, 255, .7);
+}
+
+/* 主卡（带美术挂载的那些）再透一点，让它和普通卡拉开层级。 */
+.card.art-framed,
+.card.art-receipt {
+  background: rgba(255, 253, 248, .62);
+}
+
+/* 列表行的分隔线在半透明底上会糊，压深一档。 */
+.list { border-top-color: rgba(120, 96, 62, .22); }
+.line { border-bottom-color: rgba(120, 96, 62, .16); }
+
+/* 底部导航是**功能面**，不参与美术：它要在任何背景上都清清楚楚。
+   `--nav-bg` 本来就是 .975 不透明，这里只是写明白它是有意的，别被上面
+   那条 `.card` 半透明顺手改掉。 */
+.global-nav { --nav-bg: rgba(255, 253, 248, .975); }
+
+/* ---------------------------------------------------------------- 手机框
+ *
+ * `.phone` 是 430×932——iPhone 14 Pro Max 的逻辑尺寸，比例 9:19.5。
+ * 原本在 ≥650px 只给了圆角和一点阴影，看起来像「一张窄网页」，
+ * 不像一台手机。
+ *
+ * 补齐三件让它成为一台设备的东西：
+ *   1. 一圈黑色边框（用 `box-shadow` 画，不占布局、不改 HTML）
+ *   2. 顶部的灵动岛（用背景图层画，同样不改 HTML）
+ *   3. 桌面背景 + 投影，让它「放在桌上」
+ *
+ * `.island` 那个类在 `app.css` 里定义了但 17 个页面一个都没用——
+ * 所以只能画在背景层上。
+ *
+ * 只在 ≥900px 生效：手机上它**本来就是**一台手机，再套个框是画蛇添足。
+ */
+@media (min-width: 900px) {
+  body[data-surface="consumer"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 36px 0;
+    box-sizing: border-box;
+    /* 桌面：一层暖灰，中间稍亮，手机落在光里 */
+    background:
+      radial-gradient(120% 90% at 50% 30%, #e8e3d9 0%, #cfc9bd 55%, #b8b1a4 100%);
+  }
+
+  .phone {
+    /* 固定比例。原来只有 `min-height`，内容多的页面会越长越高，
+       长到 1400px 就不是一台手机了。 */
+    height: 932px;
+    min-height: 932px;
+    max-height: 932px;
+    overflow-y: auto;
+    border-radius: 46px;
+    box-shadow:
+      0 0 0 11px #17151300,          /* 占位，下面那层才是边框 */
+      0 0 0 11px #1a1816,            /* 机身黑边 */
+      0 0 0 12.5px #4a453e,          /* 金属高光那一道 */
+      0 0 0 13.5px #221f1c,          /* 外缘暗线 */
+      0 26px 60px rgba(40, 30, 18, .38),
+      0 6px 18px rgba(40, 30, 18, .22);
+  }
+
+  /* 灵动岛画在背景层最上面。`.phone` 的背景在上面那一节已经定义，
+     这里**重复完整的三层再加一层**——`background-image` 是整体替换，
+     只写一层会把纸纹和天光冲掉。 */
+  .phone {
+    background-image:
+      url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='34'%3E%3Crect x='0' y='0' width='112' height='34' rx='17' fill='%23050505'/%3E%3Ccircle cx='90' cy='17' r='5.5' fill='%23151a22'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, rgba(203, 178, 132, .20) 0, rgba(203, 178, 132, 0) 300px),
+      url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--paper), var(--paper2));
+    background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+    background-position: center 11px, 0 0, 0 0, 0 0;
+    background-size: 112px 34px, 100% 300px, 140px 140px, 100% 100%;
+    background-attachment: local, local, local, local;
+  }
+
+  /* 灵动岛下面要留出位置，否则品牌栏顶到它上面。 */
+  .phone > .brandbar:first-child,
+  .phone > .header-grid:first-child { margin-top: 56px !important; }
+
+  /* 底栏原来 `position: fixed` 贴视口底——套了手机框之后它会贴在
+     **桌面**的底部，飘在手机外面。
+
+     ## 必须是 `sticky`，不能是 `absolute`
+
+     第一版写的 `absolute; bottom: 0`。`.phone` 是可滚动容器
+     （`overflow-y: auto`，内容 1198px > 可视 932px），而 absolute 的包含块是
+     **padding box 的整个可滚动区域**——于是底栏钉在「全部内容的底部」，
+     一滚动它就飘到内容中间，下面还露出半张语音卡。
+
+     **我在 scrollTop=0 量过一次，`navBottom - phoneBottom = 0`，看起来是对的。**
+     一个位置量对了不等于所有位置都对——这个缺陷只有滚动之后才出现。
+
+     `sticky` 也不行：`.phone` 有 `padding-bottom: 132px`（那是给 fixed 底栏
+     留的位置），sticky 贴的是**内容边缘**、在 padding 之上，于是稳定地偏 188px。
+     再去清 padding 又要动 flex 布局，越改越远。
+
+     ## 最后用回 `fixed`，把位置**算出来**
+
+     手机在 `100vh` 的 flex 容器里垂直居中，高 932px，所以框底距视口底
+     正好 `(100vh - 932px) / 2`。底栏钉在那里就贴着框底内壁。
+     `left/transform/width` 沿用 app.css 的——它本来就是居中 430px，
+     和手机框重合。
+
+     这是「算出来」而不是「试出来」：视口一变高度，位置自动跟着对。 */
+  .global-nav {
+    position: fixed;
+    bottom: max(0px, calc((100vh - 932px) / 2));
+    border-radius: 0 0 46px 46px;
+  }
+}
+
+/* ------------------------------------------------------------------ 深色 */
+
+@media (prefers-color-scheme: dark) {
+  /* 深色下**不隐藏**这一层——R6 栽过一次：深色系统让艺术 CSS 完全不加载，
+     用户看到的是两套完全不同的产品。只压暗。 */
+  .phone::before { opacity: .18; filter: brightness(.55) saturate(.8); }
+  .phone::after { opacity: .14; filter: brightness(.55) saturate(.8); }
+  .card { background: rgba(28, 26, 23, .78); border-color: rgba(255, 255, 255, .07); }
+  .card.art-framed,
+  .card.art-receipt { background: rgba(28, 26, 23, .68); }
+}
+
+/* ---------------------------------------------------------------- 无障碍 */
+
+/* 高对比偏好下把底纹压到最弱，保证文字对比度。**不隐藏**——
+   隐藏会让版面塌一块，看起来像加载失败。 */
+@media (prefers-contrast: more) {
+  .phone::before { opacity: .1; }
+  .phone::after { opacity: .08; }
+  .card { background: rgba(255, 253, 248, .96); }
+}

@@ -1,0 +1,934 @@
+:root{
+  --paper:#f9f5eb;
+  --paper-2:#fffdf8;
+  --ink:#3f352d;
+  --muted:#77695d;
+  --jade:#496f62;
+  --jade-dark:#244b43;
+  --jade-soft:#a8bcae;
+  --gold:#b98a3b;
+  --gold-soft:#e8d6ad;
+  --red:#b85d48;
+  --line:rgba(72,58,43,.12);
+  --shadow:0 18px 50px rgba(66,48,33,.10);
+  /* 机身四周留给舞台的边距。声明成令牌是因为**有两处必须一起变**：
+     `.preview-stage` 的 padding 和 `.phone` 的 height 上限。写成两个字面量时它们
+     漂移过一次——机身 `height:min(920px,100dvh)` 在 900px 高的桌面上算出 900px，
+     加上舞台上下各 20px 就是 940px，比视口高 40px。表现是整页多出一道滚动条，
+     而机身底部那圈圆角和投影被视口下沿切掉。实测 1280×900 越界 20px、
+     1280×700 越界 40px；960px 以上才自然装得下，所以在这台机器上看不出来。 */
+  --stage-pad:20px;
+  --kai:"KaiTi","STKaiti","Kaiti SC",serif;
+  --sans:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#eee8dd;color:var(--ink);font-family:var(--sans)}
+button,input{font:inherit}
+button{-webkit-tap-highlight-color:transparent}
+body{
+  min-height:100dvh;
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 50% -20%,rgba(255,255,255,.92),transparent 46%),
+    linear-gradient(180deg,#efe9df,#e7e0d4);
+}
+.preview-stage{
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:var(--stage-pad);
+}
+.phone{
+  position:relative;
+  width:min(430px,100vw);
+  /* 减掉舞台上下两条边距，否则机身在矮桌面上比它自己的舞台还高。
+
+     这里原先还有一条 `min-height:720px`，已撤。实测（探针 probe_shell_shape.py）
+     1440×620 的电脑窗口上，`height:min(920px,100dvh-40)` 算出 580，被 min-height
+     顶成 720，于是底栏落在 y658..730——**整个在视口外**，要点底栏得先往下滚。
+     凡是窗口高度 < 760 都这样，包括 844×390 的真机横屏。
+
+     老人端 `elder-v6.css` 早就撤了同一条，理由写在那边：它在横屏上把手机撑成
+     720px，整个应用被顶出屏幕。两页形态要一致，这里跟上。 */
+  height:min(920px,calc(100dvh - var(--stage-pad) * 2));
+  overflow:hidden;
+  border-radius:38px;
+  background:
+    radial-gradient(circle at 78% 11%,rgba(255,255,255,.8),transparent 25%),
+    linear-gradient(180deg,#fbf8f0 0%,#f6f1e6 46%,#f9f5eb 100%);
+  box-shadow:0 30px 80px rgba(58,43,30,.20),0 0 0 1px rgba(62,48,36,.08);
+  isolation:isolate;
+}
+.phone::before{
+  content:"";
+  position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.23;
+  background-image:
+    radial-gradient(rgba(70,55,42,.2) .45px,transparent .45px);
+  background-size:4px 4px;
+  mix-blend-mode:multiply;
+}
+.ink-mountains{
+  position:absolute;inset:0 0 auto;height:265px;z-index:0;pointer-events:none;opacity:.64;
+}
+.ink-mountains svg{width:100%;height:100%;display:block}
+.bottom-grass{
+  position:absolute;left:0;right:0;bottom:70px;height:150px;z-index:0;pointer-events:none;opacity:.52;
+}
+.bottom-grass svg{width:100%;height:100%;display:block}
+.topbar{
+  position:relative;z-index:4;height:64px;padding:17px 22px 0;
+  display:flex;align-items:flex-start;justify-content:space-between;
+}
+.brand-mark{display:flex;align-items:center;gap:10px}
+.brand-seal{
+  width:34px;height:34px;border:1px solid rgba(145,81,54,.5);
+  display:grid;place-items:center;color:#96573f;
+  font:700 18px/1 var(--kai);transform:rotate(-2deg);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.45);
+}
+.brand-copy strong{display:block;font:700 17px/1.15 var(--kai);letter-spacing:.08em}
+.brand-copy small{display:block;margin-top:3px;color:#87786b;font-size:13px;letter-spacing:.13em}
+.top-weather{padding-top:4px;text-align:right;color:#72665a}
+.top-weather strong{display:block;font:700 13px/1 var(--kai)}
+.top-weather span{font-size:13px}
+.app-viewport{
+  position:relative;z-index:3;height:calc(100% - 64px);
+  overflow:hidden;padding-bottom:86px;
+}
+.panel{
+  height:100%;overflow-y:auto;overflow-x:hidden;
+  padding:5px 18px 118px;
+  scrollbar-width:none;
+  animation:panelIn .44s cubic-bezier(.16,.82,.18,1);
+}
+.panel::-webkit-scrollbar{display:none}
+.panel[hidden]{display:none!important}
+@keyframes panelIn{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
+.identity-island{
+  position:relative;margin:5px 0 10px;padding:8px 6px 11px 24px;min-height:116px;
+}
+.identity-island::before{
+  content:"";position:absolute;left:3px;top:4px;width:1px;height:102px;
+  background:linear-gradient(180deg,transparent,rgba(73,111,98,.54),rgba(73,111,98,.06));
+}
+.identity-island::after{
+  content:"";position:absolute;left:-3px;top:23px;width:14px;height:7px;
+  border:1px solid rgba(73,111,98,.5);border-radius:100% 0 100% 0;
+  transform:rotate(-28deg);background:rgba(169,190,176,.18);
+  box-shadow:14px 27px 0 -1px rgba(138,166,151,.18),7px 57px 0 -2px rgba(138,166,151,.16);
+}
+.hello{color:#786a5d;font-size:12px;letter-spacing:.06em}
+.identity-island h1{
+  margin:7px 0 5px;font:700 31px/1.15 var(--kai);letter-spacing:.035em;color:#4e3c2d;
+}
+.identity-island p{margin:0;color:#87786b;font-size:13px}
+.status-ribbon{
+  display:flex;align-items:center;gap:9px;margin:2px 0 13px;padding-left:23px;
+  color:#45695e;font-weight:700;font-size:12px;
+}
+.status-ribbon i{width:7px;height:7px;border-radius:50%;background:#6d9b86;box-shadow:0 0 0 5px rgba(109,155,134,.10)}
+.companion-note{
+  position:relative;margin:0 0 13px;padding:15px 18px 15px 56px;
+  border-top:1px solid rgba(153,119,68,.12);border-bottom:1px solid rgba(153,119,68,.10);
+  background:linear-gradient(90deg,rgba(255,255,255,.44),rgba(255,250,239,.10));
+}
+.companion-note .heart-line{
+  position:absolute;left:14px;top:16px;width:31px;height:31px;
+}
+.companion-note .heart-line path{
+  fill:none;stroke:#b86550;stroke-width:1.35;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:120;animation:drawHeart 1.3s ease forwards;
+}
+@keyframes drawHeart{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+.companion-note strong{display:block;font:700 16px/1.35 var(--kai);color:#594334}
+.companion-note span{display:block;margin-top:4px;color:#87786b;font-size:13px;line-height:1.6}
+.next-item{
+  position:relative;margin:4px 0 16px;padding:17px 17px 16px 18px;
+  border:1px solid rgba(178,135,63,.24);border-radius:24px 20px 28px 18px;
+  background:
+    radial-gradient(circle at 92% 4%,rgba(255,255,255,.9),transparent 25%),
+    linear-gradient(135deg,rgba(255,253,248,.88),rgba(246,238,221,.80));
+  box-shadow:0 14px 38px rgba(89,63,38,.07);
+}
+.next-item::after{
+  content:"";position:absolute;right:12px;top:12px;width:62px;height:62px;border-radius:50%;
+  border:1px solid rgba(185,138,59,.16);
+  box-shadow:inset 0 0 0 10px rgba(185,138,59,.025);
+}
+.next-label{margin:0;color:#9a7850;font-size:10px;letter-spacing:.15em;font-weight:700}
+.next-time{margin:7px 0 0;font:700 23px/1 var(--kai);color:#a56442}
+.next-title{margin:7px 0 4px;font:700 20px/1.2 var(--kai);color:#443429}
+.next-where{margin:0;color:#87786b;font-size:13px}
+.next-item button{
+  margin-top:11px;border:0;border-bottom:1px solid rgba(74,111,98,.26);
+  padding:4px 0;background:none;color:#446d61;font-weight:700;font-size:13px;
+}
+.mic-stage{
+  position:relative;margin:7px 0 18px;padding:4px 0 2px;text-align:center;
+}
+.mic-orbit{
+  position:relative;width:124px;height:124px;margin:auto;display:grid;place-items:center;
+}
+.mic-orbit::before,.mic-orbit::after{
+  content:"";position:absolute;border-radius:50%;border:1px solid rgba(73,111,98,.18);
+}
+.mic-orbit::before{inset:5px;animation:breath 2.2s ease-in-out infinite}
+.mic-orbit::after{inset:-6px;border-color:rgba(185,138,59,.13);animation:breath 2.2s .45s ease-in-out infinite}
+@keyframes breath{50%{transform:scale(1.08);opacity:.35}}
+.mic-big{
+  position:relative;z-index:2;width:92px;height:92px;border:0;border-radius:50%;
+  color:#fff;background:
+    radial-gradient(circle at 34% 27%,rgba(255,255,255,.24),transparent 26%),
+    linear-gradient(145deg,#648f7c,#315a50);
+  box-shadow:0 13px 30px rgba(52,85,73,.20),inset 0 0 0 1px rgba(255,255,255,.20);
+  cursor:pointer;
+}
+.mic-big svg{width:36px;height:36px}
+.mic-hint{margin-top:7px;color:#6d6257;font-size:12px;font-weight:700}
+.keyboard-entry{
+  margin-top:8px;border:0;background:none;color:#916843;font-size:13px;
+  border-bottom:1px solid rgba(145,104,67,.25);padding:4px 2px;cursor:pointer;
+}
+.section-head{
+  display:flex;align-items:center;justify-content:space-between;margin:10px 2px 8px;
+}
+.section-head h2{margin:0;font:700 18px/1.2 var(--kai);color:#4b3b2f}
+.section-head span{font-size:13px;color:#87786b;letter-spacing:.12em}
+.reminders{position:relative;padding-left:10px}
+.reminder-item{
+  position:relative;display:grid;grid-template-columns:51px 1fr auto;gap:9px;
+  align-items:center;padding:10px 4px 11px 12px;border-bottom:1px solid rgba(74,57,43,.08);
+}
+.reminder-item::before{
+  content:"";position:absolute;left:0;width:7px;height:7px;border-radius:50%;
+  background:#739786;box-shadow:0 0 0 4px rgba(115,151,134,.08)
+}
+.reminder-item time{font:700 14px/1 var(--kai);color:#6c5849}
+.reminder-item strong{display:block;font-size:12px;color:#4a3b30}
+.reminder-item small{display:block;margin-top:2px;color:#948577;font-size:13px}
+.reminder-item em{
+  font-style:normal;font-size:13px;color:#537a6d;background:rgba(105,149,131,.09);
+  padding:4px 7px;border-radius:999px
+}
+.more-btn{
+  width:100%;margin-top:6px;border:0;background:none;color:#7d6b5d;padding:8px;font-size:13px;cursor:pointer
+}
+.organic-flow{position:relative;margin-top:7px;padding:8px 0 22px}
+.organic-flow::before{
+  content:"";position:absolute;left:48px;top:26px;bottom:36px;width:1px;
+  background:linear-gradient(#6d9283,rgba(109,146,131,.1));
+  transform:rotate(2deg);transform-origin:top;
+}
+.record-bubble{
+  position:relative;margin:0 4px 14px 67px;padding:13px 14px 13px 15px;
+  min-height:72px;border:1px solid rgba(81,104,91,.14);
+  border-radius:44% 56% 48% 52% / 45% 42% 58% 55%;
+  background:rgba(255,253,247,.68);
+}
+.record-bubble::before{
+  content:"";position:absolute;left:-25px;top:28px;width:19px;height:1px;
+  background:rgba(76,112,96,.37);transform:rotate(-8deg);
+}
+.record-bubble .record-time{
+  position:absolute;left:-63px;top:21px;width:40px;text-align:right;
+  font:700 12px/1 var(--kai);color:#886949
+}
+.record-bubble strong{font:700 15px/1.25 var(--kai)}
+.record-bubble p{margin:5px 0 0;color:#857669;font-size:10px;line-height:1.55}
+.record-bubble.done{opacity:.62}
+.family-tree{position:relative;padding:13px 0 8px}
+.family-tree::before{
+  content:"";position:absolute;left:50%;top:14px;bottom:35px;width:1px;
+  background:linear-gradient(transparent,rgba(73,111,98,.28),transparent)
+}
+.family-person{
+  position:relative;width:84%;margin:0 auto 14px;padding:14px 14px 14px 64px;
+  min-height:74px;border-bottom:1px solid rgba(74,57,43,.10);
+}
+.family-person:nth-child(even){transform:translateX(7%)}
+.family-person .avatar{
+  position:absolute;left:5px;top:12px;width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;background:linear-gradient(145deg,#e8ded0,#fdf9f1);
+  border:1px solid rgba(168,125,66,.18);font:700 19px var(--kai);color:#805942
+}
+.family-person strong{display:block;font:700 16px var(--kai)}
+.family-person span{display:block;margin-top:4px;color:#8c7d70;font-size:10px}
+.family-person button{
+  position:absolute;right:4px;top:22px;border:0;background:none;color:#477164;font-size:13px;font-weight:700
+}
+.contact-primary{
+  width:calc(100% - 28px);margin:6px 14px 14px;border:0;border-radius:19px;
+  padding:13px 15px;background:linear-gradient(135deg,#345e53,#527b6d);color:#fff;
+  box-shadow:0 12px 28px rgba(51,84,72,.16);font-weight:700;cursor:pointer
+}
+.habit-group{margin-top:10px}
+.habit-row{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;
+  padding:14px 5px;border-bottom:1px solid rgba(73,57,43,.09)
+}
+.habit-row strong{font:700 15px var(--kai)}
+.habit-row span{display:block;margin-top:3px;color:#8d7f72;font-size:10px}
+.segmented{display:flex;gap:5px}
+.segmented button{
+  border:1px solid rgba(74,111,98,.16);border-radius:999px;background:rgba(255,255,255,.4);
+  padding:6px 9px;color:#6b5d51;font-size:10px
+}
+.segmented button.active{background:#4d7568;color:#fff;border-color:#4d7568}
+.service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.service-item{
+  min-height:88px;padding:13px;border:1px solid rgba(76,61,46,.09);
+  border-radius:21px 16px 24px 17px;background:rgba(255,253,247,.52);
+}
+.service-item b{display:block;font:700 15px var(--kai);color:#514034}
+.service-item span{display:block;margin-top:6px;color:#8b7c6e;font-size:13px;line-height:1.5}
+.trust-strip{
+  position:relative;margin:11px 0;padding:17px 17px 17px 50px;
+  border-top:1px solid rgba(168,126,61,.15);border-bottom:1px solid rgba(168,126,61,.12);
+  color:#645446;font-size:10px;line-height:1.7
+}
+.trust-strip::before{
+  content:"信";position:absolute;left:8px;top:15px;width:29px;height:29px;
+  display:grid;place-items:center;border:1px solid rgba(151,83,58,.44);color:#995a45;
+  font:700 15px var(--kai);transform:rotate(-3deg)
+}
+.focus-layer{
+  position:absolute;inset:0;z-index:25;display:none;flex-direction:column;
+  background:linear-gradient(180deg,rgba(250,247,239,.98),rgba(246,239,226,.99));
+  padding:17px 18px 104px;overflow:auto
+}
+.phone.focus-on .focus-layer{display:flex}
+.phone.focus-on .app-viewport>.panel{visibility:hidden}
+.focus-back{align-self:flex-start;border:0;background:none;color:#6e6257;padding:6px 0;font-weight:700}
+.focus-title{margin:25px 0 4px;text-align:center;font:700 28px var(--kai)}
+.focus-sub{text-align:center;color:#87786b;font-size:13px}
+.focus-orb{margin:20px auto 12px}
+.chat{
+  margin:8px 0 14px;min-height:130px;padding:12px 0;
+  border-top:1px solid rgba(75,58,44,.08);border-bottom:1px solid rgba(75,58,44,.08)
+}
+.msg{max-width:85%;margin:8px 0;padding:9px 12px;border-radius:16px;font-size:13px;line-height:1.55}
+.msg.ai{background:rgba(85,119,105,.08);color:#4f6158}
+.msg.me{margin-left:auto;background:rgba(180,137,62,.10);color:#725a3f}
+.quick{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.quick button{
+  flex:0 0 auto;border:1px solid rgba(76,111,97,.14);border-radius:999px;background:#fffaf1;
+  padding:8px 11px;font-size:10px;color:#5a4b40
+}
+.composer{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:auto}
+.composer input{
+  min-width:0;border:1px solid rgba(73,111,98,.18);border-radius:16px;background:rgba(255,255,255,.70);
+  padding:12px 13px;outline:none;color:#493d33
+}
+.composer button{
+  border:0;border-radius:16px;padding:0 17px;background:#4c7568;color:#fff;font-weight:700
+}
+.dock{
+  position:absolute;z-index:40;left:13px;right:13px;bottom:max(10px,env(safe-area-inset-bottom));
+  height:72px;padding:8px 8px 6px;display:grid;grid-template-columns:repeat(4,1fr);
+  border:1px solid rgba(89,69,48,.10);border-radius:26px 26px 23px 23px;
+  background:rgba(255,252,245,.90);backdrop-filter:blur(18px);
+  box-shadow:0 16px 42px rgba(64,47,32,.13);
+}
+.dock button{
+  position:relative;border:0;background:none;color:#817367;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;font-size:11px;cursor:pointer
+}
+.dock button .nav-icon{
+  width:30px;height:26px;display:grid;place-items:center;font:700 18px/1 var(--kai)
+}
+.dock button.is-current{color:#365f54;font-weight:800}
+.dock button.is-current::before{
+  content:"";position:absolute;top:-3px;width:28px;height:2px;border-radius:99px;background:#b68a43
+}
+/* 底栏那四个字**只在一处**声明，在 `.family-tabs` 那一段。
+   这里原先另有一套 `.dock button:nth-child(n)`，写的是「今 记 亲 我」——从老人端
+   照抄过来的，而这一页的四个分区是「今天 待办 照护 我的」，第二、三个字是错的。
+   它没显示出来，只是因为下面那套同名规则排在后面、同特异度后写覆盖先写。
+   也就是说：删掉下面那四行，屏幕上立刻出现两个错字，而任何静态闸门都不会响
+   ——它们都读 HTML，而这四个字只存在于 CSS 的 content 里。 */
+.tab-head{margin:10px 4px 4px;font:700 27px var(--kai)}
+.tab-note{margin:0 4px 16px;color:#887a6c;font-size:13px;line-height:1.55}
+.panel-kicker{margin:0 4px 7px;color:#a07b4f;font-size:13px;font-weight:800;letter-spacing:.16em}
+@media(max-width:520px){
+  .preview-stage{padding:0}
+  .phone{width:100vw;height:100dvh;min-height:0;border-radius:0;box-shadow:none}
+}
+
+/* 真机横屏：手机铺满窗口。
+   与老人端 `elder-v6.css` 那条对称（那边还带内容重排，这边内容简单不用）。
+   **必须带 `max-width` 上限**——只按 `max-height` 写的话，1440×500 的电脑窗口
+   也会被当成横屏手机，两个页面一起变成铺满的网页，而它们在电脑上都该是手机壳。
+   960px 的依据写在老人端那一条的注释里。 */
+@media(max-height:560px) and (max-width:960px){
+  .preview-stage{padding:0}
+  .phone{width:100vw;height:100dvh;min-height:0;border-radius:0;box-shadow:none}
+}
+
+
+.youhuo-robot-mascot{
+  position:fixed;left:0;top:0;width:84px;height:135px;z-index:1505;
+  pointer-events:none;opacity:0;transform:translate3d(0,0,0);
+  transition:opacity .28s ease;will-change:transform;
+}
+.youhuo-robot-mascot.is-ready{opacity:1}
+.youhuo-robot-canvas{
+  position:absolute;left:0;bottom:0;width:84px;height:135px;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  filter:drop-shadow(0 7px 6px rgba(65,49,36,.14)) drop-shadow(0 0 1px rgba(255,255,255,.72));
+  pointer-events:auto;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
+}
+.youhuo-robot-mascot.is-dragging{z-index:9999}
+.youhuo-robot-mascot.is-dragging .youhuo-robot-canvas{cursor:grabbing}
+.youhuo-robot-bubble{
+  position:absolute;bottom:109px;right:68px;width:min(220px,calc(100vw - 96px));
+  padding:10px 14px 11px;border:1px solid rgba(164,113,40,.38);
+  border-radius:20px 25px 18px 24px;color:#49382a;
+  background:radial-gradient(circle at 14% 12%,rgba(255,255,255,.9),transparent 35%),rgba(255,251,242,.97);
+  box-shadow:0 12px 34px rgba(74,54,35,.12),inset 0 0 20px rgba(255,255,255,.34);
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:12px;line-height:1.62;font-weight:650;
+  letter-spacing:.01em;white-space:normal;backdrop-filter:blur(12px);
+  opacity:0;visibility:hidden;translate:0 6px;
+  transition:opacity .22s ease,translate .22s ease,visibility .22s step-end;
+}
+.youhuo-robot-mascot.bubble-right .youhuo-robot-bubble{right:auto;left:68px}
+.youhuo-robot-bubble::after{
+  content:"";position:absolute;bottom:-7px;right:28px;width:12px;height:12px;
+  border-right:1px solid rgba(164,113,40,.30);border-bottom:1px solid rgba(164,113,40,.30);
+  background:#fffaf0;transform:rotate(45deg)
+}
+.youhuo-robot-mascot.bubble-right .youhuo-robot-bubble::after{right:auto;left:28px}
+.youhuo-robot-bubble.show{
+  opacity:1;visibility:visible;translate:0 0;
+  transition:opacity .22s ease,translate .22s ease,visibility 0s
+}
+
+
+
+/* 四屏家人端：继续沿用老人端 V6.0 的纸张、山水和有机层级。 */
+.family-panel .identity-island{min-height:108px}
+.family-panel .identity-island h1{font-size:29px}
+.role-chip{
+  display:inline-flex;align-items:center;gap:7px;margin:4px 0 0;padding:5px 9px;
+  border:1px solid rgba(73,111,98,.14);border-radius:999px;background:rgba(255,255,255,.38);
+  color:#547468;font-size:13px;font-weight:800;letter-spacing:.05em;
+}
+.role-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:#719787;box-shadow:0 0 0 4px rgba(113,151,135,.09)}
+.confirm-zone{margin:4px 0 16px}
+.confirm-card{
+  position:relative;padding:15px 16px 15px 49px;border-top:1px solid rgba(176,133,62,.14);
+  border-bottom:1px solid rgba(176,133,62,.12);background:rgba(255,253,248,.45)
+}
+.confirm-card::before{
+  content:"签";position:absolute;left:9px;top:14px;width:27px;height:27px;display:grid;place-items:center;
+  border:1px solid rgba(150,84,58,.42);color:#9e614b;font:700 14px var(--kai);transform:rotate(-4deg)
+}
+.confirm-card strong{display:block;font:700 16px/1.35 var(--kai)}
+.confirm-card p{margin:5px 0 8px;color:#827466;font-size:10px;line-height:1.55}
+.confirm-card button{
+  border:0;background:none;padding:3px 0;border-bottom:1px solid rgba(73,111,98,.25);color:#426d60;font-weight:800;font-size:10px
+}
+.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0 16px}
+/* 「我的」那一行只剩一格活的（#mChain），铺满整行。
+   这个类名此前就写在标记上，但没有任何规则配它——一个看起来在起作用、
+   实际什么都不做的类名。 */
+.metric-row-one{grid-template-columns:1fr}
+.metric-row-one .metric{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  min-height:0;padding:15px 17px;
+}
+.metric-row-one .metric span{font-size:13px}
+.metric-row-one .metric strong{margin-top:0}
+.metric{
+  position:relative;min-height:73px;padding:11px 9px;border:1px solid rgba(79,65,50,.08);
+  border-radius:18px 14px 22px 15px;background:rgba(255,253,248,.48)
+}
+.metric span{display:block;color:#87786b;font-size:13px}
+.metric strong{display:block;margin-top:6px;font:700 22px/1 var(--kai);color:#4a5f55}
+.report-strip{
+  position:relative;margin:3px 0 15px;padding:15px 17px 15px 18px;
+  border:1px solid rgba(164,128,68,.15);border-radius:23px 18px 27px 17px;
+  background:linear-gradient(135deg,rgba(255,253,247,.78),rgba(241,237,224,.62));
+}
+.report-strip::after{
+  content:"";position:absolute;right:14px;top:12px;width:48px;height:48px;border-radius:50%;
+  border:1px solid rgba(73,111,98,.13);box-shadow:inset 0 0 0 9px rgba(73,111,98,.025)
+}
+.report-strip strong{display:block;padding-right:60px;font:700 17px var(--kai)}
+.report-strip p{margin:5px 0 0;padding-right:50px;color:#847668;font-size:10px;line-height:1.58}
+.todo-calendar{
+  display:flex;gap:8px;overflow:auto;padding:4px 2px 13px;scrollbar-width:none
+}
+.day-pill{
+  flex:0 0 61px;padding:10px 6px;text-align:center;border:1px solid rgba(79,63,47,.09);
+  border-radius:19px 14px 21px 15px;background:rgba(255,253,248,.48);color:#7f7063
+}
+.day-pill b{display:block;font:700 17px var(--kai);color:#594537}
+.day-pill span{font-size:13px}
+.day-pill.active{background:linear-gradient(145deg,#547b6e,#345d52);color:#fff;border-color:transparent}
+.day-pill.active b{color:#fff}
+/* `.todo-list` / `.todo-item` 的规则跟着标记一起删了：待办面板里那一节
+   写死的「今天」已经去掉（真日历在它上面，两份「今天」只能留一份），
+   现在全站没有任何东西再产出这两个类名。留着一份没有标记配的样式，
+   下一个人会以为这一页还有那个列表。 */
+.family-form{
+  margin:5px 0 18px;padding:14px 15px;border:1px solid rgba(84,65,48,.08);
+  border-radius:21px 16px 25px 17px;background:rgba(255,253,247,.50)
+}
+.family-form label{display:block;margin:0 0 10px;color:#746558;font-size:10px}
+.family-form input{
+  display:block;width:100%;margin-top:5px;border:0;border-bottom:1px solid rgba(73,111,98,.20);
+  background:transparent;padding:8px 2px;color:#493d33;outline:none
+}
+.family-form button{
+  width:100%;border:0;border-radius:16px;padding:11px;background:linear-gradient(135deg,#355f54,#537c6e);
+  color:#fff;font-weight:800;font-size:13px
+}
+.care-seg{
+  display:flex;gap:7px;overflow-x:auto;margin:7px -2px 13px;padding:2px 2px 7px;scrollbar-width:none
+}
+.care-seg button{
+  flex:0 0 auto;border:1px solid rgba(73,111,98,.14);border-radius:999px;background:rgba(255,255,255,.42);
+  padding:7px 10px;color:#6b5f53;font-size:10px
+}
+.care-seg button.is-current{background:#4b7568;color:#fff;border-color:#4b7568}
+.care-detail[hidden]{display:none!important}
+.care-verdict{
+  position:relative;margin:2px 0 13px;padding:16px 18px;border:1px solid rgba(178,135,63,.22);
+  border-radius:25px 19px 29px 17px;background:linear-gradient(135deg,rgba(255,254,250,.83),rgba(241,236,220,.75))
+}
+.care-verdict small{display:block;color:#987647;font-size:13px;letter-spacing:.13em}
+.care-verdict strong{display:block;margin-top:6px;font:700 20px/1.28 var(--kai)}
+.care-verdict p{margin:6px 0 0;color:#827466;font-size:10px;line-height:1.55}
+.care-rows{margin:4px 0 15px}
+.care-row{
+  display:grid;grid-template-columns:35px 1fr auto;gap:11px;align-items:center;
+  padding:12px 4px;border-bottom:1px solid rgba(73,57,43,.08);cursor:pointer
+}
+.care-symbol{
+  width:32px;height:32px;display:grid;place-items:center;border-radius:50%;
+  border:1px solid rgba(176,132,61,.18);background:rgba(255,252,245,.56);font:700 15px var(--kai);color:#896546
+}
+.care-row strong{display:block;font:700 14px var(--kai)}
+.care-row small{display:block;margin-top:3px;color:#8d7e70;font-size:13px}
+.care-row em{font-style:normal;color:#4f766a;font-size:10px}
+.care-chart{
+  height:112px;margin:11px 0 17px;padding:14px;border-top:1px solid rgba(75,58,44,.08);
+  border-bottom:1px solid rgba(75,58,44,.08);display:flex;align-items:flex-end;gap:10px
+}
+/* 高度由下面那组 `.h48`…`.h72` 给。
+   这里原先还写着 `height:var(--h)`，而 `--h` 全站没有任何地方声明过——
+   CSS 对未声明的自定义属性的处理是把**整条声明**丢掉（invalid at computed-value
+   time），所以它从来没起过作用，也从来不会报错。留着它会让下一个人以为
+   柱高是通过内联 `--h` 传进来的，而这一页禁止内联 style。 */
+.care-chart i{flex:1;border-radius:10px 10px 3px 3px;background:linear-gradient(180deg,rgba(76,117,103,.52),rgba(76,117,103,.10))}
+.record-flow{position:relative;margin:7px 0 16px;padding-left:22px}
+.record-flow::before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:1px;background:linear-gradient(#b98a3b,rgba(185,138,59,.08))}
+.record-row{position:relative;padding:0 0 15px 8px}
+.record-row::before{content:"";position:absolute;left:-18px;top:4px;width:7px;height:7px;border-radius:50%;background:#668a7d;box-shadow:0 0 0 4px rgba(102,138,125,.08)}
+.record-row strong{display:block;font:700 14px var(--kai)}.record-row span{display:block;color:#8b7c6e;font-size:13px;margin-top:3px}
+.fam-links{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:9px 0}
+.fam-link{
+  display:block;padding:14px;border:1px solid rgba(77,60,45,.08);border-radius:18px 14px 21px 16px;
+  background:rgba(255,253,248,.47);color:#4b6158;text-decoration:none;font:700 13px var(--kai)
+}
+.family-tabs button:nth-child(1) .nav-icon::before{content:"今"}
+.family-tabs button:nth-child(2) .nav-icon::before{content:"办"}
+.family-tabs button:nth-child(3) .nav-icon::before{content:"护"}
+.family-tabs button:nth-child(4) .nav-icon::before{content:"我"}
+.family-tabs button:nth-child(3).is-current{color:#365f54}
+.notice-line{
+  margin:3px 0 12px;padding:8px 11px;border-left:2px solid rgba(73,111,98,.38);
+  color:#64766d;background:rgba(255,255,255,.28);font-size:10px;line-height:1.55
+}
+.care-chart i.h48{height:48%}
+.care-chart i.h55{height:55%}
+.care-chart i.h57{height:57%}
+.care-chart i.h60{height:60%}
+.care-chart i.h61{height:61%}
+.care-chart i.h63{height:63%}
+.care-chart i.h64{height:64%}
+.care-chart i.h65{height:65%}
+.care-chart i.h66{height:66%}
+.care-chart i.h68{height:68%}
+.care-chart i.h72{height:72%}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   注水之后的样子
+   ──────────────────────────────────────────────────────────────────────
+   这一页的业务逻辑用的是**设计一那一份**（family.js / care.js），而设计一的
+   样式住在四层全局表里（tokens/base/components/pages.css）——这一页一层都没引，
+   只有 family-v6.css 一张。
+
+   后果不是「有点不一样」，是断成两截：静态标记好看，数据一到、`replaceChildren`
+   一跑，那一块就变成浏览器默认样式的 16px 段落。实测活 DOM 里有 38 个类名在
+   这张表里一条规则都没有——「需要您确认」那张带朱印的卡变成两个灰色系统按钮，
+   「做过的事」变成「优活登录了2026/8/19 01:23:16」这样标题和时间挤成一行的长条，
+   「照护」那句结论变成一行 16px 粗体顶格压在分区按钮下面。
+
+   为什么闸门没抓到：闸门读的是**静态 HTML**，而这些标记只在浏览器里存在。
+   风格指纹、对比度、溢出探针量的也都是注水前那一屏。
+
+   下面按 JS 真正写出来的结构补齐，用的是这一页自己的纸面语言（楷体标题、
+   9–11px 正文、有机圆角、竹青与藤黄），不是把那四层抄过来。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── 退出口 ────────────────────────────────────────────────────────────
+   「返回首页」原先是一个**没有任何规则**的 <a>：浏览器默认的蓝色下划线，
+   21px 高，压在圆角机身的最上沿——它是这一页唯一的退出口，却是屏幕上唯一
+   一个不属于这套设计的元素，而且触控高度只有 21px。
+   现在它是机身顶上一条独立的窄栏，48px 触控高度；`.app-viewport` 的高度里
+   把这 48px 减掉，否则整机内容会顶出 `.phone` 的 overflow:hidden。 */
+.back-link{
+  position:relative;z-index:5;
+  display:inline-flex;align-items:center;gap:6px;
+  height:48px;padding:0 22px;
+  color:#5c7a6e;font-size:12px;font-weight:700;letter-spacing:.04em;
+  text-decoration:none;-webkit-tap-highlight-color:transparent;
+}
+.back-link:hover,.back-link:focus-visible{color:#33564a}
+.app-viewport{height:calc(100% - 112px)}
+
+/* 操作回执做成浮层，不占布局高度。
+   它 `hidden` 时不画，一旦 care.js 把它打开，如果它是普通流内元素，
+   下面 64px 的顶栏和整个视口会被往下推——而 `.phone` 是 overflow:hidden，
+   被推出去的那一截（底栏上方的内容）直接被裁掉。
+
+   ── 选择器为什么不是 `#careNotice` ──────────────────────────────────────
+   原来是 `#careNotice`，ID 选择器（1,0,0），压过下面 `.notice.good` /
+   `.notice.warning` / `.notice.bad`（0,2,0）——而那三条只声明 `color` 与
+   `border-left-color`，后者还被这里的 `border:1px solid …` 简写一起顶掉。
+   于是三种语气一个通道都分不开：实测（真浏览器 430×932，同一个元素依次挂
+   三种语气）字色全是 rgb(93,79,66)、左线全是 1px rgba(150,110,60,.22)、
+   底全是 rgba(255,252,245,.96)——**一共 1 种长相**。「记好了」和「这一条
+   现在改不了」在屏幕上是同一个样子。
+
+   同一页上的 `#familyNotice` 没有 ID 规则焊着，实测 3 种长相；`/care` 与
+   `/family` 也是 3 种。正确答案不用发明，照它们的做法即可。
+
+   `.notice[id="careNotice"]` 是 (0,2,0)：仍然压过 `.notice`（0,1,0），
+   拿到浮层该有的几何与纸面；但**不再压过语气**。三件事跟着改：
+
+     · 不再声明 `color`——字色交回 `.notice` 与 `.notice.warning|bad`，
+       和这一页上那个好的回执位（`#familyNotice`）走同一条路；
+     · `border` 简写拆成上右下三条——左边那道线的宽度线型由 `.notice`
+       （2px solid）给，颜色由语气给。简写会把 `border-left-color` 一起
+       写上，那是三个通道里最先被顶掉的一个；
+     · 纸面按语气分三张（下面两条 (0,3,0)）。这里不能直接让
+       `.notice.warning{background:rgba(185,138,59,.07)}` 生效：这一块是
+       **压在内容上面的浮层**，7% 的淡彩透得过去，底下那一行字会印在回执
+       里。所以换成同样的语气、96% 不透明的纸——不是把底色这条通道丢掉。
+
+   靠 `.notice` 这个类是稳的：`care.js::notify()` 自己写的就是
+   `host.className = 'notice ' + tone`，它是这个元素 className 的唯一写入者。
+   不用 `!important`：那压得住这一次，然后变成下一个人的同一个问题。 */
+.notice[id="careNotice"]{
+  position:absolute;z-index:32;left:14px;right:14px;top:54px;margin:0;
+  padding:11px 14px;
+  border-top:1px solid rgba(150,110,60,.22);
+  border-right:1px solid rgba(150,110,60,.22);
+  border-bottom:1px solid rgba(150,110,60,.22);
+  border-radius:16px 12px 18px 13px;
+  background:rgba(255,252,245,.96);backdrop-filter:blur(10px);
+  box-shadow:0 12px 30px rgba(70,52,35,.14);
+  font-size:13px;line-height:1.6;
+}
+/* 语气纸面。(0,3,0)：压过上面那张中性纸，也压过 `.notice.warning|bad` 的
+   7% 淡彩——浮层要的是不透明。`.warn` 一起写上：`.notice.warning,.notice.warn`
+   是同一条规则，只挡一个名字会留下一半。 */
+.notice.warning[id="careNotice"],.notice.warn[id="careNotice"]{
+  background-color:rgba(255,248,234,.96)}
+.notice.bad[id="careNotice"]{background-color:rgba(255,243,238,.96)}
+
+/* ── 语气 ──────────────────────────────────────────────────────────────
+   四套词汇共用一组颜色：判定词（good/warn/bad/unknown/pending）、
+   任务步骤（todo/confirm/relay/done/cancelled）、回执语气（good/warning/bad）、
+   以及计数格的 alert。`unknown` 有意和 `warn` 分开——common.js 里写明了
+   「本该有记录却一条都没有」必须被看见，而 `pending`（今天还没过完）是中性的。 */
+.pill,.status-chip{
+  display:inline-block;margin-left:7px;padding:3px 9px;
+  border:1px solid rgba(74,111,98,.16);border-radius:999px;
+  background:rgba(255,255,255,.5);
+  color:#6b5d51;font-size:13px;font-weight:700;line-height:1.5;
+  white-space:nowrap;vertical-align:middle;
+}
+.pill.good,.status-chip.good,.status-chip.done{
+  color:#3f6d5c;border-color:rgba(73,111,98,.26);background:rgba(105,149,131,.12)}
+.pill.warn,.pill.pending,.status-chip.confirm,.status-chip.relay{
+  color:#8a6222;border-color:rgba(185,138,59,.30);background:rgba(185,138,59,.13)}
+.pill.unknown{
+  color:#8a6a3e;border-color:rgba(150,110,60,.30);background:rgba(150,110,60,.10);
+  border-style:dashed}
+.pill.bad,.status-chip.escalated{
+  color:#9d4c37;border-color:rgba(178,90,68,.30);background:rgba(184,93,72,.12)}
+.status-chip.cancelled{color:#8b7c6e;opacity:.8}
+
+/* 文字语气。只在这几个宿主上生效，不做成裸的 `.good{color:…}`——
+   `.good` 同时会被挂到 `.metric` 这种整块容器上，裸规则会把整格染色。 */
+.meta{color:#8b7c6e;font-size:10px;line-height:1.62}
+.meta.bad{color:#9d4c37}
+.metric.alert strong,.metric.bad strong{color:#9d4c37}
+.metric.good strong{color:#41695a}
+.identity-island h1.fam-verdict.warn{color:#8a6222}
+.identity-island h1.fam-verdict.bad{color:#9d4c37}
+
+/* 提示条。`#familyNotice` 的静态类是 `notice-line`，但 family.js 的 notify()
+   直接 `host.className = 'notice ' + tone`——静态那条被整个换掉，所以
+   `.notice` 必须自己成立，不能靠 `.notice-line` 兜着。 */
+.notice{
+  margin:6px 0 12px;padding:10px 13px;
+  border-left:2px solid rgba(73,111,98,.38);
+  background:rgba(255,255,255,.34);
+  color:#5f7168;font-size:13px;line-height:1.62;
+}
+.notice.good{border-left-color:rgba(73,111,98,.5)}
+.notice.warning,.notice.warn{border-left-color:rgba(185,138,59,.55);color:#7a6338;
+  background:rgba(185,138,59,.07)}
+.notice.bad{border-left-color:rgba(178,90,68,.55);color:#8e4c39;
+  background:rgba(184,93,72,.07)}
+/* 家人端那个回执位做成浮层，压在底栏上方。
+ *
+ * 它原先写在「今天」那个 panel 里面，而四个分区靠 `panel[hidden]` 切换——
+ * 于是在待办 / 照护 / 我的 上写的每一句回执都进了隐藏子树。实测（切到「待办」
+ * 加一条提醒）：提醒真的建了，`#familyNotice` 里也写上了「已经设置提醒：…」，
+ * 而它高度 0、在 hidden 子树里，整屏可见文本里**一个字都没有**。
+ *
+ * 搬到 `.app-viewport` 之外之后又出现第二种「看不见」：`.app-viewport` 是
+ * `height:calc(100% - 112px); overflow:hidden`，一个普通流内元素排在它之后
+ * 会被顶到机身外面（实测 y=746，视口高 720）。所以必须做成浮层。
+ *
+ * 位置照老人侧的 `.status-line`：两边的 `.dock` 规则逐字相同
+ * （`height:72px`、`bottom:max(10px, env(safe-area-inset-bottom))`），
+ * 所以 `84px` 这个抬高量在这里同样成立。
+ *
+ * 三条纪律照上面 `#careNotice` 那一块（同一次失败留下的）：
+ * 选择器用 `.notice[id="familyNotice"]`（0,2,0）不用 ID；不写 `color`；
+ * 不用 `border` 简写。语气的三张纸在下面，(0,3,0)。 */
+.notice[id="familyNotice"]{
+  position:absolute;z-index:45;left:13px;right:13px;
+  bottom:calc(84px + max(10px,env(safe-area-inset-bottom)));
+  margin:0;padding:9px 13px;
+  border-top:1px solid rgba(89,69,48,.10);
+  border-right:1px solid rgba(89,69,48,.10);
+  border-bottom:1px solid rgba(89,69,48,.10);
+  border-radius:14px;
+  background:rgba(255,252,245,.94);backdrop-filter:blur(12px);
+  box-shadow:0 10px 24px rgba(64,47,32,.10);
+  font-size:13px;line-height:1.55;
+}
+/* 语气纸面。(0,3,0)：压过上面那张中性纸，也压过 `.notice.warning|bad` 的
+   7% 淡彩——浮层要的是不透明，透过去的话底下那行字会印在回执里。 */
+.notice.warning[id="familyNotice"],.notice.warn[id="familyNotice"]{
+  background-color:rgba(255,248,234,.96)}
+.notice.bad[id="familyNotice"]{background-color:rgba(255,243,238,.96)}
+
+.notice strong{display:block;margin-bottom:4px;font:700 13px/1.4 var(--kai)}
+.notice .care-lines{margin:0}
+
+/* ── 「需要您确认」与「其他正在办的事」 ────────────────────────────────
+   family.js 的 fmtTask() 写出来的是 `.task`：一个 <strong> 标题、两行说明、
+   （只有等家属点头时）两个按钮。给它静态 `.confirm-card` 同一张纸和那枚朱印。 */
+.task{
+  position:relative;margin:0 0 10px;padding:15px 16px 14px 49px;
+  border-top:1px solid rgba(176,133,62,.14);border-bottom:1px solid rgba(176,133,62,.12);
+  background:rgba(255,253,248,.45);
+}
+.task:last-child{margin-bottom:0}
+.task::before{
+  content:"签";position:absolute;left:9px;top:14px;width:27px;height:27px;
+  display:grid;place-items:center;border:1px solid rgba(150,84,58,.42);
+  color:#9e614b;font:700 14px var(--kai);transform:rotate(-4deg);
+}
+.task>strong{display:block;margin-bottom:6px;font:700 16px/1.35 var(--kai);color:#4b3b2f}
+.task>div{margin-top:3px;color:#827466;font-size:10px;line-height:1.6}
+.task button{
+  min-height:56px;margin:11px 8px 0 0;padding:0 18px;
+  border:1px solid rgba(73,111,98,.26);border-radius:16px 13px 18px 14px;
+  background:linear-gradient(135deg,rgba(53,95,84,.96),rgba(83,124,110,.96));
+  color:#fffdf8;font:700 12px var(--kai);letter-spacing:.04em;cursor:pointer;
+}
+.task button.danger{
+  background:rgba(255,255,255,.5);border-color:rgba(178,90,68,.34);color:#9d4c37;
+}
+.task button[disabled]{opacity:.55;cursor:default}
+/* 「其他正在办的事」里的没有按钮，也不该带朱印——那枚印章的意思是
+   「这一件在等您签」。 */
+#otherTasks .task{padding-left:16px;background:none}
+#otherTasks .task::before{content:none}
+
+/* ── 待办日历 ──────────────────────────────────────────────────────────
+   `.todo-calendar` 原本是一条横向滚动的日期胶囊带（静态 `.day-pill`，
+   `flex:0 0 61px`，五个正好排满一行）。renderCalendar() 写进来的却是
+   `.calendar-day`——每一天一个分组，里面有标题和若干条目。塞进同一条横向
+   flex 里，两天并排、条目竖着挤成两栏，就是截图上那一坨。
+   加 `flex-wrap:wrap` 并让 `.calendar-day` 占满一行：静态胶囊不受影响
+   （它们加起来不到一行宽），真数据则竖着排。这一屏的说明写的就是「先按日期看」。 */
+.todo-calendar{flex-wrap:wrap}
+.calendar-day{
+  flex:1 1 100%;margin:0 0 10px;padding:12px 14px 6px;
+  border:1px solid rgba(79,63,47,.09);border-radius:20px 15px 23px 16px;
+  background:rgba(255,253,248,.48);
+}
+.calendar-day.today{
+  border-color:rgba(73,111,98,.26);
+  background:linear-gradient(135deg,rgba(255,254,250,.86),rgba(238,244,238,.62));
+}
+.calendar-day h3{
+  margin:0 0 6px;font:700 15px/1.3 var(--kai);color:#57452f;
+}
+.calendar-day.today h3{color:#33574b}
+.calendar-entry{
+  display:grid;grid-template-columns:48px 1fr auto;gap:9px;align-items:center;
+  padding:9px 0;border-top:1px solid rgba(74,57,43,.08);
+}
+.calendar-entry time{font:700 13px var(--kai);color:#765c48}
+.calendar-entry>div{color:#4a3b30;font-size:12px;line-height:1.45}
+.calendar-entry .status-chip{margin-left:0}
+
+/* ── 可信记录 ──────────────────────────────────────────────────────────
+   `.audit-row` 是 `<span class="audit-what">做了什么</span><time>什么时候</time>`。
+   两个都是行内元素，没有样式时它们挤成一行、16px、没有分隔——屏幕上读到的是
+   「优活登录了2026/8/19 01:23:16」。静态 `.record-row` 早就有正确的形状
+   （粗体一行 + 灰色小字一行 + 时间轴上的一个点），这里让它们长得一样。 */
+.record-flow .audit-row{position:relative;padding:0 0 14px 8px}
+.record-flow .audit-row::before{
+  content:"";position:absolute;left:-18px;top:4px;width:7px;height:7px;border-radius:50%;
+  background:#668a7d;box-shadow:0 0 0 4px rgba(102,138,125,.08);
+}
+.audit-what{display:block;font:700 14px/1.35 var(--kai);color:#4b3b2f}
+.audit-row time{display:block;margin-top:3px;color:#8b7c6e;font-size:13px}
+.record-flow>.meta{padding-left:8px}
+
+/* ── 生活日报 ──────────────────────────────────────────────────────────
+   `#dailyReport` 是静态 `.report-strip`（右上角有一枚装饰圆环），
+   注水后里面是 `p.meta` + 若干 `.report-section` + 一个 `<details class="report-more">`。
+   前两块要给圆环让出位置，否则标题会压在环上。 */
+.report-strip>.meta:first-child{padding-right:56px}
+.report-section{margin:12px 0 0}
+.report-section:first-of-type{padding-right:52px}
+.report-section h3{
+  display:flex;align-items:center;flex-wrap:wrap;gap:0;
+  margin:0 0 5px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.report-section>div{color:#7f7164;font-size:10px;line-height:1.72}
+.report-section>div.meta{color:#8b7c6e}
+.report-more{margin:12px 0 0;border-top:1px solid rgba(75,58,44,.08)}
+.report-more>summary{
+  display:flex;align-items:center;min-height:48px;
+  color:#7b6a5c;font-size:13px;font-weight:700;cursor:pointer;
+  list-style:none;-webkit-tap-highlight-color:transparent;
+}
+.report-more>summary::-webkit-details-marker{display:none}
+.report-more>summary::before{
+  content:"＋";margin-right:7px;color:#a07b4f;font-size:12px;
+}
+.report-more[open]>summary::before{content:"－"}
+.report-more[open]{padding-bottom:6px}
+
+/* ── 照护结论 ──────────────────────────────────────────────────────────
+   `.report-verdict` 是 `#ovVerdict` 和 `#todayBody` 顶上那一条，
+   结构是 `<span class="report-badge">判定词</span><strong>整句</strong>`。
+   没有样式时两个都是行内，于是屏幕上是「还没有记录今天该有的记录还没出现（…」
+   ——判定词和句子黏成一句读不通的话。给它静态 `.care-verdict` 那张纸。 */
+.report-verdict{
+  position:relative;display:block;margin:2px 0 13px;padding:15px 17px;
+  border:1px solid rgba(178,135,63,.22);border-radius:25px 19px 29px 17px;
+  background:linear-gradient(135deg,rgba(255,254,250,.83),rgba(241,236,220,.75));
+}
+.report-verdict.good{border-color:rgba(73,111,98,.26)}
+.report-verdict.bad{border-color:rgba(178,90,68,.30)}
+.report-badge{
+  display:block;margin-bottom:6px;color:#987647;
+  font-size:13px;font-weight:800;letter-spacing:.13em;
+}
+.report-verdict.good .report-badge{color:#41695a}
+.report-verdict.bad .report-badge{color:#9d4c37}
+.report-verdict>strong{display:block;font:700 17px/1.42 var(--kai);color:#493a2d}
+
+/* ── 照护档案的各分区 ──────────────────────────────────────────────────
+   care.js 用同一组积木画六个分区：`.care-block`（一小节）、`.care-item`（一张卡）、
+   `.digest`（键值摘要）、`.care-form`（表单）。 */
+.care-block{margin:0 0 14px}
+.care-block-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin:0 0 6px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.care-lines{margin:0;padding-left:17px;color:#7f7164;font-size:10px;line-height:1.78}
+.care-lines li{margin:2px 0}
+.care-lines li::marker{color:#a5b3a6}
+.care-period{margin:0 0 10px;color:#8b7c6e;font-size:10px}
+
+.care-item{
+  margin:0 0 11px;padding:14px 15px;
+  border:1px solid rgba(84,65,48,.09);border-radius:21px 16px 24px 17px;
+  background:rgba(255,253,247,.52);
+}
+.care-item-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:9px;
+  margin:0 0 6px;font:700 15px/1.35 var(--kai);color:#4b3b2f;
+}
+.care-item-head .meta{font:400 9px/1.5 var(--sans)}
+.care-item p{margin:3px 0 0;color:#7f7164;font-size:10px;line-height:1.66}
+
+.digest{margin:0 0 12px;border-top:1px solid rgba(75,58,44,.08)}
+.digest-row{
+  display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;
+  padding:9px 2px;border-bottom:1px solid rgba(74,57,43,.08);
+}
+.digest-row strong{font:700 12px/1.4 var(--kai);color:#5b4a3c}
+.digest-row>div{color:#7f7164;font-size:13px;line-height:1.5;text-align:right}
+
+/* 表单：标签在上、输入在下，触控高度 48px，提交 56px。 */
+.care-form{
+  margin:14px 0 12px;padding:14px 15px;
+  border:1px solid rgba(84,65,48,.08);border-radius:21px 16px 25px 17px;
+  background:rgba(255,253,247,.50);
+}
+.care-form>.care-block-head{margin-bottom:10px}
+.care-field{margin:0 0 10px}
+.care-field label{display:block;margin-bottom:4px;color:#746558;font-size:10px}
+.care-field input{
+  display:block;width:100%;min-height:48px;
+  border:0;border-bottom:1px solid rgba(73,111,98,.20);
+  background:transparent;padding:6px 2px;color:#493d33;outline:none;font-size:14px;
+}
+.care-field input:focus{border-bottom-color:rgba(73,111,98,.55)}
+.care-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.care-actions button{
+  flex:1 1 auto;min-height:48px;padding:0 16px;
+  border:1px solid rgba(73,111,98,.24);border-radius:16px 13px 18px 14px;
+  background:linear-gradient(135deg,rgba(53,95,84,.96),rgba(83,124,110,.96));
+  color:#fffdf8;font:700 12px var(--kai);letter-spacing:.04em;cursor:pointer;
+}
+.care-actions button[type="submit"]{min-height:56px}
+.care-actions button.secondary{
+  background:rgba(255,255,255,.5);color:#5c6b62;border-color:rgba(73,111,98,.20);
+}
+.care-actions button[disabled]{opacity:.55;cursor:default}
+.care-form>.meta{margin:10px 0 0}
+
+/* `#notices` 在「没有通知」时是一段裸文本，在有通知时是若干 `.task`。 */
+#notices{color:#7f7164;font-size:13px;line-height:1.7}
+
+/* ── 触控目标 ──────────────────────────────────────────────────────────
+   硬约束：可点的东西不小于 48px，主要操作不小于 56px。
+   实测这一页原先有五个不合格：返回链接 21px、三个输入框 31–33px、
+   「同步到他的手机」37px。照护分区那排胶囊只有 26px。 */
+/* 这排胶囊原先是 26px 高、10px 字。撑到 48px 之后横向也要跟着放，
+   否则「概览」两个字挤在一个近乎正圆的球里。
+   放大之后七个装不下一行了，横向滚动是它本来就有的行为（overflow-x:auto）；
+   但那样一来最右边那个会贴着屏幕边、被切掉半个字——所以左右各留一段
+   scroll-padding，配合 a.js 里点击后把当前那个滚进视野。 */
+.care-seg{scroll-behavior:smooth;scroll-padding-inline:14px}
+.care-seg::after{content:"";flex:0 0 6px}
+.care-seg button{min-height:48px;padding:0 19px;font-size:12px}
+.family-form label{margin-bottom:12px}
+.family-form input{min-height:48px;padding:6px 2px;font-size:14px}
+.family-form button{min-height:56px;padding:0 12px;font-size:12px}
+.more-btn{min-height:48px}
+.confirm-card button{min-height:48px;padding:0}
+.fam-link{display:flex;align-items:center;min-height:56px}
+.care-row{min-height:56px}

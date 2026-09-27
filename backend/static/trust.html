@@ -21,6 +21,8 @@
   <link rel="stylesheet" href="/static/base.css" />
   <link rel="stylesheet" href="/static/components.css" />
   <link rel="stylesheet" href="/static/pages.css" />
+  <link rel="stylesheet" href="/static/art-cards.css" />
+<link rel="stylesheet" href="/static/control-states.css">
   <script src="/static/register-sw.js"></script>
 </head>
 <body data-mode="youhuo" data-nav="tabbar" data-surface="consumer">
@@ -51,7 +53,15 @@
          它把这一页最想立的那件事亲手推翻。所以改成说得准的版本。 -->
     <p class="trust-claim">优活替您办事，但不替您做决定。下面这四条，前两条在这一页当场看得见。</p>
 
-    <p class="notice good care-status" aria-live="polite" id="status">正在准备……</p>
+    <!--: `good` 换成 `info`。和 `judge.html` 上那一处是同一个缺陷：写死 `good`，
+         而 `trust.js` 的四处写入只改 `textContent`。实测（`Network.setBlockedURLs`
+         掐掉 `/v2/auth/demo` 再刷新）这一行是
+         「这份凭证暂时看不了：家里网不通。等一下我再试试」配 `rgb(31,138,81)`
+         ——绿的。而 `receiptFailed()` 那一条只 `remove('good')`、不加 `bad`，
+         于是「这一次没办成」落回 `.notice` 基类的琥珀 `rgb(184,113,10)`，
+         和一条普通提醒像素级相同。
+         现在由 `trust.js::setStatus(text, tone)` 一起换文字和颜色。 -->
+    <p class="notice info care-status" aria-live="polite" id="status">正在准备……</p>
 
     <!-- 事务凭证。
          这一页原先是"六张能力演示卡"——每张卡都能证明一件事，但要评委自己把六件事
@@ -68,9 +78,28 @@
            种子数据里水费 68.40 与电费 126.50 两条都在，`trust.js` 取 `updated_at`
            最新的那一条，命中的是电费。说明文字把币种钉死，数据一换就自相矛盾。
            这里不需要说是哪一种——要证明的是「每一步都留下了记录」。 -->
-      <p class="section-note">一次真实的缴费：开口、核对账单、念一遍金额、家人点头、拿回执。
+      <!--: 事务类型也不能钉死，理由和上面那段「币种不能钉死」**一模一样**，
+           只是当时只修了币种那一半。
+           `trust.js` 已经不再按 `bill_payment` 过滤，抬头是按类型算的
+           `${typeWord}凭证`。实测：老人说一句「帮我挂个心内科」（导演台上就是那个
+           按钮），再打开这一页——
+               这一行： 一次真实的**缴费**：开口、**核对账单**、念一遍金额……
+               它下面： **挂号**凭证 / 医院挂号 / 未完成
+           同一屏上两句话说的是同一条记录，而它们说的不是同一件事。
+           「核对账单」同样只对缴费成立，一并去掉。
+           这一段要证明的是「每一步都留下了记录」，那句话对三种事务都成立。 -->
+      <p class="section-note">一次真的办事，从开口到拿回执：他说了什么、要办的是哪一笔、
+        家人什么时候点的头、对方什么时候回的话。
         每一步都留下了记录，中间改一步，后面全部对不上。</p>
-      <article class="panel receipt" id="receipt" aria-live="polite">
+      <!-- 票据，不是健康卡。
+           外框来自 `art/ui/receipt-frame.svg`——它是可拉伸的描边框
+           （`border-image`，四角原样、只拉边），所以凭证有几行都不会变形。
+           完整卡壳（hero/wide）在这里用不了：那是有构图的画，高度一变就拉扁。
+
+           印章**不写在这里**。`trust.js` 只有在这一笔真的核验通过时才加
+           `data-art-seal="true"`；写死在 HTML 上的话，一张还在「正在读」
+           的凭证上就已经盖着章了——在这一页上那是最不能出的错。 -->
+      <article class="panel receipt art-receipt" id="receipt" aria-live="polite">
         <p class="receipt-pending">正在读这件事的记录……</p>
       </article>
     </section>
@@ -120,7 +149,10 @@
       这背后还有一整套技术证明：听不清时不猜、外来文档里的金额不算指令、办到一半断了
       记得走到哪、紧急时多给的权限会自己收回。那些要在电脑上看。
     </p>
-    <a class="trust-more-link" href="/judge">在电脑上看完整证明</a>
+    <!-- 三栏行组件（图标 / 文字 / 箭头）。卷轴是「完整证明」的意象。 -->
+    <!-- 文字要**包在元素里**。裸文本节点在网格里是匿名项，`grid-column` 管不到它，
+         落到哪一栏由自动排布决定——量出来文字栏宽度是 0。 -->
+    <a class="trust-more-link art-row" href="/judge" data-art-scene="chrysanth"><span>在电脑上看完整证明</span></a>
 
     <!-- 这一页此前**没有**底部导航，出口只有一个 back-link。而它属于 family shell
          的「待办」（`surfaces.py` 里 `/trust` 的 entry 是 `todo`：一笔办完的事就在
@@ -141,5 +173,6 @@
   <script src="/static/identity.js"></script>
     <script src="/static/common.js"></script>
     <script src="/static/trust.js" defer></script>
+    <script src="/static/art-cards.js" defer></script>
 </body>
 </html>
