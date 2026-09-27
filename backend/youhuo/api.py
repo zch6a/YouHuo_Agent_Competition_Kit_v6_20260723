@@ -501,6 +501,10 @@ def create_app(
     #
     # 暖黄顶栏 + 搜索、轮播、四列宫格、分区卡片、底部五格（中间是说话）。
     # 同样**不另写业务逻辑**：`app4/*.js` 只把这套 DOM 接到已有的端点上。
+    @app.get("/phone", include_in_schema=False)
+    def phone_demo_ui() -> FileResponse:
+        return FileResponse(static_dir / "app4" / "phone-demo.html")
+
     @app.get("/elder4", include_in_schema=False)
     def elder_app4_ui() -> FileResponse:
         return FileResponse(static_dir / "elder-app4.html")
