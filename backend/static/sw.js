@@ -106,7 +106,7 @@
 //: 另：`isApi()` 加了 `download`（安卓安装包），理由见那里。
 //: v26 → v27：第四套「像个真 App」的两端上线（/elder4、/family4），多出九个文件。
 //: v27 → v28：第四套加质感层：原创插画五张、霞鹜文楷子集字体。
-const VERSION = 'youhuo-shell-v66';
+const VERSION = 'youhuo-shell-v67';
 
 //: 外壳 = 六个页面各自的 HTML、CSS、JS 和图标。
 //:

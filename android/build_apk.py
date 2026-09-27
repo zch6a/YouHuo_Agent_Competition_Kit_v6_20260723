@@ -44,8 +44,8 @@ SIGN = Path(os.environ.get("YOUHUO_ANDROID_SIGN", r"D:\youhuo_work\android_sign"
 
 DEFAULT_BASE = "https://youhuo.onrender.com"
 VARIANTS = {"elder": "com.youhuo.elder", "family": "com.youhuo.family", "app": "com.youhuo.app"}
-VERSION_NAME = "2.0.3"
-VERSION_CODE = 5
+VERSION_NAME = "2.0.4"
+VERSION_CODE = 6
 MIN_SDK = 24          # 安卓 7.0：覆盖几乎所有还在用的安卓手机
 TARGET_SDK = 34
 

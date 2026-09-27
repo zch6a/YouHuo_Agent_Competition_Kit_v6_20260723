@@ -54,6 +54,7 @@ final class NativeBridge implements TextToSpeech.OnInitListener {
 
     // ---- 听写：系统的语音识别
     private SpeechRecognizer recognizer;
+    private final PcmRecorder pcmRecorder = new PcmRecorder();
     private String listeningId;
     private String pendingListenId;
     private String pendingListenLang;
@@ -74,6 +75,7 @@ final class NativeBridge implements TextToSpeech.OnInitListener {
                 .getString("role", activity.getString(R.string.role)));
             o.put("platform", "android");
             o.put("sdk", Build.VERSION.SDK_INT);
+            o.put("model", Build.MANUFACTURER + " " + Build.MODEL);
             return o.toString();
         } catch (Exception e) {
             return "{}";
@@ -172,6 +174,26 @@ final class NativeBridge implements TextToSpeech.OnInitListener {
         js("window.__youhuoBridge&&window.__youhuoBridge.ttsEvent(" + JSONObject.quote(id) + ","
                 + JSONObject.quote(type) + ")");
     }
+
+    // Native PCM capture does not require an installed recognition service.
+    @JavascriptInterface
+    public String startPcmRecording(final String id) {
+        if (id == null || !id.matches("[A-Za-z0-9_-]{1,80}")) return "NATIVE_ID";
+        if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            main.post(new Runnable() { @Override public void run() { activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MainActivity.REQ_MIC); } });
+            // Never begin recording after permission is granted unless held again.
+            return "NATIVE_PERMISSION";
+        }
+        android.media.AudioManager audioManager = (android.media.AudioManager) activity.getSystemService(Activity.AUDIO_SERVICE);
+        if (audioManager != null && audioManager.isMicrophoneMute()) return "NATIVE_SYSTEM_MUTE";
+        pcmRecorder.start(id);
+        return "ok";
+    }
+    @JavascriptInterface
+    public void stopPcmRecording(String id, boolean discard) { pcmRecorder.stop(id, discard); }
+    @JavascriptInterface
+    public String pollPcmRecording(String id) { return pcmRecorder.poll(id); }
+    void cancelPcmRecording() { pcmRecorder.cancelAll(); }
 
     // ================================================================ 听写
     @JavascriptInterface
@@ -410,6 +432,7 @@ final class NativeBridge implements TextToSpeech.OnInitListener {
     }
 
     void shutdown() {
+        pcmRecorder.shutdown();
         if (recognizer != null) {
             recognizer.destroy();
             recognizer = null;

@@ -4,6 +4,11 @@
 let microphoneQueue=Promise.resolve(), microphoneRelease=Promise.resolve(), microphoneOwner;
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function microphoneError(error){
+  if(error.message?.startsWith('NATIVE_')){
+    const message=error.message==='NATIVE_PERMISSION'?'请允许麦克风权限，授权后重新按住说话。':error.message==='NATIVE_SYSTEM_MUTE'?'系统麦克风已关闭，请打开手机的麦克风开关后重试。':error.message==='NATIVE_CANCELLED'?'录音已取消，请重新按住说话。':'手机录音未能启动，请检查麦克风权限、系统麦克风开关，并结束其他录音或通话。';
+    let version='';try{version=JSON.parse(window.YouhuoNative.appInfo()).version||'';}catch(_){}
+    return `${message}（App ${version} · ${error.message}）`;
+  }
   if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error.name))
     return window.YouhuoNative?'请在手机设置 → 应用 → 优活 → 权限中允许麦克风，并打开系统麦克风开关。':'请在网站权限中允许麦克风，并检查系统麦克风开关。';
   if(['NotFoundError','DevicesNotFoundError'].includes(error.name))return '没有找到可用话筒，请检查手机或耳机的麦克风。';
@@ -44,6 +49,7 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
   function cleanup(s){
     if(s.cleanup)return s.cleanup;
     clearTimeout(s.timer);
+    if(s.nativeId){try{window.YouhuoNative.stopPcmRecording(s.nativeId,true);}catch(_){}}
     if(s.processor){s.processor.onaudioprocess=null;try{s.processor.disconnect();}catch(_){}}
     for(const node of [s.source,s.gain]){try{node?.disconnect();}catch(_){}}
     s.stream?.getTracks().forEach(t=>t.stop());
@@ -53,7 +59,27 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
     return s.cleanup;
   }
   function cancel(){generation++;const s=session;session=null;if(s){s.cancelled=true;try{s.recognition?.abort();}catch(_){}cleanup(s);}state('idle');}
-  async function finish(){const s=session;if(!s)return;if(s.recognition){s.recognition.stop();return;}session=null;cleanup(s);state('processing');hint('正在把您的话转成文字…');
+  async function finish(){const s=session;if(!s||s.finishing)return;if(s.recognition){s.recognition.stop();return;}
+    if(s.nativeId){
+      s.finishing=true;clearTimeout(s.timer);state('processing');hint('正在把您的话转成文字…');
+      try{
+        window.YouhuoNative.stopPcmRecording(s.nativeId,false);
+        let result;
+        for(let i=0;i<40;i++){
+          if(s.id!==generation)return;
+          result=JSON.parse(window.YouhuoNative.pollPcmRecording(s.nativeId));
+          if(result.state==='done')break;
+          if(result.state==='error')throw new Error(result.error||'NATIVE_READ');
+          if(result.state==='cancelled')throw new Error('NATIVE_CANCELLED');
+          await pause(75);
+        }
+        if(result?.state!=='done')throw new Error('NATIVE_STOP_TIMEOUT');
+        const binary=atob(result.pcm||''),pcm=new Float32Array(binary.length/2);
+        for(let i=0;i<pcm.length;i++){let value=binary.charCodeAt(i*2)|(binary.charCodeAt(i*2+1)<<8);if(value>=32768)value-=65536;pcm[i]=value/32768;}
+        s.chunks=[pcm];s.rate=result.rate;
+      }catch(e){if(s.id===generation){hint(microphoneError(e));state('idle');}cleanup(s);if(session===s)session=null;return;}
+    }
+    session=null;cleanup(s);state('processing');hint('正在把您的话转成文字…');
     try {
       const length=s.chunks.reduce((n,a)=>n+a.length,0);if(length<s.rate*.25)throw new Error('按住说一句话，松开后再识别。');
       const Offline=window.OfflineAudioContext||window.webkitOfflineAudioContext;
@@ -69,7 +95,7 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
     try {
       let available;try{available=await status();}catch(_){available=null;}if(id!==generation)return;
       const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-      if(!available?.available&&Recognition){
+      if(!available?.available&&Recognition&&!window.YouhuoNative?.startPcmRecording){
         const recognition=new Recognition(),s={id,recognition,cancelled:false};session=s;recognition.lang='zh-CN';recognition.continuous=true;recognition.interimResults=true;recognition.maxAlternatives=1;let finalText='',failed=false;
         recognition.onstart=()=>{if(id!==generation)return;state('listening');hint('正在听，松开后转成文字。');};
         recognition.onresult=e=>{if(id!==generation)return;let final=[],interim=[];for(const r of e.results)(r.isFinal?final:interim).push(r[0].transcript);finalText=final.join('');hint(finalText||interim.join('')||'我在听…');};
@@ -78,6 +104,22 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
         s.timer=setTimeout(()=>recognition.stop(),20000);try{recognition.start();}catch(e){cleanup(s);session=null;throw e;}return;
       }
       if(!available?.available){hint(available?.note||'语音识别暂未就绪，请稍后再点话筒。');state('idle');return;}
+      if(window.YouhuoNative?.startPcmRecording){
+        const s={id,nativeId:'pcm_'+Date.now()+'_'+Math.random().toString(36).slice(2),chunks:[]};session=s;
+        const started=window.YouhuoNative.startPcmRecording(s.nativeId);
+        if(started!=='ok')throw new Error(started||'NATIVE_START');
+        for(let i=0;i<40;i++){
+          if(id!==generation)return;
+          const result=JSON.parse(window.YouhuoNative.pollPcmRecording(s.nativeId));
+          if(result.state==='error')throw new Error(result.error||'NATIVE_START');
+          if(result.state==='cancelled')throw new Error('NATIVE_CANCELLED');
+          if(result.state==='recording'){
+            state('listening');hint('正在听，松开后转文字（最多20秒）。');s.timer=setTimeout(finish,19000);return;
+          }
+          await pause(75);
+        }
+        throw new Error('NATIVE_START_TIMEOUT');
+      }
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前浏览器不支持录音，请使用系统浏览器打开。');
       const stream=await acquireMicrophone(()=>id===generation);if(!stream)return;
       const s={id,stream,chunks:[]};session=s;const Context=window.AudioContext||window.webkitAudioContext,context=new Context();s.context=context;await context.resume();if(id!==generation){await cleanup(s);return;}

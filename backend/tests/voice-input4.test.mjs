@@ -61,3 +61,15 @@ await voice.start();voice.cancel();window.AudioContext=Context;const reopening=v
 let firstStates=[];const voiceA=createVoiceInput({...callbacks,onState:s=>firstStates.push(s)}),voiceB=createVoiceInput(callbacks);
 await voiceA.start();await voiceB.start();assert.equal(firstStates.at(-1),'idle');assert.equal(states.at(-1),'listening');voiceB.cancel();
 console.log('PASS Android constraint fallback, permission/busy hints, serialized acquisition, cancelled retry, awaited close, single owner');
+// Native Android capture bypasses WebView getUserMedia completely.
+let nativeState='recording', nativeStops=[],nativeStarts=0,uploads=0;
+const nativePcm=Buffer.alloc(16000*2);for(let i=0;i<16000;i++)nativePcm.writeInt16LE(1000,i*2);
+window.YouhuoNative={appInfo:()=>'{"version":"2.0.4"}',startPcmRecording(){nativeStarts++;nativeState='recording';return 'ok';},stopPcmRecording(id,discard){nativeStops.push(discard);nativeState=discard?'cancelled':'done';},pollPcmRecording(){return JSON.stringify({state:nativeState,rate:16000,pcm:nativePcm.toString('base64')});}};
+navigator.mediaDevices.getUserMedia=()=>{throw new Error('WebView capture must not be called');};
+window.YouHuo.api=async(path,options)=>{if(path.endsWith('status'))return {available:true};uploads++;posted=options.body;return {heard:true,text:'原生录音成功'};};
+voice=createVoiceInput(callbacks);await voice.start();assert.equal(states.at(-1),'listening');await voice.stop();assert.equal(words.at(-1),'原生录音成功');assert.equal(uploads,1);assert.deepEqual(nativeStops,[false,true]);assert.equal(new DataView(await posted.arrayBuffer()).getUint32(24,true),16000);
+window.YouhuoNative.startPcmRecording=()=> 'NATIVE_PERMISSION';await voice.start();assert.match(hints.at(-1),/授权后重新按住/);assert.equal(states.at(-1),'idle');assert.equal(uploads,1);
+window.YouhuoNative.startPcmRecording=()=>{nativeState='preparing';return 'ok';};const nativePending=voice.start();await tick();voice.cancel();await nativePending;assert.equal(nativeState,'cancelled');assert.equal(uploads,1);
+window.YouhuoNative.startPcmRecording=()=>{nativeState='error';return 'ok';};window.YouhuoNative.pollPcmRecording=()=>JSON.stringify({state:nativeState,error:'NATIVE_START'});await voice.start();assert.match(hints.at(-1),/2.0.4.*NATIVE_START/);assert.equal(states.at(-1),'idle');
+delete window.YouhuoNative;
+console.log('PASS native PCM upload, permission, cancellation and diagnostic errors; zero WebView capture calls');

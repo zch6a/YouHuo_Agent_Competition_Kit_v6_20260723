@@ -1,10 +1,10 @@
 {
-  "version_name": "2.0.3",
-  "version_code": 5,
+  "version_name": "2.0.4",
+  "version_code": 6,
   "base_url": "https://youhuo.onrender.com",
-  "source_sha256": "27ae96d02db75bd9da358820bb08ec393cd88fa435dcb0bdbcf750735145df60",
+  "source_sha256": "1a683db9bc4684b186496ccd496fa3ba27b164aee32b293b95051eb892fc347e",
   "lan_test": false,
   "apks": {
-    "youhuo-app.apk": "4408dc2fe753bfe8b457192451c762afcd287b342c76650584d147898ccecc45"
+    "youhuo-app.apk": "32f4e3c38ddbdec920a084f407c59886e314fce28ec8fd2fadf0a1bbd7e1a927"
   }
 }

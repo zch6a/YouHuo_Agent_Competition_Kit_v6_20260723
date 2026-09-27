@@ -80,6 +80,12 @@ public class MainActivity extends Activity {
         setContentView(root);
 
         configureWebView();
+        // Refresh HTTP assets on upgrade without deleting cookies or account data.
+        String assetVersion = getSharedPreferences("app_session", MODE_PRIVATE).getString("asset_version", "");
+        if (!BuildInfo.VERSION_NAME.equals(assetVersion)) {
+            web.clearCache(true);
+            getSharedPreferences("app_session", MODE_PRIVATE).edit().putString("asset_version", BuildInfo.VERSION_NAME).apply();
+        }
         bridge = new NativeBridge(this, web);
         web.addJavascriptInterface(bridge, "YouhuoNative");
 
@@ -144,6 +150,14 @@ public class MainActivity extends Activity {
                     showOffline(false);
                 }
                 if (sameOrigin(Uri.parse(url))) {
+                    // An old service worker may serve old recording JS even after
+                    // installing a new APK. Clear only our disposable shell caches.
+                    web.evaluateJavascript("(function(){try{var v='" + BuildInfo.VERSION_NAME
+                        + "',k='youhuoNativeAssetVersion';if(localStorage.getItem(k)===v)return;"
+                        + "localStorage.setItem(k,v);if(!window.caches)return;"
+                        + "caches.keys().then(function(keys){return Promise.all(keys.filter(function(k){"
+                        + "return k.indexOf('youhuo-shell-')===0;}).map(function(k){return caches.delete(k);}));})"
+                        + ".then(function(){location.reload();}).catch(function(){});}catch(e){}})()", null);
                     String path = Uri.parse(url).getPath();
                     if ("/family4".equals(path) || "/elder4".equals(path)) {
                         getSharedPreferences("app_session", MODE_PRIVATE).edit()
@@ -363,6 +377,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (bridge != null) bridge.cancelPcmRecording();
         ReminderPoller.setForeground(false);
         web.onPause();
         super.onPause();
