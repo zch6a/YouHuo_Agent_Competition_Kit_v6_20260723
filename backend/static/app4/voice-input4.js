@@ -1,4 +1,39 @@
 /* One recording session at a time. No audio is kept in browser storage. */
+// A cancelled getUserMedia request cannot itself be aborted. Queue the next
+// acquisition until its predecessor has settled and released its tracks.
+let microphoneQueue=Promise.resolve(), microphoneRelease=Promise.resolve(), microphoneOwner;
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function microphoneError(error){
+  if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error.name))
+    return window.YouhuoNative?'请在手机设置 → 应用 → 优活 → 权限中允许麦克风，并打开系统麦克风开关。':'请在网站权限中允许麦克风，并检查系统麦克风开关。';
+  if(['NotFoundError','DevicesNotFoundError'].includes(error.name))return '没有找到可用话筒，请检查手机或耳机的麦克风。';
+  if(['NotReadableError','TrackStartError','AbortError','OverconstrainedError'].includes(error.name)||/could not start audio source/i.test(error.message||''))
+    return '麦克风暂时无法启动。请结束通话或其他录音，检查系统麦克风开关，再按住重试；仍不行请退出优活后重新打开。';
+  return error.message||'话筒未能启动，请重试。';
+}
+function acquireMicrophone(current){
+  const task=microphoneQueue.then(async()=>{
+    await microphoneRelease;
+    if(!current())return null;
+    for(let attempt=0;attempt<2;attempt++){
+      if(!current())return null;
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:attempt?true:{channelCount:{ideal:1},echoCancellation:{ideal:true},noiseSuppression:{ideal:true},autoGainControl:{ideal:true}},video:false});
+        if(!current()){stream.getTracks().forEach(t=>t.stop());await pause(150);return null;}
+        return stream;
+      }catch(error){
+        if(!current())return null;
+        const recoverable=['NotReadableError','TrackStartError','AbortError','OverconstrainedError'].includes(error.name)||/could not start audio source/i.test(error.message||'');
+        if(attempt||!recoverable)throw error;
+        // Some Android audio drivers reject processing constraints or need a
+        // moment to release the previous recorder. Retry once without them.
+        await pause(250);
+      }
+    }
+  });
+  microphoneQueue=task.catch(()=>{});
+  return task;
+}
 export function createVoiceInput({role='elder',onText,onHint,onState}) {
   let session=null, generation=0, phase="idle";
   const state=value=>{phase=value;onState(value);};
@@ -6,7 +41,17 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
   let statusValue,statusAt=0,statusPending;
   function status(){if(statusValue&&Date.now()-statusAt<(statusValue.available?60000:1500))return Promise.resolve(statusValue);if(statusPending)return statusPending;statusPending=request('/api/v1/listen/web/status').then(value=>{statusValue=value;statusAt=Date.now();return value;}).finally(()=>statusPending=null);return statusPending;}
   const hint=message=>onHint(message);
-  function cleanup(s){clearTimeout(s.timer);if(s.processor){s.processor.onaudioprocess=null;try{s.processor.disconnect();}catch(_){}}for(const node of [s.source,s.gain]){try{node?.disconnect();}catch(_){}}s.stream?.getTracks().forEach(t=>t.stop());s.context?.close().catch(()=>{});}
+  function cleanup(s){
+    if(s.cleanup)return s.cleanup;
+    clearTimeout(s.timer);
+    if(s.processor){s.processor.onaudioprocess=null;try{s.processor.disconnect();}catch(_){}}
+    for(const node of [s.source,s.gain]){try{node?.disconnect();}catch(_){}}
+    s.stream?.getTracks().forEach(t=>t.stop());
+    let closing;try{closing=s.context?.close();}catch(_){}
+    s.cleanup=Promise.resolve(closing).catch(()=>{});
+    microphoneRelease=Promise.all([microphoneRelease,s.cleanup]).then(()=>{});
+    return s.cleanup;
+  }
   function cancel(){generation++;const s=session;session=null;if(s){s.cancelled=true;try{s.recognition?.abort();}catch(_){}cleanup(s);}state('idle');}
   async function finish(){const s=session;if(!s)return;if(s.recognition){s.recognition.stop();return;}session=null;cleanup(s);state('processing');hint('正在把您的话转成文字…');
     try {
@@ -19,7 +64,7 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
       if(s.id!==generation)return;if(result.heard&&result.text){onText(result.text);hint('听写好了，核对后点发送。');}else hint('没有听清，靠近话筒再说一次吧。');
     }catch(e){if(s.id===generation)hint(e.message||'识别暂时没成功，请重试。');}finally{if(s.id===generation)state('idle');}
   }
-  async function start(){if(session||phase==='preparing'||phase==='processing')return;const id=++generation;state('preparing');hint('正在准备话筒…');
+  async function start(){if(session||phase==='preparing'||phase==='processing')return;if(microphoneOwner&&microphoneOwner!==cancel)microphoneOwner();microphoneOwner=cancel;const id=++generation;state('preparing');hint('正在准备话筒…');
     if(!window.isSecureContext&&!window.YouhuoNative){hint('语音输入需要安全连接，请使用 https://youhuo.onrender.com/phone');state('idle');return;}
     try {
       let available;try{available=await status();}catch(_){available=null;}if(id!==generation)return;
@@ -28,19 +73,21 @@ export function createVoiceInput({role='elder',onText,onHint,onState}) {
         const recognition=new Recognition(),s={id,recognition,cancelled:false};session=s;recognition.lang='zh-CN';recognition.continuous=true;recognition.interimResults=true;recognition.maxAlternatives=1;let finalText='',failed=false;
         recognition.onstart=()=>{if(id!==generation)return;state('listening');hint('正在听，松开后转成文字。');};
         recognition.onresult=e=>{if(id!==generation)return;let final=[],interim=[];for(const r of e.results)(r.isFinal?final:interim).push(r[0].transcript);finalText=final.join('');hint(finalText||interim.join('')||'我在听…');};
-        recognition.onerror=e=>{failed=true;const messages={'not-allowed':'请在地址栏的网站权限中允许麦克风，再试一次。','service-not-allowed':'浏览器识别不可用，服务端正在准备，请稍后再点话筒。','audio-capture':'没有找到可用话筒，请检查麦克风。','network':'浏览器识别连接失败，服务端正在准备，请稍后再试。','no-speech':'没有听到声音，请靠近话筒再说一次。'};if(id===generation)hint(messages[e.error]||'这次没听清，请再试一次。');};
+        recognition.onerror=e=>{failed=true;const messages={'not-allowed':microphoneError({name:'NotAllowedError'}),'service-not-allowed':'浏览器识别不可用，服务端正在准备，请稍后再点话筒。','audio-capture':microphoneError({name:'NotReadableError'}),'network':'浏览器识别连接失败，服务端正在准备，请稍后再试。','no-speech':'没有听到声音，请靠近话筒再说一次。'};if(id===generation)hint(messages[e.error]||'这次没听清，请再试一次。');};
         recognition.onend=()=>{cleanup(s);if(session===s)session=null;if(id!==generation)return;state('idle');if(!s.cancelled&&finalText){onText(finalText);hint('听写好了，核对后点发送。');}else if(!failed&&!s.cancelled)hint('没有听到完整的话，请再试一次。');};
         s.timer=setTimeout(()=>recognition.stop(),20000);try{recognition.start();}catch(e){cleanup(s);session=null;throw e;}return;
       }
       if(!available?.available){hint(available?.note||'语音识别暂未就绪，请稍后再点话筒。');state('idle');return;}
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前浏览器不支持录音，请使用系统浏览器打开。');
-      const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});if(id!==generation){stream.getTracks().forEach(t=>t.stop());return;}
-      const s={id,stream,chunks:[]};session=s;const Context=window.AudioContext||window.webkitAudioContext,context=new Context();s.context=context;await context.resume();if(id!==generation){stream.getTracks().forEach(t=>t.stop());await context.close();return;}
+      const stream=await acquireMicrophone(()=>id===generation);if(!stream)return;
+      const s={id,stream,chunks:[]};session=s;const Context=window.AudioContext||window.webkitAudioContext,context=new Context();s.context=context;await context.resume();if(id!==generation){await cleanup(s);return;}
       const source=context.createMediaStreamSource(stream),processor=context.createScriptProcessor(4096,1,1),gain=context.createGain();gain.gain.value=0;Object.assign(s,{source,processor,gain,rate:context.sampleRate});
       processor.onaudioprocess=e=>{if(session!==s)return;const max=Math.floor(s.rate*19),used=s.chunks.reduce((n,a)=>n+a.length,0);if(used>=max){finish();return;}s.chunks.push(e.inputBuffer.getChannelData(0).slice(0,max-used));};source.connect(processor);processor.connect(gain);gain.connect(context.destination);s.timer=setTimeout(finish,19000);state('listening');hint('正在听，松开后转文字（最多20秒）。');
-    }catch(e){if(id!==generation)return;if(session){cleanup(session);session=null;}state('idle');hint(e.name==='NotAllowedError'?'请在地址栏的网站权限中允许麦克风，再试一次。':e.name==='NotFoundError'?'没有找到话筒，请检查设备。':e.message||'话筒未能启动，请重试。');}
+    }catch(e){if(id!==generation)return;if(session){cleanup(session);session=null;}state('idle');hint(microphoneError(e));}
   }
   window.addEventListener('pagehide',cancel);
+  window.addEventListener('blur',cancel);
+  window.document?.addEventListener('visibilitychange',()=>{if(window.document.hidden)cancel();});
   return {start,stop:()=>{if(phase==='preparing'){cancel();hint('请按住话筒，看到“正在听”后说话。');return;}return finish();},cancel,warm:()=>status().catch(()=>null)};
 }
 

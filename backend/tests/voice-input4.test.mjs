@@ -34,3 +34,30 @@ handlers.pointerdown(pointer);handlers.pointerup(pointer);handlers.lostpointerca
 handlers.pointerdown(pointer);handlers.pointercancel(pointer);assert.deepEqual(events,['start','stop','start','cancel']);
 handlers.keydown({key:' ',preventDefault(){}});handlers.keyup({key:' ',preventDefault(){}});assert.deepEqual(events.slice(-2),['start','stop']);
 console.log('PASS hold/release/cancel and keyboard hold gestures');
+// Android/WebView regression cases: recoverable driver errors and rapid re-press.
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const callbacks={onText:t=>words.push(t),onHint:t=>hints.push(t),onState:s=>states.push(s)};
+const stream=()=>({getTracks:()=>[{stop(){stopped++;}}]});
+let attempts=[];
+navigator.mediaDevices.getUserMedia=async constraints=>{attempts.push(constraints);if(attempts.length===1)throw Object.assign(new Error('Could not start audio source'),{name:'NotReadableError'});return stream();};
+voice=createVoiceInput(callbacks);await voice.start();assert.equal(attempts.length,2);assert.equal(attempts[1].audio,true);assert.equal(states.at(-1),'listening');voice.cancel();
+attempts=[];navigator.mediaDevices.getUserMedia=async()=>{attempts.push(1);throw Object.assign(new Error(),{name:'NotAllowedError'});};
+window.YouhuoNative={};await voice.start();assert.equal(attempts.length,1);assert.match(hints.at(-1),/手机设置.*允许麦克风/);delete window.YouhuoNative;
+attempts=[];navigator.mediaDevices.getUserMedia=async()=>{attempts.push(1);throw Object.assign(new Error('Could not start audio source'),{name:'NotReadableError'});};
+await voice.start();assert.equal(attempts.length,2);assert.match(hints.at(-1),/结束通话或其他录音/);assert.doesNotMatch(hints.at(-1),/Could not/);
+// A new hold must wait for the abandoned OS acquisition, then stop its track.
+const order=[];let resolveFirst;
+navigator.mediaDevices.getUserMedia=()=>{order.push('acquire');return order.length===1?new Promise(resolve=>resolveFirst=resolve):Promise.resolve(stream());};
+const first=voice.start();await tick();voice.cancel();const second=voice.start();await tick();assert.deepEqual(order,['acquire']);
+resolveFirst({getTracks:()=>[{stop(){order.push('release-stale');}}]});await Promise.all([first,second]);assert.deepEqual(order,['acquire','release-stale','acquire']);assert.equal(states.at(-1),'listening');voice.cancel();
+// Releasing during the recovery delay must not reopen the microphone.
+attempts=[];navigator.mediaDevices.getUserMedia=async()=>{attempts.push(1);throw Object.assign(new Error(),{name:'NotReadableError'});};
+const retrying=voice.start();await tick();voice.cancel();await retrying;assert.equal(attempts.length,1);assert.equal(states.at(-1),'idle');
+// Wait for the old AudioContext to finish closing before acquiring again.
+let closeDone;class SlowClose extends Context{close(){return new Promise(resolve=>closeDone=resolve);}}
+window.AudioContext=SlowClose;attempts=[];navigator.mediaDevices.getUserMedia=async()=>{attempts.push(1);return stream();};
+await voice.start();voice.cancel();window.AudioContext=Context;const reopening=voice.start();await tick();assert.equal(attempts.length,1);closeDone();await reopening;assert.equal(attempts.length,2);voice.cancel();
+// Two controls must not keep two live recordings in the same document.
+let firstStates=[];const voiceA=createVoiceInput({...callbacks,onState:s=>firstStates.push(s)}),voiceB=createVoiceInput(callbacks);
+await voiceA.start();await voiceB.start();assert.equal(firstStates.at(-1),'idle');assert.equal(states.at(-1),'listening');voiceB.cancel();
+console.log('PASS Android constraint fallback, permission/busy hints, serialized acquisition, cancelled retry, awaited close, single owner');
