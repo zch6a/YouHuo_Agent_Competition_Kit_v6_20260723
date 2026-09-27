@@ -44,8 +44,8 @@ SIGN = Path(os.environ.get("YOUHUO_ANDROID_SIGN", r"D:\youhuo_work\android_sign"
 
 DEFAULT_BASE = "https://youhuo.onrender.com"
 VARIANTS = {"elder": "com.youhuo.elder", "family": "com.youhuo.family", "app": "com.youhuo.app"}
-VERSION_NAME = "2.0.2"
-VERSION_CODE = 4
+VERSION_NAME = "2.0.3"
+VERSION_CODE = 5
 MIN_SDK = 24          # 安卓 7.0：覆盖几乎所有还在用的安卓手机
 TARGET_SDK = 34
 
@@ -198,6 +198,11 @@ def build(variant: str, base_url: str, ks: Path, pw: str, *, debug: bool = False
     verify = run([JDK / "bin" / "java.exe", "-jar", BT / "lib" / "apksigner.jar", "verify",
                   "--verbose", out], capture=True)
     badging = run([BT / "aapt2.exe", "dump", "badging", out], capture=True)
+    # Inspect the actual packaged manifest: WebView capture needs both.
+    for permission in ("RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"):
+        if f"uses-permission: name='android.permission.{permission}'" not in badging:
+            raise RuntimeError(f"APK missing required audio permission: {permission}")
+
     for line in verify.splitlines():
         if line.startswith("Verified using"):
             print("   ", line)

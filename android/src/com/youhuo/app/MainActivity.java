@@ -209,6 +209,11 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingWebPermission == request) pendingWebPermission = null;
+            }
+
+            @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 // 这两页不用定位；不申请、不给。
                 callback.invoke(origin, false, false);

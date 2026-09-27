@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 说话给优活听。只在她第一次按麦克风时才问。 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- WebView audio capture also needs communication audio routing. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- 吃药、复查这类提醒，App 在后台时也要能弹出来（安卓 13 起要她点头）。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
