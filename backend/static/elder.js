@@ -1957,8 +1957,8 @@ fontScaleEl.addEventListener('change', () => applyProfile({...interactionProfile
 speechRateEl.addEventListener('change', () => { interactionProfile.speech_rate = Number(speechRateEl.value); });
 
 const voiceInput = createVoiceInput({role: 'elder',
-  onText(text) { input.value=text; input.dispatchEvent(new Event('input',{bubbles:true})); },
-  onHint(text) { setFocus(true); setStatus(text); setMicHint(text); },
+  onText(text) { setFocus(true); input.value=text; input.dispatchEvent(new Event('input',{bubbles:true})); },
+  onHint(text) { setStatus(text); setMicHint(text); },
   onState(state) {
     mic.disabled=state==='processing';
     if(state==='listening') setActivity('listening');
@@ -1967,7 +1967,7 @@ const voiceInput = createVoiceInput({role: 'elder',
     else setActivity('idle');
   }
 });
-bindHoldToTalk(mic,voiceInput,()=>{setFocus(true);if(stopSpeaking)stopSpeaking();});
+bindHoldToTalk(mic,voiceInput,()=>{if(stopSpeaking)stopSpeaking();});
 const focusMic=document.getElementById('focusMic');
 if(focusMic)bindHoldToTalk(focusMic,voiceInput,()=>{if(stopSpeaking)stopSpeaking();});
 
