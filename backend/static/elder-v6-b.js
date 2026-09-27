@@ -777,7 +777,7 @@ const reduceMotion=false;
     {selector:'[data-section="kin"]', delay:240, text:'这里是「家人」。需要家人一起确认的事情、常用联系人和一键联系都在这里。'},
     {selector:'[data-section="me"]', delay:240, text:'这里是「我的」。字号、语速、常用服务和优活怎么保护您，都在这一格里。'},
 
-    {selector:'#mic', delay:0, text:'这是语音入口。点一下开始说，再点一下结束，不需要一直按住。', noEars:'这台手机现在听不了语音。点这里会带您去打字，我一样能办。'},
+    {selector:'#mic', delay:0, text:'这是语音入口。按住开始说，再点一下结束，不需要一直按住。', noEars:'这台手机现在听不了语音。点这里会带您去打字，我一样能办。'},
     {selector:'#typeInstead', delay:0, text:'如果今天不方便说话，可以从这里改成打字。这个入口一直留在首页。'},
     {selector:'#nextItem', delay:0, text:'这是今天的「下一件」。首页只把最值得注意的一件事放大，不让您自己在很多事项里找。'},
     {selector:'#nextOpen', delay:0, text:'点这里可以查看这件事的详细内容，再决定要不要继续。'},
@@ -801,7 +801,7 @@ const reduceMotion=false;
       const el=target.closest && target.closest(item.selector);
       // 听不了语音的手机上（没有识别服务，见 app-bridge.js）换一句真话：
       // 不能一边请她「用语音告诉我」，一边按下去只能打字。
-      const deaf=!(window.SpeechRecognition||window.webkitSpeechRecognition);
+      const deaf=!(navigator.mediaDevices?.getUserMedia||window.SpeechRecognition||window.webkitSpeechRecognition);
       if(el) return {...item,el,text:(deaf&&item.noEars)?item.noEars:item.text};
     }
     return null;

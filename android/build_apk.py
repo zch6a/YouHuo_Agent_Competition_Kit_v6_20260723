@@ -42,10 +42,10 @@ JDK = Path(os.environ.get("YOUHUO_JDK", r"D:\DevEco\jdk17\jdk-17.0.20.1+1"))
 WORK = Path(os.environ.get("YOUHUO_ANDROID_WORK", r"D:\youhuo_work\android_build"))
 SIGN = Path(os.environ.get("YOUHUO_ANDROID_SIGN", r"D:\youhuo_work\android_sign"))
 
-DEFAULT_BASE = "https://5fe522bb333c4ec4b789413de1b18992.sg2.agentos-app.run"
+DEFAULT_BASE = "https://youhuo.onrender.com"
 VARIANTS = {"elder": "com.youhuo.elder", "family": "com.youhuo.family", "app": "com.youhuo.app"}
-VERSION_NAME = "2.0.1"
-VERSION_CODE = 3
+VERSION_NAME = "2.0.2"
+VERSION_CODE = 4
 MIN_SDK = 24          # 安卓 7.0：覆盖几乎所有还在用的安卓手机
 TARGET_SDK = 34
 

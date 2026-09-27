@@ -1,3 +1,4 @@
+import {createVoiceInput, bindHoldToTalk} from './voice-input4.js';
 /* 新版老人端（/elder4）的接线。数据全走已有端点，对话走 `/v2/chat`。 */
 import {api, token, icon, el, toast, tabs, carousel, slide, metric, todaySays, dayLine, avatar} from '/static/app4/core4.js';
 import {configureNeuralVoice, probeNeuralVoice, speakClauses, warmNeuralVoice} from '/static/speech.js';
@@ -82,6 +83,7 @@ const toolLabels = {schedule_today:'今日安排', medication_today:'服药记�
 async function ask(text) {
   text = String(text || '').trim();
   if (!text || busy) return;
+  stopListening();
   openSheet();
   busy = true;
   agentState('thinking');
@@ -127,6 +129,7 @@ function openSheet() {
   $('sheet').hidden = false;
   if (!$('msgs').children.length) bubble('您说，我听着。想办的事、想问的事都行。', 'bot');
   warmNeuralVoice();
+  voiceInput.warm();
 }
 function closeSheet() {
   $('sheet').hidden = true;
@@ -135,47 +138,20 @@ function closeSheet() {
 }
 
 // ---------------------------------------------------------------- 听写
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognizer = null;
-function stopListening() {
-  if (!busy) agentState('idle');
-  document.body.dataset.listening = 'off';
-  if (recognizer) { try { recognizer.stop(); } catch (_) { /* 已停 */ } recognizer = null; }
-}
-function listen() {
-  openSheet();
-  if (!Recognition) {
-    $('hint').textContent = '这台设备听不了说话，请在下面打字';
-    $('say').focus();
-    return;
+const voiceInput = createVoiceInput({role: ROLE,
+  onHint: text => { $('hint').textContent=text; $('hint').setAttribute('role','status'); },
+  onText: text => { $('say').value=text; $('say').dispatchEvent(new Event('input',{bubbles:true})); },
+  onState: state => {
+    const listening=state==='listening'; document.body.dataset.listening=listening?'on':'off';
+    $('talkBtn').setAttribute('aria-label',listening?'松开转文字':'按住说话，松开转文字');
+    $('talkBtn').setAttribute('aria-pressed',String(listening));
+    $('talkBtn').disabled=state==='processing';
+    $('talkFab').disabled=state==='processing';
+    agentState(listening?'listening':state==='processing'?'thinking':'idle');
   }
-  if (recognizer) { stopListening(); return; }
-  if (stopSpeaking) stopSpeaking();
-  warmNeuralVoice();
-  recognizer = new Recognition();
-  recognizer.lang = 'zh-CN';
-  recognizer.interimResults = true;
-  recognizer.maxAlternatives = 1;
-  document.body.dataset.listening = 'on';
-  agentState('listening');
-  $('hint').textContent = '我在听，您说完停一下就好';
-  let finalText = '';
-  recognizer.onresult = ev => {
-    let live = '';
-    for (const r of ev.results) { if (r.isFinal) finalText = r[0].transcript; else live += r[0].transcript; }
-    $('hint').textContent = finalText || live || '我在听';
-  };
-  recognizer.onerror = ev => {
-    $('hint').textContent = ev.error === 'not-allowed' ? '没拿到话筒的许可，请在下面打字' : '没听清，您再按一下说';
-  };
-  recognizer.onend = () => {
-    document.body.dataset.listening = 'off';
-    recognizer = null;
-    if (!finalText && !busy) agentState('idle');
-    if (finalText) ask(finalText);
-  };
-  try { recognizer.start(); } catch (_) { stopListening(); }
-}
+});
+function stopListening(){voiceInput.cancel();}
+function prepareListening(){openSheet();if(stopSpeaking)stopSpeaking();}
 
 // ---------------------------------------------------------------- 页面数据
 function row({when, what, sub, pill, tone}) {
@@ -325,8 +301,8 @@ function wire() {
   rebuildDots = carousel(document.querySelector('.a4-banner')) || (() => {});
   document.querySelectorAll('[data-say]').forEach(b => b.addEventListener('click', () => ask(b.dataset.say)));
   document.querySelectorAll('[data-open-chat]').forEach(b => b.addEventListener('click', () => { openSheet(); $('say').focus(); }));
-  $('talkFab').addEventListener('click', listen);
-  $('talkBtn').addEventListener('click', listen);
+  bindHoldToTalk($('talkFab'),voiceInput,prepareListening);
+  bindHoldToTalk($('talkBtn'),voiceInput,prepareListening);
   $('sheetClose').addEventListener('click', closeSheet);
   $('compose').addEventListener('submit', ev => {
     ev.preventDefault();
@@ -340,8 +316,9 @@ function wire() {
 }
 
 wire();
+voiceInput.warm();
 window.addEventListener('app4:pet-chat', event => {
-  if (event.detail?.voice) listen();
+  if (event.detail?.voice) {openSheet();$('hint').textContent='按住话筒说话，松开转成文字。';}
   else { openSheet(); $('say').focus(); }
 });
 refresh().then(inbox => { if (inbox) seen = new Set(inbox.items.map(n => n.id)); })

@@ -64,7 +64,7 @@ export function createPetHub(pet, family) {
     release();activeFeature=key;title.textContent=spec[0];
     const loading=document.createElement('p');loading.className='pet-hub-loading';loading.setAttribute('role','status');loading.textContent='小优正在打开…';
     const frame=document.createElement('iframe');frame.title=spec[0];frame.allow='microphone';frame.setAttribute('aria-busy','true');frame.inert=true;
-    frame.src=key==='trust'?'/static/app4/trust-workspace.html?pet=1':`/static/app4/${family?'family':'elder'}-workspace.html?view=${key}&pet=1#${spec[1]}`;
+    frame.src=key==='reminders'?`/static/app4/reminders-workspace.html?role=${family?'family':'elder'}&pet=1`:key==='trust'?'/static/app4/trust-workspace.html?pet=1':`/static/app4/${family?'family':'elder'}-workspace.html?view=${key}&pet=1#${spec[1]}`;
     body.append(loading,frame);timer=setTimeout(()=>loading.textContent='打开较慢，可以返回小优再试。',12000);
   }
   window.addEventListener('message',e=>{

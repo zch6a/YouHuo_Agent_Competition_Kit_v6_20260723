@@ -3,7 +3,7 @@ const elder = document.body.classList.contains('a4-elder');
 const mode = elder ? 'elder' : 'family';
 export const features = elder ? {
   habits: ['字号与语速', 'me'], privacy: ['我的资料与记忆', 'me'],
-  history: ['办事记录与详情', 'log'], reminders: ['提醒与待确认', 'home'],
+  history: ['办事记录与详情', 'log'], reminders: ['提醒与记忆', 'home'],
   assistant: ['办事与陪伴', 'home'],
 } : {
   reminders: ['提醒与记忆', 'todo'], history: ['办事记录', 'mine'],
@@ -84,7 +84,7 @@ function openFeature(key, trigger) {
   const frame = document.createElement('iframe');
   frame.title = feature[0]; frame.allow = 'microphone';
   frame.setAttribute('aria-busy', 'true');
-  frame.src = key === 'trust' ? '/static/app4/trust-workspace.html' : `/static/app4/${mode}-workspace.html?view=${key}#${feature[1]}`;
+  frame.src = key === 'reminders' ? `/static/app4/reminders-workspace.html?role=${mode}` : key === 'trust' ? '/static/app4/trust-workspace.html' : `/static/app4/${mode}-workspace.html?view=${key}#${feature[1]}`;
   content.replaceChildren(frame); back.focus();
   clearTimeout(timer);
   timer = setTimeout(() => { loading.textContent = '打开较慢，可以返回后再试。'; }, 12000);

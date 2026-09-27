@@ -2329,6 +2329,34 @@ def build_app_router(db, engine, v4_store=None, *, demo_mode: bool = True, voice
     # 要办事仍然得再走一次 `/v2/chat` 和它后面的确认。把识别和动作合成一步，
     # 等于让一次误识别直接变成一笔交易。
 
+    from .web_asr import WebEars
+    web_ears = WebEars()
+
+    def _web_voice_actor(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
+        if credentials is None or credentials.scheme.casefold() != "bearer":
+            raise HTTPException(status_code=401, detail="请刷新页面后再试。")
+        return _actor(credentials)
+
+    @router.get("/listen/web/status")
+    def web_listen_status(ctx: AuthContext = Depends(_web_voice_actor)):
+        return web_ears.status()
+
+    @router.post("/listen/web")
+    async def web_listen(request: Request, ctx: AuthContext = Depends(_web_voice_actor)) -> AppListenResult:
+        from starlette.concurrency import run_in_threadpool
+        limit = 16000 * 2 * 20 + 44
+        chunks = bytearray()
+        async for chunk in request.stream():
+            if len(chunks) + len(chunk) > limit:
+                raise HTTPException(status_code=413, detail="一次最多说20秒。")
+            chunks.extend(chunk)
+        try:
+            return await run_in_threadpool(web_ears.transcribe, bytes(chunks))
+        except (UnsupportedAudio, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
     @router.get("/listen/status")
     def listen_status(ctx: AuthContext = Depends(_actor)) -> AppListenStatus:
         """这台服务能不能听。板子开采之前先问这个。"""

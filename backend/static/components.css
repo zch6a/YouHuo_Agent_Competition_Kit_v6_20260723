@@ -1411,3 +1411,6 @@ button.log-item:focus-visible {
   /* 「今天没有要办的事。」压在 --surface-2 #211f1c 上：3.03 -> 9.89:1 */
   body .today-line { color: var(--ink-2); }
 }
+
+/* Decorative rings must not intercept press-and-hold microphone gestures. */
+.mic-dial::before,.mic-dial::after{pointer-events:none}

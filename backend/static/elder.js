@@ -1,3 +1,4 @@
+import {createVoiceInput, bindHoldToTalk} from './app4/voice-input4.js';
 import {
   configureNeuralVoice, pickVoice, probeNeuralVoice, resetVoiceCache, speakClauses, warmNeuralVoice,
 } from '/static/speech.js';
@@ -1822,6 +1823,7 @@ document.querySelector('#saveProfile').addEventListener('click', () => {
  *               真的从单子上下去了——「说办好了」和「办好了」是两件事。
  */
 async function loadMemories(notice) {
+  if(document.documentElement.classList.contains('app4-embedded')){location.href='/static/app4/reminders-workspace.html?role=elder&tab=memory'+(new URLSearchParams(location.search).get('pet')==='1'?'&pet=1':'');return;}
   const host = document.querySelector('#memoriesBody');
   if (!host) return;
   try {
@@ -1954,111 +1956,20 @@ function startForget(item) {
 fontScaleEl.addEventListener('change', () => applyProfile({...interactionProfile, font_scale: Number(fontScaleEl.value)}));
 speechRateEl.addEventListener('change', () => { interactionProfile.speech_rate = Number(speechRateEl.value); });
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SR) {
-  const rec = new SR();
-  rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 3;
-  rec.onstart = () => {
-    setActivity('listening');
-    setStatus('正在听，请慢慢说。一次只说一件事也可以。');
-  };
-  // 语音这条也没有按钮，同回车：忙落在 `#send` 上。
-  rec.onresult = e => {
-    input.value = e.results[0][0].transcript;
-    window.YouHuo.once(sendBtn, () => send());
-  };
-  rec.onend = () => {
-    // 只有还停在 listening 才回 idle：onresult 已经把状态推到 processing 了，
-    // 这里再写一次 idle 会把"让我想一想"抹掉一瞬间。
-    if (document.body.dataset.activity === 'listening') setActivity('idle');
-  };
-  //: Web Speech 的错误枚举是英文标识符，不能直接给老人看，尤其不能配一句
-  //: "请再说一遍"——权限被拒时再说一百遍也不会成功，而页面从不告诉她要去哪里开。
-  //: 这一页为了不让引擎标识符出现在老人眼前，已经写了四张这样的表。
-  const RECOGNITION_TROUBLE = {
-    'not-allowed': '我没有拿到麦克风的许可。您可以在下面打字，或者让家人帮您在手机设置里打开麦克风权限。',
-    'service-not-allowed': '这台手机暂时不让我用语音。您可以在下面打字。',
-    'audio-capture': '我找不到麦克风。您可以在下面打字。',
-    'no-speech': '我没有听到声音。请离手机近一点，再按一下慢慢说。',
-    'network': '网络不太好，语音没送出去。您可以在下面打字，或者等一会儿再试。',
-    'aborted': '刚才那次听被打断了。您可以再按一下。',
-  };
-
-  rec.onerror = e => {
-    recentRetries += 1;
-    // 此前这里写 idle——听失败和"可以开始了"在屏幕上长得一模一样。
-    setActivity(e.error === 'network' && !navigator.onLine ? 'offline' : 'error');
-    // 上面那六句话，此前**一句都不会出现在屏幕上**。
-    //
-    // `setStatus` 写的是 `#status`，而 `#status` 在 `.elder-focus` 里面，而
-    // `pages.css:304` 是 `.elder-focus { display: none }`。进 Focus Mode 的唯一入口
-    // 在 `send()` 里——语音失败时 `send()` 从来没被调用过（`onresult` 才调它）。
-    // 所以真实经过是：她按下麦克风，系统弹权限框，她点了"不允许"，然后**屏幕上
-    // 什么都没变**。那句唯一能告诉她「去手机设置里打开麦克风权限」的话，
-    // 被写进了一个 display:none 的元素里。`input.focus()` 同理——`#text` 也在里面，
-    // 对一个不显示的输入框调 focus() 什么都不会发生。
-    //
-    // 这是 A-01 的同一个缺陷第二次出现，而 A-01 修的是成功路径。失败路径更要紧：
-    // 顺利的时候她不需要提示，卡住的时候才需要。
-    //
-    // Focus Mode 恰好满足这六句话的全部前提：`#status` 显形（她读得到），composer
-    // 显形（「在下面打字」这句话从此为真，`input.focus()` 也真的落到输入框上），
-    // 而麦克风**不在**被 Focus Mode 藏起来的那一组里（`pages.css:310-314` 藏的是
-    // roleHeader / todayLine / nextItem / today-block / elder-tabs），所以
-    // 「再按一下慢慢说」也仍然可做。`#focusBack` 给她回去的路。
-    setFocus(true);
-    setStatus(RECOGNITION_TROUBLE[e.error]
-      || '语音没能用起来。您可以在下面打字，我一样能办。');
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed'
-        || e.error === 'audio-capture') input.focus();
-  };
-
-  mic.addEventListener('click', () => {
-    // 正在听的时候再按一下，按规范 `start()` 会抛 InvalidStateError——而老人重复按
-    // 恰恰是最常见的操作。此前这个未捕获异常让屏幕上什么都不变：状态行不动、
-    // 呼吸圈不动，她得不到"第二下没用"的任何反馈。
-    if (document.body.dataset.activity === 'listening') {
-      setActivity('listening', '我正在听，您说吧');
-      return;
-    }
-    setActivity('pressed');
-    // 她开口要说几秒：趁这几秒让服务器把念话那条连接开好，回答出来第一句不用再等握手。
-    warmNeuralVoice();
-    // 说话和听必须互斥。
-    //
-    // 此前 agent 还在念的时候按麦克风，`rec.start()` 会成功——识别器于是把手机
-    // 扬声器里 agent 自己的 TTS 转写下来，再当成老人这一轮发出去。`speak()` 里没有
-    // 任何东西停 `rec`，`rec.onstart` 里也没有调 `stopSpeaking`。
-    if (stopSpeaking) stopSpeaking();   // 开屏问候还没说、她就按了，这里会是 null。
-    try {
-      rec.start();
-    } catch (_) {
-      // 状态机和引擎不同步（上一次 onend 还没到）。不抛给用户，让她再按一次。
-      setActivity('idle', '再按一下试试');
-    }
-  });
-} else {
-  // 听不了语音的时候，**一进来就说**，而不是等她按了麦克风才说。
-  //
-  // 原先只在点击时写这句，空闲态的提示仍是「按一下，然后慢慢说」——在安卓模拟器上实测：
-  // 她照着按，才被告知「这个浏览器不支持语音」。而在 App 里（`data-shell="app"`，
-  // 见 app-bridge.js）说「浏览器」不对，那是一个 App。所以把**空闲态本身**改掉：
-  // 之后每一次回到空闲（说完一句、办完一件），提示都还是这一句，不会被刷回去。
-  const inApp = document.documentElement.dataset.shell === 'app';
-  const noEars = inApp ? '这台手机听不了语音，请点下面打字' : '这个浏览器听不了语音，请点下面打字';
-  ACTIVITY.idle.hint = noEars;
-  ACTIVITY.idle.label = inApp ? '这台手机听不了语音，请用下面的打字' : '这个浏览器听不了语音，请用下面的打字';
-  if (!document.body.dataset.activity || document.body.dataset.activity === 'idle') setActivity('idle');
-  mic.addEventListener('click', () => {
-    setMicHint(noEars);
-    // 按了麦克风就是想说话：直接带她去能打字的地方。`/elder2` 的输入框在对话那一屏里，
-    // 首页上看不见，光 `focus()` 什么也不会发生——走「用打字说」同一条路进去。
-    const typeInstead = document.querySelector('#typeInstead');
-    if (typeInstead) typeInstead.click();
-    else input.focus();
-  });
-  mic.title = ACTIVITY.idle.label;
-}
+const voiceInput = createVoiceInput({role: 'elder',
+  onText(text) { input.value=text; input.dispatchEvent(new Event('input',{bubbles:true})); },
+  onHint(text) { setFocus(true); setStatus(text); setMicHint(text); },
+  onState(state) {
+    mic.disabled=state==='processing';
+    if(state==='listening') setActivity('listening');
+    else if(state==='preparing') setActivity('pressed');
+    else if(state==='processing') setActivity('processing');
+    else setActivity('idle');
+  }
+});
+bindHoldToTalk(mic,voiceInput,()=>{setFocus(true);if(stopSpeaking)stopSpeaking();});
+const focusMic=document.getElementById('focusMic');
+if(focusMic)bindHoldToTalk(focusMic,voiceInput,()=>{if(stopSpeaking)stopSpeaking();});
 
 /* 装饰环把麦克风整个盖住了——把落在环上的点击交回给它。
    ..........................................................................

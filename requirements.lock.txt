@@ -30,3 +30,8 @@ uvloop==0.22.1; platform_system != "Windows"
 watchfiles==1.2.0
 websocket-client==1.9.0
 websockets==16.0
+
+# Browser recording recognizer. Small quantized Chinese model loads on demand.
+sherpa-onnx==1.12.40
+sherpa-onnx-core==1.12.40
+numpy==2.3.5
